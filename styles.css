@@ -425,6 +425,76 @@ input[type="range"] {
   font-weight: 800;
 }
 
+.unit-bioreactor .unit-icon {
+  border-radius: 50%;
+}
+
+.unit-filtration .unit-icon,
+.unit-viral-safety .unit-icon,
+.unit-separation .unit-icon,
+.unit-concentration .unit-icon {
+  border-radius: 3px;
+  clip-path: polygon(12% 0, 88% 0, 100% 50%, 88% 100%, 12% 100%, 0 50%);
+}
+
+.unit-purification .unit-icon {
+  border-radius: 50% 50% 8px 8px;
+}
+
+.unit-thermal .unit-icon {
+  border-radius: 8px;
+  transform: skewX(-8deg);
+}
+
+.unit-sterilization .unit-icon,
+.unit-utilities .unit-icon,
+.unit-containment .unit-icon {
+  border-radius: 6px;
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: -6px;
+}
+
+.unit-recovery .unit-icon,
+.unit-finishing .unit-icon,
+.unit-packaging .unit-icon {
+  border-radius: 8px 8px 2px 2px;
+}
+
+.unit-quality .unit-icon {
+  border-radius: 50%;
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: -8px;
+}
+
+.unit-preparation {
+  border-top: 3px solid #277da1;
+}
+
+.unit-bioreactor {
+  border-top: 3px solid #11847d;
+}
+
+.unit-purification,
+.unit-viral-safety {
+  border-top: 3px solid #6d597a;
+}
+
+.unit-filtration,
+.unit-separation,
+.unit-solid-liquid {
+  border-top: 3px solid #90be6d;
+}
+
+.unit-thermal,
+.unit-recovery {
+  border-top: 3px solid #bc6c25;
+}
+
+.unit-quality,
+.unit-containment {
+  border-top: 3px solid #8a6f3d;
+}
+
 .unit h3,
 .unit p {
   margin: 0;
