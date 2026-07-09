@@ -109,6 +109,13 @@ button {
   text-transform: uppercase;
 }
 
+.hint {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .template-list,
 .palette {
   display: grid;
@@ -194,6 +201,16 @@ input[type="range"] {
   min-height: 58px;
   padding: 8px;
   text-align: left;
+}
+
+.palette-item:hover,
+.template-button:hover,
+.icon-button:hover,
+.text-button:hover,
+.tool:hover,
+.tab:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 8px 18px rgba(29, 48, 64, 0.08);
 }
 
 .palette-item span {

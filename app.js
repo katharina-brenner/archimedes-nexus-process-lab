@@ -369,7 +369,7 @@ function renderScaleList() {
 
 function renderPalette() {
   els.palette.innerHTML = palette.map((item) => `
-    <button class="palette-item" draggable="true" data-type="${item.type}">
+    <button class="palette-item" draggable="true" data-type="${item.type}" title="Add ${item.label}">
       <span style="background:${item.color}">${item.icon}</span>
       <strong>${item.label}</strong>
       <small>${item.cls}</small>
@@ -526,6 +526,50 @@ function addUnitFromPalette(type, x, y) {
   showToast(`${base.label} added`);
 }
 
+function nextCanvasPosition() {
+  const rightMost = state.units.reduce((max, item) => Math.max(max, item.x), 40);
+  const row = Math.floor(state.units.length / 4);
+  return {
+    x: Math.min(rightMost + 255, 45 + (state.units.length % 4) * 255),
+    y: 85 + row * 190,
+  };
+}
+
+function selectedUnit() {
+  return state.units.find((item) => item.id === state.selectedId);
+}
+
+function duplicateSelectedUnit() {
+  const current = selectedUnit();
+  if (!current) {
+    showToast("Select a unit to copy");
+    return;
+  }
+  const copy = clone(current);
+  copy.id = `${copy.icon}-${state.nextUnit++}`;
+  copy.x += 46;
+  copy.y += 46;
+  copy.status = "Ready";
+  state.units.push(copy);
+  state.selectedId = copy.id;
+  renderAll();
+  showToast(`${current.id} copied to ${copy.id}`);
+}
+
+function connectFromSelectedUnit() {
+  const current = selectedUnit();
+  if (!current) {
+    showToast("Select a unit first");
+    return;
+  }
+  state.mode = "connect";
+  state.connectFrom = current.id;
+  document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === "connect"));
+  els.modeHint.textContent = `Now click the destination unit for ${current.id}.`;
+  renderCanvas();
+  showToast(`Connecting from ${current.id}`);
+}
+
 function renderTables() {
   els.equipmentTable.innerHTML = state.units.map((item) => `
     <tr>
@@ -607,6 +651,7 @@ function renderInspector() {
         <dt>Estimated size</dt><dd>${unitSize(selectedUnit)}</dd>
         <dt>Estimated power</dt><dd>${unitPower(selectedUnit)}</dd>
       </dl>
+      <button id="connectFromUnit" class="text-button full">Connect from this unit</button>
       <button id="duplicateUnit" class="text-button full">Duplicate</button>
       <button id="deleteUnit" class="danger-button full">Delete unit</button>
     `;
@@ -626,14 +671,9 @@ function renderInspector() {
       renderCanvas();
       renderTables();
     });
+    document.querySelector("#connectFromUnit").addEventListener("click", connectFromSelectedUnit);
     document.querySelector("#duplicateUnit").addEventListener("click", () => {
-      const copy = clone(selectedUnit);
-      copy.id = `${copy.icon}-${state.nextUnit++}`;
-      copy.x += 40;
-      copy.y += 40;
-      state.units.push(copy);
-      state.selectedId = copy.id;
-      renderAll();
+      duplicateSelectedUnit();
     });
     document.querySelector("#deleteUnit").addEventListener("click", () => {
       state.units = state.units.filter((item) => item.id !== selectedUnit.id);
@@ -683,7 +723,7 @@ function setMode(mode) {
   state.connectFrom = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === mode));
   const hints = {
-    select: "Drag units from the library or move units on the canvas.",
+    select: "Click a library item to add it. Drag units on the canvas to move them.",
     connect: "Click a source unit, then a destination unit to create a stream.",
     inspect: "Click units or streams to inspect assumptions and equations.",
   };
@@ -769,6 +809,13 @@ function bindEvents() {
     event.dataTransfer.effectAllowed = "copy";
   });
 
+  els.palette.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-type]");
+    if (!item) return;
+    const position = nextCanvasPosition();
+    addUnitFromPalette(item.dataset.type, position.x, position.y);
+  });
+
   els.canvas.addEventListener("dragover", (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
@@ -807,6 +854,8 @@ function bindEvents() {
   els.equationSearch.addEventListener("input", renderEquations);
   els.equationFilter.addEventListener("change", renderEquations);
   document.querySelector("#autoLayout").addEventListener("click", autoLayout);
+  document.querySelector("#copySelected").addEventListener("click", duplicateSelectedUnit);
+  document.querySelector("#connectSelected").addEventListener("click", connectFromSelectedUnit);
   document.querySelector("#exportJson").addEventListener("click", exportJson);
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 }

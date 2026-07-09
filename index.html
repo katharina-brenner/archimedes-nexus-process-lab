@@ -53,6 +53,7 @@
 
         <section class="control-group">
           <h2>Unit Operations</h2>
+          <p class="hint">Click an item to add it, or drag it onto the canvas.</p>
           <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
         </section>
       </aside>
@@ -72,6 +73,8 @@
           </nav>
           <div class="actions">
             <button id="autoLayout" class="icon-button" title="Auto layout" aria-label="Auto layout">L</button>
+            <button id="copySelected" class="icon-button" title="Copy selected unit" aria-label="Copy selected unit">C</button>
+            <button id="connectSelected" class="icon-button" title="Connect from selected unit" aria-label="Connect from selected unit">&gt;</button>
             <button id="exportJson" class="icon-button" title="Export JSON" aria-label="Export JSON">E</button>
             <button id="resetScenario" class="text-button">Reset</button>
           </div>
@@ -106,7 +109,7 @@
               <button class="tool active" data-mode="select">Select</button>
               <button class="tool" data-mode="connect">Connect</button>
               <button class="tool" data-mode="inspect">Inspect</button>
-              <span id="modeHint">Drag units from the library or move units on the canvas.</span>
+              <span id="modeHint">Click a library item to add it. Select equipment, copy it, or connect it to the next unit.</span>
             </div>
             <div id="flowsheetCanvas" class="flowsheet-canvas" aria-label="Drag and drop process canvas"></div>
           </div>
