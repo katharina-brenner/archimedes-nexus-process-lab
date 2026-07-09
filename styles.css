@@ -243,7 +243,7 @@ input[type="range"] {
   gap: 14px;
   min-width: 0;
   height: 100vh;
-  overflow: hidden;
+  overflow: auto;
   padding: 18px;
 }
 
@@ -264,6 +264,7 @@ input[type="range"] {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .tab,
@@ -341,6 +342,7 @@ input[type="range"] {
 .inspector,
 .data-view,
 .equations-view,
+.standards-view,
 .economics-view {
   min-height: 0;
   border: 1px solid var(--line);
@@ -371,11 +373,19 @@ input[type="range"] {
 .flowsheet-canvas {
   position: relative;
   overflow: auto;
+  min-height: 0;
   background:
     linear-gradient(var(--surface-2) 1px, transparent 1px),
     linear-gradient(90deg, var(--surface-2) 1px, transparent 1px),
     #fff;
   background-size: 32px 32px;
+}
+
+.canvas-stage {
+  position: relative;
+  min-width: var(--stage-width);
+  min-height: var(--stage-height);
+  transform-origin: top left;
 }
 
 .unit {
@@ -562,6 +572,11 @@ th {
   overflow: hidden;
 }
 
+.standards-view.active {
+  display: block;
+  overflow: auto;
+}
+
 .equation-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;
@@ -577,6 +592,47 @@ th {
   gap: 12px;
   overflow: auto;
   padding: 12px;
+}
+
+.standards-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+.standard-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 150px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.standard-card span {
+  color: var(--steel);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.standard-card h3,
+.standard-card p {
+  margin: 0;
+}
+
+.standard-card h3 {
+  font-size: 15px;
+}
+
+.standard-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .equation-card {

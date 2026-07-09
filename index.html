@@ -69,10 +69,15 @@
             <button class="tab" data-view="equipment">Equipment</button>
             <button class="tab" data-view="streams">Streams</button>
             <button class="tab" data-view="equations">Equations</button>
+            <button class="tab" data-view="standards">Standards</button>
             <button class="tab" data-view="economics">Economics</button>
           </nav>
           <div class="actions">
             <button id="autoLayout" class="icon-button" title="Auto layout" aria-label="Auto layout">L</button>
+            <button id="fitCanvas" class="icon-button" title="Fit full process" aria-label="Fit full process">F</button>
+            <button id="zoomOut" class="icon-button" title="Zoom out" aria-label="Zoom out">-</button>
+            <button id="zoomReset" class="icon-button" title="Reset zoom" aria-label="Reset zoom">1</button>
+            <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
             <button id="copySelected" class="icon-button" title="Copy selected unit" aria-label="Copy selected unit">C</button>
             <button id="connectSelected" class="icon-button" title="Connect from selected unit" aria-label="Connect from selected unit">&gt;</button>
             <button id="exportJson" class="icon-button" title="Export JSON" aria-label="Export JSON">E</button>
@@ -109,7 +114,7 @@
               <button class="tool active" data-mode="select">Select</button>
               <button class="tool" data-mode="connect">Connect</button>
               <button class="tool" data-mode="inspect">Inspect</button>
-              <span id="modeHint">Click a library item to add it. Select equipment, copy it, or connect it to the next unit.</span>
+              <span id="modeHint">Click a library item to add it. Use Fit or zoom controls to see the full process.</span>
             </div>
             <div id="flowsheetCanvas" class="flowsheet-canvas" aria-label="Drag and drop process canvas"></div>
           </div>
@@ -125,7 +130,7 @@
         <section id="equipmentView" class="view data-view">
           <table>
             <thead>
-              <tr><th>Tag</th><th>Operation</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Status</th></tr>
+              <tr><th>Tag</th><th>Operation</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Status</th></tr>
             </thead>
             <tbody id="equipmentTable"></tbody>
           </table>
@@ -154,6 +159,10 @@
             </select>
           </div>
           <div id="equationList" class="equation-list"></div>
+        </section>
+
+        <section id="standardsView" class="view standards-view">
+          <div id="standardsList" class="standards-list"></div>
         </section>
 
         <section id="economicsView" class="view economics-view">
