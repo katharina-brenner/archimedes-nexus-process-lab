@@ -826,6 +826,14 @@ input[type="range"] {
   border-top: 3px solid #2f80ed;
 }
 
+.unit-environmental {
+  border-top: 3px solid #277da1;
+}
+
+.unit-air-pollution {
+  border-top: 3px solid #bc6c25;
+}
+
 .unit h3,
 .unit p {
   margin: 0;
