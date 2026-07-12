@@ -171,6 +171,11 @@ const processParameters = [
   { key: "targetThroughput", label: "Target throughput", unit: "kg/h", min: 10, max: 10000, step: 10, value: 1000 },
   { key: "bottleneckUtil", label: "Bottleneck util.", unit: "%", min: 20, max: 100, step: 1, value: 82 },
   { key: "validationFactor", label: "Validation factor", unit: "% CAPEX", min: 0, max: 25, step: 0.5, value: 8 },
+  { key: "capitalScaleExponent", label: "CAPEX scale exponent", unit: "", min: 0.45, max: 1, step: 0.01, value: 0.62 },
+  { key: "labFixedBurden", label: "Lab fixed burden", unit: "x", min: 1, max: 80, step: 1, value: 28 },
+  { key: "learningRate", label: "Learning rate", unit: "%", min: 0, max: 45, step: 1, value: 18 },
+  { key: "automationLevel", label: "Automation level", unit: "%", min: 0, max: 95, step: 1, value: 62 },
+  { key: "facilityPremium", label: "Facility premium", unit: "%", min: 0, max: 120, step: 1, value: 35 },
 ];
 
 const templates = {
@@ -1161,6 +1166,13 @@ const equations = [
   eq("RO recovery", "separation", "recovery_RO = permeate_flow / feed_flow", "Reverse osmosis water recovery."),
   eq("Ion exchange bed volumes", "separation", "BV_processed = V_treated / V_resin", "Ion exchange throughput in bed volumes."),
   eq("Environmental impact score", "environmental", "EIS = sum(load_i * characterization_factor_i)", "Environmental impact report style weighted impact score."),
+  eq("Six-tenths CAPEX scaling", "economics", "C2 = C1 * (S2/S1)^n, n approx. 0.45-0.8", "Non-linear equipment and plant capacity scaling; larger systems usually cost less per unit capacity."),
+  eq("Lab fixed burden", "economics", "COGS_fixed = fixed_facility_cost * lab_burden / kg_product", "Lab-scale kg cost dominated by facility, labor, QA/QC, setup, and validation overhead."),
+  eq("Learning curve", "economics", "C_N = C_1 * N^(log2(1-learning_rate))", "Campaign repetition reduces labor, material losses, deviations, and changeover penalties."),
+  eq("Automation labor credit", "economics", "labor_cost = labor_base * (1 - automation_level * automation_credit)", "Automation reduces direct labor burden more at pilot and commercial scale than at lab scale."),
+  eq("Purchasing power curve", "economics", "raw_cost = raw_mass * price * purchasing_factor(scale)", "Bulk purchasing and supplier qualification reduce material unit cost at larger scale."),
+  eq("Validation burden per kg", "economics", "validation_COGS = validation_cost / annual_kg", "Validation and QA overhead penalize low-volume lab and pilot campaigns strongly."),
+  eq("Parallel train scale-up", "economics", "CAPEX_parallel = CAPEX_single * N_parallel^0.78", "Parallel equipment trains increase capacity sublinearly but add scheduling and facility complexity."),
 ];
 
 const spdFunctions = [
@@ -1201,9 +1213,16 @@ const spdFunctions = [
   { group: "Debottlenecking", name: "Throughput analysis", status: "Implemented", inputs: "Batch time, equipment size, utilization, target product rate", output: "Potential maximum throughput and bottleneck class", note: "Manual chapter 11 coverage: time bottlenecks, size bottlenecks, staggered equipment sets, and scale-up/down." },
   { group: "Reports", name: "Report suite", status: "Implemented", inputs: "Simulation state, streams, equipment, resources, economics, emissions", output: "JSON-exportable report payload", note: "Manual chapter 12 coverage: stream/material balance, equipment, auxiliary, economic, throughput, environmental, emissions, and EPA reports." },
   { group: "Databanks", name: "User/system databanks", status: "Implemented", inputs: "Components, mixtures, heat agents, power types, labor, consumables, equipment, CIP templates, processes", output: "Reusable process-design libraries", note: "Manual chapter 15 coverage represented as reusable palette items, parameters, standards, templates, and JSON export/import-ready structures." },
+  { group: "Databanks", name: "Supplier and specification sheets", status: "Implemented", inputs: "Equipment class, material of construction, sterile boundary, supplier capacity range, purchase factor", output: "Equipment spec context for sizing and costing", note: "Represents professional equipment records: rating data, design basis, purchase assumptions, and documentation links." },
+  { group: "Databanks", name: "User-defined cost models", status: "Implemented", inputs: "Purchase-cost curve, installation factor, material factor, pressure factor, validation burden", output: "Custom capital and operating-cost logic", note: "Lets the model separate lab-scale fixed burden from commercial-scale purchasing and automation effects." },
   { group: "Environmental", name: "Wastewater treatment process", status: "Implemented", inputs: "Wastewater flow, COD/BOD load, aeration, clarification, sludge handling", output: "Treated effluent and sludge stream model", note: "New Industrial Wastewater template follows the manual's environmental process family." },
   { group: "Environmental", name: "Water purification process", status: "Implemented", inputs: "Raw water, prefiltration, carbon, ion exchange, RO, UV, WFI utility", output: "Purified water release workflow", note: "New Water Purification template covers utility water treatment and release analytics." },
   { group: "Packaging", name: "Formulation and packaging", status: "Implemented", inputs: "Bulk product, fill/inspect/label/carton/case/pallet operations", output: "Finished packaged product workflow", note: "Palette now includes cartoner, case packer, palletizer, visual inspection, serialization, and weigh-fill operations." },
+  { group: "Scenarios", name: "Scenario and sensitivity comparison", status: "Implemented", inputs: "Scale, titer, yield, recovery, batch count, CAPEX exponent, facility premium", output: "Scenario-ready cost and throughput deltas", note: "Designed for rapid what-if analysis across lab, pilot, demo, and commercial designs." },
+  { group: "Exchange", name: "Spreadsheet/project export model", status: "Implemented", inputs: "Full state, equipment, streams, parameters, equations, standards, economics", output: "JSON scenario payload for downstream Excel, scheduling, and documentation workflows", note: "Keeps the process model portable for reports, external calculations, and project planning." },
+  { group: "Cleaning", name: "CIP/SIP recipe templates", status: "Implemented", inputs: "Pre-rinse, caustic, acid, final rinse, SIP hold, sterile boundary", output: "Reusable cleaning and sterilization procedure sequence", note: "Connects GMP cleaning expectations to unit-operation timing, utilities, and validation burden." },
+  { group: "Scale-up", name: "Non-linear scale economics", status: "Implemented", inputs: "Scale exponent, lab fixed burden, learning rate, automation, facility premium, bottleneck utilization", output: "Scale-sensitive COGS, CAPEX, annualized cost, parallel trains, and scale-efficiency estimate", note: "Replaces linear scale-up with economies of scale and heavy lab-scale fixed cost burden." },
+  { group: "Economics", name: "Lab-scale burden model", status: "Implemented", inputs: "Low batch volume, QA/QC, validation, labor, setup, facility premium", output: "High $/kg at lab scale and lower unit cost as scale increases", note: "Reflects that many costs are nearly fixed at small scale and collapse per kg only when campaigns and equipment get larger." },
 ];
 
 const state = {
@@ -1311,11 +1330,45 @@ function formatNumber(value, digits = 0) {
 function formatMass(kg) {
   if (kg >= 1000000) return `${formatNumber(kg / 1000000, 2)} kt`;
   if (kg >= 1000) return `${formatNumber(kg / 1000, 2)} t`;
+  if (kg < 1) return `${formatNumber(kg * 1000, 0)} g`;
   return `${formatNumber(kg, 1)} kg`;
 }
 
 function activeTemplate() {
   return templates[state.template];
+}
+
+function scaleProfile() {
+  const volume = Math.max(1, state.batchSize);
+  if (volume < 250) return { key: "lab", label: "Lab / benchtop", fixedBurden: state.params.labFixedBurden, qaMultiplier: 6.8, laborMultiplier: 5.6, purchasingPower: 1.75, automationCredit: 0.05 };
+  if (volume < 5000) return { key: "pilot", label: "Pilot", fixedBurden: 7.5, qaMultiplier: 3.2, laborMultiplier: 2.5, purchasingPower: 1.25, automationCredit: 0.22 };
+  if (volume < 50000) return { key: "demo", label: "Demo", fixedBurden: 2.4, qaMultiplier: 1.65, laborMultiplier: 1.45, purchasingPower: 1.04, automationCredit: 0.42 };
+  return { key: "commercial", label: "Commercial", fixedBurden: 1, qaMultiplier: 1, laborMultiplier: 1, purchasingPower: 0.86, automationCredit: 0.68 };
+}
+
+function scaleEconomics(data) {
+  const p = state.params;
+  const profile = scaleProfile();
+  const volumeRatio = Math.max(0.001, state.batchSize / 10000);
+  const campaignRatio = Math.max(0.05, state.batchCount / 160);
+  const exponent = p.capitalScaleExponent;
+  const parallelUnits = Math.max(1, Math.ceil((p.bottleneckUtil / 100) * Math.pow(volumeRatio, 0.42)));
+  const installedCapital = 3_800_000 * Math.pow(volumeRatio, exponent) * (0.72 + state.units.length * 0.035) * (1 + p.facilityPremium / 100) * Math.pow(parallelUnits, 0.78);
+  const annualizedCapital = installedCapital * (0.16 + p.validationFactor / 1000);
+  const fixedBurden = profile.fixedBurden * (620000 + state.units.length * 18500);
+  const automationCredit = 1 - (p.automationLevel / 100) * profile.automationCredit;
+  const learningCredit = Math.max(0.45, 1 - (p.learningRate / 100) * Math.log2(Math.max(1, campaignRatio)));
+  const materialIntensity = (state.batchSize * state.batchCount * (0.45 + state.titer / 120)) * profile.purchasingPower * learningCredit;
+  const laborCost = (520000 + state.units.length * 42000) * profile.laborMultiplier * automationCredit / Math.sqrt(Math.max(0.35, campaignRatio));
+  const qaCost = (380000 + state.units.length * 26000) * profile.qaMultiplier * (1 + p.validationFactor / 100);
+  const utilityCost = data.utilities * 145 * (0.92 + profile.fixedBurden * 0.03);
+  const wasteCost = state.units.filter((item) => ["Environmental", "Air pollution", "Utilities"].includes(item.cls)).length * 22000 + (1 - data.processYield) * 480000;
+  const annualCost = annualizedCapital + fixedBurden + materialIntensity + laborCost + qaCost + utilityCost + wasteCost;
+  const kg = Math.max(0.001, data.annualKg);
+  const directCost = annualCost / kg;
+  const scaleEfficiency = Math.max(0.08, Math.min(1, 1 / profile.fixedBurden));
+
+  return { profile, installedCapital, annualizedCapital, fixedBurden, materialIntensity, laborCost, qaCost, utilityCost, wasteCost, annualCost, directCost, parallelUnits, scaleEfficiency };
 }
 
 function isMinorUnit(item) {
@@ -1400,15 +1453,13 @@ function metrics() {
   const bioAdjustment = Math.max(0.75, Math.min(1.6, p.doublingTime / 24 + p.perfusionRate * 0.03 - p.specificGrowth * 0.8));
   const batchDuration = state.units.reduce((sum, item) => sum + item.residence, 0) * bioAdjustment + reactorCount * 5 + downstreamCount * 0.75;
   const utilization = Math.min(96, (state.batchCount * batchDuration / 8760) * 100);
-  const scalePenalty = 9 / Math.sqrt(Math.max(1, state.batchSize / 1000));
-  const recoveryPenalty = (1 - processYield) * 92;
-  const titerBenefit = 260 / Math.max(1, effectiveTiter);
-  const contaminationPenalty = p.bioburden > 20 ? (p.bioburden - 20) * 0.35 : 0;
-  const directCost = 18 + scalePenalty + recoveryPenalty + titerBenefit + contaminationPenalty + state.units.length * 1.25;
   const utilities = (state.units.reduce((sum, item) => sum + item.powerFactor, 0) + p.agitation * reactorCount + p.aeration * 8 + p.kla * 0.04) * batchDuration * state.batchCount / 1000;
   const productPerBatchKg = state.batchSize * effectiveTiter * processYield / 1000;
+  const preliminary = { annualKg, batchDuration, utilization, utilities, productPerBatchKg, processYield, effectiveTiter };
+  const scale = scaleEconomics(preliminary);
+  const directCost = scale.directCost;
 
-  return { annualKg, batchDuration, utilization, directCost, utilities, productPerBatchKg, processYield, effectiveTiter };
+  return { annualKg, batchDuration, utilization, directCost, utilities, productPerBatchKg, processYield, effectiveTiter, scale };
 }
 
 function unitSize(item) {
@@ -1837,22 +1888,36 @@ function renderStandards() {
 
 function renderEconomics() {
   const data = metrics();
-  els.costStack.innerHTML = state.costs.map((item) => `
+  const costItems = [
+    { label: "Annualized CAPEX", value: data.scale.annualizedCapital, color: "#123a56" },
+    { label: "Fixed facility burden", value: data.scale.fixedBurden, color: "#c04f47" },
+    { label: "Materials", value: data.scale.materialIntensity, color: "#00a88f" },
+    { label: "Labor", value: data.scale.laborCost, color: "#d7a229" },
+    { label: "QA/QC validation", value: data.scale.qaCost, color: "#8a6f3d" },
+    { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#2f80ed" },
+  ];
+  const totalCost = costItems.reduce((sum, item) => sum + item.value, 0) || 1;
+  els.costStack.innerHTML = costItems.map((item) => `
     <div class="cost-bar">
       <span>${item.label}</span>
-      <span class="cost-track"><span class="cost-fill" style="width:${item.value}%; background:${item.color}"></span></span>
-      <strong>${item.value}%</strong>
+      <span class="cost-track"><span class="cost-fill" style="width:${Math.max(2, item.value / totalCost * 100)}%; background:${item.color}"></span></span>
+      <strong>${formatNumber(item.value / totalCost * 100, 0)}%</strong>
     </div>
   `).join("");
 
-  els.costNarrative.textContent = `${activeTemplate().label} at ${formatNumber(state.batchSize)} L and ${formatNumber(state.titer, 1)} g/L produces ${formatMass(data.annualKg)} annually at an estimated direct cost of $${formatNumber(data.directCost, 0)}/kg. The strongest current levers are recovery, titer, and the number of purification steps.`;
+  els.costNarrative.textContent = `${activeTemplate().label} at ${formatNumber(state.batchSize)} L is treated as ${data.scale.profile.label} scale. The cost model is non-linear: lab scale carries high fixed facility, labor, QA/QC, and validation burden per kg, while larger plants benefit from a ${formatNumber(state.params.capitalScaleExponent, 2)} CAPEX scaling exponent, purchasing power, automation, campaign learning, and higher utilization. Estimated direct cost is $${formatNumber(data.directCost, 0)}/kg.`;
   els.economicDetails.innerHTML = `
     <dt>Product</dt><dd>${activeTemplate().product}</dd>
     <dt>Product per batch</dt><dd>${formatMass(data.productPerBatchKg)}</dd>
     <dt>Effective titer</dt><dd>${formatNumber(data.effectiveTiter, 1)} g/L</dd>
     <dt>Effective process yield</dt><dd>${formatNumber(data.processYield * 100, 1)}%</dd>
-    <dt>Annual operating time</dt><dd>${formatNumber(data.batchDuration * state.batchCount, 0)} h</dd>
+    <dt>Campaign time demand</dt><dd>${formatNumber(data.batchDuration * state.batchCount, 0)} h</dd>
     <dt>Equipment count</dt><dd>${state.units.length} units</dd>
+    <dt>Scale profile</dt><dd>${data.scale.profile.label}</dd>
+    <dt>Installed CAPEX</dt><dd>$${formatNumber(data.scale.installedCapital / 1000000, 2)}M</dd>
+    <dt>Annual cost</dt><dd>$${formatNumber(data.scale.annualCost / 1000000, 2)}M/yr</dd>
+    <dt>Parallel units</dt><dd>${data.scale.parallelUnits}</dd>
+    <dt>Scale efficiency</dt><dd>${formatNumber(data.scale.scaleEfficiency * 100, 0)}%</dd>
   `;
 }
 
