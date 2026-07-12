@@ -65,7 +65,16 @@ const palette = [
   { type: "solvent-tank", label: "Solvent Tank Farm", isoName: "GMP solvent storage and transfer system", cls: "Hold", icon: "ST", color: "#bc6c25", residence: 8, power: 0.7, standards: ["ATEX/DSEAR", "ICH Q7", "ISO 10628"] },
   { type: "dryer-mill", label: "Mill and Sieve", isoName: "Cone mill and vibratory sieve", cls: "Finishing", icon: "MS", color: "#bc6c25", residence: 1.5, power: 2.2, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
   { type: "weigh-fill", label: "Weigh Fill", isoName: "Bulk weigh fill station", cls: "Packaging", icon: "WF", color: "#3f6173", residence: 1, power: 0.8, standards: ["EU GMP Annex 16", "21 CFR 211"] },
+  { type: "pump", label: "Transfer Pump", isoName: "Hygienic transfer pump", cls: "Piping", icon: "P", color: "#2f80ed", residence: 0.1, power: 1.6, standards: ["ASME BPE", "ISO 10628", "EU GMP Annex 15"] },
+  { type: "valve", label: "Manual Valve", isoName: "Hygienic diaphragm valve", cls: "Piping", icon: "V", color: "#4f6f8f", residence: 0.05, power: 0.02, standards: ["ASME BPE", "ISO 10628"] },
+  { type: "control-valve", label: "Control Valve", isoName: "Automated flow control valve", cls: "Piping", icon: "CV", color: "#2f80ed", residence: 0.05, power: 0.08, standards: ["ASME BPE", "ISA-88", "21 CFR Part 11"] },
+  { type: "flowmeter", label: "Flowmeter", isoName: "Coriolis or magnetic flowmeter", cls: "Instrumentation", icon: "FM", color: "#00a88f", residence: 0.05, power: 0.05, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
+  { type: "sensor", label: "PAT Sensor", isoName: "Inline pH DO conductivity or UV sensor", cls: "Instrumentation", icon: "S", color: "#8a6f3d", residence: 0.05, power: 0.08, standards: ["ICH Q8", "GAMP 5", "21 CFR Part 11"] },
+  { type: "pressure-relief", label: "Pressure Relief", isoName: "Relief valve or rupture disc assembly", cls: "Piping", icon: "PR", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ASME BPE", "PED", "ISO 10628"] },
+  { type: "manifold", label: "Manifold", isoName: "Hygienic transfer manifold", cls: "Piping", icon: "MF", color: "#4f6f8f", residence: 0.1, power: 0.05, standards: ["ASME BPE", "EU GMP Annex 1", "ISO 10628"] },
 ];
+
+const quickAddTypes = ["valve", "control-valve", "pump", "flowmeter", "sensor", "pressure-relief", "manifold", "sampling"];
 
 const standards = [
   { group: "GMP", name: "EU GMP Annex 1", scope: "Sterile medicinal product manufacture, contamination control strategy, aseptic processing, environmental monitoring." },
@@ -935,6 +944,8 @@ const els = {
   templateList: document.querySelector("#templateList"),
   scaleList: document.querySelector("#scaleList"),
   parameterList: document.querySelector("#parameterList"),
+  quickAdd: document.querySelector("#quickAdd"),
+  equationSpotlight: document.querySelector("#equationSpotlight"),
   palette: document.querySelector("#palette"),
   canvas: document.querySelector("#flowsheetCanvas"),
   processEyebrow: document.querySelector("#processEyebrow"),
@@ -1021,6 +1032,42 @@ function activeTemplate() {
   return templates[state.template];
 }
 
+function isMinorUnit(item) {
+  return ["Piping", "Instrumentation"].includes(item.cls);
+}
+
+function streamKind(item, from, to) {
+  const text = `${item.id} ${item.composition} ${item.phase} ${from?.cls || ""} ${to?.cls || ""}`.toLowerCase();
+  if (text.includes("waste") || text.includes("spent") || text.includes("raffinate") || text.includes("bottoms")) return "waste";
+  if (item.phase === "Gas" || ["Utilities", "Piping"].includes(from?.cls) || ["Utilities", "Piping"].includes(to?.cls) || text.includes("cip") || text.includes("steam") || text.includes("solvent")) return "utility";
+  if (["Quality", "Instrumentation"].includes(from?.cls) || ["Quality", "Instrumentation"].includes(to?.cls) || text.includes("sample") || text.includes("report") || text.includes("analytics")) return "qc";
+  return "main";
+}
+
+function streamLabel(kind) {
+  return {
+    main: "Main product flow",
+    utility: "Utility or service flow",
+    waste: "Waste or side stream",
+    qc: "QC, PAT, or data flow",
+  }[kind];
+}
+
+function unitWidth(item) {
+  return isMinorUnit(item) ? 156 : 218;
+}
+
+function unitMidline(item) {
+  return item.y + (isMinorUnit(item) ? 29 : 46);
+}
+
+function relevantEquations() {
+  const selectedUnit = state.units.find((item) => item.id === state.selectedId);
+  const selectedStream = state.streams.find((item) => item.id === state.selectedId);
+  const categories = selectedStream ? ["mass", "energy"] : selectedUnit?.cls === "Bioreactor" ? ["kinetics", "mass", "energy"] : selectedUnit?.cls === "Purification" ? ["separation", "mass"] : selectedUnit?.cls === "Filtration" ? ["separation", "mass"] : selectedUnit?.cls === "Thermal" ? ["energy", "separation"] : ["mass", "separation", "economics"];
+  return equations.filter((item) => categories.includes(item.category)).slice(0, 4);
+}
+
 function loadTemplate(key, preserveScale = false) {
   const template = templates[key];
   state.template = key;
@@ -1080,6 +1127,8 @@ function metrics() {
 
 function unitSize(item) {
   const basis = item.cls === "Bioreactor" ? state.batchSize * 1.25 : state.batchSize * 0.35;
+  if (item.cls === "Piping") return "line item";
+  if (item.cls === "Instrumentation") return "inline point";
   if (item.cls === "Thermal") return `${formatNumber(Math.max(25, state.batchSize * item.powerFactor / 320), 0)} kW duty`;
   if (item.cls === "Filtration") return `${formatNumber(Math.max(2, state.batchSize / 180), 1)} m2`;
   if (item.cls === "Viral safety") return `${formatNumber(Math.max(1.5, state.batchSize / 260), 1)} m2 or hold h`;
@@ -1142,6 +1191,34 @@ function renderPalette() {
   `).join("");
 }
 
+function renderQuickAdd() {
+  els.quickAdd.innerHTML = quickAddTypes.map((type) => {
+    const item = palette.find((candidate) => candidate.type === type);
+    return `
+      <button class="quick-add-button" draggable="true" data-type="${item.type}" title="Add ${item.label}">
+        <span style="background:${item.color}">${item.icon}</span>
+        <b>${item.label}</b>
+      </button>
+    `;
+  }).join("");
+}
+
+function renderEquationSpotlight() {
+  const context = state.streams.find((item) => item.id === state.selectedId) ? "Selected stream equations" : selectedUnit() ? `${selectedUnit().cls} equations` : "Live model equations";
+  els.equationSpotlight.innerHTML = `
+    <strong>${context}</strong>
+    <div>
+      ${relevantEquations().map((item) => `
+        <button class="equation-chip" data-equation-query="${item.name}">
+          <span>${item.category}</span>
+          <b>${item.name}</b>
+          <code>${item.formula}</code>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderParameters() {
   els.parameterList.innerHTML = processParameters.map((item) => {
     const value = state.params[item.key];
@@ -1187,21 +1264,23 @@ function renderCanvas() {
     const to = state.units.find((candidate) => candidate.id === item.to);
     if (!from || !to) return;
     const line = document.createElement("button");
-    const x1 = from.x + 218;
-    const y1 = from.y + 46;
+    const x1 = from.x + unitWidth(from);
+    const y1 = unitMidline(from);
     const x2 = to.x;
-    const y2 = to.y + 46;
+    const y2 = unitMidline(to);
     const length = Math.hypot(x2 - x1, y2 - y1);
     const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-    line.className = "stream-line";
+    const kind = streamKind(item, from, to);
+    line.className = `stream-line stream-${kind}`;
     line.style.left = `${x1}px`;
     line.style.top = `${y1}px`;
     line.style.width = `${length}px`;
     line.style.transform = `rotate(${angle}deg)`;
-    line.title = `${item.id}: ${item.composition}`;
+    line.title = `${item.id}: ${item.composition} · ${streamLabel(kind)}`;
     line.addEventListener("click", () => {
       state.selectedId = item.id;
       renderInspector();
+      renderEquationSpotlight();
       renderCanvas();
     });
     if (state.selectedId === item.id) line.classList.add("selected");
@@ -1211,7 +1290,7 @@ function renderCanvas() {
   state.units.forEach((item) => {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    node.className = `unit unit-${className}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}`;
+    node.className = `unit unit-${className}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}`;
     node.style.left = `${item.x}px`;
     node.style.top = `${item.y}px`;
     node.style.borderLeftColor = item.color;
@@ -1237,6 +1316,7 @@ function wireUnitNode(node, item) {
     }
     state.selectedId = item.id;
     renderInspector();
+    renderEquationSpotlight();
     renderCanvas();
   });
 
@@ -1274,10 +1354,10 @@ function redrawStreamsOnly() {
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
     if (!line || !from || !to) return;
-    const x1 = from.x + 218;
-    const y1 = from.y + 46;
+    const x1 = from.x + unitWidth(from);
+    const y1 = unitMidline(from);
     const x2 = to.x;
-    const y2 = to.y + 46;
+    const y2 = unitMidline(to);
     line.style.left = `${x1}px`;
     line.style.top = `${y1}px`;
     line.style.width = `${Math.hypot(x2 - x1, y2 - y1)}px`;
@@ -1309,6 +1389,16 @@ function addUnitFromPalette(type, x, y) {
   state.selectedId = newUnit.id;
   renderAll();
   showToast(`${base.label} added`);
+}
+
+function addUnitFromButton(type) {
+  const current = selectedUnit();
+  if (current) {
+    addUnitFromPalette(type, current.x + (isMinorUnit(palette.find((item) => item.type === type)) ? 148 : 255), current.y + 34);
+    return;
+  }
+  const position = nextCanvasPosition();
+  addUnitFromPalette(type, position.x, position.y);
 }
 
 function nextCanvasPosition() {
@@ -1524,9 +1614,9 @@ function setMode(mode) {
   state.connectFrom = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === mode));
   const hints = {
-    select: "Click a library item to add it. Drag units on the canvas to move them.",
-    connect: "Click a source unit, then a destination unit to create a stream.",
-    inspect: "Click units or streams to inspect assumptions and equations.",
+    select: "Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.",
+    connect: "Connect mode: click the source unit first, then click the destination unit. Animated streams show direction.",
+    inspect: "Inspect mode: click a unit or stream to see sizing, assumptions, standards, and relevant equations.",
   };
   els.modeHint.textContent = hints[mode];
   renderCanvas();
@@ -1605,6 +1695,8 @@ function renderAll() {
   renderTemplateList();
   renderScaleList();
   renderPalette();
+  renderQuickAdd();
+  renderEquationSpotlight();
   renderParameters();
   renderMetrics();
   renderCanvas();
@@ -1626,11 +1718,16 @@ function bindEvents() {
     if (button) applyScale(button.dataset.scale);
   });
 
-  els.palette.addEventListener("dragstart", (event) => {
-    const item = event.target.closest("[data-type]");
-    if (!item) return;
-    event.dataTransfer.setData("text/plain", item.dataset.type);
-    event.dataTransfer.effectAllowed = "copy";
+  [els.palette, els.quickAdd].forEach((container) => {
+    container.addEventListener("dragstart", (event) => {
+      const item = event.target.closest("[data-type]");
+      if (!item) return;
+      event.dataTransfer.setData("text/plain", item.dataset.type);
+      event.dataTransfer.effectAllowed = "copy";
+      els.canvas.classList.add("drop-ready");
+    });
+
+    container.addEventListener("dragend", () => els.canvas.classList.remove("drop-ready"));
   });
 
   els.palette.addEventListener("click", (event) => {
@@ -1640,13 +1737,33 @@ function bindEvents() {
     addUnitFromPalette(item.dataset.type, position.x, position.y);
   });
 
+  els.quickAdd.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-type]");
+    if (!item) return;
+    addUnitFromButton(item.dataset.type);
+  });
+
+  els.equationSpotlight.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-equation-query]");
+    if (!chip) return;
+    setView("equations");
+    els.equationSearch.value = chip.dataset.equationQuery;
+    renderEquations();
+  });
+
   els.canvas.addEventListener("dragover", (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
+    els.canvas.classList.add("drop-ready");
+  });
+
+  els.canvas.addEventListener("dragleave", (event) => {
+    if (!els.canvas.contains(event.relatedTarget)) els.canvas.classList.remove("drop-ready");
   });
 
   els.canvas.addEventListener("drop", (event) => {
     event.preventDefault();
+    els.canvas.classList.remove("drop-ready");
     const type = event.dataTransfer.getData("text/plain");
     if (!type) return;
     const rect = els.canvas.getBoundingClientRect();

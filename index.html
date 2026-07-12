@@ -116,11 +116,24 @@
         <section id="flowsheetView" class="view active">
           <div class="canvas-frame">
             <div class="canvas-toolbar" aria-label="Canvas tools">
-              <button class="tool active" data-mode="select">Select</button>
-              <button class="tool" data-mode="connect">Connect</button>
-              <button class="tool" data-mode="inspect">Inspect</button>
-              <span id="modeHint">Click a library item to add it. Use Fit or zoom controls to see the full process.</span>
+              <button class="tool active" data-mode="select"><b>Move</b><span>Select, drag, edit</span></button>
+              <button class="tool" data-mode="connect"><b>Connect</b><span>Click source, then target</span></button>
+              <button class="tool" data-mode="inspect"><b>Inspect</b><span>Open assumptions</span></button>
+              <span id="modeHint">Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.</span>
             </div>
+            <div class="canvas-assist">
+              <div>
+                <strong>Quick add</strong>
+                <div id="quickAdd" class="quick-add"></div>
+              </div>
+              <div class="flow-legend" aria-label="Flow legend">
+                <span class="legend-main">Main product</span>
+                <span class="legend-utility">Utility</span>
+                <span class="legend-waste">Waste</span>
+                <span class="legend-qc">QC / data</span>
+              </div>
+            </div>
+            <div id="equationSpotlight" class="equation-spotlight"></div>
             <div id="flowsheetCanvas" class="flowsheet-canvas" aria-label="Drag and drop process canvas"></div>
           </div>
           <aside class="inspector" aria-label="Inspector">
