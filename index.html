@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SuperPro Designer</title>
+    <title>Archimedes Nexus Process Lab</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Project controls">
         <div class="brand">
-          <div class="brand-mark">SP</div>
+          <div class="brand-mark">AN</div>
           <div>
-            <h1>SuperPro Designer</h1>
-            <p>Batch and continuous bioprocess studio</p>
+            <h1>Archimedes Nexus</h1>
+            <p>Process intelligence lab</p>
           </div>
         </div>
 
@@ -49,6 +49,11 @@
             <input id="recovery" type="range" min="20" max="98" step="1" value="72" />
             <b id="recoveryValue">72%</b>
           </label>
+        </section>
+
+        <section class="control-group parameter-panel">
+          <h2>Biochemical Parameters</h2>
+          <div id="parameterList" class="parameter-list"></div>
         </section>
 
         <section class="control-group">

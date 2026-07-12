@@ -41,6 +41,30 @@ const palette = [
   { type: "waste-inactivation", label: "Waste Inactivation", isoName: "Thermal or chemical bio-waste inactivation skid", cls: "Utilities", icon: "WI", color: "#b74d45", residence: 3, power: 6.2, standards: ["EU GMP Part I", "Biosafety guidance", "ISO 14001"] },
   { type: "qc", label: "QC Release Testing", isoName: "Quality control testing hold point", cls: "Quality", icon: "QC", color: "#8a6f3d", residence: 12, power: 0.2, standards: ["ICH Q2", "ICH Q6B", "USP <85>"] },
   { type: "em", label: "Environmental Monitoring", isoName: "Cleanroom environmental monitoring point", cls: "Quality", icon: "EM", color: "#8a6f3d", residence: 0.5, power: 0.1, standards: ["EU GMP Annex 1", "ISO 14644", "USP <1116>"] },
+  { type: "cell-bank", label: "Cell Bank Thaw", isoName: "Master or working cell bank thaw station", cls: "Preparation", icon: "CB", color: "#51606f", residence: 1, power: 0.2, standards: ["ICH Q5D", "EU GMP Part I", "ISO 20387"] },
+  { type: "seed-flask", label: "Shake Flask Seed", isoName: "Incubator shake flask seed culture", cls: "Bioreactor", icon: "SK", color: "#11847d", residence: 24, power: 0.1, standards: ["ICH Q5D", "EU GMP Annex 15"] },
+  { type: "single-use-mixer", label: "Single-Use Mixer", isoName: "Single-use mixing bag with load cells", cls: "Preparation", icon: "SU", color: "#277da1", residence: 1.5, power: 0.3, standards: ["ASME BPE", "ISO 10993", "EU GMP Annex 1"] },
+  { type: "feed-tank", label: "Fed-Batch Feed Tank", isoName: "Sterile feed vessel or single-use feed bag", cls: "Hold", icon: "FT", color: "#5a7d7c", residence: 6, power: 0.3, standards: ["ASME BPE", "EU GMP Annex 15"] },
+  { type: "gas-mixing", label: "Gas Mixing Skid", isoName: "Bioreactor air oxygen carbon dioxide gas blending skid", cls: "Utilities", icon: "GM", color: "#3f6173", residence: 0.2, power: 2.8, standards: ["ASME BPE", "ISA-88", "ISO 8573"] },
+  { type: "compressor", label: "Clean Air Compressor", isoName: "Oil-free compressed air generation and drying package", cls: "Utilities", icon: "CA", color: "#3f6173", residence: 0.2, power: 12, standards: ["ISO 8573", "EU GMP Annex 1", "ISPE Baseline"] },
+  { type: "clean-steam", label: "Clean Steam Generator", isoName: "Clean steam generator for SIP and sterilizers", cls: "Utilities", icon: "CS", color: "#b74d45", residence: 0.5, power: 14, standards: ["ASME BPE", "EN 285", "EU GMP Annex 1"] },
+  { type: "hvac", label: "Cleanroom HVAC", isoName: "GMP HVAC and HEPA air handling unit", cls: "Utilities", icon: "HV", color: "#3f6173", residence: 0.5, power: 18, standards: ["ISO 14644", "EU GMP Annex 1", "ISPE Baseline"] },
+  { type: "sampling", label: "Aseptic Sampling", isoName: "Closed aseptic sampling point", cls: "Quality", icon: "SP", color: "#8a6f3d", residence: 0.2, power: 0.05, standards: ["EU GMP Annex 1", "USP <85>", "ICH Q6B"] },
+  { type: "pat", label: "PAT Analyzer", isoName: "Process analytical technology analyzer", cls: "Quality", icon: "PAT", color: "#8a6f3d", residence: 0.1, power: 0.4, standards: ["ICH Q8", "ICH Q9", "21 CFR Part 11"] },
+  { type: "ph-adjust", label: "pH Adjustment", isoName: "Acid base pH adjustment vessel", cls: "Preparation", icon: "pH", color: "#577590", residence: 0.8, power: 0.3, standards: ["ISO 10628", "ICH Q7", "ASME BPE"] },
+  { type: "antifoam", label: "Antifoam Dosing", isoName: "Sterile antifoam dosing skid", cls: "Utilities", icon: "AD", color: "#3f6173", residence: 0.2, power: 0.1, standards: ["ASME BPE", "EU GMP Annex 15"] },
+  { type: "surge-tank", label: "Surge Vessel", isoName: "Intermediate surge or equalization vessel", cls: "Hold", icon: "SV", color: "#5a7d7c", residence: 2.5, power: 0.4, standards: ["ISO 10628", "ASME BPE"] },
+  { type: "harvest-hold", label: "Harvest Hold", isoName: "Temperature-controlled harvest hold vessel", cls: "Hold", icon: "HH", color: "#5a7d7c", residence: 8, power: 1.2, standards: ["EU GMP Annex 15", "ASME BPE", "ICH Q5C"] },
+  { type: "prefilter", label: "Prefilter", isoName: "Bioburden reduction prefilter", cls: "Filtration", icon: "PF", color: "#90be6d", residence: 0.5, power: 0.2, standards: ["ISO 13408-2", "EU GMP Annex 1"] },
+  { type: "polish-filter", label: "Polishing Filter", isoName: "Fine polishing filter assembly", cls: "Filtration", icon: "PF2", color: "#90be6d", residence: 0.5, power: 0.2, standards: ["ISO 13408-2", "EU GMP Annex 1"] },
+  { type: "bagging", label: "Single-Use Bag Hold", isoName: "Sterile single-use bag hold assembly", cls: "Hold", icon: "BH", color: "#5a7d7c", residence: 3, power: 0.1, standards: ["ISO 10993", "EU GMP Annex 1", "ASME BPE"] },
+  { type: "labeling", label: "Label and Serialization", isoName: "Labeling serialization and vision inspection line", cls: "Packaging", icon: "LS", color: "#3f6173", residence: 0.8, power: 1.1, standards: ["EU GMP Annex 16", "21 CFR Part 11", "ISO 15378"] },
+  { type: "inspection", label: "Visual Inspection", isoName: "Automated visual inspection station", cls: "Quality", icon: "VIQ", color: "#8a6f3d", residence: 1, power: 1.8, standards: ["EU GMP Annex 1", "USP <790>", "21 CFR 211"] },
+  { type: "cold-storage", label: "Cold Storage", isoName: "Qualified cold room or freezer storage", cls: "Hold", icon: "CSG", color: "#4895ef", residence: 24, power: 4.5, standards: ["ICH Q5C", "EU GMP Annex 15", "GMP GDP"] },
+  { type: "waste-hold", label: "Waste Hold Tank", isoName: "GMP liquid waste hold tank", cls: "Utilities", icon: "WH", color: "#b74d45", residence: 6, power: 0.5, standards: ["ISO 14001", "EU GMP Part I"] },
+  { type: "solvent-tank", label: "Solvent Tank Farm", isoName: "GMP solvent storage and transfer system", cls: "Hold", icon: "ST", color: "#bc6c25", residence: 8, power: 0.7, standards: ["ATEX/DSEAR", "ICH Q7", "ISO 10628"] },
+  { type: "dryer-mill", label: "Mill and Sieve", isoName: "Cone mill and vibratory sieve", cls: "Finishing", icon: "MS", color: "#bc6c25", residence: 1.5, power: 2.2, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
+  { type: "weigh-fill", label: "Weigh Fill", isoName: "Bulk weigh fill station", cls: "Packaging", icon: "WF", color: "#3f6173", residence: 1, power: 0.8, standards: ["EU GMP Annex 16", "21 CFR 211"] },
 ];
 
 const standards = [
@@ -68,6 +92,33 @@ const scalePresets = {
   demo: { label: "Demo", batchSize: 10000, batchCount: 160, titer: 18, recovery: 76 },
   commercial: { label: "Commercial", batchSize: 100000, batchCount: 260, titer: 35, recovery: 84 },
 };
+
+const processParameters = [
+  { key: "viability", label: "Viability", unit: "%", min: 45, max: 99, step: 1, value: 92 },
+  { key: "inoculation", label: "Inoculation ratio", unit: "%", min: 2, max: 25, step: 0.5, value: 10 },
+  { key: "doublingTime", label: "Doubling time", unit: "h", min: 8, max: 72, step: 1, value: 24 },
+  { key: "specificGrowth", label: "mu max", unit: "1/h", min: 0.01, max: 0.18, step: 0.01, value: 0.05 },
+  { key: "cellDensity", label: "Peak cell density", unit: "M cells/mL", min: 0.2, max: 120, step: 0.2, value: 18 },
+  { key: "glucose", label: "Glucose setpoint", unit: "g/L", min: 0.2, max: 12, step: 0.1, value: 4 },
+  { key: "glutamine", label: "Glutamine", unit: "mM", min: 0, max: 8, step: 0.1, value: 3 },
+  { key: "lactate", label: "Lactate limit", unit: "g/L", min: 0.2, max: 8, step: 0.1, value: 2 },
+  { key: "ammonia", label: "Ammonia limit", unit: "mM", min: 0.2, max: 8, step: 0.1, value: 2 },
+  { key: "ph", label: "pH", unit: "", min: 5.5, max: 8.2, step: 0.05, value: 7.1 },
+  { key: "temperature", label: "Temperature", unit: "C", min: 20, max: 39, step: 0.1, value: 36.5 },
+  { key: "doSetpoint", label: "Dissolved oxygen", unit: "% air sat.", min: 10, max: 80, step: 1, value: 40 },
+  { key: "kla", label: "kLa", unit: "1/h", min: 2, max: 260, step: 1, value: 65 },
+  { key: "our", label: "OUR", unit: "mmol/L/h", min: 0.2, max: 18, step: 0.1, value: 4.5 },
+  { key: "agitation", label: "Agitation P/V", unit: "W/L", min: 0.01, max: 12, step: 0.01, value: 0.9 },
+  { key: "aeration", label: "Aeration", unit: "vvm", min: 0.01, max: 2.5, step: 0.01, value: 0.35 },
+  { key: "feedRate", label: "Feed rate", unit: "% vol/day", min: 0, max: 80, step: 1, value: 18 },
+  { key: "perfusionRate", label: "Perfusion rate", unit: "VVD", min: 0, max: 8, step: 0.1, value: 1 },
+  { key: "harvestRecovery", label: "Harvest recovery", unit: "%", min: 40, max: 99, step: 1, value: 88 },
+  { key: "clarificationYield", label: "Clarification yield", unit: "%", min: 40, max: 99, step: 1, value: 92 },
+  { key: "chromYield", label: "Chromatography yield", unit: "%", min: 35, max: 99, step: 1, value: 82 },
+  { key: "ufdfYield", label: "UF/DF yield", unit: "%", min: 50, max: 99, step: 1, value: 91 },
+  { key: "sterileFilterFlux", label: "Sterile filter flux", unit: "LMH", min: 20, max: 600, step: 5, value: 180 },
+  { key: "bioburden", label: "Bioburden limit", unit: "CFU/mL", min: 0, max: 100, step: 1, value: 10 },
+];
 
 const templates = {
   culturedMeat: {
@@ -445,6 +496,308 @@ const templates = {
   },
 };
 
+const detailLayers = {
+  culturedMeat: {
+    units: [
+      unit("CB-001", "cell-bank", 40, 635, "Cell Bank Thaw"),
+      unit("SK-010", "seed-flask", 290, 635, "Shake Flask Expansion"),
+      unit("GM-201", "gas-mixing", 1040, 635, "O2/CO2 Gas Mix"),
+      unit("PAT-201", "pat", 790, 635, "Metabolite PAT"),
+      unit("SP-301", "sampling", 1290, 635, "Aseptic Harvest Sample"),
+      unit("EM-901", "em", 40, 820, "Grade C/D Monitoring"),
+      unit("CIP-901", "cip", 290, 820, "Wash/CIP Skid"),
+      unit("WH-901", "waste-hold", 540, 820, "Cell Culture Waste Hold"),
+      unit("CSG-902", "cold-storage", 790, 820, "Chilled Product Hold"),
+      unit("LS-903", "labeling", 1040, 820, "Label and Serialization"),
+    ],
+    streams: [
+      stream("D-001", "CB-001", "SK-010", "Thawed vial", "Slurry"),
+      stream("D-002", "SK-010", "BR-101", "Flask seed culture", "Broth"),
+      stream("D-003", "GM-201", "BR-201", "Sterile gas mix", "Gas"),
+      stream("D-004", "BR-201", "PAT-201", "Glucose lactate pH sample", "Liquid"),
+      stream("D-005", "CF-301", "SP-301", "Harvest IPC sample", "Slurry"),
+      stream("D-006", "AF-501", "CSG-902", "Filled chilled product", "Solid"),
+      stream("D-007", "CSG-902", "LS-903", "Released cold product", "Solid"),
+      stream("D-008", "CIP-901", "PV-101", "CIP solution", "Aqueous"),
+      stream("D-009", "BR-201", "WH-901", "Spent culture waste", "Broth"),
+      stream("D-010", "EM-901", "QC-701", "EM trend report", "Solid"),
+    ],
+  },
+  penicillin: {
+    units: [
+      unit("ST-001", "solvent-tank", 40, 635, "Butyl Acetate Tank Farm"),
+      unit("pH-401", "ph-adjust", 290, 635, "Acid pH Adjustment"),
+      unit("EX-401", "extractor", 540, 635, "Primary Solvent Extractor"),
+      unit("PS-401", "phase-separator", 790, 635, "Raffinate Separator"),
+      unit("PF-501", "prefilter", 1040, 635, "Crystal Prefilter"),
+      unit("MS-602", "dryer-mill", 1290, 635, "Milling and Sieve"),
+      unit("SP-801", "sampling", 40, 820, "API IPC Sample"),
+      unit("WH-901", "waste-hold", 290, 820, "Solvent Waste Hold"),
+      unit("DC-902", "distillation", 540, 820, "Solvent Recovery"),
+      unit("CIP-903", "cip", 790, 820, "Extraction Train CIP"),
+      unit("EM-904", "em", 1040, 820, "API Suite EM"),
+    ],
+    streams: [
+      stream("D-001", "ST-001", "EX-401", "Extraction solvent", "Liquid"),
+      stream("D-002", "DF-301", "pH-401", "Clarified acidic broth", "Liquid"),
+      stream("D-003", "pH-401", "EX-401", "pH-adjusted filtrate", "Liquid"),
+      stream("D-004", "EX-401", "PS-401", "Mixed solvent extract", "Liquid"),
+      stream("D-005", "PS-401", "MX-402", "Separated organic product phase", "Liquid"),
+      stream("D-006", "CR-501", "PF-501", "Crystal slurry guard filtration", "Slurry"),
+      stream("D-007", "DR-601", "MS-602", "Dried API granules", "Solid"),
+      stream("D-008", "MS-602", "PK-701", "Milled API", "Solid"),
+      stream("D-009", "MS-602", "SP-801", "Blend uniformity sample", "Solid"),
+      stream("D-010", "PS-401", "WH-901", "Spent solvent raffinate", "Liquid"),
+      stream("D-011", "WH-901", "DC-902", "Solvent recovery feed", "Liquid"),
+      stream("D-012", "CIP-903", "EX-401", "CIP solution", "Aqueous"),
+      stream("D-013", "EM-904", "QC-801", "Environmental report", "Solid"),
+    ],
+  },
+  antibody: {
+    units: [
+      unit("CB-001", "cell-bank", 40, 820, "WCB Thaw"),
+      unit("SK-010", "seed-flask", 290, 820, "Shake Flask Seed"),
+      unit("FT-202", "feed-tank", 540, 820, "Concentrated Feed Tank"),
+      unit("GM-203", "gas-mixing", 790, 820, "Gas Overlay and Sparge"),
+      unit("AD-204", "antifoam", 1040, 820, "Sterile Antifoam Dose"),
+      unit("HH-301", "harvest-hold", 1290, 820, "Cold Harvest Hold"),
+      unit("RP-400", "resin-prep", 40, 1005, "Protein A Resin Prep"),
+      unit("BH-405", "bagging", 290, 1005, "Chrom Pool Bag Hold"),
+      unit("PF-502", "prefilter", 540, 1005, "Virus Filter Prefilter"),
+      unit("SP-610", "sampling", 790, 1005, "Drug Substance IPC"),
+      unit("INS-803", "inspection", 1040, 1005, "Filled Vial Inspection"),
+      unit("LS-804", "labeling", 1290, 1005, "Serialization"),
+      unit("CSG-805", "cold-storage", 540, 1190, "2-8 C Storage"),
+      unit("EM-999", "em", 790, 1190, "Grade A/B Monitoring"),
+    ],
+    streams: [
+      stream("D-001", "CB-001", "SK-010", "Thawed CHO vial", "Slurry"),
+      stream("D-002", "SK-010", "BR-101", "Shake flask seed", "Broth"),
+      stream("D-003", "FT-202", "BR-201", "Concentrated nutrient feed", "Aqueous"),
+      stream("D-004", "GM-203", "BR-201", "Air O2 CO2 overlay", "Gas"),
+      stream("D-005", "AD-204", "BR-201", "Antifoam addition", "Liquid"),
+      stream("D-006", "BR-201", "HH-301", "Timed harvest pool", "Broth"),
+      stream("D-007", "HH-301", "CF-301", "Chilled harvest", "Broth"),
+      stream("D-008", "RP-400", "PA-401", "Equilibrated Protein A resin", "Slurry"),
+      stream("D-009", "CH-404", "BH-405", "Polish pool hold", "Liquid"),
+      stream("D-010", "BH-405", "PF-502", "Conditioned pool", "Liquid"),
+      stream("D-011", "PF-502", "VF-501", "Prefiltered viral safety feed", "Liquid"),
+      stream("D-012", "UF-601", "SP-610", "DS release sample", "Liquid"),
+      stream("D-013", "AF-802", "INS-803", "Filled vials", "Liquid"),
+      stream("D-014", "INS-803", "LS-804", "Accepted vials", "Solid"),
+      stream("D-015", "LS-804", "CSG-805", "Serialized drug product", "Solid"),
+      stream("D-016", "EM-999", "QC-901", "EM batch record", "Solid"),
+    ],
+  },
+  fermentation: {
+    units: [
+      unit("CA-001", "compressor", 40, 635, "Oil-Free Air"),
+      unit("GM-002", "gas-mixing", 290, 635, "Sterile Aeration Skid"),
+      unit("AD-003", "antifoam", 540, 635, "Antifoam Dose"),
+      unit("PAT-004", "pat", 790, 635, "Off-Gas PAT"),
+      unit("HH-302", "harvest-hold", 1040, 635, "Broth Surge Hold"),
+      unit("SV-402", "surge-tank", 1290, 635, "Clarified Liquor Surge"),
+      unit("PF-403", "polish-filter", 40, 820, "Recovery Polish Filter"),
+      unit("ST-504", "solvent-tank", 290, 820, "Recovery Solvent Feed"),
+      unit("SP-801", "sampling", 540, 820, "Final Product Sample"),
+      unit("WH-901", "waste-hold", 790, 820, "Biomass Waste Hold"),
+      unit("CIP-902", "cip", 1040, 820, "Fermentation CIP"),
+      unit("EM-903", "em", 1290, 820, "Production Area EM"),
+    ],
+    streams: [
+      stream("D-001", "CA-001", "GM-002", "Dry clean air", "Gas"),
+      stream("D-002", "GM-002", "FR-201", "Sterile aeration", "Gas"),
+      stream("D-003", "AD-003", "FR-201", "Antifoam feed", "Liquid"),
+      stream("D-004", "FR-201", "PAT-004", "Off-gas analytics", "Gas"),
+      stream("D-005", "FR-201", "HH-302", "Harvest transfer", "Broth"),
+      stream("D-006", "HH-302", "CF-301", "Equalized broth", "Broth"),
+      stream("D-007", "CF-301", "SV-402", "Clarified product liquor", "Liquid"),
+      stream("D-008", "SV-402", "PF-403", "Surge outlet", "Liquid"),
+      stream("D-009", "PF-403", "NF-401", "Polished liquor", "Liquid"),
+      stream("D-010", "ST-504", "DC-501", "Recovery solvent", "Liquid"),
+      stream("D-011", "FD-701", "SP-801", "Final product sample", "Solid"),
+      stream("D-012", "CF-301", "WH-901", "Separated biomass", "Slurry"),
+      stream("D-013", "CIP-902", "FR-201", "CIP return loop", "Aqueous"),
+      stream("D-014", "EM-903", "QC-901", "EM batch record", "Solid"),
+    ],
+  },
+  insulin: {
+    units: [
+      unit("CB-001", "cell-bank", 40, 635, "Microbial Cell Bank Thaw"),
+      unit("SK-010", "seed-flask", 290, 635, "Shake Flask Seed"),
+      unit("CA-011", "compressor", 540, 635, "Fermentation Air"),
+      unit("pH-404", "ph-adjust", 790, 635, "Refold pH Control"),
+      unit("BH-405", "bagging", 1040, 635, "Refold Hold Bag"),
+      unit("PF-406", "prefilter", 1290, 635, "Column Guard Filter"),
+      unit("RP-500", "resin-prep", 40, 820, "Resin Slurry Prep"),
+      unit("SP-701", "sampling", 290, 820, "Crystal IPC"),
+      unit("MS-802", "dryer-mill", 540, 820, "Mill and Sieve"),
+      unit("WF-803", "weigh-fill", 790, 820, "Bulk Weigh Fill"),
+      unit("EM-904", "em", 1040, 820, "API EM"),
+      unit("WH-905", "waste-hold", 1290, 820, "Cell Debris Waste"),
+    ],
+    streams: [
+      stream("D-001", "CB-001", "SK-010", "Thawed E. coli vial", "Slurry"),
+      stream("D-002", "SK-010", "FR-101", "Seed culture", "Broth"),
+      stream("D-003", "CA-011", "FR-201", "Sterile air", "Gas"),
+      stream("D-004", "MX-403", "pH-404", "Refolding pool", "Liquid"),
+      stream("D-005", "pH-404", "BH-405", "pH-controlled refold pool", "Liquid"),
+      stream("D-006", "BH-405", "PF-406", "Held refold pool", "Liquid"),
+      stream("D-007", "PF-406", "CH-501", "Filtered column feed", "Liquid"),
+      stream("D-008", "RP-500", "CH-501", "Prepared chromatography resin", "Slurry"),
+      stream("D-009", "CR-701", "SP-701", "Crystal sample", "Slurry"),
+      stream("D-010", "DR-801", "MS-802", "Dry insulin cake", "Solid"),
+      stream("D-011", "MS-802", "WF-803", "Milled insulin", "Solid"),
+      stream("D-012", "WF-803", "QC-901", "Bulk filled insulin API", "Solid"),
+      stream("D-013", "EM-904", "QC-901", "EM report", "Solid"),
+      stream("D-014", "CF-402", "WH-905", "Cell debris", "Slurry"),
+    ],
+  },
+  vaccine: {
+    units: [
+      unit("CB-001", "cell-bank", 40, 635, "Cell Bank Thaw"),
+      unit("SK-010", "seed-flask", 290, 635, "Spinner Flask Seed"),
+      unit("GM-202", "gas-mixing", 540, 635, "CO2 Overlay"),
+      unit("PAT-203", "pat", 790, 635, "Virus Titer PAT"),
+      unit("HH-301", "harvest-hold", 1040, 635, "Virus Harvest Hold"),
+      unit("PF-303", "prefilter", 1290, 635, "Clarification Guard Filter"),
+      unit("BH-601", "bagging", 40, 820, "Antigen Pool Bag"),
+      unit("SP-701", "sampling", 290, 820, "Sterility and Potency Sample"),
+      unit("IS-902", "isolator", 540, 820, "Vial Fill Isolator"),
+      unit("INS-903", "inspection", 790, 820, "Vial Inspection"),
+      unit("LS-904", "labeling", 1040, 820, "Label and Carton"),
+      unit("CSG-905", "cold-storage", 1290, 820, "Cold Chain Storage"),
+      unit("EM-999", "em", 540, 1005, "Aseptic EM"),
+    ],
+    streams: [
+      stream("D-001", "CB-001", "SK-010", "Thawed vial", "Slurry"),
+      stream("D-002", "SK-010", "WB-101", "Spinner seed", "Broth"),
+      stream("D-003", "GM-202", "PB-201", "Gas overlay", "Gas"),
+      stream("D-004", "PB-201", "PAT-203", "Virus titer sample", "Liquid"),
+      stream("D-005", "PB-201", "HH-301", "Virus harvest", "Broth"),
+      stream("D-006", "HH-301", "DF-301", "Chilled harvest", "Broth"),
+      stream("D-007", "DF-301", "PF-303", "Depth filtrate", "Liquid"),
+      stream("D-008", "PF-303", "MF-302", "Guard-filtered harvest", "Liquid"),
+      stream("D-009", "CH-601", "BH-601", "Purified antigen pool", "Liquid"),
+      stream("D-010", "BH-601", "SF-701", "Held antigen pool", "Liquid"),
+      stream("D-011", "SF-701", "SP-701", "Sterile bulk sample", "Liquid"),
+      stream("D-012", "FV-801", "IS-902", "Formulated vaccine bulk", "Liquid"),
+      stream("D-013", "IS-902", "AF-901", "Isolator fill transfer", "Liquid"),
+      stream("D-014", "AF-901", "INS-903", "Filled vials", "Liquid"),
+      stream("D-015", "INS-903", "LS-904", "Accepted vials", "Solid"),
+      stream("D-016", "LS-904", "CSG-905", "Serialized cold-chain product", "Solid"),
+      stream("D-017", "EM-999", "QC-999", "Aseptic EM report", "Solid"),
+    ],
+  },
+  plasmid: {
+    units: [
+      unit("CB-001", "cell-bank", 40, 635, "E. coli Cell Bank Thaw"),
+      unit("SK-010", "seed-flask", 290, 635, "Seed Flask"),
+      unit("CA-011", "compressor", 540, 635, "Compressed Air"),
+      unit("pH-402", "ph-adjust", 790, 635, "Neutralization Control"),
+      unit("PF-403", "prefilter", 1040, 635, "Lysate Guard Filter"),
+      unit("BH-504", "bagging", 1290, 635, "Conditioned Lysate Hold"),
+      unit("RP-600", "resin-prep", 40, 820, "AEX Resin Prep"),
+      unit("NF-702", "nanofilter", 290, 820, "Endotoxin Reduction NF"),
+      unit("SP-803", "sampling", 540, 820, "pDNA IPC Sample"),
+      unit("CSG-804", "cold-storage", 790, 820, "Frozen DS Hold"),
+      unit("WH-901", "waste-hold", 1040, 820, "Cell Debris Waste"),
+      unit("EM-902", "em", 1290, 820, "Gene Therapy EM"),
+    ],
+    streams: [
+      stream("D-001", "CB-001", "SK-010", "Thawed cell bank", "Slurry"),
+      stream("D-002", "SK-010", "FR-101", "Seed inoculum", "Broth"),
+      stream("D-003", "CA-011", "FR-201", "Sterile air", "Gas"),
+      stream("D-004", "MX-401", "pH-402", "Alkaline lysate", "Slurry"),
+      stream("D-005", "pH-402", "DF-402", "Neutralized lysate", "Slurry"),
+      stream("D-006", "DF-402", "PF-403", "Clarified lysate", "Liquid"),
+      stream("D-007", "PF-403", "BH-504", "Guard-filtered lysate", "Liquid"),
+      stream("D-008", "BH-504", "UF-501", "Conditioned lysate", "Liquid"),
+      stream("D-009", "RP-600", "CH-601", "Prepared AEX resin", "Slurry"),
+      stream("D-010", "UF-701", "NF-702", "Concentrated pDNA", "Liquid"),
+      stream("D-011", "NF-702", "EM-801", "Endotoxin-reduced pDNA", "Liquid"),
+      stream("D-012", "SF-802", "SP-803", "Sterile pDNA sample", "Liquid"),
+      stream("D-013", "SF-802", "CSG-804", "Sterile pDNA DS", "Liquid"),
+      stream("D-014", "CF-301", "WH-901", "Biomass waste", "Slurry"),
+      stream("D-015", "EM-902", "QC-901", "EM report", "Solid"),
+    ],
+  },
+  cellTherapy: {
+    units: [
+      unit("CSG-001", "cold-storage", 40, 450, "Incoming Cryoshipper"),
+      unit("CB-002", "cell-bank", 290, 450, "Patient Material Thaw"),
+      unit("SP-003", "sampling", 540, 450, "Identity Sample"),
+      unit("GM-302", "gas-mixing", 790, 450, "Incubator Gas Mix"),
+      unit("PAT-303", "pat", 1040, 450, "Viability PAT"),
+      unit("BH-602", "bagging", 1290, 450, "Washed Cell Hold Bag"),
+      unit("IS-802", "isolator", 40, 635, "Cryobag Fill Isolator"),
+      unit("INS-803", "inspection", 290, 635, "Bag Integrity Inspection"),
+      unit("CSG-804", "cold-storage", 540, 635, "Vapor Phase LN2 Storage"),
+      unit("LS-805", "labeling", 790, 635, "Chain-of-Identity Labeling"),
+      unit("EM-902", "em", 1040, 635, "Grade A/B EM"),
+      unit("WH-903", "waste-hold", 1290, 635, "Biohazard Waste Hold"),
+    ],
+    streams: [
+      stream("D-001", "CSG-001", "QC-001", "Controlled receipt", "Solid"),
+      stream("D-002", "QC-001", "CB-002", "Released starting material", "Slurry"),
+      stream("D-003", "CB-002", "SP-003", "Identity sample", "Slurry"),
+      stream("D-004", "CB-002", "WB-101", "Thawed patient cells", "Slurry"),
+      stream("D-005", "GM-302", "BR-301", "Incubator atmosphere", "Gas"),
+      stream("D-006", "BR-301", "PAT-303", "Viability and density read", "Liquid"),
+      stream("D-007", "UF-601", "BH-602", "Washed concentrated cells", "Slurry"),
+      stream("D-008", "BH-602", "FV-701", "Held cells", "Slurry"),
+      stream("D-009", "FV-701", "IS-802", "Cryoformulated cells", "Slurry"),
+      stream("D-010", "IS-802", "AF-801", "Isolated fill transfer", "Slurry"),
+      stream("D-011", "AF-801", "INS-803", "Filled cryobags", "Solid"),
+      stream("D-012", "INS-803", "LS-805", "Accepted cryobags", "Solid"),
+      stream("D-013", "LS-805", "CSG-804", "COI-labeled dose", "Solid"),
+      stream("D-014", "EM-902", "QC-901", "EM batch record", "Solid"),
+      stream("D-015", "PV-201", "WH-903", "Biohazard waste", "Slurry"),
+    ],
+  },
+  api: {
+    units: [
+      unit("ST-001", "solvent-tank", 40, 635, "Solvent Tank Farm"),
+      unit("pH-201", "ph-adjust", 290, 635, "Charge pH Adjustment"),
+      unit("SV-303", "surge-tank", 540, 635, "Reaction Quench Hold"),
+      unit("PF-403", "polish-filter", 790, 635, "Organic Polish Filter"),
+      unit("ST-404", "solvent-tank", 1040, 635, "Wash Solvent Tank"),
+      unit("PF-502", "prefilter", 1290, 635, "Crystallizer Guard Filter"),
+      unit("MS-702", "dryer-mill", 40, 820, "Mill and Sieve"),
+      unit("SP-703", "sampling", 290, 820, "Particle Size IPC"),
+      unit("WF-804", "weigh-fill", 540, 820, "Drum Weigh Fill"),
+      unit("WH-901", "waste-hold", 790, 820, "Mother Liquor Waste"),
+      unit("CIP-902", "cip", 1040, 820, "API Train Cleaning"),
+      unit("EM-903", "em", 1290, 820, "API Suite EM"),
+    ],
+    streams: [
+      stream("D-001", "ST-001", "MX-201", "Solvent charge", "Liquid"),
+      stream("D-002", "MX-201", "pH-201", "Prepared reaction feed", "Liquid"),
+      stream("D-003", "pH-201", "BR-301", "pH-adjusted charge", "Liquid"),
+      stream("D-004", "HX-302", "SV-303", "Cooled reaction mass", "Liquid"),
+      stream("D-005", "SV-303", "EX-401", "Quench feed", "Liquid"),
+      stream("D-006", "PS-402", "PF-403", "Organic phase", "Liquid"),
+      stream("D-007", "PF-403", "CR-501", "Polished crystallization feed", "Liquid"),
+      stream("D-008", "ST-404", "PS-402", "Wash solvent", "Liquid"),
+      stream("D-009", "CR-501", "PF-502", "Seeded crystal slurry", "Slurry"),
+      stream("D-010", "PF-502", "FD-601", "Guard-filtered slurry", "Slurry"),
+      stream("D-011", "FD-601", "MS-702", "Dry API cake", "Solid"),
+      stream("D-012", "MS-702", "SP-703", "PSD sample", "Solid"),
+      stream("D-013", "MS-702", "WF-804", "Milled API", "Solid"),
+      stream("D-014", "WF-804", "PK-801", "Filled drums", "Solid"),
+      stream("D-015", "DC-701", "WH-901", "Distillation bottoms", "Liquid"),
+      stream("D-016", "CIP-902", "BR-301", "Validated cleaning cycle", "Aqueous"),
+      stream("D-017", "EM-903", "QC-901", "EM release report", "Solid"),
+    ],
+  },
+};
+
+Object.entries(detailLayers).forEach(([key, layer]) => {
+  templates[key].units.push(...layer.units);
+  templates[key].streams.push(...layer.streams);
+  templates[key].description = `${templates[key].description}; detailed utilities, IPC, holds, waste, and release controls`;
+});
+
 const equations = [
   eq("Cell growth", "kinetics", "mu = mu_max * S / (K_s + S)", "Monod growth rate for substrate-limited cultures."),
   eq("Logistic growth", "kinetics", "dX/dt = mu * X * (1 - X / X_max)", "Density-limited biomass growth."),
@@ -572,6 +925,7 @@ const state = {
   batchCount: 120,
   titer: 12,
   recovery: 72,
+  params: Object.fromEntries(processParameters.map((item) => [item.key, item.value])),
   units: [],
   streams: [],
   costs: [],
@@ -580,6 +934,7 @@ const state = {
 const els = {
   templateList: document.querySelector("#templateList"),
   scaleList: document.querySelector("#scaleList"),
+  parameterList: document.querySelector("#parameterList"),
   palette: document.querySelector("#palette"),
   canvas: document.querySelector("#flowsheetCanvas"),
   processEyebrow: document.querySelector("#processEyebrow"),
@@ -703,19 +1058,24 @@ function applyScale(key) {
 }
 
 function metrics() {
-  const annualKg = state.batchSize * state.titer * state.batchCount * (state.recovery / 100) / 1000;
+  const p = state.params;
+  const processYield = (state.recovery / 100) * (p.viability / 100) * (p.harvestRecovery / 100) * (p.clarificationYield / 100) * (p.chromYield / 100) * (p.ufdfYield / 100);
+  const effectiveTiter = state.titer * Math.min(1.35, Math.max(0.45, (p.viability / 92) * (p.cellDensity / 18) * (p.doSetpoint / 40) * (7.6 - Math.abs(p.ph - 7.1)) / 7.6));
+  const annualKg = state.batchSize * effectiveTiter * state.batchCount * processYield / 1000;
   const reactorCount = state.units.filter((item) => item.cls === "Bioreactor").length || 1;
   const downstreamCount = state.units.filter((item) => item.cls !== "Bioreactor").length || 1;
-  const batchDuration = state.units.reduce((sum, item) => sum + item.residence, 0) + reactorCount * 5 + downstreamCount * 0.75;
+  const bioAdjustment = Math.max(0.75, Math.min(1.6, p.doublingTime / 24 + p.perfusionRate * 0.03 - p.specificGrowth * 0.8));
+  const batchDuration = state.units.reduce((sum, item) => sum + item.residence, 0) * bioAdjustment + reactorCount * 5 + downstreamCount * 0.75;
   const utilization = Math.min(96, (state.batchCount * batchDuration / 8760) * 100);
   const scalePenalty = 9 / Math.sqrt(Math.max(1, state.batchSize / 1000));
-  const recoveryPenalty = (100 - state.recovery) * 0.75;
-  const titerBenefit = 260 / Math.max(1, state.titer);
-  const directCost = 18 + scalePenalty + recoveryPenalty + titerBenefit + state.units.length * 1.8;
-  const utilities = state.units.reduce((sum, item) => sum + item.powerFactor, 0) * batchDuration * state.batchCount / 1000;
-  const productPerBatchKg = state.batchSize * state.titer * (state.recovery / 100) / 1000;
+  const recoveryPenalty = (1 - processYield) * 92;
+  const titerBenefit = 260 / Math.max(1, effectiveTiter);
+  const contaminationPenalty = p.bioburden > 20 ? (p.bioburden - 20) * 0.35 : 0;
+  const directCost = 18 + scalePenalty + recoveryPenalty + titerBenefit + contaminationPenalty + state.units.length * 1.25;
+  const utilities = (state.units.reduce((sum, item) => sum + item.powerFactor, 0) + p.agitation * reactorCount + p.aeration * 8 + p.kla * 0.04) * batchDuration * state.batchCount / 1000;
+  const productPerBatchKg = state.batchSize * effectiveTiter * processYield / 1000;
 
-  return { annualKg, batchDuration, utilization, directCost, utilities, productPerBatchKg };
+  return { annualKg, batchDuration, utilization, directCost, utilities, productPerBatchKg, processYield, effectiveTiter };
 }
 
 function unitSize(item) {
@@ -751,6 +1111,10 @@ function syncInputs() {
   els.batchCount.value = state.batchCount;
   els.titer.value = state.titer;
   els.recovery.value = state.recovery;
+  processParameters.forEach((item) => {
+    const input = document.querySelector(`[data-parameter="${item.key}"]`);
+    if (input) input.value = state.params[item.key];
+  });
 }
 
 function renderTemplateList() {
@@ -776,6 +1140,19 @@ function renderPalette() {
       <small>${item.cls}</small>
     </button>
   `).join("");
+}
+
+function renderParameters() {
+  els.parameterList.innerHTML = processParameters.map((item) => {
+    const value = state.params[item.key];
+    return `
+      <label class="parameter-row">
+        <span>${item.label}</span>
+        <input data-parameter="${item.key}" type="range" min="${item.min}" max="${item.max}" step="${item.step}" value="${value}" />
+        <b>${formatNumber(value, item.step < 1 ? 2 : 0)}${item.unit ? ` ${item.unit}` : ""}</b>
+      </label>
+    `;
+  }).join("");
 }
 
 function renderMetrics() {
@@ -810,7 +1187,7 @@ function renderCanvas() {
     const to = state.units.find((candidate) => candidate.id === item.to);
     if (!from || !to) return;
     const line = document.createElement("button");
-    const x1 = from.x + 206;
+    const x1 = from.x + 218;
     const y1 = from.y + 46;
     const x2 = to.x;
     const y2 = to.y + 46;
@@ -897,7 +1274,7 @@ function redrawStreamsOnly() {
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
     if (!line || !from || !to) return;
-    const x1 = from.x + 206;
+    const x1 = from.x + 218;
     const y1 = from.y + 46;
     const x2 = to.x;
     const y2 = to.y + 46;
@@ -938,7 +1315,7 @@ function nextCanvasPosition() {
   const rightMost = state.units.reduce((max, item) => Math.max(max, item.x), 40);
   const row = Math.floor(state.units.length / 4);
   return {
-    x: Math.min(rightMost + 255, 45 + (state.units.length % 4) * 255),
+    x: Math.min(rightMost + 265, 45 + (state.units.length % 4) * 265),
     y: 85 + row * 190,
   };
 }
@@ -1049,6 +1426,8 @@ function renderEconomics() {
   els.economicDetails.innerHTML = `
     <dt>Product</dt><dd>${activeTemplate().product}</dd>
     <dt>Product per batch</dt><dd>${formatMass(data.productPerBatchKg)}</dd>
+    <dt>Effective titer</dt><dd>${formatNumber(data.effectiveTiter, 1)} g/L</dd>
+    <dt>Effective process yield</dt><dd>${formatNumber(data.processYield * 100, 1)}%</dd>
     <dt>Annual operating time</dt><dd>${formatNumber(data.batchDuration * state.batchCount, 0)} h</dd>
     <dt>Equipment count</dt><dd>${state.units.length} units</dd>
   `;
@@ -1181,8 +1560,8 @@ function fitCanvas(silent = false) {
 function autoLayout() {
   const columns = 6;
   state.units.forEach((item, index) => {
-    item.x = 45 + (index % columns) * 255;
-    item.y = 85 + Math.floor(index / columns) * 190;
+    item.x = 45 + (index % columns) * 265;
+    item.y = 85 + Math.floor(index / columns) * 185;
   });
   renderCanvas();
   showToast("Layout updated");
@@ -1197,6 +1576,7 @@ function exportJson() {
       batchCount: state.batchCount,
       titer: state.titer,
       recovery: state.recovery,
+      biochemical: state.params,
     },
     metrics: metrics(),
     units: state.units,
@@ -1225,6 +1605,7 @@ function renderAll() {
   renderTemplateList();
   renderScaleList();
   renderPalette();
+  renderParameters();
   renderMetrics();
   renderCanvas();
   renderTables();
@@ -1292,6 +1673,18 @@ function bindEvents() {
       renderEconomics();
       renderInspector();
     });
+  });
+
+  els.parameterList.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-parameter]");
+    if (!input) return;
+    state.params[input.dataset.parameter] = Number(input.value);
+    renderParameters();
+    renderMetrics();
+    renderCanvas();
+    renderTables();
+    renderEconomics();
+    renderInspector();
   });
 
   els.equationSearch.addEventListener("input", renderEquations);
