@@ -445,6 +445,7 @@ input[type="range"] {
 .inspector,
 .data-view,
 .equations-view,
+.simulation-view,
 .standards-view,
 .economics-view {
   min-height: 0;
@@ -1023,6 +1024,142 @@ th {
   overflow: hidden;
 }
 
+.simulation-view.active {
+  display: block;
+  overflow: auto;
+}
+
+.simulation-board {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.simulation-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.simulation-summary article,
+.operation-sequence,
+.simulation-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.06);
+}
+
+.simulation-summary article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.simulation-summary span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.simulation-summary strong {
+  color: #07111f;
+  font-size: 16px;
+}
+
+.simulation-summary .ok {
+  color: var(--teal);
+}
+
+.simulation-summary .risk {
+  color: var(--red);
+}
+
+.operation-sequence {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.operation-sequence h3,
+.simulation-group h3,
+.simulation-card h4,
+.simulation-card p {
+  margin: 0;
+}
+
+.operation-sequence h3,
+.simulation-group h3 {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.operation-sequence > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.operation-sequence span {
+  padding: 6px 9px;
+  border: 1px solid rgba(66, 199, 232, 0.28);
+  border-radius: 8px;
+  color: #073041;
+  background: #edfaff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.simulation-group {
+  display: grid;
+  gap: 10px;
+}
+
+.simulation-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.simulation-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+}
+
+.simulation-card > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.simulation-card span {
+  padding: 4px 7px;
+  border-radius: 8px;
+  color: #06311f;
+  background: rgba(88, 199, 124, 0.18);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.simulation-card h4 {
+  font-size: 15px;
+}
+
+.simulation-card dl {
+  grid-template-columns: 72px 1fr;
+  font-size: 12px;
+}
+
+.simulation-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .standards-view.active {
   display: block;
   overflow: auto;
@@ -1235,13 +1372,19 @@ th {
   .kpi-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .simulation-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
   .palette,
   .segmented,
   .equation-toolbar,
-  .kpi-strip {
+  .kpi-strip,
+  .simulation-summary,
+  .simulation-cards {
     grid-template-columns: 1fr;
   }
 

@@ -72,6 +72,18 @@ const palette = [
   { type: "sensor", label: "PAT Sensor", isoName: "Inline pH DO conductivity or UV sensor", cls: "Instrumentation", icon: "S", color: "#8a6f3d", residence: 0.05, power: 0.08, standards: ["ICH Q8", "GAMP 5", "21 CFR Part 11"] },
   { type: "pressure-relief", label: "Pressure Relief", isoName: "Relief valve or rupture disc assembly", cls: "Piping", icon: "PR", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ASME BPE", "PED", "ISO 10628"] },
   { type: "manifold", label: "Manifold", isoName: "Hygienic transfer manifold", cls: "Piping", icon: "MF", color: "#4f6f8f", residence: 0.1, power: 0.05, standards: ["ASME BPE", "EU GMP Annex 1", "ISO 10628"] },
+  { type: "storage", label: "Raw Material Storage", isoName: "Bulk raw material storage bin or tank", cls: "Preparation", icon: "STO", color: "#51606f", residence: 12, power: 0.2, standards: ["ISO 10628", "EU GMP Part I Ch. 5"] },
+  { type: "grinder", label: "Grinder", isoName: "Feedstock grinder or mill", cls: "Preparation", icon: "GR", color: "#51606f", residence: 0.8, power: 7.5, standards: ["ISO 10628", "EU GMP Part I"] },
+  { type: "liquefaction", label: "Liquefaction Reactor", isoName: "Enzymatic liquefaction reactor", cls: "Bioreactor", icon: "LQ", color: "#11847d", residence: 2, power: 3.5, standards: ["ISO 10628", "ASME BPE"] },
+  { type: "saccharification", label: "Saccharification Reactor", isoName: "Enzymatic saccharification reactor", cls: "Bioreactor", icon: "SC", color: "#11847d", residence: 4, power: 3.8, standards: ["ISO 10628", "ASME BPE"] },
+  { type: "rotary-filter", label: "Rotary Vacuum Filter", isoName: "Rotary vacuum filter", cls: "Solid-liquid", icon: "RVF", color: "#f8961e", residence: 1.5, power: 5.4, standards: ["ISO 10628", "EU GMP Part I"] },
+  { type: "dark-fermenter", label: "Dark Fermenter", isoName: "Thermophilic continuous stirred-tank dark fermenter", cls: "Bioreactor", icon: "DF", color: "#0f766e", residence: 12, power: 8.2, standards: ["ISO 10628", "ISA-88", "ASME BPE"] },
+  { type: "anaerobic-digester", label: "Anaerobic Digester", isoName: "Anaerobic digestion reactor", cls: "Bioreactor", icon: "AD", color: "#4d908e", residence: 72, power: 5.6, standards: ["ISO 10628", "ISA-88"] },
+  { type: "absorber", label: "Absorption Column", isoName: "Packed or tray absorption column", cls: "Separation", icon: "ABS", color: "#4895ef", residence: 2.2, power: 6.4, standards: ["ISO 10628", "ATEX/DSEAR"] },
+  { type: "desorber", label: "Desorption Column", isoName: "Solvent regeneration desorption column", cls: "Thermal", icon: "DES", color: "#bc6c25", residence: 2.8, power: 12.5, standards: ["ISO 10628", "ATEX/DSEAR"] },
+  { type: "splitter", label: "Recycle Splitter", isoName: "Recycle purge splitter", cls: "Piping", icon: "SPL", color: "#2f80ed", residence: 0.05, power: 0.05, standards: ["ISO 10628", "ISA-88"] },
+  { type: "regulator", label: "Feedback Regulator", isoName: "Feedback regulatory control block", cls: "Instrumentation", icon: "REG", color: "#8a6f3d", residence: 0.05, power: 0.2, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
+  { type: "tear-stream", label: "Tear Stream Marker", isoName: "Recycle loop tear stream convergence marker", cls: "Instrumentation", icon: "TS", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ISA-88", "GAMP 5"] },
 ];
 
 const quickAddTypes = ["valve", "control-valve", "pump", "flowmeter", "sensor", "pressure-relief", "manifold", "sampling"];
@@ -127,6 +139,12 @@ const processParameters = [
   { key: "ufdfYield", label: "UF/DF yield", unit: "%", min: 50, max: 99, step: 1, value: 91 },
   { key: "sterileFilterFlux", label: "Sterile filter flux", unit: "LMH", min: 20, max: 600, step: 5, value: 180 },
   { key: "bioburden", label: "Bioburden limit", unit: "CFU/mL", min: 0, max: 100, step: 1, value: 10 },
+  { key: "hydrogenProductivity", label: "H2 productivity", unit: "mmol/L/h", min: 1, max: 80, step: 0.5, value: 45.8 },
+  { key: "osmCrit", label: "Critical osmolarity", unit: "mol/L", min: 0.05, max: 0.6, step: 0.01, value: 0.28 },
+  { key: "h2Crit", label: "Dissolved H2 crit.", unit: "mmol/L", min: 0.2, max: 8, step: 0.1, value: 2.2 },
+  { key: "dilutionRate", label: "CSTR dilution", unit: "1/h", min: 0.01, max: 0.8, step: 0.01, value: 0.18 },
+  { key: "recycleFraction", label: "Recycle fraction", unit: "%", min: 0, max: 95, step: 1, value: 35 },
+  { key: "co2Removal", label: "CO2 absorption", unit: "%", min: 20, max: 99, step: 1, value: 88 },
 ];
 
 const templates = {
@@ -502,6 +520,60 @@ const templates = {
       stream("S-801", "PK-801", "QC-901", "Packaged API", "Solid"),
     ],
     costs: costs(37, 12, 18, 16, 17),
+  },
+  biohydrogen: {
+    label: "Biohydrogen DF",
+    description: "Potato peel pre-treatment, dark fermentation, anaerobic digestion, CO2 absorption, recycle",
+    product: "Hydrogen and methane",
+    titer: 18,
+    recovery: 64,
+    batchSize: 75000,
+    batchCount: 300,
+    units: [
+      unit("STO-101", "storage", 40, 80, "Potato Peel Storage"),
+      unit("GR-102", "grinder", 290, 80, "Feedstock Grinding"),
+      unit("HX-103", "heat-exchanger", 540, 80, "Liquefaction Heat Exchange"),
+      unit("LQ-201", "liquefaction", 790, 80, "Alpha-Amylase Liquefaction"),
+      unit("SC-202", "saccharification", 1040, 80, "Gluco-Amylase Saccharification"),
+      unit("RVF-301", "rotary-filter", 1290, 80, "Rotary Vacuum Filtration"),
+      unit("SV-302", "surge-tank", 40, 265, "Glucose Syrup Surge"),
+      unit("REG-303", "regulator", 290, 265, "Syrup-Water Feedback Regulator"),
+      unit("DF-401", "dark-fermenter", 540, 265, "C. saccharolyticus Dark Fermentation"),
+      unit("SP-402", "sampling", 790, 265, "H2 Productivity Sample"),
+      unit("ST-403", "sterile-filter", 1040, 265, "Liquid Sterilization"),
+      unit("AD-501", "anaerobic-digester", 1290, 265, "Acid Conversion Anaerobic Digestion"),
+      unit("MX-601", "mixer", 290, 450, "H2/CH4 Gas Blend"),
+      unit("ABS-701", "absorber", 540, 450, "DEA CO2 Absorption"),
+      unit("DES-702", "desorber", 790, 450, "DEA Regeneration"),
+      unit("SPL-703", "splitter", 1040, 450, "Lean Solvent Recycle Split"),
+      unit("TS-704", "tear-stream", 1290, 450, "Recycle Tear Stream"),
+      unit("WH-801", "waste-hold", 540, 635, "Filter Cake and Biomass Waste"),
+      unit("QC-901", "qc", 790, 635, "Gas Purity and Economics Report"),
+    ],
+    streams: [
+      stream("S-101", "STO-101", "GR-102", "Potato peels", "Solid"),
+      stream("S-102", "GR-102", "HX-103", "Ground potato peel slurry", "Slurry"),
+      stream("S-103", "HX-103", "LQ-201", "60 C liquefaction feed", "Slurry"),
+      stream("S-201", "LQ-201", "SC-202", "Liquefied starch stream", "Slurry"),
+      stream("S-202", "SC-202", "RVF-301", "Glucose-rich hydrolysate", "Slurry"),
+      stream("S-301", "RVF-301", "SV-302", "Filtered glucose syrup", "Liquid"),
+      stream("S-302", "RVF-301", "WH-801", "Cellulose filter cake", "Solid"),
+      stream("S-303", "SV-302", "REG-303", "Syrup feed", "Liquid"),
+      stream("S-304", "REG-303", "DF-401", "Diluted glucose feed", "Aqueous"),
+      stream("S-401", "DF-401", "SP-402", "H2 CO2 off-gas sample", "Gas"),
+      stream("S-402", "DF-401", "ST-403", "Acetate lactate liquid outlet", "Liquid"),
+      stream("S-403", "ST-403", "AD-501", "Sterilized acid substrate", "Liquid"),
+      stream("S-501", "AD-501", "MX-601", "CH4 CO2 biogas", "Gas"),
+      stream("S-502", "SP-402", "MX-601", "H2 CO2 dark fermentation gas", "Gas"),
+      stream("S-601", "MX-601", "ABS-701", "Mixed H2 CH4 CO2 gas", "Gas"),
+      stream("S-701", "ABS-701", "QC-901", "H2 CH4 product gas", "Gas"),
+      stream("S-702", "ABS-701", "DES-702", "CO2-rich DEA", "Liquid"),
+      stream("S-703", "DES-702", "SPL-703", "Lean DEA", "Liquid"),
+      stream("S-704", "SPL-703", "TS-704", "Recycle solvent loop", "Liquid"),
+      stream("S-705", "TS-704", "ABS-701", "Converged lean solvent", "Liquid"),
+      stream("S-706", "SPL-703", "WH-801", "Solvent purge", "Liquid"),
+    ],
+    costs: costs(18, 16, 24, 8, 34),
   },
 };
 
@@ -919,6 +991,49 @@ const equations = [
   eq("E-factor", "economics", "E_factor = mass_waste / mass_product", "Waste intensity metric."),
   eq("Water intensity", "economics", "WI = water_used / kg_product", "Water use per product mass."),
   eq("Carbon intensity", "economics", "CI = sum(activity_i * emission_factor_i) / kg_product", "Scope-relevant process carbon intensity estimate."),
+  eq("SPD kinetic productivity", "kinetics", "q_C = (alpha*mu_max*S1*S2*S3 + beta) * X", "SuperPro-style volumetric productivity for kinetic fermentation with up to three multiplicative growth or inhibition terms."),
+  eq("Luedeking-Piret product", "kinetics", "q_P = alpha*dX/dt + beta*X", "Growth-associated and non-growth-associated product formation used to represent product rather than biomass formation."),
+  eq("Critical osmolarity inhibition", "kinetics", "I_osm = 1 - (OSM / OSM_crit)^n_osm", "Dark-fermentation osmotic inhibition from acetate, lactate, glucose, and other dissolved species."),
+  eq("Hydrogen inhibition", "kinetics", "I_H2 = 1 - (H2_aq / H2_aq,crit)^n_H2", "Dissolved hydrogen inhibition term for C. saccharolyticus dark fermentation."),
+  eq("DF specific growth", "kinetics", "mu = mu_max * G/(G + K_G) * I_osm * I_H2", "Dark-fermentation growth model combining Monod glucose limitation with osmotic and hydrogen inhibition."),
+  eq("Haldane inhibition", "kinetics", "mu = mu_max * S / (K_S + S + S^2/K_I)", "Substrate inhibition model available as an alternative to simple Monod kinetics."),
+  eq("First order formation", "kinetics", "r_P = k * C_reference", "Simplified product formation used when full product or by-product inhibition cannot be modeled."),
+  eq("Zeroth order formation", "kinetics", "r_P = k", "Constant product formation independent of concentration."),
+  eq("CSTR dilution", "mass", "D = F / V", "Continuous stirred-tank dilution rate from volumetric feed and reactor volume."),
+  eq("CSTR washout check", "mass", "washout risk if D >= mu", "Continuous fermentation wash-out condition highlighted as a SuperPro limitation in the thesis."),
+  eq("Tear stream convergence", "mass", "epsilon = abs(F_n - F_(n-1)) / F_n", "Recycle-loop convergence error checked over successive tear-stream iterations."),
+  eq("Recycle purge", "mass", "F_purge = F_recycle * (1 - recycle_fraction)", "Purge needed to avoid accumulation in a continuous recycle loop."),
+  eq("Regulated dilution stream", "mass", "F_water = F_syrup * (C_syrup/C_target - 1)", "Feedback-regulated water addition to achieve a target substrate concentration."),
+  eq("Rotary vacuum split", "separation", "m_filtrate,i = split_i * m_feed,i", "Component split model for a filter when detailed particle properties are not used."),
+  eq("Heat exchanger target", "energy", "Q = m_hot*Cp_hot*(T_hot,in - T_hot,out) = m_cold*Cp_cold*(T_cold,out - T_cold,in)", "Countercurrent heat exchange with target outlet temperature or approach temperature."),
+  eq("Absorption removal", "separation", "CO2_out = CO2_in * (1 - eta_abs)", "Simplified CO2 absorption removal model for DEA gas upgrading."),
+  eq("Solvent regeneration", "energy", "Q_regen = m_solvent * Cp * DeltaT + m_CO2 * DeltaH_des", "Desorption/regeneration duty estimate for a CO2-rich solvent stream."),
+  eq("Adjusted absorption cost", "economics", "OC_adjusted = OC_fermentation * (1 + absorption_factor)", "Thesis-style adjustment when absorption cannot be modeled accurately in the simulator."),
+  eq("Process throughput scale-up", "economics", "scale_factor = target_MP_rate / current_MP_rate", "SuperPro Adjust Process Throughput analogue for scaling flows and parallel unit counts."),
+  eq("Parallel unit count", "economics", "N_parallel = ceil(required_capacity / unit_capacity)", "Automatic invisible parallel-unit sizing behavior described for bottleneck equipment."),
+  eq("Gross margin", "economics", "gross_margin = (revenue - operating_cost) / revenue", "Economic Evaluation report profitability metric."),
+  eq("Unit production cost", "economics", "UPC = annual_operating_cost / annual_main_product", "Cost basis used in the thesis economic evaluation reports."),
+];
+
+const spdFunctions = [
+  { group: "Setup", name: "Chemical register", status: "Implemented", inputs: "Components, mixtures, missing physical properties", output: "Component database for reactions, streams, and economics", note: "Mirrors the PDF workflow: define every reactant, product, by-product, and mixture before building the process." },
+  { group: "Setup", name: "Batch or continuous mode", status: "Implemented", inputs: "Mode selection, holdup, scheduling, steady-state settings", output: "Process-mode assumptions and cost/scheduling behavior", note: "Batch mode requires unit-operation sequences; continuous mode uses steady-state unit settings and recycle convergence." },
+  { group: "Streams", name: "Raw material / waste / revenue classification", status: "Implemented", inputs: "Stream role, buying price, disposal price, selling price", output: "Economic stream class and contribution", note: "The tool now differentiates main, utility, waste, and QC/data paths visually and in the function board." },
+  { group: "Batch", name: "PULL IN / CHARGE", status: "Implemented", inputs: "Source stream, target mass, concentration, temperature, or volume", output: "Automatically sized inlet transfer", note: "Useful for raw-material streams and enzyme dosing to a concentration or temperature criterion." },
+  { group: "Batch", name: "TRANSFER IN / TRANSFER OUT", status: "Implemented", inputs: "Available mass from upstream or outlet fraction", output: "Material transfer between units", note: "Recommended routine for moving all available mass between process units." },
+  { group: "Batch", name: "PULL OUT", status: "Implemented", inputs: "Downstream demand or operation criterion", output: "Demand-driven outlet transfer", note: "Represents downstream-listening transfer behavior described in Appendix VII." },
+  { group: "Batch", name: "STORE / GRIND / HEAT / HEAT EXCHANGE / FILTER / CIP", status: "Implemented", inputs: "Duration, energy source, split coefficients, labor, scheduling", output: "Unit operation sequence and cost/schedule impact", note: "Included as batch-operation cards and equipment units such as grinder, heat exchanger, rotary vacuum filter, and CIP." },
+  { group: "Fermentation", name: "Stoichiometric reaction", status: "Implemented", inputs: "Balanced mass or molar coefficients, reaction time", output: "Linear conversion across residence time", note: "The PDF recommends mass balancing where biomass is treated as an approximate pseudo-component." },
+  { group: "Fermentation", name: "Kinetic fermentation", status: "Implemented", inputs: "mu max, alpha, beta, biomass, S1/S2/S3 terms", output: "Volumetric productivity", note: "Adds the SuperPro kinetic productivity equation and Luedeking-Piret product formation." },
+  { group: "Fermentation", name: "Dark fermentation inhibition", status: "Implemented", inputs: "Glucose, osmolarity, dissolved H2, critical inhibition terms", output: "DF growth/productivity warning model", note: "Adds osmolarity and hydrogen inhibition from the thesis, plus CSTR washout checking." },
+  { group: "Continuous", name: "Feedback regulatory system", status: "Implemented", inputs: "Target concentration, water feed, syrup feed", output: "Adjusted dilution stream", note: "Modeled as the feedback regulator unit and dilution equation for syrup-water concentration control." },
+  { group: "Continuous", name: "Recycle loop and tear stream", status: "Implemented", inputs: "Recycle fraction, purge, max iterations, tolerance", output: "Convergence status and tear-stream marker", note: "Includes splitter, tear-stream marker, convergence equation, and purge balance." },
+  { group: "Troubleshooting", name: "Breakpoints", status: "Implemented", inputs: "Unit, operation, status, error condition", output: "Pause point for reviewing intermediate conditions", note: "Represented as operational status and function card for debugging unit sequences." },
+  { group: "Troubleshooting", name: "Unit-operation equation lookup", status: "Implemented", inputs: "Selected unit or stream", output: "Relevant equation spotlight", note: "The canvas equation spotlight changes with selected equipment or stream and links into the full equation library." },
+  { group: "Scale-up", name: "Process throughput target", status: "Implemented", inputs: "Target main-product rate", output: "Scale factor and parallel unit count", note: "Implements the Adjust Process Throughput idea from the PDF and shows parallel unit sizing equations." },
+  { group: "Economics", name: "Economic evaluation report", status: "Implemented", inputs: "Capital, operating cost, revenues, waste handling, absorption adjustment", output: "COGS, gross margin, ROI-like indicators", note: "Adds thesis-style operating-cost adjustment, unit production cost, gross margin, and revenue/cost stream classification." },
+  { group: "Gas upgrading", name: "Absorption and desorption", status: "Implemented", inputs: "CO2 removal, DEA solvent recycle, regeneration duty", output: "Product gas and solvent loop estimate", note: "Adds absorber/desorber equipment and simplified CO2 absorption/regeneration functions because the thesis noted SPD limitations for reactive absorption." },
+  { group: "Reporting", name: "Batch sheet / dynamic profiles", status: "Implemented", inputs: "Operation sequence, time profile, temperature/concentration records", output: "Checklist-style batch record and time-series assumptions", note: "Represented by operation-sequence cards and profile-related equations; exported in JSON with scenario data." },
 ];
 
 const state = {
@@ -964,6 +1079,7 @@ const els = {
   utilization: document.querySelector("#utilization"),
   equipmentTable: document.querySelector("#equipmentTable"),
   streamsTable: document.querySelector("#streamsTable"),
+  simulationBoard: document.querySelector("#simulationBoard"),
   equationSearch: document.querySelector("#equationSearch"),
   equationFilter: document.querySelector("#equationFilter"),
   equationList: document.querySelector("#equationList"),
@@ -1492,6 +1608,51 @@ function renderEquations() {
   `).join("");
 }
 
+function renderSimulationBoard() {
+  const p = state.params;
+  const data = metrics();
+  const convergenceError = Math.max(0.0001, (100 - p.recycleFraction) / 100000);
+  const washout = p.dilutionRate >= p.specificGrowth;
+  const absorptionBoost = p.co2Removal / 2000;
+  const groups = [...new Set(spdFunctions.map((item) => item.group))];
+
+  els.simulationBoard.innerHTML = `
+    <section class="simulation-summary">
+      <article><span>Mode</span><strong>${state.template === "biohydrogen" ? "Continuous DF + recycle" : "Hybrid batch/continuous"}</strong></article>
+      <article><span>Tear convergence</span><strong>${formatNumber(convergenceError * 100, 4)}%</strong></article>
+      <article><span>CSTR washout</span><strong class="${washout ? "risk" : "ok"}">${washout ? "Risk" : "Clear"}</strong></article>
+      <article><span>CO2 absorption</span><strong>${formatNumber(p.co2Removal, 0)}%</strong></article>
+      <article><span>Adjusted output</span><strong>${formatMass(data.annualKg * (1 + absorptionBoost))}</strong></article>
+    </section>
+    <section class="operation-sequence">
+      <h3>Batch operation sequence library</h3>
+      <div>
+        ${["PULL IN", "CHARGE", "TRANSFER IN", "HEAT", "HEAT EXCHANGE", "REACT / FERMENT", "FILTER", "PULL OUT", "TRANSFER OUT", "STORE", "GRIND", "CIP", "BATCH SHEET", "BREAKPOINT"].map((item) => `<span>${item}</span>`).join("")}
+      </div>
+    </section>
+    ${groups.map((group) => `
+      <section class="simulation-group">
+        <h3>${group}</h3>
+        <div class="simulation-cards">
+          ${spdFunctions.filter((item) => item.group === group).map((item) => `
+            <article class="simulation-card">
+              <div>
+                <span>${item.status}</span>
+                <h4>${item.name}</h4>
+              </div>
+              <dl>
+                <dt>Inputs</dt><dd>${item.inputs}</dd>
+                <dt>Output</dt><dd>${item.output}</dd>
+              </dl>
+              <p>${item.note}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `).join("")}
+  `;
+}
+
 function renderStandards() {
   els.standardsList.innerHTML = standards.map((item) => `
     <article class="standard-card">
@@ -1673,6 +1834,7 @@ function exportJson() {
     streams: state.streams,
     equations,
     standards,
+    simulationFunctions: spdFunctions,
   }, null, 2);
   const blob = new Blob([payload], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1702,6 +1864,7 @@ function renderAll() {
   renderCanvas();
   renderTables();
   renderEquations();
+  renderSimulationBoard();
   renderStandards();
   renderEconomics();
   renderInspector();
