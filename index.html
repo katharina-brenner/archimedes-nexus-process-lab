@@ -3,6 +3,213 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archimedes Nexus Process Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Project controls">
+        <div class="brand">
+          <div class="brand-mark">AN</div>
+          <div>
+            <h1>Archimedes Nexus</h1>
+            <p>Process intelligence lab</p>
+          </div>
+        </div>
+
+        <section class="control-group">
+          <h2>Process Template</h2>
+          <div id="templateList" class="template-list"></div>
+        </section>
+
+        <section class="control-group">
+          <h2>Scale</h2>
+          <div id="scaleList" class="segmented"></div>
+        </section>
+
+        <section class="control-group">
+          <h2>Global Parameters</h2>
+          <label class="slider-row">
+            <span>Batch volume</span>
+            <input id="batchSize" type="range" min="50" max="200000" step="50" value="4000" />
+            <b id="batchSizeValue">4,000 L</b>
+          </label>
+          <label class="slider-row">
+            <span>Annual batches</span>
+            <input id="batchCount" type="range" min="5" max="330" step="5" value="120" />
+            <b id="batchCountValue">120</b>
+          </label>
+          <label class="slider-row">
+            <span>Titer</span>
+            <input id="titer" type="range" min="0.2" max="80" step="0.1" value="12" />
+            <b id="titerValue">12 g/L</b>
+          </label>
+          <label class="slider-row">
+            <span>Recovery</span>
+            <input id="recovery" type="range" min="20" max="98" step="1" value="72" />
+            <b id="recoveryValue">72%</b>
+          </label>
+        </section>
+
+        <section class="control-group parameter-panel">
+          <h2>Biochemical Parameters</h2>
+          <div id="parameterList" class="parameter-list"></div>
+        </section>
+
+        <section class="control-group">
+          <h2>Unit Operations</h2>
+          <p class="hint">Click an item to add it, or drag it onto the canvas.</p>
+          <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="processEyebrow">Cultured meat production</p>
+            <h2>Process Flowsheet</h2>
+          </div>
+          <nav class="view-tabs" aria-label="Workspace views">
+            <button class="tab active" data-view="flowsheet">Flowsheet</button>
+            <button class="tab" data-view="equipment">Equipment</button>
+            <button class="tab" data-view="streams">Streams</button>
+            <button class="tab" data-view="equations">Equations</button>
+            <button class="tab" data-view="simulation">Simulation</button>
+            <button class="tab" data-view="standards">Standards</button>
+            <button class="tab" data-view="economics">Economics</button>
+          </nav>
+          <div class="actions">
+            <button id="autoLayout" class="icon-button" title="Auto layout" aria-label="Auto layout">L</button>
+            <button id="fitCanvas" class="icon-button" title="Fit full process" aria-label="Fit full process">F</button>
+            <button id="zoomOut" class="icon-button" title="Zoom out" aria-label="Zoom out">-</button>
+            <button id="zoomReset" class="icon-button" title="Reset zoom" aria-label="Reset zoom">1</button>
+            <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="copySelected" class="icon-button" title="Copy selected unit" aria-label="Copy selected unit">C</button>
+            <button id="connectSelected" class="icon-button" title="Connect from selected unit" aria-label="Connect from selected unit">&gt;</button>
+            <button id="exportJson" class="icon-button" title="Export JSON" aria-label="Export JSON">E</button>
+            <button id="resetScenario" class="text-button">Reset</button>
+          </div>
+        </header>
+
+        <section class="kpi-strip" aria-label="Key metrics">
+          <article>
+            <span>Annual product</span>
+            <strong id="annualProduct">0 t</strong>
+          </article>
+          <article>
+            <span>Batch duration</span>
+            <strong id="batchDuration">0 h</strong>
+          </article>
+          <article>
+            <span>Direct cost</span>
+            <strong id="directCost">$0/kg</strong>
+          </article>
+          <article>
+            <span>Utilities</span>
+            <strong id="utilities">0 MWh</strong>
+          </article>
+          <article>
+            <span>Plant utilization</span>
+            <strong id="utilization">0%</strong>
+          </article>
+        </section>
+
+        <section id="flowsheetView" class="view active">
+          <div class="canvas-frame">
+            <div class="canvas-toolbar" aria-label="Canvas tools">
+              <button class="tool active" data-mode="select"><b>Move</b><span>Select, drag, edit</span></button>
+              <button class="tool" data-mode="connect"><b>Connect</b><span>Click source, then target</span></button>
+              <button class="tool" data-mode="inspect"><b>Inspect</b><span>Open assumptions</span></button>
+              <span id="modeHint">Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.</span>
+            </div>
+            <div class="canvas-assist">
+              <div>
+                <strong>Quick add</strong>
+                <div id="quickAdd" class="quick-add"></div>
+              </div>
+              <div class="flow-legend" aria-label="Flow legend">
+                <span class="legend-main">Main product</span>
+                <span class="legend-utility">Utility</span>
+                <span class="legend-waste">Waste</span>
+                <span class="legend-qc">QC / data</span>
+              </div>
+            </div>
+            <div id="equationSpotlight" class="equation-spotlight"></div>
+            <div id="flowsheetCanvas" class="flowsheet-canvas" aria-label="Drag and drop process canvas"></div>
+          </div>
+          <aside class="inspector" aria-label="Inspector">
+            <div class="inspector-header">
+              <p>Inspector</p>
+              <strong id="inspectorTitle">Select a unit</strong>
+            </div>
+            <div id="inspectorBody" class="inspector-body"></div>
+          </aside>
+        </section>
+
+        <section id="equipmentView" class="view data-view">
+          <table>
+            <thead>
+              <tr><th>Tag</th><th>Operation</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Status</th></tr>
+            </thead>
+            <tbody id="equipmentTable"></tbody>
+          </table>
+        </section>
+
+        <section id="streamsView" class="view data-view">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>From</th><th>To</th><th>Flow</th><th>Key components</th><th>Phase</th></tr>
+            </thead>
+            <tbody id="streamsTable"></tbody>
+          </table>
+        </section>
+
+        <section id="equationsView" class="view equations-view">
+          <div class="equation-toolbar">
+            <input id="equationSearch" type="search" placeholder="Search balances, kinetics, reactions, chromatography..." />
+            <select id="equationFilter" aria-label="Equation category">
+              <option value="all">All categories</option>
+              <option value="stoichiometry">Stoichiometry</option>
+              <option value="kinetics">Kinetics</option>
+              <option value="mass">Mass balance</option>
+              <option value="energy">Energy</option>
+              <option value="separation">Separation</option>
+              <option value="emissions">Emissions</option>
+              <option value="environmental">Environmental</option>
+              <option value="economics">Economics</option>
+            </select>
+          </div>
+          <div id="equationList" class="equation-list"></div>
+        </section>
+
+        <section id="simulationView" class="view simulation-view">
+          <div class="simulation-board" id="simulationBoard"></div>
+        </section>
+
+        <section id="standardsView" class="view standards-view">
+          <div id="standardsList" class="standards-list"></div>
+        </section>
+
+        <section id="economicsView" class="view economics-view">
+          <div class="cost-stack" id="costStack"></div>
+          <div class="economic-notes">
+            <h3>Cost Drivers</h3>
+            <p id="costNarrative"></p>
+            <dl id="economicDetails"></dl>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SuperPro Designer</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
