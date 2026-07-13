@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Archimedes Nexus Process Lab</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260713-builder-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -56,11 +56,6 @@
           <div id="parameterList" class="parameter-list"></div>
         </section>
 
-        <section class="control-group">
-          <h2>Unit Operations</h2>
-          <p class="hint">Click an item to add it, or drag it onto the canvas.</p>
-          <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
-        </section>
       </aside>
 
       <main class="workspace">
@@ -79,15 +74,15 @@
             <button class="tab" data-view="economics">Economics</button>
           </nav>
           <div class="actions">
-            <button id="autoLayout" class="icon-button" title="Auto layout" aria-label="Auto layout">L</button>
-            <button id="fitCanvas" class="icon-button" title="Fit full process" aria-label="Fit full process">F</button>
+            <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Auto Layout</span></button>
+            <button id="fitCanvas" class="action-button primary" title="Fit the whole flowsheet into view" aria-label="Fit full process"><span>Fit Process</span></button>
             <button id="zoomOut" class="icon-button" title="Zoom out" aria-label="Zoom out">-</button>
-            <button id="zoomReset" class="icon-button" title="Reset zoom" aria-label="Reset zoom">1</button>
+            <button id="zoomReset" class="action-button compact" title="Reset zoom" aria-label="Reset zoom"><span>100%</span></button>
             <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
-            <button id="copySelected" class="icon-button" title="Copy selected unit" aria-label="Copy selected unit">C</button>
-            <button id="connectSelected" class="icon-button" title="Connect from selected unit" aria-label="Connect from selected unit">&gt;</button>
-            <button id="exportJson" class="icon-button" title="Export JSON" aria-label="Export JSON">E</button>
-            <button id="resetScenario" class="text-button">Reset</button>
+            <button id="copySelected" class="action-button" title="Duplicate the selected unit" aria-label="Duplicate selected unit"><span>Duplicate Unit</span></button>
+            <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect Selected</span></button>
+            <button id="exportJson" class="action-button" title="Export the full process model as JSON" aria-label="Export JSON"><span>Export Model</span></button>
+            <button id="resetScenario" class="text-button">Reset Scenario</button>
           </div>
         </header>
 
@@ -116,15 +111,23 @@
 
         <section id="flowsheetView" class="view active">
           <div class="canvas-frame">
+            <div class="builder-library" aria-label="Equipment builder library">
+              <div class="library-intro">
+                <p>Drag-and-drop builder</p>
+                <h3>Equipment Library</h3>
+                <span>Drag any unit onto the canvas, or click once to add it to the next open position.</span>
+              </div>
+              <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
+            </div>
             <div class="canvas-toolbar" aria-label="Canvas tools">
-              <button class="tool active" data-mode="select"><b>Move</b><span>Select, drag, edit</span></button>
-              <button class="tool" data-mode="connect"><b>Connect</b><span>Click source, then target</span></button>
-              <button class="tool" data-mode="inspect"><b>Inspect</b><span>Open assumptions</span></button>
+              <button class="tool active" data-mode="select"><b>Move & Edit Units</b><span>Select a unit, drag it, or change its assumptions</span></button>
+              <button class="tool" data-mode="connect"><b>Draw Process Stream</b><span>Click a source unit, then a destination unit</span></button>
+              <button class="tool" data-mode="inspect"><b>Inspect Equations</b><span>Open sizing, standards, balances, and equations</span></button>
               <span id="modeHint">Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.</span>
             </div>
             <div class="canvas-assist">
               <div>
-                <strong>Quick add</strong>
+                <strong>Inline valves and instruments</strong>
                 <div id="quickAdd" class="quick-add"></div>
               </div>
               <div class="flow-legend" aria-label="Flow legend">
