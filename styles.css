@@ -439,6 +439,8 @@ input[type="range"] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 14px;
+  min-height: max(760px, calc(100vh - 178px));
+  overflow: visible;
 }
 
 .canvas-frame,
@@ -458,6 +460,7 @@ input[type="range"] {
 .canvas-frame {
   display: grid;
   grid-template-rows: auto auto auto 1fr;
+  min-height: max(720px, calc(100vh - 190px));
   overflow: hidden;
 }
 
@@ -652,7 +655,10 @@ input[type="range"] {
 .flowsheet-canvas {
   position: relative;
   overflow: auto;
-  min-height: 0;
+  min-height: 620px;
+  max-height: none;
+  overscroll-behavior: contain;
+  scroll-padding: 96px;
   background:
     linear-gradient(rgba(169, 189, 205, 0.32) 1px, transparent 1px),
     linear-gradient(90deg, rgba(169, 189, 205, 0.32) 1px, transparent 1px),
@@ -687,6 +693,7 @@ input[type="range"] {
   min-width: var(--stage-width);
   min-height: var(--stage-height);
   transform-origin: top left;
+  margin: 0 96px 180px 0;
 }
 
 .unit {
