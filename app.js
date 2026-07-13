@@ -1396,6 +1396,10 @@ function unitWidth(item) {
   return isMinorUnit(item) ? 156 : 218;
 }
 
+function unitHeight(item) {
+  return isMinorUnit(item) ? 58 : 88;
+}
+
 function unitMidline(item) {
   return item.y + (isMinorUnit(item) ? 29 : 46);
 }
@@ -1587,8 +1591,10 @@ function renderMetrics() {
 
 function renderCanvas() {
   els.canvas.innerHTML = "";
-  const stageWidth = Math.max(1500, ...state.units.map((item) => item.x + 280));
-  const stageHeight = Math.max(760, ...state.units.map((item) => item.y + 180));
+  const stagePaddingX = 520;
+  const stagePaddingY = 420;
+  const stageWidth = Math.max(1800, ...state.units.map((item) => item.x + unitWidth(item) + stagePaddingX));
+  const stageHeight = Math.max(1120, ...state.units.map((item) => item.y + unitHeight(item) + stagePaddingY));
   const stage = document.createElement("div");
   stage.className = "canvas-stage";
   stage.style.width = `${stageWidth}px`;
@@ -2034,8 +2040,8 @@ function setZoom(value) {
 
 function fitCanvas(silent = false) {
   if (!state.units.length) return;
-  const maxX = Math.max(...state.units.map((item) => item.x + 240));
-  const maxY = Math.max(...state.units.map((item) => item.y + 130));
+  const maxX = Math.max(...state.units.map((item) => item.x + unitWidth(item) + 96));
+  const maxY = Math.max(...state.units.map((item) => item.y + unitHeight(item) + 96));
   const rect = els.canvas.getBoundingClientRect();
   const availableWidth = Math.max(240, rect.width - 48);
   const availableHeight = Math.max(220, rect.height - 48);
