@@ -112,6 +112,15 @@ const palette = [
   { type: "excel-link", label: "Excel/OLE Link", isoName: "Hot-linked spreadsheet or OLE automation object", cls: "Exchange", icon: "XL", color: "#00a88f", residence: 0.1, power: 0.05, standards: ["21 CFR Part 11", "GAMP 5"] },
   { type: "visual-object", label: "Visual Object", isoName: "Text, line, rectangle, ellipse, polyline, or polygon annotation", cls: "Documentation", icon: "VO", color: "#4f6f8f", residence: 0.05, power: 0.01, standards: ["ISO 10628", "GAMP 5"] },
   { type: "process-explorer", label: "Process Explorer", isoName: "Process tree, search, locate, and overview navigator node", cls: "Documentation", icon: "PX", color: "#4f6f8f", residence: 0.05, power: 0.01, standards: ["GAMP 5", "21 CFR Part 11"] },
+  { type: "cleaning-agent", label: "Cleaning Agent Tank", isoName: "Validated cleaning-agent preparation and supply tank", cls: "Utilities", icon: "CAT", color: "#b74d45", residence: 1.2, power: 0.6, standards: ["EU GMP Annex 15", "ASME BPE"] },
+  { type: "rinse-water", label: "Rinse Water Hold", isoName: "Final rinse water hold and conductivity endpoint tank", cls: "Utilities", icon: "RW", color: "#5bc0de", residence: 0.8, power: 0.4, standards: ["USP <1231>", "EU GMP Annex 15"] },
+  { type: "caustic-hold", label: "Caustic Hold", isoName: "Caustic cleaning solution hold tank", cls: "Utilities", icon: "NaOH", color: "#b74d45", residence: 1, power: 0.5, standards: ["ASME BPE", "EU GMP Annex 15"] },
+  { type: "acid-hold", label: "Acid Hold", isoName: "Acid cleaning solution hold tank", cls: "Utilities", icon: "ACD", color: "#b74d45", residence: 1, power: 0.5, standards: ["ASME BPE", "EU GMP Annex 15"] },
+  { type: "cip-return", label: "CIP Return", isoName: "CIP return, neutralization, and spent-rinse collection", cls: "Utilities", icon: "CIPR", color: "#9b4d4d", residence: 1.5, power: 0.8, standards: ["EU GMP Annex 15", "ISO 14001"] },
+  { type: "heat-recovery", label: "Heat Recovery Loop", isoName: "Process heat recovery exchanger and reuse loop", cls: "Thermal", icon: "HR", color: "#bc6c25", residence: 0.6, power: 1.1, standards: ["ISO 10628", "ISPE Baseline"] },
+  { type: "condensate-return", label: "Condensate Return", isoName: "Clean steam condensate recovery and credit node", cls: "Utilities", icon: "CRN", color: "#bc6c25", residence: 0.4, power: 0.7, standards: ["ASME BPE", "ISPE Baseline"] },
+  { type: "solvent-recycle", label: "Solvent Recycle", isoName: "Recovered solvent recycle and purge control", cls: "Recovery", icon: "SRC", color: "#6d597a", residence: 1.1, power: 1.8, standards: ["ISO 10628", "ICH Q7"] },
+  { type: "water-reuse", label: "Water Reuse", isoName: "Process water reuse and reject-routing node", cls: "Environmental", icon: "WR", color: "#277da1", residence: 1.4, power: 1.2, standards: ["USP <1231>", "ISO 14001"] },
   { type: "weigh-scale", label: "Weigh Scale", isoName: "Process weigh scale or load cell station", cls: "Instrumentation", icon: "WS", color: "#8a6f3d", residence: 0.05, power: 0.05, standards: ["21 CFR Part 11", "GAMP 5"] },
 ];
 
@@ -1032,6 +1041,46 @@ Object.entries(detailLayers).forEach(([key, layer]) => {
   templates[key].description = `${templates[key].description}; detailed utilities, IPC, holds, waste, and release controls`;
 });
 
+const manualInfrastructureLayer = {
+  units: [
+    unit("CAT-950", "cleaning-agent", 40, 1375, "Cleaning Agent Prep"),
+    unit("RWT-951", "rinse-water", 290, 1375, "Final Rinse Hold"),
+    unit("CIP-952", "cip", 540, 1375, "CIP Supply Skid"),
+    unit("CIPR-953", "cip-return", 790, 1375, "CIP Return and Neutralization"),
+    unit("SIP-954", "sip", 1040, 1375, "SIP/Clean Steam Panel"),
+    unit("HR-960", "heat-recovery", 40, 1560, "Heat Reuse Exchanger"),
+    unit("HTA-961", "heat-agent", 290, 1560, "Heat Transfer Agent Loop"),
+    unit("CRN-962", "condensate-return", 540, 1560, "Condensate Return"),
+    unit("SPL-970", "splitter", 790, 1560, "Recycle/Purge Splitter"),
+    unit("TS-971", "tear-stream", 1040, 1560, "Recycle Convergence Tear"),
+    unit("MI-980", "material-inventory", 40, 1745, "Material Inventory Chart"),
+    unit("PM-981", "power-meter", 290, 1745, "Power Demand/Generation"),
+    unit("WR-982", "water-reuse", 540, 1745, "Water Reuse and Reject Routing"),
+    unit("SRC-983", "solvent-recycle", 790, 1745, "Solvent Recycle/Purge"),
+    unit("RPT-990", "report-set", 1040, 1745, "SR/EER/AUX/CIP-SIP Report Set"),
+  ],
+  streams: [
+    stream("M-CIP-001", "CAT-950", "CIP-952", "Caustic acid cleaning agent supply", "Aqueous"),
+    stream("M-CIP-002", "RWT-951", "CIP-952", "Final rinse water", "Aqueous"),
+    stream("M-CIP-003", "CIP-952", "CIPR-953", "Spent CIP return", "Aqueous"),
+    stream("M-SIP-004", "SIP-954", "CIP-952", "Sterile steam and condensate", "Gas"),
+    stream("M-HR-001", "HR-960", "HTA-961", "Recovered heat transfer agent", "Liquid"),
+    stream("M-HR-002", "SIP-954", "CRN-962", "Clean steam condensate return", "Liquid"),
+    stream("M-RCY-001", "SPL-970", "TS-971", "Recycle tear stream convergence", "Liquid"),
+    stream("M-RCY-002", "SRC-983", "SPL-970", "Recovered solvent recycle", "Liquid"),
+    stream("M-WR-001", "WR-982", "SPL-970", "Water reuse recycle with purge", "Aqueous"),
+    stream("M-RPT-001", "MI-980", "RPT-990", "Material inventory and storage report", "Solid"),
+    stream("M-RPT-002", "PM-981", "RPT-990", "Power demand and generation report", "Solid"),
+    stream("M-RPT-003", "CIPR-953", "RPT-990", "CIP/SIP cycle report", "Solid"),
+  ],
+};
+
+Object.values(templates).forEach((template) => {
+  template.units.push(...clone(manualInfrastructureLayer.units));
+  template.streams.push(...clone(manualInfrastructureLayer.streams));
+  template.description = `${template.description}; CIP/SIP, recycle, heat-reuse, resource inventory, and report infrastructure`;
+});
+
 const equations = [
   eq("Cell growth", "kinetics", "mu = mu_max * S / (K_s + S)", "Monod growth rate for substrate-limited cultures."),
   eq("Logistic growth", "kinetics", "dX/dt = mu * X * (1 - X / X_max)", "Density-limited biomass growth."),
@@ -1228,6 +1277,21 @@ const equations = [
   eq("Wegstein convergence", "mass", "x_next = lambda*x_direct + (1-lambda)*x_previous", "Recycle-loop acceleration strategy associated with tear-stream convergence."),
   eq("Emission limit check", "emissions", "status = pass if annual_emission <= emission_limit", "Emission limit comparison for EMS and EPA-MACT style reports."),
   eq("Report set completeness", "economics", "coverage = generated_reports / selected_reports", "Generate-and-save report-set completeness check."),
+  eq("Cleaning-agent demand", "mass", "m_cleaner = V_CIP * rho_solution * concentration_cleaner", "Cleaning-agent stream demand for caustic, acid, or formulated cleaning solutions."),
+  eq("CIP cycle occupancy", "economics", "t_CIP,total = t_pre_rinse + t_caustic + t_intermediate_rinse + t_acid + t_final_rinse", "CIP template duration for equipment occupancy and recipe cycle time."),
+  eq("Rinse endpoint", "mass", "endpoint pass if conductivity_final <= conductivity_limit and TOC <= TOC_limit", "Final-rinse endpoint used for cleaning verification."),
+  eq("SIP sterilization hold", "kinetics", "F0 = integral(10^((T(t)-121.1)/z)) dt", "Steam-in-place lethality equivalent for validated sterilization holds."),
+  eq("Condensate return credit", "energy", "Q_credit = m_condensate * Cp * (T_return - T_makeup)", "Energy credit from clean steam condensate return."),
+  eq("Heat reuse fraction", "energy", "reuse_fraction = Q_recovered / Q_process_heat_demand", "Share of process heat supplied by recovered heat rather than new utility."),
+  eq("Pinch heat recovery", "energy", "Q_recovered,max = min(Q_hot_available, Q_cold_required) * eta_HX", "Heat recovery estimate for matched hot and cold process streams."),
+  eq("Solvent recycle efficiency", "mass", "eta_solvent_recycle = m_solvent_reused / m_solvent_fresh_equivalent", "Solvent recovery and reuse efficiency with purge allowance."),
+  eq("Water reuse ratio", "environmental", "reuse_water_ratio = water_reused / total_process_water", "Water reuse performance for process-water recovery nodes."),
+  eq("Recycle accumulation check", "mass", "accumulation_i = F_in,i - F_out,i + generation_i - consumption_i", "Checks whether recycle and purge settings prevent component buildup."),
+  eq("Purge fraction", "mass", "purge_fraction = F_purge / (F_recycle + F_purge)", "Recycle-loop purge fraction used to control impurities and inerts."),
+  eq("Auxiliary equipment occupancy", "economics", "aux_occupancy = sum(auxiliary_busy_time) / available_auxiliary_time", "Occupancy basis for CIP skids, SIP panels, transfer panels, and vacuum pumps."),
+  eq("Resource bottleneck index", "economics", "RBI = max(resource_demand_t / resource_capacity_t)", "Resource bottleneck check for labor, utilities, heat agents, materials, and auxiliaries."),
+  eq("Inventory coverage", "economics", "coverage_days = inventory_on_hand / average_daily_consumption", "Material inventory coverage for raw materials, cleaning agents, solvents, and buffers."),
+  eq("Cleaning validation sampling", "mass", "N_samples = equipment_surface_groups * swab_points_per_group + rinse_samples", "Sampling workload for cleaning validation and release documentation."),
 ];
 
 const spdFunctions = [
@@ -1298,6 +1362,11 @@ const spdFunctions = [
   { group: "Databanks", name: "Currency, consumable, material, and site databanks", status: "Implemented", inputs: "Currencies, consumables, equipment materials, site resources, auxiliary types", output: "Resource-cost library coverage", note: "Adds the remaining non-process databanks described in the manual." },
   { group: "Databanks", name: "Process library search", status: "Implemented", inputs: "Process records, PLRF sync, criteria, refine search, expand search", output: "Searchable process-library concept", note: "Manual chapter 15 coverage for adding process records, syncing a process library root folder, and AND/OR criteria search." },
   { group: "Emissions", name: "Emission limits and special tank models", status: "Implemented", inputs: "Quiescent tank, agitated tank, cooling tower, VOC load, annual limit", output: "Limit-check and special emission model coverage", note: "Extends emissions coverage with manual chapter 10 limit checks and tank/cooling-tower model concepts." },
+  { group: "Cleaning", name: "Cleaning-agent stream classification", status: "Implemented", inputs: "Caustic, acid, rinse water, cleaning-agent inventory, spent rinse", output: "Cleaning-agent supply and return model", note: "Manual stream classification coverage for cleaning agents, raw materials, waste, revenue/credit, and unclassified streams." },
+  { group: "Cleaning", name: "CIP/SIP auxiliary occupancy", status: "Implemented", inputs: "CIP skid, SIP panel, cycle template, return/neutralization, final rinse endpoint", output: "CIP/SIP support train and occupancy signal", note: "Manual auxiliary equipment coverage for CIP skids, SIP panels, equipment occupancy charts, and CIP template databank behavior." },
+  { group: "Energy", name: "Heat reuse and condensate return", status: "Implemented", inputs: "Hot stream, cold stream, heat transfer agent, condensate return, recovery efficiency", output: "Recovered duty and utility credit", note: "Adds heat-transfer-agent charts, heat recovery, reuse, and condensate return concepts." },
+  { group: "Recycle", name: "Solvent and water recycle with purge", status: "Implemented", inputs: "Recycle split, purge split, solvent recovery, water reuse, tear stream", output: "Recycle loop, purge, and convergence model", note: "Covers recycle-loop convergence, preferred tear streams, solvent reuse, and water reuse/reject routing." },
+  { group: "Resources", name: "Main vs support process role model", status: "Implemented", inputs: "Unit class, stream class, utilities, cleaning, recycle, heat, QC, waste", output: "Visible unit role badges and support infrastructure layer", note: "Makes the core process visually distinct from utilities, cleaning, resource, heat-reuse, recycle, waste, and QC/data elements." },
 ];
 
 const state = {
@@ -1465,6 +1534,29 @@ function streamLabel(kind) {
     waste: "Waste or side stream",
     qc: "QC, PAT, or data flow",
   }[kind];
+}
+
+function unitLayer(item) {
+  const text = `${item.id} ${item.type} ${item.name} ${item.cls}`.toLowerCase();
+  if (text.includes("cip") || text.includes("sip") || text.includes("clean") || text.includes("rinse") || text.includes("caustic") || text.includes("acid hold")) return "cleaning";
+  if (text.includes("recycle") || text.includes("tear") || text.includes("splitter") || text.includes("reuse") || text.includes("solvent recycle")) return "recycle";
+  if (text.includes("heat") || text.includes("condensate") || item.cls === "Thermal") return "heat";
+  if (item.cls === "Quality" || item.cls === "Instrumentation" || item.cls === "Reports" || item.cls === "Documentation" || text.includes("report") || text.includes("sample") || text.includes("pat") || text.includes("em")) return "quality";
+  if (item.cls === "Environmental" || item.cls === "Air pollution" || text.includes("waste") || text.includes("sludge") || text.includes("emission")) return "waste";
+  if (["Utilities", "Resources", "Piping", "Containment"].includes(item.cls)) return "support";
+  return "main";
+}
+
+function unitLayerLabel(layer) {
+  return {
+    main: "Main process",
+    support: "Support",
+    cleaning: "CIP/SIP cleaning",
+    recycle: "Recycle/reuse",
+    heat: "Heat reuse",
+    waste: "Waste/emissions",
+    quality: "QC/data",
+  }[layer] || "Support";
 }
 
 function unitWidth(item) {
@@ -1710,14 +1802,17 @@ function renderCanvas() {
   state.units.forEach((item) => {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    node.className = `unit unit-${className}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}`;
+    const layer = unitLayer(item);
+    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}`;
     node.style.left = `${item.x}px`;
     node.style.top = `${item.y}px`;
     node.style.borderLeftColor = item.color;
+    node.dataset.layer = layer;
     node.dataset.id = item.id;
     node.innerHTML = `
       <span class="unit-icon" style="background:${item.color}">${item.icon}</span>
       <span>
+        <em class="unit-role">${unitLayerLabel(layer)}</em>
         <h3>${item.id}</h3>
         <p>${item.name}</p>
         <small>${unitSize(item)} · ${unitPower(item)}</small>
