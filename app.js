@@ -142,6 +142,67 @@ const canvasFocusOptions = [
   { key: "support", label: "Support systems" },
 ];
 
+const sectionPresets = [
+  {
+    key: "upstream",
+    label: "Upstream Train",
+    detail: "Media, seed, bioreactor",
+    types: ["wfi", "media", "sterile-filter", "hold-tank", "seed-reactor", "production-reactor"],
+    y: 250,
+    composition: "Sterile feed / culture",
+    phase: "Broth",
+  },
+  {
+    key: "downstream",
+    label: "Downstream Train",
+    detail: "Harvest to purification",
+    types: ["cell-removal", "depth-filter", "protein-a", "low-ph", "chromatography", "ufdf"],
+    y: 435,
+    composition: "Clarified product pool",
+    phase: "Liquid",
+  },
+  {
+    key: "cip",
+    label: "CIP / SIP Loop",
+    detail: "Cleaning supply and return",
+    types: ["cleaning-agent", "caustic-hold", "acid-hold", "rinse-water", "cip", "cip-return"],
+    y: 805,
+    composition: "Validated cleaning circuit",
+    phase: "Aqueous",
+  },
+  {
+    key: "recycle",
+    label: "Reuse + Heat",
+    detail: "Recycle, purge, energy credit",
+    types: ["heat-exchanger", "heat-recovery", "condensate-return", "splitter", "water-reuse", "solvent-recycle"],
+    y: 620,
+    composition: "Recovered utility / recycle stream",
+    phase: "Liquid",
+  },
+  {
+    key: "quality",
+    label: "QC + Data Layer",
+    detail: "PAT, EM, records, release",
+    types: ["sampling", "pat", "em", "qc", "stream-summary", "report-set"],
+    y: 620,
+    composition: "Sample / data link",
+    phase: "Liquid",
+  },
+];
+
+const processLanes = [
+  { top: 52, height: 126, label: "Feed, media, and utility supply", tone: "support" },
+  { top: 237, height: 126, label: "Core reaction / bioreactor train", tone: "main" },
+  { top: 422, height: 126, label: "Harvest, separation, purification", tone: "main" },
+  { top: 607, height: 126, label: "Fill finish, QC, packaging", tone: "quality" },
+  { top: 792, height: 126, label: "CIP/SIP, recycle, heat reuse", tone: "cleaning" },
+  { top: 977, height: 126, label: "Wastewater, emissions, environmental controls", tone: "waste" },
+  { top: 1162, height: 126, label: "Resource planning and auxiliary systems", tone: "support" },
+  { top: 1347, height: 126, label: "Reports, data exchange, process explorer", tone: "quality" },
+  { top: 1532, height: 126, label: "Extended process branches", tone: "recycle" },
+  { top: 1717, height: 126, label: "Design notes and validation objects", tone: "support" },
+];
+
 const standards = [
   { group: "GMP", name: "EU GMP Annex 1", scope: "Sterile medicinal product manufacture, contamination control strategy, aseptic processing, environmental monitoring." },
   { group: "GMP", name: "EU GMP Annex 15", scope: "Qualification and validation, process validation, cleaning validation, transport verification." },
@@ -1415,6 +1476,7 @@ const els = {
   paletteSearch: document.querySelector("#paletteSearch"),
   paletteGroups: document.querySelector("#paletteGroups"),
   paletteCount: document.querySelector("#paletteCount"),
+  sectionPresets: document.querySelector("#sectionPresets"),
   canvasFocus: document.querySelector("#canvasFocus"),
   equationSpotlight: document.querySelector("#equationSpotlight"),
   palette: document.querySelector("#palette"),
@@ -1594,6 +1656,10 @@ function unitMidline(item) {
   return item.y + (isMinorUnit(item) ? 29 : 46);
 }
 
+function snapToCanvasGrid(value, step = 16) {
+  return Math.max(24, Math.round(value / step) * step);
+}
+
 function relevantEquations() {
   const selectedUnit = state.units.find((item) => item.id === state.selectedId);
   const selectedStream = state.streams.find((item) => item.id === state.selectedId);
@@ -1765,6 +1831,15 @@ function renderCanvasFocus() {
   `).join("");
 }
 
+function renderSectionPresets() {
+  els.sectionPresets.innerHTML = sectionPresets.map((item) => `
+    <button data-section-preset="${item.key}" title="Add ${item.label}">
+      <b>${item.label}</b>
+      <span>${item.detail}</span>
+    </button>
+  `).join("");
+}
+
 function renderQuickAdd() {
   els.quickAdd.innerHTML = quickAddTypes.map((type) => {
     const item = palette.find((candidate) => candidate.type === type);
@@ -1820,6 +1895,16 @@ function renderMetrics() {
   els.utilization.textContent = `${formatNumber(data.utilization, 0)}%`;
 }
 
+function renderProcessLanes(stage, stageHeight) {
+  stage.insertAdjacentHTML("beforeend", processLanes
+    .filter((item) => item.top < stageHeight - 40)
+    .map((item) => `
+      <div class="process-lane lane-${item.tone}" style="top:${item.top}px;height:${item.height}px">
+        <span>${item.label}</span>
+      </div>
+    `).join(""));
+}
+
 function renderCanvas() {
   els.canvas.innerHTML = "";
   const visibleUnits = state.units.filter(isUnitVisible);
@@ -1837,6 +1922,7 @@ function renderCanvas() {
   els.canvas.style.setProperty("--stage-width", `${stageWidth * state.zoom}px`);
   els.canvas.style.setProperty("--stage-height", `${stageHeight * state.zoom}px`);
   els.canvas.appendChild(stage);
+  renderProcessLanes(stage, stageHeight);
 
   stage.dataset.focus = state.canvasFocus;
   stage.insertAdjacentHTML("beforeend", `
@@ -1929,8 +2015,8 @@ function wireUnitNode(node, item) {
     node.setPointerCapture(event.pointerId);
 
     const move = (moveEvent) => {
-      item.x = Math.max(20, originalX + (moveEvent.clientX - startX) / state.zoom);
-      item.y = Math.max(20, originalY + (moveEvent.clientY - startY) / state.zoom);
+      item.x = snapToCanvasGrid(originalX + (moveEvent.clientX - startX) / state.zoom);
+      item.y = snapToCanvasGrid(originalY + (moveEvent.clientY - startY) / state.zoom);
       node.style.left = `${item.x}px`;
       node.style.top = `${item.y}px`;
       redrawStreamsOnly();
@@ -1983,12 +2069,16 @@ function handleConnectClick(id) {
 
 function addUnitFromPalette(type, x, y) {
   const base = palette.find((item) => item.type === type);
-  const prefix = base.icon.replace(/[^A-Z]/g, "").slice(0, 2) || "U";
-  const newUnit = unit(`${prefix}-${state.nextUnit++}`, type, x, y);
+  const newUnit = unit(nextUnitId(base), type, snapToCanvasGrid(x), snapToCanvasGrid(y));
   state.units.push(newUnit);
   state.selectedId = newUnit.id;
   renderAll();
   showToast(`${base.label} added`);
+}
+
+function nextUnitId(base) {
+  const prefix = base.icon.replace(/[^A-Z]/g, "").slice(0, 3) || "U";
+  return `${prefix}-${state.nextUnit++}`;
 }
 
 function addUnitFromButton(type) {
@@ -2001,12 +2091,40 @@ function addUnitFromButton(type) {
   addUnitFromPalette(type, position.x, position.y);
 }
 
+function addSectionPreset(key) {
+  const preset = sectionPresets.find((item) => item.key === key);
+  if (!preset) return;
+  const maxRight = state.units.reduce((max, item) => Math.max(max, item.x + unitWidth(item)), 40);
+  const startX = snapToCanvasGrid(maxRight + 112);
+  const startY = snapToCanvasGrid(preset.y);
+  const added = preset.types.map((type, index) => {
+    const base = palette.find((item) => item.type === type);
+    const x = startX + index * (isMinorUnit(base) ? 178 : 250);
+    const y = startY + (isMinorUnit(base) ? 20 : 0);
+    const item = unit(nextUnitId(base), type, snapToCanvasGrid(x), snapToCanvasGrid(y));
+    state.units.push(item);
+    return item;
+  });
+
+  added.slice(1).forEach((item, index) => {
+    state.streams.push(stream(`S-${state.nextStream++}`, added[index].id, item.id, preset.composition, preset.phase));
+  });
+
+  state.selectedId = added[0]?.id || state.selectedId;
+  state.canvasFocus = "all";
+  renderAll();
+  window.requestAnimationFrame(() => {
+    els.canvas.scrollTo({ left: Math.max(0, startX * state.zoom - 120), top: Math.max(0, startY * state.zoom - 120), behavior: "smooth" });
+  });
+  showToast(`${preset.label} added`);
+}
+
 function nextCanvasPosition() {
   const rightMost = state.units.reduce((max, item) => Math.max(max, item.x), 40);
   const row = Math.floor(state.units.length / 4);
   return {
-    x: Math.min(rightMost + 265, 45 + (state.units.length % 4) * 265),
-    y: 85 + row * 190,
+    x: snapToCanvasGrid(Math.min(rightMost + 265, 45 + (state.units.length % 4) * 265)),
+    y: snapToCanvasGrid(85 + row * 190),
   };
 }
 
@@ -2357,6 +2475,7 @@ function renderAll() {
   els.paletteSearch.value = state.paletteSearch;
   renderPaletteGroups();
   renderPalette();
+  renderSectionPresets();
   renderCanvasFocus();
   renderQuickAdd();
   renderEquationSpotlight();
@@ -2402,6 +2521,12 @@ function bindEvents() {
     renderCanvasFocus();
     renderCanvas();
     renderInspector();
+  });
+
+  els.sectionPresets.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-section-preset]");
+    if (!button) return;
+    addSectionPreset(button.dataset.sectionPreset);
   });
 
   [els.palette, els.quickAdd].forEach((container) => {
