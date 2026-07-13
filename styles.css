@@ -1,29 +1,29 @@
-@import url("https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
   color-scheme: light;
-  --ink: #0d1520;
-  --muted: #64748b;
-  --quiet: #94a3b8;
-  --line: #dce5ee;
-  --line-strong: #b8c7d5;
+  --ink: #111827;
+  --muted: #5f6b7a;
+  --quiet: #8a96a8;
+  --line: #d9e0ea;
+  --line-strong: #aeb9c8;
   --panel: #ffffff;
   --surface: #eef4f8;
   --surface-2: #e0eaf1;
-  --shell: #08111d;
-  --shell-2: #0d1f31;
-  --steel: #123a56;
-  --teal: #00a88f;
+  --shell: #0f1723;
+  --shell-2: #151f2e;
+  --steel: #233044;
+  --teal: #2f80ed;
   --green: #58c77c;
-  --cyan: #42c7e8;
+  --cyan: #5bc0de;
   --amber: #d7a229;
   --red: #c04f47;
   --shadow: 0 22px 58px rgba(7, 17, 31, 0.16);
   --glass: rgba(255, 255, 255, 0.76);
   --glass-strong: rgba(255, 255, 255, 0.92);
-  --siemens-blue: #0098d8;
-  --ui-font: "Space Grotesk", "Avenir Next", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --display-font: "Exo 2", "Space Grotesk", "Avenir Next Condensed", "DIN Alternate", var(--ui-font);
+  --enterprise-blue: #2f80ed;
+  --ui-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --display-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-family: var(--ui-font);
 }
 
@@ -36,9 +36,9 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at 14% 8%, rgba(0, 168, 143, 0.2), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(0, 152, 216, 0.18), transparent 30%),
-    linear-gradient(135deg, #07111d 0%, #102235 36%, #eef4f8 36%, #f8fbfd 100%);
+    radial-gradient(circle at 14% 8%, rgba(47, 128, 237, 0.16), transparent 26%),
+    radial-gradient(circle at 86% 4%, rgba(66, 77, 94, 0.2), transparent 30%),
+    linear-gradient(135deg, #0b111c 0%, #151f2e 34%, #edf2f7 34%, #f7f9fc 100%);
 }
 
 button,
@@ -113,7 +113,7 @@ button {
 .brand h1 {
   font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .brand p,
@@ -210,8 +210,8 @@ button {
 .tool.active {
   border-color: rgba(0, 168, 143, 0.72);
   color: #03101a;
-  background: linear-gradient(135deg, #7be9f5, #00c2a8 55%, #00a88f);
-  box-shadow: 0 10px 24px rgba(0, 168, 143, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  background: linear-gradient(135deg, #d8e8ff, #84b8ff 48%, #2f80ed);
+  box-shadow: 0 10px 24px rgba(47, 128, 237, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .template-button.active span {
@@ -356,7 +356,7 @@ input[type="range"] {
 .topbar h2 {
   font-size: 26px;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .view-tabs,
@@ -403,10 +403,10 @@ input[type="range"] {
 }
 
 .action-button.primary {
-  border-color: rgba(0, 152, 216, 0.55);
+  border-color: rgba(47, 128, 237, 0.55);
   color: #03101a;
-  background: linear-gradient(135deg, #92efff, #34c8eb 45%, #00a88f);
-  box-shadow: 0 12px 24px rgba(0, 152, 216, 0.16);
+  background: linear-gradient(135deg, #edf5ff, #9dc7ff 42%, #2f80ed);
+  box-shadow: 0 12px 24px rgba(47, 128, 237, 0.18);
 }
 
 .action-button.compact {
@@ -492,9 +492,9 @@ input[type="range"] {
 
 .canvas-frame {
   display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
-  min-height: max(720px, calc(100vh - 190px));
-  overflow: hidden;
+  grid-template-rows: auto auto auto minmax(760px, 1fr) auto;
+  min-height: max(920px, calc(100vh - 150px));
+  overflow: visible;
 }
 
 .builder-library {
@@ -504,8 +504,8 @@ input[type="range"] {
   padding: 12px;
   border-bottom: 1px solid var(--line);
   background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.96), rgba(238, 248, 252, 0.86)),
-    linear-gradient(90deg, rgba(0, 168, 143, 0.1), rgba(0, 152, 216, 0.08));
+    linear-gradient(120deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9)),
+    linear-gradient(90deg, rgba(47, 128, 237, 0.1), rgba(35, 48, 68, 0.08));
 }
 
 .library-intro {
@@ -630,10 +630,15 @@ input[type="range"] {
   display: flex;
   gap: 7px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
 }
 
 .quick-add-button {
+  flex: 0 0 auto;
   display: inline-grid;
   grid-template-columns: 24px auto;
   gap: 6px;
@@ -664,6 +669,7 @@ input[type="range"] {
 
 .flow-legend span {
   position: relative;
+  flex: 0 0 auto;
   padding-left: 28px;
   color: var(--muted);
   font-size: 11px;
@@ -701,7 +707,7 @@ input[type="range"] {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
   background: linear-gradient(180deg, #ffffff, #f8fbfd);
 }
 
@@ -753,15 +759,16 @@ input[type="range"] {
 .flowsheet-canvas {
   position: relative;
   overflow: auto;
-  min-height: 620px;
+  min-height: max(760px, calc(100vh - 280px));
+  height: 100%;
   max-height: none;
   overscroll-behavior: contain;
   scroll-padding: 96px;
   background:
-    linear-gradient(rgba(169, 189, 205, 0.32) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(169, 189, 205, 0.32) 1px, transparent 1px),
-    radial-gradient(circle at 15% 12%, rgba(0, 168, 143, 0.08), transparent 24%),
-    linear-gradient(180deg, #fbfdff 0%, #f3f8fb 100%);
+    linear-gradient(rgba(145, 158, 178, 0.24) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(145, 158, 178, 0.24) 1px, transparent 1px),
+    radial-gradient(circle at 15% 12%, rgba(47, 128, 237, 0.08), transparent 24%),
+    linear-gradient(180deg, #fbfcfe 0%, #eef3f8 100%);
   background-size: 32px 32px;
 }
 
@@ -964,16 +971,17 @@ input[type="range"] {
 
 .stream-line {
   position: absolute;
-  height: 5px;
+  height: 6px;
   border: 0;
   border-radius: 99px;
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.78) 0 10px, transparent 10px 22px),
-    linear-gradient(90deg, #00a88f, #58c77c);
-  background-size: 34px 100%, 100% 100%;
-  box-shadow: 0 0 0 1px rgba(0, 168, 143, 0.12), 0 2px 6px rgba(0, 168, 143, 0.18);
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.82) 0 10px, transparent 10px 24px),
+    linear-gradient(90deg, #2f80ed, #49c6a8);
+  background-size: 42px 100%, 42px 100%, 100% 100%;
+  box-shadow: 0 0 0 1px rgba(47, 128, 237, 0.14), 0 0 18px rgba(47, 128, 237, 0.24), 0 2px 6px rgba(17, 24, 39, 0.14);
   transform-origin: left center;
-  animation: flowPulse 1.15s linear infinite;
+  animation: flowPulse 0.9s linear infinite, flowGlow 2.2s ease-in-out infinite;
 }
 
 .stream-line.selected {
@@ -984,20 +992,23 @@ input[type="range"] {
 
 .stream-utility {
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.72) 0 8px, transparent 8px 18px),
-    linear-gradient(90deg, #42c7e8, #2f80ed);
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.72) 0 8px, transparent 8px 20px),
+    linear-gradient(90deg, #5bc0de, #2f80ed);
 }
 
 .stream-waste {
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.65) 0 9px, transparent 9px 20px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 0 2px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.65) 0 9px, transparent 9px 22px),
     linear-gradient(90deg, #c04f47, #d7a229);
 }
 
 .stream-qc {
-  height: 3px;
+  height: 4px;
   background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0 5px, transparent 5px 12px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 1.5px, transparent 2.5px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0 5px, transparent 5px 14px),
     linear-gradient(90deg, #8a6f3d, #b48cff);
   opacity: 0.9;
 }
@@ -1029,10 +1040,20 @@ input[type="range"] {
 
 @keyframes flowPulse {
   from {
-    background-position: 0 0, 0 0;
+    background-position: 0 0, 0 0, 0 0;
   }
   to {
-    background-position: 34px 0, 0 0;
+    background-position: 42px 0, 42px 0, 0 0;
+  }
+}
+
+@keyframes flowGlow {
+  0%,
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.28);
   }
 }
 
@@ -1476,10 +1497,13 @@ th {
 
   .workspace {
     min-height: 100vh;
+    gap: 10px;
+    padding: 12px;
   }
 
   .topbar {
     order: 1;
+    gap: 10px;
   }
 
   #flowsheetView {
@@ -1502,13 +1526,52 @@ th {
     justify-content: start;
   }
 
+  .view-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+  }
+
   .actions {
-    grid-template-columns: repeat(auto-fit, minmax(128px, max-content));
+    display: flex;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
     justify-self: start;
+  }
+
+  .action-button,
+  .text-button,
+  .icon-button {
+    flex: 0 0 auto;
   }
 
   .builder-library {
     grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .library-intro {
+    min-height: auto;
+    padding: 10px;
+  }
+
+  .library-intro h3 {
+    font-size: 18px;
+  }
+
+  .canvas-frame {
+    min-height: 980px;
+  }
+
+  .flowsheet-canvas {
+    min-height: 720px;
   }
 
   .kpi-strip {
@@ -1521,7 +1584,6 @@ th {
 }
 
 @media (max-width: 720px) {
-  .palette,
   .segmented,
   .equation-toolbar,
   .kpi-strip,
@@ -1531,12 +1593,42 @@ th {
   }
 
   .actions {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    grid-template-columns: none;
   }
 
   .action-button,
   .text-button {
     min-width: 0;
+  }
+
+  .topbar h2 {
+    font-size: 22px;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .palette {
+    min-height: 78px;
+  }
+
+  .builder-library .palette-item {
+    flex-basis: 150px;
+    min-height: 50px;
+  }
+
+  .canvas-toolbar {
+    min-height: auto;
+  }
+
+  .tool {
+    min-width: min(100%, 240px);
+  }
+
+  #modeHint {
+    flex-basis: 100%;
   }
 
   .slider-row {
