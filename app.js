@@ -2093,9 +2093,9 @@ function setMode(mode) {
   state.connectFrom = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === mode));
   const hints = {
-    select: "Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.",
-    connect: "Connect mode: click the source unit first, then click the destination unit. Animated streams show direction.",
-    inspect: "Inspect mode: click a unit or stream to see sizing, assumptions, standards, and relevant equations.",
+    select: "Move & Edit Units: click any equipment block to select it, drag it to reposition, or use the library above to add new units.",
+    connect: "Draw Process Stream: click the source equipment first, then click the destination. Animated streams show process direction.",
+    inspect: "Inspect Equations: click equipment or a stream to review sizing assumptions, standards, balances, and relevant formulas.",
   };
   els.modeHint.textContent = hints[mode];
   renderCanvas();
