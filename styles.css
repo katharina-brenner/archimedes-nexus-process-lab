@@ -501,7 +501,7 @@ input[type="range"] {
 
 .builder-library {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 12px;
   padding: 12px;
   border-bottom: 1px solid var(--line);
@@ -547,10 +547,96 @@ input[type="range"] {
   line-height: 1.35;
 }
 
-.palette {
+.library-count {
+  width: fit-content;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border: 1px solid rgba(47, 128, 237, 0.22);
+  border-radius: 999px;
+  color: #17314a;
+  background: rgba(222, 235, 252, 0.82);
+  font-size: 11px;
+}
+
+.library-panel {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.library-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.library-search {
+  display: grid;
+  gap: 4px;
+}
+
+.library-search span,
+.canvas-focus strong,
+.quick-add-panel strong {
+  color: #536174;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.library-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(31, 42, 58, 0.28);
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  outline: none;
+}
+
+.library-search input:focus {
+  border-color: rgba(47, 128, 237, 0.7);
+  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.14);
+}
+
+.palette-groups,
+.focus-toggle {
   display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.palette-groups button,
+.focus-toggle button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(31, 42, 58, 0.22);
+  border-radius: 999px;
+  color: #344258;
+  background: rgba(255, 255, 255, 0.74);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.palette-groups button.active,
+.focus-toggle button.active {
+  border-color: rgba(47, 128, 237, 0.54);
+  color: #061019;
+  background: linear-gradient(135deg, #edf5ff, #9dc7ff);
+  box-shadow: 0 8px 18px rgba(47, 128, 237, 0.16);
+}
+
+.palette {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(172px, 190px);
+  grid-template-rows: repeat(2, minmax(62px, auto));
   gap: 8px;
-  min-height: 96px;
+  min-height: 138px;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 2px 2px 8px;
@@ -558,10 +644,43 @@ input[type="range"] {
 }
 
 .builder-library .palette-item {
-  flex: 0 0 168px;
+  min-width: 0;
   scroll-snap-align: start;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 10px 22px rgba(29, 48, 64, 0.08);
+}
+
+.builder-library .palette-item small {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+
+.builder-library .palette-item small b {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #223044;
+  background: rgba(226, 233, 242, 0.92);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.palette-empty {
+  display: grid;
+  align-content: center;
+  min-height: 118px;
+  padding: 14px;
+  border: 1px dashed rgba(31, 42, 58, 0.28);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.palette-empty strong {
+  color: var(--ink);
+  font-size: 13px;
 }
 
 .canvas-toolbar {
@@ -610,12 +729,19 @@ input[type="range"] {
 
 .canvas-assist {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, auto) minmax(260px, 0.7fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.8fr) minmax(210px, auto) minmax(260px, 0.8fr);
   gap: 12px;
   align-items: center;
   padding: 10px;
   border-bottom: 1px solid var(--line);
   background: rgba(248, 251, 253, 0.82);
+}
+
+.quick-add-panel,
+.canvas-focus {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
 }
 
 .canvas-assist strong {
@@ -816,7 +942,7 @@ input[type="range"] {
 }
 
 .flowsheet-canvas.drop-ready::before {
-  content: "Drop equipment here";
+  content: attr(data-drop-label);
   position: sticky;
   left: 18px;
   top: 18px;
@@ -838,6 +964,32 @@ input[type="range"] {
   min-height: var(--stage-height);
   transform-origin: top left;
   margin: 0 96px 180px 0;
+}
+
+.canvas-focus-note {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid rgba(31, 42, 58, 0.22);
+  border-radius: 999px;
+  color: #4b596b;
+  background: rgba(249, 251, 253, 0.86);
+  box-shadow: 0 12px 26px rgba(7, 17, 31, 0.12);
+  pointer-events: none;
+}
+
+.canvas-focus-note b {
+  color: #0d1726;
+  font-size: 11px;
+}
+
+.canvas-focus-note span {
+  font-size: 11px;
 }
 
 .unit {
@@ -1667,6 +1819,14 @@ th {
     padding: 10px;
   }
 
+  .library-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-assist {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .library-intro {
     min-height: auto;
     padding: 10px;
@@ -1722,10 +1882,10 @@ th {
 
   .palette {
     min-height: 78px;
+    grid-auto-columns: minmax(150px, 168px);
   }
 
   .builder-library .palette-item {
-    flex-basis: 150px;
     min-height: 50px;
   }
 
@@ -1739,6 +1899,10 @@ th {
 
   #modeHint {
     flex-basis: 100%;
+  }
+
+  .canvas-assist {
+    grid-template-columns: 1fr;
   }
 
   .slider-row {

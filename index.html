@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Archimedes Nexus Process Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20260713-site-process-roles" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-builder-focus" />
   </head>
   <body>
     <div class="app-shell">
@@ -115,9 +115,19 @@
               <div class="library-intro">
                 <p>Drag-and-drop builder</p>
                 <h3>Equipment Library</h3>
-                <span>Drag any unit onto the canvas, or click once to add it to the next open position.</span>
+                <span>Search, filter, then drag or click a unit to place it.</span>
+                <b id="paletteCount" class="library-count">0 units shown</b>
               </div>
-              <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
+              <div class="library-panel">
+                <div class="library-controls">
+                  <label class="library-search">
+                    <span>Search equipment</span>
+                    <input id="paletteSearch" type="search" placeholder="Bioreactor, CIP, valve, heat..." />
+                  </label>
+                  <div id="paletteGroups" class="palette-groups" aria-label="Equipment categories"></div>
+                </div>
+                <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
+              </div>
             </div>
             <div class="canvas-toolbar" aria-label="Canvas tools">
               <button class="tool active" data-mode="select"><b>Move & Edit Units</b><span>Select a unit, drag it, or change its assumptions</span></button>
@@ -126,9 +136,13 @@
               <span id="modeHint">Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.</span>
             </div>
             <div class="canvas-assist">
-              <div>
-                <strong>Inline valves and instruments</strong>
+              <div class="quick-add-panel">
+                <strong>Quick add near selection</strong>
                 <div id="quickAdd" class="quick-add"></div>
+              </div>
+              <div class="canvas-focus" aria-label="Flowsheet focus">
+                <strong>Canvas focus</strong>
+                <div id="canvasFocus" class="focus-toggle"></div>
               </div>
               <div class="flow-legend" aria-label="Flow legend">
                 <span class="legend-main">Main product</span>

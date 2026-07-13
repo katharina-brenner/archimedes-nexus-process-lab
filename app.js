@@ -126,6 +126,22 @@ const palette = [
 
 const quickAddTypes = ["valve", "control-valve", "pump", "flowmeter", "sensor", "pressure-relief", "manifold", "sampling"];
 
+const paletteGroups = [
+  { key: "core", label: "Core", classes: ["Preparation", "Bioreactor", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging"] },
+  { key: "upstream", label: "Upstream", classes: ["Preparation", "Bioreactor", "Hold", "Sterilization"] },
+  { key: "downstream", label: "Downstream", classes: ["Solid-liquid", "Filtration", "Purification", "Concentration", "Separation", "Recovery", "Finishing", "Packaging"] },
+  { key: "utilities", label: "Utilities + CIP", classes: ["Utilities", "Thermal", "Sterilization", "Environmental"] },
+  { key: "piping", label: "Piping", classes: ["Piping", "Instrumentation"] },
+  { key: "quality", label: "Quality", classes: ["Quality", "Viral safety"] },
+  { key: "all", label: "All equipment", classes: [] },
+];
+
+const canvasFocusOptions = [
+  { key: "all", label: "All" },
+  { key: "main", label: "Main process" },
+  { key: "support", label: "Support systems" },
+];
+
 const standards = [
   { group: "GMP", name: "EU GMP Annex 1", scope: "Sterile medicinal product manufacture, contamination control strategy, aseptic processing, environmental monitoring." },
   { group: "GMP", name: "EU GMP Annex 15", scope: "Qualification and validation, process validation, cleaning validation, transport verification." },
@@ -1386,6 +1402,9 @@ const state = {
   units: [],
   streams: [],
   costs: [],
+  paletteGroup: "core",
+  paletteSearch: "",
+  canvasFocus: "all",
 };
 
 const els = {
@@ -1393,6 +1412,10 @@ const els = {
   scaleList: document.querySelector("#scaleList"),
   parameterList: document.querySelector("#parameterList"),
   quickAdd: document.querySelector("#quickAdd"),
+  paletteSearch: document.querySelector("#paletteSearch"),
+  paletteGroups: document.querySelector("#paletteGroups"),
+  paletteCount: document.querySelector("#paletteCount"),
+  canvasFocus: document.querySelector("#canvasFocus"),
   equationSpotlight: document.querySelector("#equationSpotlight"),
   palette: document.querySelector("#palette"),
   canvas: document.querySelector("#flowsheetCanvas"),
@@ -1691,12 +1714,53 @@ function renderScaleList() {
   `).join("");
 }
 
+function paletteMatchesGroup(item) {
+  const group = paletteGroups.find((candidate) => candidate.key === state.paletteGroup) || paletteGroups[0];
+  return group.key === "all" || group.classes.includes(item.cls);
+}
+
+function paletteMatchesSearch(item) {
+  const query = state.paletteSearch.trim().toLowerCase();
+  if (!query) return true;
+  return [item.label, item.isoName, item.cls, item.icon, ...(item.standards || [])]
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
+function filteredPalette() {
+  return palette.filter((item) => paletteMatchesGroup(item) && paletteMatchesSearch(item));
+}
+
+function renderPaletteGroups() {
+  els.paletteGroups.innerHTML = paletteGroups.map((item) => `
+    <button class="${item.key === state.paletteGroup ? "active" : ""}" data-palette-group="${item.key}">
+      ${item.label}
+    </button>
+  `).join("");
+}
+
 function renderPalette() {
-  els.palette.innerHTML = palette.map((item) => `
+  const items = filteredPalette();
+  els.paletteCount.textContent = `${items.length} unit${items.length === 1 ? "" : "s"} shown`;
+  els.palette.innerHTML = items.length ? items.map((item) => `
     <button class="palette-item" draggable="true" data-type="${item.type}" title="Add ${item.label}">
       <span style="background:${item.color}">${item.icon}</span>
       <strong>${item.label}</strong>
-      <small>${item.cls}</small>
+      <small><b>${unitLayerLabel(unitLayer(item))}</b>${item.cls}</small>
+    </button>
+  `).join("") : `
+    <div class="palette-empty">
+      <strong>No matching equipment</strong>
+      <span>Try another category or search term.</span>
+    </div>
+  `;
+}
+
+function renderCanvasFocus() {
+  els.canvasFocus.innerHTML = canvasFocusOptions.map((item) => `
+    <button class="${item.key === state.canvasFocus ? "active" : ""}" data-canvas-focus="${item.key}">
+      ${item.label}
     </button>
   `).join("");
 }
@@ -1758,10 +1822,13 @@ function renderMetrics() {
 
 function renderCanvas() {
   els.canvas.innerHTML = "";
+  const visibleUnits = state.units.filter(isUnitVisible);
+  const visibleUnitIds = new Set(visibleUnits.map((item) => item.id));
+  const visibleStreams = state.streams.filter((item) => visibleUnitIds.has(item.from) && visibleUnitIds.has(item.to));
   const stagePaddingX = 520;
   const stagePaddingY = 420;
-  const stageWidth = Math.max(1800, ...state.units.map((item) => item.x + unitWidth(item) + stagePaddingX));
-  const stageHeight = Math.max(1120, ...state.units.map((item) => item.y + unitHeight(item) + stagePaddingY));
+  const stageWidth = Math.max(1800, ...visibleUnits.map((item) => item.x + unitWidth(item) + stagePaddingX));
+  const stageHeight = Math.max(1120, ...visibleUnits.map((item) => item.y + unitHeight(item) + stagePaddingY));
   const stage = document.createElement("div");
   stage.className = "canvas-stage";
   stage.style.width = `${stageWidth}px`;
@@ -1771,7 +1838,15 @@ function renderCanvas() {
   els.canvas.style.setProperty("--stage-height", `${stageHeight * state.zoom}px`);
   els.canvas.appendChild(stage);
 
-  state.streams.forEach((item) => {
+  stage.dataset.focus = state.canvasFocus;
+  stage.insertAdjacentHTML("beforeend", `
+    <div class="canvas-focus-note">
+      <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
+      <span>${visibleUnits.length} units · ${visibleStreams.length} streams</span>
+    </div>
+  `);
+
+  visibleStreams.forEach((item) => {
     const from = state.units.find((candidate) => candidate.id === item.from);
     const to = state.units.find((candidate) => candidate.id === item.to);
     if (!from || !to) return;
@@ -1784,6 +1859,7 @@ function renderCanvas() {
     const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
     const kind = streamKind(item, from, to);
     line.className = `stream-line stream-${kind}`;
+    line.dataset.streamId = item.id;
     line.style.left = `${x1}px`;
     line.style.top = `${y1}px`;
     line.style.width = `${length}px`;
@@ -1799,7 +1875,7 @@ function renderCanvas() {
     stage.appendChild(line);
   });
 
-  state.units.forEach((item) => {
+  visibleUnits.forEach((item) => {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const layer = unitLayer(item);
@@ -1821,6 +1897,14 @@ function renderCanvas() {
     wireUnitNode(node, item);
     stage.appendChild(node);
   });
+}
+
+function isUnitVisible(item) {
+  if (state.canvasFocus === "all") return true;
+  const layer = unitLayer(item);
+  if (state.canvasFocus === "main") return layer === "main";
+  if (state.canvasFocus === "support") return layer !== "main";
+  return true;
 }
 
 function wireUnitNode(node, item) {
@@ -1864,8 +1948,9 @@ function wireUnitNode(node, item) {
 }
 
 function redrawStreamsOnly() {
-  state.streams.forEach((streamItem, index) => {
-    const line = els.canvas.querySelectorAll(".canvas-stage .stream-line")[index];
+  els.canvas.querySelectorAll(".canvas-stage .stream-line").forEach((line) => {
+    const streamItem = state.streams.find((item) => item.id === line.dataset.streamId);
+    if (!streamItem) return;
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
     if (!line || !from || !to) return;
@@ -2269,7 +2354,10 @@ function showToast(message) {
 function renderAll() {
   renderTemplateList();
   renderScaleList();
+  els.paletteSearch.value = state.paletteSearch;
+  renderPaletteGroups();
   renderPalette();
+  renderCanvasFocus();
   renderQuickAdd();
   renderEquationSpotlight();
   renderParameters();
@@ -2294,16 +2382,43 @@ function bindEvents() {
     if (button) applyScale(button.dataset.scale);
   });
 
+  els.paletteSearch.addEventListener("input", (event) => {
+    state.paletteSearch = event.target.value;
+    renderPalette();
+  });
+
+  els.paletteGroups.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-palette-group]");
+    if (!button) return;
+    state.paletteGroup = button.dataset.paletteGroup;
+    renderPaletteGroups();
+    renderPalette();
+  });
+
+  els.canvasFocus.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-canvas-focus]");
+    if (!button) return;
+    state.canvasFocus = button.dataset.canvasFocus;
+    renderCanvasFocus();
+    renderCanvas();
+    renderInspector();
+  });
+
   [els.palette, els.quickAdd].forEach((container) => {
     container.addEventListener("dragstart", (event) => {
       const item = event.target.closest("[data-type]");
       if (!item) return;
+      const base = palette.find((candidate) => candidate.type === item.dataset.type);
       event.dataTransfer.setData("text/plain", item.dataset.type);
       event.dataTransfer.effectAllowed = "copy";
+      els.canvas.dataset.dropLabel = base ? `Drop ${base.label} on the canvas` : "Drop equipment on the canvas";
       els.canvas.classList.add("drop-ready");
     });
 
-    container.addEventListener("dragend", () => els.canvas.classList.remove("drop-ready"));
+    container.addEventListener("dragend", () => {
+      els.canvas.classList.remove("drop-ready");
+      delete els.canvas.dataset.dropLabel;
+    });
   });
 
   els.palette.addEventListener("click", (event) => {
@@ -2330,16 +2445,21 @@ function bindEvents() {
   els.canvas.addEventListener("dragover", (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
+    if (!els.canvas.dataset.dropLabel) els.canvas.dataset.dropLabel = "Drop equipment on the canvas";
     els.canvas.classList.add("drop-ready");
   });
 
   els.canvas.addEventListener("dragleave", (event) => {
-    if (!els.canvas.contains(event.relatedTarget)) els.canvas.classList.remove("drop-ready");
+    if (!els.canvas.contains(event.relatedTarget)) {
+      els.canvas.classList.remove("drop-ready");
+      delete els.canvas.dataset.dropLabel;
+    }
   });
 
   els.canvas.addEventListener("drop", (event) => {
     event.preventDefault();
     els.canvas.classList.remove("drop-ready");
+    delete els.canvas.dataset.dropLabel;
     const type = event.dataTransfer.getData("text/plain");
     if (!type) return;
     const rect = els.canvas.getBoundingClientRect();
