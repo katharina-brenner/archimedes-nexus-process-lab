@@ -484,6 +484,7 @@ body.show-public .app-shell {
 }
 
 .public-section {
+  scroll-margin-top: 86px;
   padding: 76px 72px;
   border-bottom: 1px solid rgba(160, 180, 206, 0.13);
 }
@@ -597,6 +598,208 @@ body.show-public .app-shell {
 
 .ecosystem-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.proof-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.14fr) minmax(280px, 0.86fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.proof-lead,
+.proof-metrics,
+.review-intro,
+.module-copy-grid article,
+.usecase-grid article,
+.review-grid article,
+.faq-grid article {
+  min-width: 0;
+  border: 1px solid rgba(160, 180, 206, 0.18);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(226, 238, 250, 0.075), rgba(226, 238, 250, 0.035)),
+    rgba(7, 26, 49, 0.26);
+  box-shadow: 0 24px 70px rgba(3, 14, 27, 0.16);
+}
+
+.proof-lead {
+  display: grid;
+  gap: 14px;
+  padding: 26px;
+}
+
+.proof-lead h3,
+.proof-lead p,
+.module-copy-grid h3,
+.module-copy-grid p,
+.usecase-grid h3,
+.usecase-grid p,
+.review-grid p,
+.review-grid span,
+.faq-grid h3,
+.faq-grid p,
+.review-intro p {
+  margin: 0;
+}
+
+.proof-lead h3 {
+  max-width: 780px;
+  color: #fff;
+  font-size: 30px;
+  line-height: 1.08;
+}
+
+.proof-lead p,
+.review-intro p,
+.faq-grid p {
+  color: #b6c5d7;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.proof-metrics {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.proof-metrics span {
+  display: grid;
+  gap: 6px;
+  min-height: 104px;
+  align-content: center;
+  border: 1px solid rgba(155, 231, 221, 0.16);
+  border-radius: 12px;
+  padding: 15px;
+  background: rgba(226, 238, 250, 0.045);
+}
+
+.proof-metrics b {
+  color: #f9fcff;
+  font-size: 17px;
+}
+
+.proof-metrics small {
+  color: #9fb0c5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.usecase-grid,
+.module-copy-grid,
+.review-grid,
+.faq-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.usecase-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.usecase-grid article {
+  display: grid;
+  gap: 11px;
+  align-content: start;
+  min-height: 258px;
+  padding: 20px;
+}
+
+.usecase-grid span {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: #06192c;
+  background: linear-gradient(135deg, #e8fffb, #75d0c7);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.usecase-grid h3,
+.module-copy-grid h3,
+.faq-grid h3 {
+  color: #fff;
+  font-size: 19px;
+  line-height: 1.16;
+}
+
+.usecase-grid p,
+.module-copy-grid p {
+  color: #b6c5d7;
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.module-copy-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.module-copy-grid article {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 226px;
+  padding: 20px;
+}
+
+.public-reviews {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(155, 231, 221, 0.09), transparent 30%),
+    radial-gradient(circle at 88% 14%, rgba(201, 154, 68, 0.08), transparent 28%);
+}
+
+.review-intro {
+  max-width: 860px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+}
+
+.review-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-grid article {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 278px;
+  padding: 22px;
+}
+
+.review-stars {
+  color: #9be7dd;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.review-grid p {
+  color: #f4f8fb;
+  font-size: 17px;
+  line-height: 1.42;
+}
+
+.review-grid span {
+  align-self: end;
+  color: #9fb0c5;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.faq-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.faq-grid article {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 188px;
+  padding: 20px;
 }
 
 .public-login {
@@ -4741,8 +4944,16 @@ th {
 
   .platform-grid,
   .workflow-rail,
-  .public-bento {
+  .public-bento,
+  .usecase-grid,
+  .module-copy-grid,
+  .review-grid,
+  .faq-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .proof-layout {
+    grid-template-columns: 1fr;
   }
 
   .public-bento {
@@ -4983,8 +5194,25 @@ th {
   .public-bento,
   .platform-grid,
   .workflow-rail,
-  .ecosystem-grid {
+  .ecosystem-grid,
+  .usecase-grid,
+  .module-copy-grid,
+  .review-grid,
+  .faq-grid {
     grid-template-columns: 1fr;
+  }
+
+  .proof-lead h3 {
+    font-size: 24px;
+  }
+
+  .proof-lead,
+  .module-copy-grid article,
+  .usecase-grid article,
+  .review-grid article,
+  .faq-grid article {
+    min-height: auto;
+    padding: 16px;
   }
 
   .public-bento {

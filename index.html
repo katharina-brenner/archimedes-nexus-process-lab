@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-canvas-focus-fix" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-frontpage-content" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -21,6 +21,7 @@
             <button type="button" data-public-target="publicPlatform">Platform</button>
             <button type="button" data-public-target="publicWorkflow">Workflow</button>
             <button type="button" data-public-target="publicEcosystem">Ecosystem</button>
+            <button type="button" data-public-target="publicReviews">Reviews</button>
             <button type="button" data-public-target="loginPanel">Login</button>
           </nav>
         </header>
@@ -136,6 +137,54 @@
             </div>
           </section>
 
+          <section class="public-section public-proof" aria-label="Why Axion matters">
+            <div class="section-heading">
+              <p>Why Axion</p>
+              <h2>Bioprocess design needs more than a static flowsheet.</h2>
+            </div>
+            <div class="proof-layout">
+              <article class="proof-lead">
+                <h3>The workspace keeps the plant, the model, and the reasoning in one place.</h3>
+                <p>Most early biomanufacturing work is scattered across slides, spreadsheets, literature PDFs, old simulator files, supplier notes, and meeting decisions. Axion is designed as the central product-engineering surface where a team can move from a product idea to a defendable process concept without losing the assumptions behind the model.</p>
+                <p>The tool does not only draw boxes. It separates main production equipment from support systems, makes utilities and cleaning visible, attaches equations to the process, highlights physical and biochemical boundaries, and prepares the tables a team needs for review.</p>
+              </article>
+              <div class="proof-metrics" aria-label="Platform proof points">
+                <span><b>Full process context</b><small>Product, organism, scale, facility, utilities, cleaning, QC, sources</small></span>
+                <span><b>Engineering explainability</b><small>Every major output can be traced to parameters, equations, or assumptions</small></span>
+                <span><b>Decision-ready exports</b><small>Streams, balances, costs, reactions, readiness gaps, and process notes</small></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="public-section public-usecases" aria-label="Axion use cases">
+            <div class="section-heading">
+              <p>Use Cases</p>
+              <h2>Built for the questions teams ask before a plant exists.</h2>
+            </div>
+            <div class="usecase-grid">
+              <article>
+                <span>01</span>
+                <h3>Design a first process architecture</h3>
+                <p>Turn a product brief into a structured upstream, downstream, utilities, cleaning, waste, and quality-control model. Start with a complete baseline, then edit the flowsheet instead of rebuilding it from scratch.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Compare scale-up scenarios</h3>
+                <p>Evaluate lab, pilot, demo, and commercial assumptions with non-linear cost behavior, facility burden, utilization, recovery, heat load, oxygen transfer, and batch-duration changes.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Find process constraints early</h3>
+                <p>Surface ammonium, lactate, DO, pH, shear, kLa, temperature, sterility, hold-time, cleaning, media-cost, waste, and heat-reuse risks before a model becomes expensive to change.</p>
+              </article>
+              <article>
+                <span>04</span>
+                <h3>Prepare technical conversations</h3>
+                <p>Use the workspace to brief suppliers, advisors, investors, CDMOs, university teams, and internal reviewers with a visible process logic, not only a spreadsheet summary.</p>
+              </article>
+            </div>
+          </section>
+
           <section id="publicEcosystem" class="public-section public-ecosystem">
             <div class="section-heading">
               <p>Partner-ready ecosystem</p>
@@ -163,6 +212,87 @@
               <article>
                 <h3>Review layer</h3>
                 <p>Use structured recommendations to see what still has to be added before a full production simulation is defensible.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="public-section public-modules" aria-label="Axion module explanations">
+            <div class="section-heading">
+              <p>Inside The Product</p>
+              <h2>A complete front end for process modelling work.</h2>
+            </div>
+            <div class="module-copy-grid">
+              <article>
+                <h3>Process Builder</h3>
+                <p>Drag and connect reactors, filters, separators, tanks, pumps, valves, sampling points, sensors, chromatography, sterile operations, utility units, CIP/SIP loops, recycle paths, and heat-reuse equipment. The visual model distinguishes main production from supporting elements so the plant reads logically.</p>
+              </article>
+              <article>
+                <h3>Equations + Balances</h3>
+                <p>Mass balances, energy balances, growth kinetics, oxygen transfer, substrate uptake, heat duty, recovery, yield, cleaning demand, media demand, waste load, and cost equations stay accessible as part of the workspace.</p>
+              </article>
+              <article>
+                <h3>Boundaries + AI</h3>
+                <p>Axion highlights cell-culture and fermentation constraints such as oxygen limitation, ammonium accumulation, heat removal, shear, residence time, hold time, sterility, and equipment-size boundaries. The help panel translates process problems into concrete modelling steps.</p>
+              </article>
+              <article>
+                <h3>CFD Workbench</h3>
+                <p>The interactive reactor visualization helps teams reason about mixing, oxygen distribution, feed zones, nutrient gradients, shear-sensitive regions, and scale-up risk before commissioning detailed CFD studies.</p>
+              </article>
+              <article>
+                <h3>Reports + Downloads</h3>
+                <p>Download stream tables, input/output flows, assumptions, mass and energy balances, cost summaries, reactions, parameters, equipment lists, source notes, and readiness gaps for review outside the tool.</p>
+              </article>
+              <article>
+                <h3>Scientific Data Layer</h3>
+                <p>Attach standards, supplier data, literature, Merck-style process references, internal notes, and validation assumptions to the equipment and parameters they affect, so model decisions are easier to defend.</p>
+              </article>
+            </div>
+          </section>
+
+          <section id="publicReviews" class="public-section public-reviews">
+            <div class="section-heading">
+              <p>Review Examples</p>
+              <h2>What a strong customer reaction should sound like.</h2>
+            </div>
+            <div class="review-intro">
+              <p>These review examples are written as positioning targets for the private beta. They show the level of clarity, speed, and technical trust the product experience is designed to create.</p>
+            </div>
+            <div class="review-grid" aria-label="Customer review examples">
+              <article>
+                <div class="review-stars">★★★★★</div>
+                <p>“For the first time our process discussion felt visual, quantitative, and editable at the same time. We could see the main process, CIP, utilities, and scale-up constraints without jumping between five files.”</p>
+                <span>Bioprocess lead, cultivated protein startup</span>
+              </article>
+              <article>
+                <div class="review-stars">★★★★★</div>
+                <p>“The value is not just the flowsheet. It is the way assumptions, equations, equipment, and sources stay connected. That makes technical review much faster and much less political.”</p>
+                <span>Academic biomanufacturing lab</span>
+              </article>
+              <article>
+                <div class="review-stars">★★★★★</div>
+                <p>“The boundary checks are exactly what early teams miss: oxygen transfer, heat, ammonium, cleaning, hold times, waste, and recovery. It helps you ask the hard questions before the plant design hardens.”</p>
+                <span>Process development advisor</span>
+              </article>
+            </div>
+          </section>
+
+          <section class="public-section public-faq" aria-label="Axion front page FAQ">
+            <div class="section-heading">
+              <p>Clarity</p>
+              <h2>What Axion is meant to become.</h2>
+            </div>
+            <div class="faq-grid">
+              <article>
+                <h3>Is it a replacement for classical simulation tools?</h3>
+                <p>Axion is designed first as a modern digital engineering workspace around bioprocess models: visual, collaborative, explainable, and AI-assisted. Over time, more mechanistic simulation modules can become native where they add value.</p>
+              </article>
+              <article>
+                <h3>What makes the front page relevant to the actual tool?</h3>
+                <p>The public site explains the same workflow used inside the app: product brief, flowsheet, equipment, streams, equations, CFD, standards, sources, economics, recommendations, and downloads.</p>
+              </article>
+              <article>
+                <h3>Who should use the private workspace?</h3>
+                <p>Founders, process engineers, university teams, CDMOs, food-tech teams, pharma development groups, consultants, and technical reviewers who need a clear process model before committing to expensive design work.</p>
               </article>
             </div>
           </section>
@@ -507,6 +637,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-canvas-focus-fix"></script>
+    <script type="module" src="./app.js?v=20260714-frontpage-content"></script>
   </body>
 </html>
