@@ -4100,13 +4100,34 @@ function lockApp() {
 }
 
 const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
+const staticAuth = {
+  token: "axion-static-session-v1",
+  passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9",
+};
+let staticAccessMode = false;
+
+async function sha256Hex(value) {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function staticPasswordMatches(password) {
+  return (await sha256Hex(password)) === staticAuth.passwordHash;
+}
 
 async function apiRequest(path, options = {}) {
+  const session = window.localStorage.getItem("axion-session");
+  if (session === staticAuth.token && path === "/api/account") {
+    return { account: { role: "static", productName: "Axion Process OS" } };
+  }
+  if (path === "/api/auth/google-config" && session === staticAuth.token) {
+    return { enabled: false, clientId: "" };
+  }
   const headers = {
     "content-type": "application/json",
     ...(options.headers || {}),
   };
-  const session = window.localStorage.getItem("axion-session");
   if (session) headers.authorization = `Bearer ${session}`;
   const response = await fetch(path, {
     ...options,
@@ -4129,10 +4150,22 @@ function storeSession(token) {
 }
 
 function renderProductConfig(config) {
+  staticAccessMode = false;
   if (els.loginOrigin) {
     els.loginOrigin.textContent = config?.productName
       ? "Backend online. Private process workspace ready."
       : "Backend online. Private workspace ready.";
+  }
+}
+
+function renderStaticAccessMode() {
+  staticAccessMode = true;
+  if (els.loginOrigin) {
+    els.loginOrigin.textContent = "Online static mode. Enter the workspace password to unlock Axion.";
+  }
+  if (els.googleLoginFallback) els.googleLoginFallback.disabled = true;
+  if (els.googleLoginStatus) {
+    els.googleLoginStatus.textContent = "Google login requires the backend; password login is available for this hosted static version.";
   }
 }
 
@@ -4195,6 +4228,10 @@ async function handleGoogleCredential(response) {
 
 async function setupGoogleLogin() {
   if (!els.googleLoginBox) return;
+  if (staticAccessMode) {
+    renderStaticAccessMode();
+    return;
+  }
   try {
     const config = await apiRequest("/api/auth/google-config");
     if (!config.enabled || !config.clientId) {
@@ -4307,9 +4344,7 @@ async function loadProductConfig() {
     const config = await apiRequest("/api/product");
     renderProductConfig(config);
   } catch (error) {
-    if (els.loginOrigin) {
-      els.loginOrigin.textContent = "Backend offline. Start it with npm run backend.";
-    }
+    renderStaticAccessMode();
   }
 }
 
@@ -4330,8 +4365,7 @@ async function checkStoredAuth() {
 }
 
 function bindAuth() {
-  loadProductConfig();
-  setupGoogleLogin();
+  loadProductConfig().finally(() => setupGoogleLogin());
 
   els.publicLogo?.addEventListener("click", () => scrollPublicTarget("publicHome"));
   els.workspaceLogo?.addEventListener("click", showPublicHome);
@@ -4352,6 +4386,17 @@ function bindAuth() {
     const user = els.loginUser.value.trim();
     const password = els.loginPassword.value.trim();
     els.loginError.textContent = "";
+    if (staticAccessMode) {
+      if (await staticPasswordMatches(password)) {
+        storeSession(staticAuth.token);
+        els.loginPassword.value = "";
+        unlockApp();
+        showToast("Workspace unlocked");
+      } else {
+        els.loginError.textContent = "Access denied. Use the workspace password.";
+      }
+      return;
+    }
     try {
       const payload = await apiRequest("/api/auth/login", {
         method: "POST",
@@ -4362,7 +4407,14 @@ function bindAuth() {
       unlockApp();
       showToast(`Logged in as ${payload.account.role}`);
     } catch (error) {
-      els.loginError.textContent = error.message;
+      if (await staticPasswordMatches(password)) {
+        storeSession(staticAuth.token);
+        els.loginPassword.value = "";
+        unlockApp();
+        showToast("Workspace unlocked");
+      } else {
+        els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
+      }
     }
   });
 

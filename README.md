@@ -11,6 +11,10 @@ npm run backend
 
 Then open `http://127.0.0.1:8899/index.html?v=navy-ci`.
 
+## Online static access
+
+The app also includes a static hosted access mode for GitHub Pages or Sites deployments. If the backend API is not available, the login screen switches to password-only static mode and unlocks the same frontend workspace after the workspace password is entered. The Node backend remains the recommended mode for stronger production authentication.
+
 ## Product-first workflow
 
 The front of the application now works like a company-grade product entry flow:
