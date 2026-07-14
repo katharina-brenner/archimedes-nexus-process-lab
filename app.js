@@ -1771,6 +1771,10 @@ const els = {
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
   loginOrigin: document.querySelector("#loginOrigin"),
+  googleLoginBox: document.querySelector("#googleLoginBox"),
+  googleLoginFallback: document.querySelector("#googleLoginFallback"),
+  googleButtonMount: document.querySelector("#googleButtonMount"),
+  googleLoginStatus: document.querySelector("#googleLoginStatus"),
   checkoutForm: document.querySelector("#checkoutForm"),
   checkoutName: document.querySelector("#checkoutName"),
   checkoutEmail: document.querySelector("#checkoutEmail"),
@@ -4056,6 +4060,74 @@ function renderProductConfig(config) {
   }
 }
 
+function loadGoogleScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector("script[data-google-identity]");
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentity = "true";
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", reject, { once: true });
+    document.head.append(script);
+  });
+}
+
+async function handleGoogleCredential(response) {
+  els.loginError.textContent = "";
+  try {
+    const payload = await apiRequest("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    storeSession(payload.token);
+    unlockApp();
+    showToast(`Logged in with Google as ${payload.account.email || payload.account.role}`);
+  } catch (error) {
+    els.loginError.textContent = error.message;
+  }
+}
+
+async function setupGoogleLogin() {
+  if (!els.googleLoginBox) return;
+  try {
+    const config = await apiRequest("/api/auth/google-config");
+    if (!config.enabled || !config.clientId) {
+      els.googleLoginFallback.disabled = true;
+      els.googleLoginStatus.textContent = "Google login is not configured. Set GOOGLE_CLIENT_ID on the backend.";
+      return;
+    }
+    els.googleLoginStatus.textContent = "Google login ready.";
+    els.googleLoginFallback.style.display = "none";
+    await loadGoogleScript();
+    window.google.accounts.id.initialize({
+      client_id: config.clientId,
+      callback: handleGoogleCredential,
+      ux_mode: "popup",
+    });
+    window.google.accounts.id.renderButton(els.googleButtonMount, {
+      theme: "filled_black",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      width: 320,
+    });
+  } catch (error) {
+    els.googleLoginFallback.disabled = true;
+    els.googleLoginStatus.textContent = `Google login unavailable: ${error.message}`;
+  }
+}
+
 function renderCheckoutResult(result) {
   if (!els.checkoutResult) return;
   const payment = result.payment;
@@ -4191,6 +4263,7 @@ async function checkStoredAuth() {
 
 function bindAuth() {
   loadProductConfig();
+  setupGoogleLogin();
 
   els.loginForm?.addEventListener("submit", async (event) => {
     event.preventDefault();

@@ -44,13 +44,20 @@ export BANK_NAME="Your bank"
 export ANAXION_ADMIN_USER="owner"
 export ANAXION_ADMIN_PASSWORD="set-a-private-password"
 export SESSION_SECRET="set-a-long-random-secret"
+export GOOGLE_CLIENT_ID="your-google-oauth-client-id.apps.googleusercontent.com"
+export GOOGLE_ALLOWED_EMAILS="you@example.com"
+export GOOGLE_ALLOWED_DOMAINS=""
 ```
+
+Google login uses Google Identity Services in the browser and verifies the returned ID token on the backend. It only renders as active when `GOOGLE_CLIENT_ID` is configured.
 
 ## Backend API
 
 - `GET /api/product` lists product, price, bank-transfer configuration, and backend features
 - `POST /api/checkout` creates a 725 EUR bank-transfer order
 - `POST /api/auth/login` logs in the owner or an activated license holder
+- `GET /api/auth/google-config` tells the frontend whether Google login is configured
+- `POST /api/auth/google` verifies a Google ID token and creates a server session
 - `GET /api/account` verifies a server session
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit

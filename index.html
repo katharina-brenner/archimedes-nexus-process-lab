@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Anaxion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-anaxion-briefing" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-anaxion-google-login" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login and license purchase">
@@ -42,6 +42,12 @@
           </label>
           <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
           <button class="login-button" type="submit">Enter Anaxion</button>
+          <div class="login-divider"><span>or</span></div>
+          <div id="googleLoginBox" class="google-login-box" aria-label="Google login">
+            <button id="googleLoginFallback" class="google-login-fallback" type="button">Continue with Google</button>
+            <div id="googleButtonMount" class="google-button-mount"></div>
+            <small id="googleLoginStatus">Checking Google login configuration.</small>
+          </div>
           <p id="loginError" class="login-error" role="alert"></p>
           <small>Production-grade access requires this backend or a hosted equivalent. GitHub Pages alone cannot process payments or server sessions.</small>
         </form>
@@ -370,6 +376,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-anaxion-briefing"></script>
+    <script type="module" src="./app.js?v=20260714-anaxion-google-login"></script>
   </body>
 </html>

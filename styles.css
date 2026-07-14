@@ -227,6 +227,55 @@ body.authenticated .login-gate {
   font-weight: 900;
 }
 
+.login-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  color: #7f91a4;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  height: 1px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.google-login-box {
+  display: grid;
+  gap: 8px;
+}
+
+.google-button-mount {
+  min-height: 40px;
+}
+
+.google-login-fallback {
+  min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 8px;
+  color: #eaf2fb;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 900;
+}
+
+.google-login-fallback:disabled {
+  color: #7f91a4;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.google-login-box small {
+  color: #8ca6bd;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .license-card {
   align-content: start;
   background:

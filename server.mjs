@@ -33,6 +33,15 @@ const config = {
   sessionSecret: process.env.SESSION_SECRET || "anaxion-local-dev-secret",
   adminUser: (process.env.ANAXION_ADMIN_USER || "owner").toLowerCase(),
   adminPassword: process.env.ANAXION_ADMIN_PASSWORD || "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
+  googleAllowedDomains: (process.env.GOOGLE_ALLOWED_DOMAINS || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean),
   bank: {
     accountHolder: process.env.BANK_ACCOUNT_HOLDER || "",
     iban: process.env.BANK_IBAN || "",
@@ -67,6 +76,7 @@ function backendFeatures() {
     "Manual paid-status activation after incoming transfer",
     "License-key generation",
     "Server-side login tokens",
+    "Google OAuth login with backend token verification",
     "Admin order and license listing",
     "Static app hosting from the same backend",
     "Bank account configuration via environment variables",
@@ -95,6 +105,9 @@ function publicConfig() {
       bankName: config.bank.bankName || "Configure BANK_NAME",
     },
     features: backendFeatures(),
+    auth: {
+      googleEnabled: Boolean(config.googleClientId),
+    },
   };
 }
 
@@ -334,6 +347,73 @@ async function help(req, res) {
   json(res, 200, { guide: inferHelpGuide(body.prompt, body.context || {}) });
 }
 
+function googleConfig(req, res) {
+  json(res, 200, {
+    enabled: Boolean(config.googleClientId),
+    clientId: config.googleClientId,
+    restricted: Boolean(config.googleAllowedEmails.length || config.googleAllowedDomains.length),
+  });
+}
+
+function googleAccountAllowed(profile) {
+  const email = String(profile.email || "").toLowerCase();
+  const domain = email.includes("@") ? email.split("@").at(-1) : "";
+  if (!config.googleAllowedEmails.length && !config.googleAllowedDomains.length) {
+    return true;
+  }
+  return config.googleAllowedEmails.includes(email) || config.googleAllowedDomains.includes(domain);
+}
+
+async function googleLogin(req, res) {
+  if (!config.googleClientId) {
+    json(res, 503, { error: "Google login is not configured. Set GOOGLE_CLIENT_ID on the backend." });
+    return;
+  }
+  const body = await parseBody(req);
+  const credential = String(body.credential || "").trim();
+  if (!credential) {
+    json(res, 400, { error: "Missing Google credential." });
+    return;
+  }
+  const tokenInfoUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`;
+  const googleResponse = await fetch(tokenInfoUrl);
+  const profile = await googleResponse.json().catch(() => ({}));
+  if (!googleResponse.ok) {
+    json(res, 401, { error: profile.error_description || "Google credential could not be verified." });
+    return;
+  }
+  if (profile.aud !== config.googleClientId) {
+    json(res, 401, { error: "Google credential audience does not match this application." });
+    return;
+  }
+  if (profile.email_verified !== "true" && profile.email_verified !== true) {
+    json(res, 401, { error: "Google email is not verified." });
+    return;
+  }
+  if (!googleAccountAllowed(profile)) {
+    json(res, 403, { error: "This Google account is not allowed for Anaxion." });
+    return;
+  }
+
+  const email = String(profile.email || "").toLowerCase();
+  const token = signSession({
+    sub: email,
+    role: "google",
+    email,
+    name: profile.name || email,
+    exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
+  });
+  json(res, 200, {
+    token,
+    account: {
+      role: "google",
+      name: profile.name || email,
+      email,
+      productName: config.productName,
+    },
+  });
+}
+
 async function login(req, res) {
   const body = await parseBody(req);
   const user = String(body.user || "").trim().toLowerCase();
@@ -423,6 +503,14 @@ async function routeApi(req, res, pathname) {
   }
   if (req.method === "POST" && pathname === "/api/auth/login") {
     await login(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/auth/google-config") {
+    googleConfig(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/auth/google") {
+    await googleLogin(req, res);
     return;
   }
   if (req.method === "POST" && pathname === "/api/project/brief") {
