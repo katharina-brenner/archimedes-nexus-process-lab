@@ -1028,17 +1028,20 @@ button {
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 12px;
-  color: #061019;
+  border-radius: 14px;
+  color: #f5f1e8;
   font-weight: 800;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.22),
-    0 12px 24px rgba(0, 0, 0, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 0 1px rgba(171, 190, 210, 0.24),
+    0 14px 28px rgba(4, 12, 24, 0.28);
 }
 
 .technical-logo {
   overflow: hidden;
-  background: linear-gradient(145deg, #f7f5ef 0%, #d9d6cc 100%);
+  background:
+    radial-gradient(circle at 70% 18%, rgba(31, 183, 166, 0.28), transparent 30%),
+    linear-gradient(145deg, #0b1b31 0%, #123150 58%, #071426 100%);
   image-rendering: auto;
   transition: transform 150ms ease, box-shadow 150ms ease;
 }
@@ -1046,41 +1049,34 @@ button {
 .technical-logo::before {
   content: "";
   position: absolute;
-  left: 11px;
-  top: 13px;
-  width: 22px;
-  height: 17px;
-  border: 3px solid #071a31;
-  border-radius: 18px 18px 14px 14px;
-  background: transparent;
-  box-shadow:
-    -7px 1px 0 -4px #1fb7a6,
-    7px 1px 0 -4px #1fb7a6;
+  inset: 8px 10px 7px;
+  background: linear-gradient(180deg, #fffaf0 0%, #d7e1e7 100%);
+  clip-path: polygon(50% 0%, 88% 100%, 70% 100%, 56% 64%, 44% 64%, 30% 100%, 12% 100%);
+  filter: drop-shadow(0 0 12px rgba(245, 241, 232, 0.2));
 }
 
 .technical-logo::after {
   content: "";
   position: absolute;
-  left: 8px;
-  top: 16px;
-  width: 28px;
-  height: 12px;
-  border-left: 3px solid #1fb7a6;
-  border-right: 3px solid #1fb7a6;
+  left: 17px;
+  top: 26px;
+  width: 10px;
+  height: 4px;
   border-radius: 999px;
+  background: #1fb7a6;
+  box-shadow: 0 0 14px rgba(31, 183, 166, 0.26);
 }
 
 .technical-logo span {
   position: absolute;
-  left: 17px;
-  top: 22px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #071a31;
-  box-shadow:
-    8px 0 #071a31,
-    4px 7px 0 -1px #1fb7a6;
+  left: 9px;
+  top: 9px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 183, 166, 0.18);
+  background: transparent;
+  transform: rotate(-18deg);
 }
 
 .brand h1,

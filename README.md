@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=lovable-front`.
+Then open `http://127.0.0.1:8899/index.html?v=premium-mark`.
 
 ## Online static access
 
