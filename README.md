@@ -9,7 +9,19 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=archytas-backend`.
+Then open `http://127.0.0.1:8899/index.html?v=archytas-briefing`.
+
+## Product-first workflow
+
+The front of the application now works like a company-grade product entry flow:
+
+- Login opens a BeamAI-inspired Archytas landing surface, not the payment screen
+- Start page asks for a natural-language product and plant description
+- Optional data files can be attached to the product brief
+- Archytas automatically maps the brief to the closest process model
+- The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
+- A persistent help field lets users describe a problem in words and receive direct tool steps
+- Payment and license creation live in the `Billing` area, where users expect commercial access controls
 
 ## Paid access workflow
 
@@ -40,12 +52,17 @@ export SESSION_SECRET="set-a-long-random-secret"
 - `POST /api/checkout` creates a 725 EUR bank-transfer order
 - `POST /api/auth/login` logs in the owner or an activated license holder
 - `GET /api/account` verifies a server session
+- `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
+- `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
 - `GET /api/admin/orders` lists orders and licenses for the owner
 - `POST /api/admin/orders/:id/mark-paid` marks an order paid and creates an active license key
 
 ## What is included
 
 - Process templates for cultured meat, penicillin, monoclonal antibody, industrial fermentation, recombinant insulin, viral vaccine, plasmid DNA, autologous cell therapy, small-molecule API, biohydrogen dark-fermentation, industrial wastewater, water purification, and air pollution control
+- Natural-language product brief that chooses the process model automatically, so users do not have to manually choose between template families
+- Data upload capture for project briefs, including file metadata and short previews for CSV, text, JSON, and other attached data
+- Persistent help dock for natural-language troubleshooting inside the tool
 - Scale presets for lab, pilot, demo, and commercial designs
 - Click-to-add and drag-and-drop unit-operation library with 120+ ISO/PFD-style pharmaceutical, biochemical, environmental, packaging, utilities, wastewater, water-purification, air-pollution, resource, report, recycling, heat-reuse, cleaning, and documentation items
 - Granular process flowsheets with visible process-role badges for main process, support, CIP/SIP cleaning, recycle/reuse, heat reuse, waste/emissions, and QC/data elements
@@ -66,4 +83,4 @@ export SESSION_SECRET="set-a-long-random-secret"
 - Cost-driver economics view with annualized CAPEX, fixed facility burden, materials, labor, QA/QC validation, utilities, and waste cost shares
 - JSON scenario export
 
-No package install is required.
+The backend has no runtime dependencies beyond Node.js.

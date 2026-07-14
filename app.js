@@ -3195,43 +3195,161 @@ function templateComplexity(template) {
   return { units, streams, bioreactors, downstream };
 }
 
+function inferTemplateFromBrief(text) {
+  const lower = text.toLowerCase();
+  const rules = [
+    { key: "penicillin", terms: ["penicillin", "antibiotic", "beta lactam", "fungal"] },
+    { key: "culturedMeat", terms: ["cultured meat", "cell meat", "myoblast", "muscle", "scaffold", "food"] },
+    { key: "antibody", terms: ["antibody", "mab", "monoclonal", "igg", "cho", "protein a"] },
+    { key: "fermentation", terms: ["fermentation", "enzyme", "microbial", "yeast", "bacteria", "aerobic"] },
+    { key: "insulin", terms: ["insulin", "recombinant protein", "e coli", "refolding"] },
+    { key: "vaccine", terms: ["vaccine", "viral", "virus", "antigen", "vero"] },
+    { key: "plasmid", terms: ["plasmid", "dna", "rna", "nucleic acid"] },
+    { key: "cellTherapy", terms: ["cell therapy", "car-t", "autologous", "t cell"] },
+    { key: "smallMolecule", terms: ["small molecule", "api", "crystallization", "solvent"] },
+    { key: "biohydrogen", terms: ["hydrogen", "dark fermentation", "biogas"] },
+    { key: "wastewater", terms: ["wastewater", "cod", "bod", "effluent"] },
+    { key: "waterPurification", terms: ["water purification", "wfi", "reverse osmosis", "ultrapure"] },
+    { key: "airPollution", terms: ["air pollution", "voc", "scrubber", "emission"] },
+  ];
+  const match = rules.find((rule) => templates[rule.key] && rule.terms.some((term) => lower.includes(term)));
+  return match?.key || "fermentation";
+}
+
+function briefAssumptions(templateKey, fileCount) {
+  const item = templates[templateKey] || templates.fermentation;
+  return [
+    `Model selected: ${item.label}`,
+    `Product class: ${item.product}`,
+    `${item.units.length} equipment nodes and ${item.streams.length} streams loaded`,
+    fileCount ? `${fileCount} uploaded file${fileCount === 1 ? "" : "s"} attached to the project brief` : "No uploaded data attached yet",
+    "Next recommended step: open Process Builder, inspect the main bioreactor, then review Boundaries + AI",
+  ];
+}
+
+function readBriefFiles(input) {
+  const files = Array.from(input?.files || []).slice(0, 6);
+  return Promise.all(files.map((file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = String(reader.result || "");
+      resolve({
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        contentPreview: raw.slice(0, 2400),
+      });
+    };
+    reader.onerror = () => resolve({ name: file.name, type: file.type || "application/octet-stream", size: file.size, contentPreview: "" });
+    if (/text|csv|json|xml|tab-separated|spreadsheet/i.test(file.type) || /\.(csv|txt|json|tsv|xml)$/i.test(file.name)) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+  })));
+}
+
+async function buildFromProductBrief() {
+  const briefInput = document.querySelector("#productBriefInput");
+  const scaleSelect = document.querySelector("#productScaleSelect");
+  const fileInput = document.querySelector("#productDataFiles");
+  const result = document.querySelector("#briefResult");
+  const brief = briefInput?.value.trim() || "";
+  if (brief.length < 12) {
+    if (result) result.innerHTML = "<p>Please describe the product, organism, process goal, scale, or quality constraints in a few words.</p>";
+    return;
+  }
+  if (result) result.innerHTML = "<p>Building project model from your product brief...</p>";
+  const templateKey = inferTemplateFromBrief(brief);
+  const files = await readBriefFiles(fileInput);
+  state.productBrief = brief;
+  state.productFiles = files.map(({ contentPreview, ...file }) => file);
+  state.inferredTemplate = templateKey;
+  loadTemplate(templateKey);
+  if (scaleSelect?.value && scalePresets[scaleSelect.value]) applyScale(scaleSelect.value);
+  try {
+    await apiRequest("/api/project/brief", {
+      method: "POST",
+      body: JSON.stringify({
+        brief,
+        templateKey,
+        scale: state.scale,
+        files,
+        assumptions: briefAssumptions(templateKey, files.length),
+      }),
+    });
+  } catch {
+    // The local model should still work when the persistence backend is offline.
+  }
+  renderStartBoard();
+  renderOverview();
+  renderTables();
+  renderEquations();
+  renderSimulationBoard();
+  renderCfdBoard();
+  renderAiBoard();
+  setView("overview");
+  showToast(`Project model created: ${templates[templateKey].label}`);
+}
+
 function renderStartBoard() {
-  const featured = ["penicillin", "culturedMeat", "antibody", "fermentation", "insulin", "vaccine", "plasmid", "cellTherapy"];
-  const primaryKeys = featured.filter((key) => templates[key]);
-  const secondaryKeys = Object.keys(templates).filter((key) => !primaryKeys.includes(key));
+  const selected = templates[state.inferredTemplate] || activeTemplate();
+  const assumptions = briefAssumptions(state.inferredTemplate, state.productFiles.length);
   els.startBoard.innerHTML = `
     <section class="start-hero">
       <div>
-        <p>Choose production model first</p>
-        <h3>Start with one process, then optimize the plant</h3>
-        <span>Select penicillin, cultured meat, monoclonal antibody, fermentation, or another template. After choosing, the tool opens the focused optimization workspace with flowsheet, CFD, balances, cost model, equations, and downloads.</span>
+        <p>Product brief first</p>
+        <h3>Tell Archytas what plant you want to build.</h3>
+        <span>Describe the product, host organism, scale, quality targets, constraints, and any available data. Archytas maps it to the closest process model, loads equipment, streams, equations, boundaries, costs, CFD screening, and downloadable reports.</span>
       </div>
-      <button class="action-button primary" data-jump-view="overview" type="button">Continue with ${activeTemplate().label}</button>
+      <button class="action-button primary" data-build-from-brief type="button">Build plant model</button>
     </section>
-    <section class="process-choice-grid">
-      ${primaryKeys.map((key) => {
-        const item = templates[key];
-        const complexity = templateComplexity(item);
-        return `
-          <article class="process-choice-card${key === state.template ? " active" : ""}">
-            <span>${item.product}</span>
-            <h3>${item.label}</h3>
-            <p>${item.description}</p>
-            <dl>
-              <dt>Equipment</dt><dd>${complexity.units} units</dd>
-              <dt>Streams</dt><dd>${complexity.streams} flows</dd>
-              <dt>Bioreactors</dt><dd>${complexity.bioreactors}</dd>
-              <dt>Downstream</dt><dd>${complexity.downstream} steps</dd>
-            </dl>
-            <button class="action-button primary" data-start-template="${key}" type="button">${key === state.template ? "Selected" : "Select process"}</button>
-          </article>
-        `;
-      }).join("")}
+    <section class="product-brief-grid">
+      <article class="brief-composer">
+        <label>
+          <span>Product and plant description</span>
+          <textarea id="productBriefInput" rows="8" placeholder="Example: I want to model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and downloadable mass balances.">${escapeAttr(state.productBrief)}</textarea>
+        </label>
+        <div class="brief-row">
+          <label>
+            <span>Starting scale</span>
+            <select id="productScaleSelect">
+              ${Object.entries(scalePresets).map(([key, item]) => `<option value="${key}"${key === state.scale ? " selected" : ""}>${item.label}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Upload data</span>
+            <input id="productDataFiles" type="file" multiple />
+          </label>
+        </div>
+        <button class="action-button primary" data-build-from-brief type="button">Generate process workspace</button>
+        <div id="briefResult" class="brief-result" aria-live="polite"></div>
+      </article>
+      <article class="brief-model-card">
+        <span>Current model</span>
+        <h3>${selected.label}</h3>
+        <p>${selected.description}</p>
+        <dl>
+          <dt>Product</dt><dd>${selected.product}</dd>
+          <dt>Equipment</dt><dd>${selected.units.length} units</dd>
+          <dt>Streams</dt><dd>${selected.streams.length} flows</dd>
+          <dt>Uploaded data</dt><dd>${state.productFiles.length} files</dd>
+        </dl>
+        <ul>
+          ${assumptions.map((item) => `<li>${item}</li>`).join("")}
+        </ul>
+        <div class="brief-actions">
+          <button data-jump-view="flowsheet" type="button">Open builder</button>
+          <button data-jump-view="reports" type="button">Open downloads</button>
+        </div>
+      </article>
     </section>
-    <section class="start-secondary">
-      <h3>More process templates</h3>
+    <section class="start-secondary brief-examples">
+      <h3>Example prompts</h3>
       <div>
-        ${secondaryKeys.map((key) => `<button data-start-template="${key}" type="button">${templates[key].label}</button>`).join("")}
+        <button data-fill-brief="Cultured meat pilot plant with media prep, seed train, production stirred-tank bioreactors, harvest, washing, filling, CIP, water reuse, oxygen transfer, ammonium and lactate boundaries.">Cultured meat plant</button>
+        <button data-fill-brief="Penicillin production with sterile fermentation, solvent extraction, crystallization, drying, emissions control, solvent recycle, batch scheduling, and full mass and energy balances.">Penicillin API</button>
+        <button data-fill-brief="Monoclonal antibody process in CHO cells with fed-batch bioreactor, Protein A capture, low pH viral inactivation, polishing, UF/DF, sterile filtration, GMP release, and cost model.">Antibody process</button>
       </div>
     </section>
   `;
@@ -3524,6 +3642,7 @@ function pageTitle(view) {
     recommendations: "Readiness Roadmap",
     economics: "Economics",
     reports: "Downloads",
+    billing: "Billing",
   }[view] || "Choose Process";
 }
 
@@ -3956,6 +4075,85 @@ function renderCheckoutResult(result) {
   `;
 }
 
+function fallbackHelp(prompt) {
+  const lower = prompt.toLowerCase();
+  const steps = [];
+  let targetView = "overview";
+  if (lower.includes("oxygen") || lower.includes("do ") || lower.includes("kla") || lower.includes("cfd")) {
+    targetView = "cfd";
+    steps.push("Open Bioreactor CFD and inspect oxygen distribution, nutrient gradient, shear, and hotspot cards.");
+    steps.push("Increase kLa, reduce working volume, split into parallel trains, or revise sparger/agitation assumptions.");
+  }
+  if (lower.includes("ammon") || lower.includes("lactate") || lower.includes("ph") || lower.includes("boundary")) {
+    targetView = "ai";
+    steps.push("Open Boundaries + AI and check ammonium, lactate, pH, DO, kLa, working-volume, and scale-up warnings.");
+    steps.push("Adjust feed strategy, perfusion/bleed, glutamine burden, or batch duration until the boundary card clears.");
+  }
+  if (lower.includes("cost") || lower.includes("capex") || lower.includes("price")) {
+    targetView = "economics";
+    steps.push("Open Economics and compare CAPEX scale exponent, lab fixed burden, validation factor, facility premium, and utilization.");
+    steps.push("Use Reports to download costs and mass balances for an external review.");
+  }
+  if (lower.includes("stream") || lower.includes("mass") || lower.includes("energy") || lower.includes("download")) {
+    targetView = "reports";
+    steps.push("Open Downloads and export mass + energy balances, streams, equations, parameters, and CFD screening.");
+  }
+  if (!steps.length) {
+    targetView = "flowsheet";
+    steps.push("Open Process Builder and select the most relevant unit or stream.");
+    steps.push("Use Flow visibility = Full PFD, then inspect equations below the canvas and check downstream tables.");
+  }
+  return {
+    targetView,
+    title: "Recommended next steps",
+    steps,
+    assumptions: [
+      `Active model: ${activeTemplate().label}`,
+      `Current scale: ${scalePresets[state.scale].label}`,
+      `Selected unit: ${state.selectedId || "none"}`,
+    ],
+  };
+}
+
+function renderHelpResult(payload) {
+  if (!els.helpResult) return;
+  const guide = payload.guide || payload;
+  els.helpResult.innerHTML = `
+    <strong>${guide.title || "Recommended next steps"}</strong>
+    <ol>${(guide.steps || []).map((step) => `<li>${step}</li>`).join("")}</ol>
+    <div>${(guide.assumptions || []).map((item) => `<span>${item}</span>`).join("")}</div>
+    ${guide.targetView ? `<button data-help-jump="${guide.targetView}" type="button">Open ${pageTitle(guide.targetView)}</button>` : ""}
+  `;
+}
+
+async function askToolHelp() {
+  const prompt = els.helpPrompt?.value.trim() || "";
+  if (prompt.length < 5) {
+    renderHelpResult({ title: "Describe the issue first", steps: ["Tell Archytas what is confusing or failing, for example oxygen transfer, ammonium, cost, stream download, or equipment placement."], assumptions: [] });
+    return;
+  }
+  if (els.helpResult) els.helpResult.innerHTML = "<p>Preparing guidance...</p>";
+  const localGuide = fallbackHelp(prompt);
+  try {
+    const payload = await apiRequest("/api/help", {
+      method: "POST",
+      body: JSON.stringify({
+        prompt,
+        context: {
+          template: state.template,
+          scale: state.scale,
+          selectedId: state.selectedId,
+          unitCount: state.units.length,
+          streamCount: state.streams.length,
+        },
+      }),
+    });
+    renderHelpResult({ guide: { ...localGuide, ...(payload.guide || {}) } });
+  } catch {
+    renderHelpResult(localGuide);
+  }
+}
+
 async function loadProductConfig() {
   try {
     const config = await apiRequest("/api/product");
@@ -4042,6 +4240,24 @@ function bindAuth() {
     lockApp();
     showToast("Logged out");
   });
+
+  els.helpToggle?.addEventListener("click", () => {
+    els.helpDock?.classList.toggle("open");
+  });
+
+  els.askHelp?.addEventListener("click", askToolHelp);
+
+  els.helpPrompt?.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") askToolHelp();
+  });
+
+  els.helpResult?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-help-jump]");
+    if (button) {
+      setView(button.dataset.helpJump);
+      els.helpDock?.classList.remove("open");
+    }
+  });
 }
 
 function renderAll() {
@@ -4079,6 +4295,20 @@ function bindEvents() {
   });
 
   els.startBoard.addEventListener("click", (event) => {
+    const buildButton = event.target.closest("[data-build-from-brief]");
+    if (buildButton) {
+      buildFromProductBrief();
+      return;
+    }
+    const fillButton = event.target.closest("[data-fill-brief]");
+    if (fillButton) {
+      const input = document.querySelector("#productBriefInput");
+      if (input) {
+        input.value = fillButton.dataset.fillBrief;
+        input.focus();
+      }
+      return;
+    }
     const templateButton = event.target.closest("[data-start-template]");
     if (templateButton) {
       loadTemplate(templateButton.dataset.startTemplate);

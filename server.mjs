@@ -56,6 +56,7 @@ const staticTypes = new Map([
 const defaultDb = {
   orders: [],
   licenses: [],
+  projectBriefs: [],
   audit: [],
 };
 
@@ -211,7 +212,7 @@ async function createCheckout(req, res) {
     return;
   }
 
-  const db = await loadDb();
+  const db = ensureDbShape(await loadDb());
   const order = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -242,12 +243,103 @@ async function createCheckout(req, res) {
   });
 }
 
+function ensureDbShape(db) {
+  db.orders ||= [];
+  db.licenses ||= [];
+  db.projectBriefs ||= [];
+  db.audit ||= [];
+  return db;
+}
+
+function inferHelpGuide(prompt, context = {}) {
+  const lower = String(prompt || "").toLowerCase();
+  const steps = [];
+  let targetView = "flowsheet";
+  if (lower.includes("oxygen") || lower.includes("kla") || lower.includes("cfd") || lower.includes("nutrient")) {
+    targetView = "cfd";
+    steps.push("Open Bioreactor CFD and compare oxygen, nutrient, shear, and hotspot maps for the selected reactor.");
+    steps.push("If the reactor is large, evaluate parallel trains, oxygen enrichment, sparger design, agitation, and working-volume reduction.");
+  }
+  if (lower.includes("ammon") || lower.includes("lactate") || lower.includes("ph") || lower.includes("boundary")) {
+    targetView = "ai";
+    steps.push("Open Boundaries + AI and inspect ammonium, lactate, pH, DO, kLa, and mammalian-volume warnings.");
+    steps.push("Revise feed composition, glutamine burden, perfusion/bleed strategy, or harvest timing before scaling further.");
+  }
+  if (lower.includes("cost") || lower.includes("capex") || lower.includes("opex") || lower.includes("price")) {
+    targetView = "economics";
+    steps.push("Open Economics and check fixed lab burden, CAPEX exponent, validation factor, utilization, automation, and facility premium.");
+    steps.push("Download the cost report and compare lab, pilot, demo, and commercial scale assumptions.");
+  }
+  if (lower.includes("download") || lower.includes("mass") || lower.includes("energy") || lower.includes("stream")) {
+    targetView = "reports";
+    steps.push("Open Downloads and export mass + energy balances, stream tables, chemical equations, parameters, and CFD JSON.");
+  }
+  if (!steps.length) {
+    steps.push("Open Process Builder, select the unit or stream related to the issue, and switch Flow visibility to Full PFD.");
+    steps.push("Then open Equations or Boundaries + AI depending on whether the problem is mathematical or operational.");
+  }
+  return {
+    targetView,
+    title: "Recommended tool workflow",
+    steps,
+    assumptions: [
+      `Model: ${context.template || "current process"}`,
+      `Scale: ${context.scale || "current scale"}`,
+      `Selected unit: ${context.selectedId || "none"}`,
+    ],
+  };
+}
+
+async function createProjectBrief(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const brief = String(body.brief || "").trim();
+  if (brief.length < 12) {
+    json(res, 400, { error: "Project brief is too short" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const record = {
+    id: randomUUID(),
+    createdAt: new Date().toISOString(),
+    createdBy: session.sub,
+    templateKey: String(body.templateKey || "fermentation"),
+    scale: String(body.scale || "pilot"),
+    brief,
+    files: Array.isArray(body.files) ? body.files.slice(0, 8).map((file) => ({
+      name: String(file.name || "uploaded-file"),
+      type: String(file.type || "application/octet-stream"),
+      size: Number(file.size || 0),
+      contentPreview: String(file.contentPreview || "").slice(0, 2400),
+    })) : [],
+    assumptions: Array.isArray(body.assumptions) ? body.assumptions.map(String).slice(0, 12) : [],
+  };
+  db.projectBriefs.unshift(record);
+  db.audit.unshift({ at: record.createdAt, type: "project.brief.created", id: record.id, templateKey: record.templateKey });
+  await saveDb(db);
+  json(res, 201, { projectBrief: { ...record, files: record.files.map(({ contentPreview, ...file }) => file) } });
+}
+
+async function help(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  json(res, 200, { guide: inferHelpGuide(body.prompt, body.context || {}) });
+}
+
 async function login(req, res) {
   const body = await parseBody(req);
   const user = String(body.user || "").trim().toLowerCase();
   const password = String(body.password || "");
   const licenseKey = String(body.licenseKey || password || "").trim().toUpperCase();
-  const db = await loadDb();
+  const db = ensureDbShape(await loadDb());
 
   if (safeCompare(user, config.adminUser) && safeCompare(password, config.adminPassword)) {
     if (!config.adminPassword) {
@@ -285,7 +377,7 @@ async function listOrders(req, res) {
     json(res, 403, { error: "Admin access required" });
     return;
   }
-  const db = await loadDb();
+  const db = ensureDbShape(await loadDb());
   json(res, 200, { orders: db.orders.map(sanitizeOrder), licenses: db.licenses.map(sanitizeLicense) });
 }
 
@@ -295,7 +387,7 @@ async function markPaid(req, res, orderId) {
     json(res, 403, { error: "Admin access required" });
     return;
   }
-  const db = await loadDb();
+  const db = ensureDbShape(await loadDb());
   const order = db.orders.find((item) => item.id === orderId || item.reference === orderId);
   if (!order) {
     json(res, 404, { error: "Order not found" });
@@ -331,6 +423,14 @@ async function routeApi(req, res, pathname) {
   }
   if (req.method === "POST" && pathname === "/api/auth/login") {
     await login(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/project/brief") {
+    await createProjectBrief(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/help") {
+    await help(req, res);
     return;
   }
   if (req.method === "GET" && pathname === "/api/account") {
