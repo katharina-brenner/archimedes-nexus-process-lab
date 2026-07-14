@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=public-pages-pricing`.
+Then open `http://127.0.0.1:8899/index.html?v=pixel-axolotl-logo`.
 
 ## Online static access
 
