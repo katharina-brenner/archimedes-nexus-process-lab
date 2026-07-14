@@ -2428,12 +2428,20 @@ function syncInputs() {
 }
 
 function renderTemplateList() {
-  els.templateList.innerHTML = Object.entries(templates).map(([key, item]) => `
-    <button class="template-button${key === state.template ? " active" : ""}" data-template="${key}" data-tooltip="${escapeAttr(`${item.label}: ${item.product}. Opens a complete process template with equipment, streams, economics, standards, and facility support systems.`)}">
+  const item = activeTemplate();
+  const complexity = templateComplexity(item);
+  els.templateList.innerHTML = `
+    <article class="current-product-card" data-tooltip="${escapeAttr(`${item.label}: active product model with equipment, streams, economics, standards, and facility support systems.`)}">
+      <span>Active model</span>
       <strong>${item.label}</strong>
-      <span>${item.description}</span>
-    </button>
-  `).join("");
+      <p>${item.product}</p>
+      <dl>
+        <dt>Equipment</dt><dd>${complexity.units}</dd>
+        <dt>Streams</dt><dd>${complexity.streams}</dd>
+      </dl>
+      <button class="template-button product-back-button" data-open-products type="button">Back to products</button>
+    </article>
+  `;
 }
 
 function renderScaleList() {
@@ -4363,6 +4371,11 @@ function renderAll() {
 
 function bindEvents() {
   els.templateList.addEventListener("click", (event) => {
+    const productsButton = event.target.closest("[data-open-products]");
+    if (productsButton) {
+      setView("start");
+      return;
+    }
     const button = event.target.closest("[data-template]");
     if (button) loadTemplate(button.dataset.template);
   });
