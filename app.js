@@ -3303,8 +3303,8 @@ function renderStartBoard() {
     <section class="start-hero">
       <div>
         <p>Product brief first</p>
-        <h3>Tell Anaxion what plant you want to build.</h3>
-        <span>Describe the product, host organism, scale, quality targets, constraints, and any available data. Anaxion maps it to the closest process model, loads equipment, streams, equations, boundaries, costs, CFD screening, and downloadable reports.</span>
+        <h3>Tell Axion what plant you want to build.</h3>
+        <span>Describe the product, host organism, scale, quality targets, constraints, and any available data. Axion maps it to the closest process model, loads equipment, streams, equations, boundaries, costs, CFD screening, and downloadable reports.</span>
       </div>
       <button class="action-button primary" data-build-from-brief type="button">Build plant model</button>
     </section>
@@ -3663,7 +3663,7 @@ function renderOverview() {
   els.overviewBoard.innerHTML = `
     <section class="overview-hero">
       <div>
-        <p>Anaxion Process OS</p>
+        <p>Axion Process OS</p>
         <h3>${activeTemplate().label} production model</h3>
         <span>Enterprise process modeling workspace with process builder, material streams, physical boundaries, scientific sources, standards, and economic readiness.</span>
       </div>
@@ -4017,14 +4017,14 @@ function lockApp() {
   document.body.classList.remove("authenticated");
 }
 
-const legacyAuthKeys = ["anaxion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
+const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
 
 async function apiRequest(path, options = {}) {
   const headers = {
     "content-type": "application/json",
     ...(options.headers || {}),
   };
-  const session = window.localStorage.getItem("anaxion-session");
+  const session = window.localStorage.getItem("axion-session");
   if (session) headers.authorization = `Bearer ${session}`;
   const response = await fetch(path, {
     ...options,
@@ -4042,7 +4042,7 @@ function clearLegacyAuth() {
 }
 
 function storeSession(token) {
-  window.localStorage.setItem("anaxion-session", token);
+  window.localStorage.setItem("axion-session", token);
   clearLegacyAuth();
 }
 
@@ -4201,7 +4201,7 @@ function renderHelpResult(payload) {
 async function askToolHelp() {
   const prompt = els.helpPrompt?.value.trim() || "";
   if (prompt.length < 5) {
-    renderHelpResult({ title: "Describe the issue first", steps: ["Tell Anaxion what is confusing or failing, for example oxygen transfer, ammonium, cost, stream download, or equipment placement."], assumptions: [] });
+    renderHelpResult({ title: "Describe the issue first", steps: ["Tell Axion what is confusing or failing, for example oxygen transfer, ammonium, cost, stream download, or equipment placement."], assumptions: [] });
     return;
   }
   if (els.helpResult) els.helpResult.innerHTML = "<p>Preparing guidance...</p>";
@@ -4247,7 +4247,7 @@ async function loadProductConfig() {
 
 async function checkStoredAuth() {
   clearLegacyAuth();
-  const session = window.localStorage.getItem("anaxion-session");
+  const session = window.localStorage.getItem("axion-session");
   if (!session) {
     lockApp();
     return;
@@ -4256,7 +4256,7 @@ async function checkStoredAuth() {
     await apiRequest("/api/account");
     unlockApp();
   } catch {
-    window.localStorage.removeItem("anaxion-session");
+    window.localStorage.removeItem("axion-session");
     lockApp();
   }
 }
@@ -4308,7 +4308,7 @@ function bindAuth() {
   });
 
   els.logoutButton?.addEventListener("click", () => {
-    window.localStorage.removeItem("anaxion-session");
+    window.localStorage.removeItem("axion-session");
     clearLegacyAuth();
     lockApp();
     showToast("Logged out");

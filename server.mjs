@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const dataDir = join(rootDir, ".data");
-const dbPath = join(dataDir, "anaxion-licensing.json");
+const dbPath = join(dataDir, "axion-licensing.json");
 
 function loadLocalEnv() {
   const envPath = join(rootDir, ".env");
@@ -27,13 +27,13 @@ loadLocalEnv();
 const config = {
   host: process.env.HOST || "127.0.0.1",
   port: Number(process.env.PORT || 8899),
-  productName: process.env.PRODUCT_NAME || "Anaxion Process OS",
-  priceCents: Number(process.env.ANAXION_PRICE_CENTS || 72500),
-  currency: process.env.ANAXION_CURRENCY || "EUR",
-  sessionSecret: process.env.SESSION_SECRET || "anaxion-local-dev-secret",
-  adminUser: (process.env.ANAXION_ADMIN_USER || "owner").toLowerCase(),
-  adminPassword: process.env.ANAXION_ADMIN_PASSWORD || "",
-  localPasswordLogin: process.env.ANAXION_LOCAL_PASSWORD_LOGIN === "true",
+  productName: process.env.PRODUCT_NAME || "Axion Process OS",
+  priceCents: Number(process.env.AXION_PRICE_CENTS || 72500),
+  currency: process.env.AXION_CURRENCY || "EUR",
+  sessionSecret: process.env.SESSION_SECRET || "axion-local-dev-secret",
+  adminUser: (process.env.AXION_ADMIN_USER || "owner").toLowerCase(),
+  adminPassword: process.env.AXION_ADMIN_PASSWORD || "",
+  localPasswordLogin: process.env.AXION_LOCAL_PASSWORD_LOGIN === "true",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS || "")
     .split(",")
@@ -181,7 +181,7 @@ function getBearer(req) {
 }
 
 function makeReference() {
-  return `ANAXION-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
+  return `AXION-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
 }
 
 function makeLicenseKey() {
@@ -392,7 +392,7 @@ async function googleLogin(req, res) {
     return;
   }
   if (!googleAccountAllowed(profile)) {
-    json(res, 403, { error: "This Google account is not allowed for Anaxion." });
+    json(res, 403, { error: "This Google account is not allowed for Axion." });
     return;
   }
 

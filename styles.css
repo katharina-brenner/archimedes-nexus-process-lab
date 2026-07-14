@@ -554,40 +554,75 @@ button {
 .technical-logo {
   overflow: hidden;
   background:
-    radial-gradient(circle at 72% 24%, rgba(255, 255, 255, 0.76) 0 4px, transparent 5px),
-    linear-gradient(145deg, #fbfcfb 0%, #d8f0ec 38%, #0f8f83 100%);
+    linear-gradient(145deg, #f6fffb 0%, #d8f0ec 42%, #0f8f83 100%);
+  image-rendering: pixelated;
 }
 
 .technical-logo::before {
   content: "";
   position: absolute;
-  left: 11px;
-  top: 8px;
-  width: 22px;
-  height: 28px;
-  background: #061019;
-  clip-path: polygon(50% 0, 100% 100%, 78% 100%, 65% 68%, 35% 68%, 22% 100%, 0 100%);
+  left: 14px;
+  top: 13px;
+  width: 4px;
+  height: 4px;
+  border-radius: 0;
+  background: #ff97bb;
+  box-shadow:
+    4px 0 #ff97bb,
+    8px 0 #ff97bb,
+    12px 0 #ff97bb,
+    -8px -4px #ff78a6,
+    -12px 0 #ff78a6,
+    -8px 4px #ff78a6,
+    20px -4px #ff78a6,
+    24px 0 #ff78a6,
+    20px 4px #ff78a6,
+    -4px 4px #ff97bb,
+    0 4px #ffb1c8,
+    4px 4px #ffb1c8,
+    8px 4px #ffb1c8,
+    12px 4px #ffb1c8,
+    16px 4px #ff97bb,
+    0 8px #ff97bb,
+    4px 8px #ff97bb,
+    8px 8px #ff97bb,
+    12px 8px #ff97bb,
+    4px 12px #ff97bb,
+    8px 12px #ff97bb,
+    12px 12px #ff97bb,
+    0 16px #ff78a6,
+    4px 16px #ff97bb,
+    8px 16px #ff97bb,
+    12px 16px #ff97bb,
+    16px 16px #ff78a6;
 }
 
 .technical-logo::after {
   content: "";
   position: absolute;
   left: 18px;
-  top: 24px;
-  width: 9px;
+  top: 21px;
+  width: 3px;
   height: 3px;
-  border-radius: 99px;
-  background: #d8f0ec;
+  border-radius: 0;
+  background: #061019;
+  box-shadow:
+    9px 0 #061019,
+    5px 6px #061019;
 }
 
 .technical-logo span {
   position: absolute;
-  right: 9px;
-  bottom: 9px;
-  width: 14px;
+  left: 13px;
+  top: 23px;
+  width: 3px;
   height: 3px;
-  border-radius: 99px;
-  background: #061019;
+  border-radius: 0;
+  background: #ffd8e4;
+  box-shadow:
+    19px 0 #ffd8e4,
+    9px 14px #b8fff5,
+    13px 14px #b8fff5;
 }
 
 .brand h1,

@@ -1,4 +1,4 @@
-# Anaxion Process OS
+# Axion Process OS
 
 A standalone high-density bioprocess flowsheet and process-intelligence studio inspired by professional process simulation tools.
 
@@ -9,23 +9,23 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=anaxion-briefing`.
+Then open `http://127.0.0.1:8899/index.html?v=axion-pixel-axolotl`.
 
 ## Product-first workflow
 
 The front of the application now works like a company-grade product entry flow:
 
-- Login opens a BeamAI-inspired Anaxion landing surface, not the payment screen
+- Login opens a BeamAI-inspired Axion landing surface, not the payment screen
 - Start page asks for a natural-language product and plant description
 - Optional data files can be attached to the product brief
-- Anaxion automatically maps the brief to the closest process model
+- Axion automatically maps the brief to the closest process model
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
 - A persistent help field lets users describe a problem in words and receive direct tool steps
 - Payment and license creation live in the `Billing` area, where users expect commercial access controls
 
 ## Paid access workflow
 
-Anaxion now includes a Node backend for a professional license gate:
+Axion now includes a Node backend for a professional license gate:
 
 - Price: `725 EUR`
 - Checkout creates a bank-transfer order and unique payment reference
@@ -41,8 +41,8 @@ export BANK_ACCOUNT_HOLDER="Your account holder"
 export BANK_IBAN="Your IBAN"
 export BANK_BIC="Your BIC"
 export BANK_NAME="Your bank"
-export ANAXION_ADMIN_USER="owner"
-export ANAXION_ADMIN_PASSWORD="set-a-private-password"
+export AXION_ADMIN_USER="owner"
+export AXION_ADMIN_PASSWORD="set-a-private-password"
 export SESSION_SECRET="set-a-long-random-secret"
 export GOOGLE_CLIENT_ID="your-google-oauth-client-id.apps.googleusercontent.com"
 export GOOGLE_ALLOWED_EMAILS="you@example.com"
