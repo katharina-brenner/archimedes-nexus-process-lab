@@ -9,13 +9,14 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=axion-twin-tool`.
+Then open `http://127.0.0.1:8899/index.html?v=frontpage`.
 
 ## Product-first workflow
 
 The front of the application now works like a company-grade product entry flow:
 
 - Login opens a BeamAI-inspired Axion landing surface, not the payment screen
+- The logo opens a public Axion front page with platform, workflow, ecosystem, and login sections
 - Start page asks for a natural-language product and plant description
 - Optional data files can be attached to the product brief
 - Axion automatically maps the brief to the closest process model

@@ -1803,6 +1803,12 @@ const els = {
   googleLoginFallback: document.querySelector("#googleLoginFallback"),
   googleButtonMount: document.querySelector("#googleButtonMount"),
   googleLoginStatus: document.querySelector("#googleLoginStatus"),
+  loginGate: document.querySelector("#loginGate"),
+  publicLogo: document.querySelector("#publicLogo"),
+  openLoginHero: document.querySelector("#openLoginHero"),
+  loginPanel: document.querySelector("#loginPanel"),
+  publicHome: document.querySelector("#publicHome"),
+  workspaceLogo: document.querySelector("#workspaceLogo"),
   logoutButton: document.querySelector("#logoutButton"),
 };
 
@@ -4082,12 +4088,15 @@ function showToast(message) {
 
 function unlockApp() {
   document.body.classList.remove("locked");
+  document.body.classList.remove("show-public");
   document.body.classList.add("authenticated");
 }
 
 function lockApp() {
   document.body.classList.add("locked");
   document.body.classList.remove("authenticated");
+  document.body.classList.remove("show-public");
+  window.setTimeout(() => els.loginGate?.scrollTo({ top: 0, behavior: "auto" }), 0);
 }
 
 const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
@@ -4125,6 +4134,25 @@ function renderProductConfig(config) {
       ? "Backend online. Private process workspace ready."
       : "Backend online. Private workspace ready.";
   }
+}
+
+function scrollPublicTarget(targetId, focusLogin = false) {
+  if (targetId === "publicHome") {
+    els.loginGate?.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (focusLogin) {
+    els.loginUser?.focus({ preventScroll: true });
+    window.setTimeout(() => els.loginUser?.focus(), 420);
+  }
+}
+
+function showPublicHome() {
+  document.body.classList.add("show-public");
+  window.setTimeout(() => els.loginGate?.scrollTo({ top: 0, behavior: "smooth" }), 0);
 }
 
 function loadGoogleScript() {
@@ -4304,6 +4332,20 @@ async function checkStoredAuth() {
 function bindAuth() {
   loadProductConfig();
   setupGoogleLogin();
+
+  els.publicLogo?.addEventListener("click", () => scrollPublicTarget("publicHome"));
+  els.workspaceLogo?.addEventListener("click", showPublicHome);
+  els.openLoginHero?.addEventListener("click", () => {
+    if (document.body.classList.contains("authenticated") && document.body.classList.contains("show-public")) {
+      unlockApp();
+      return;
+    }
+    scrollPublicTarget("loginPanel", true);
+  });
+
+  document.querySelectorAll("[data-public-target]").forEach((button) => {
+    button.addEventListener("click", () => scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel"));
+  });
 
   els.loginForm?.addEventListener("submit", async (event) => {
     event.preventDefault();

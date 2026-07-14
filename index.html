@@ -4,64 +4,170 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-axion-twin-tool" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-frontpage" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
-      <div class="access-shell landing-shell">
-        <section class="landing-story access-card">
-          <div class="landing-kicker">
-            <span>Axion Process OS</span>
-            <b>Biochemical plant modelling</b>
-          </div>
-          <h1>Describe the product. Axion builds the process system around it.</h1>
-          <p>From cultured meat and antibiotics to antibodies, vaccines, plasmids, cell therapy, fermentation, water and emissions: start with a natural-language product brief, attach data if you have it, then move into the full engineering workspace.</p>
-          <div class="landing-proof">
-            <span>Process design</span>
-            <span>Mass and energy balances</span>
-            <span>CFD screening</span>
-            <span>GMP and ICS 71.120</span>
-          </div>
-        </section>
-        <form id="loginForm" class="login-card access-card">
-          <div class="login-brand">
-            <div class="brand-mark technical-logo" aria-label="Axion pixel axolotl logo"><span></span></div>
-            <div>
-              <p>Process Intelligence</p>
-              <h1>Axion Process OS</h1>
+      <div class="public-site">
+        <header class="public-nav" aria-label="Axion front page navigation">
+          <button id="publicLogo" class="public-brand" type="button">
+            <span class="brand-mark technical-logo" aria-label="Axion technical pixel logo"><span></span></span>
+            <span>
+              <strong>Axion Process OS</strong>
+              <small>Biomanufacturing modelling suite</small>
+            </span>
+          </button>
+          <nav>
+            <button type="button" data-public-target="publicPlatform">Platform</button>
+            <button type="button" data-public-target="publicWorkflow">Workflow</button>
+            <button type="button" data-public-target="publicEcosystem">Ecosystem</button>
+            <button type="button" data-public-target="loginPanel">Login</button>
+          </nav>
+        </header>
+
+        <main class="public-scroll">
+          <section id="publicHome" class="public-hero" aria-label="Axion Process OS front page">
+            <div class="hero-grid" aria-hidden="true">
+              <span class="node node-feed">Media</span>
+              <span class="node node-seed">Seed</span>
+              <span class="node node-reactor">Bioreactor</span>
+              <span class="node node-purify">Purification</span>
+              <span class="node node-fill">Fill</span>
+              <i class="flow flow-a"></i>
+              <i class="flow flow-b"></i>
+              <i class="flow flow-c"></i>
+              <i class="flow flow-d"></i>
             </div>
-          </div>
-          <p class="access-copy">A precise biochemical process modelling suite for building, editing, simulating, and improving production systems.</p>
-          <label>
-            <span>User</span>
-            <input id="loginUser" autocomplete="username" placeholder="Enter user" />
-          </label>
-          <label>
-            <span>Password</span>
-            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password" />
-          </label>
-          <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
-          <button class="login-button" type="submit">Enter Axion</button>
-          <div class="login-divider"><span>or</span></div>
-          <div id="googleLoginBox" class="google-login-box" aria-label="Google login">
-            <button id="googleLoginFallback" class="google-login-fallback" type="button">Continue with Google</button>
-            <div id="googleButtonMount" class="google-button-mount"></div>
-            <small id="googleLoginStatus">Checking Google login configuration.</small>
-          </div>
-          <p id="loginError" class="login-error" role="alert"></p>
-          <small>Backend login keeps the workspace private while you build and simulate process models.</small>
-        </form>
+            <div class="public-hero-copy">
+              <p>Axion Process OS</p>
+              <h1>Engineering software for biochemical production systems.</h1>
+              <span>Describe the product, upload project data, then build a complete process model with flowsheets, equipment, balances, CFD screening, standards, sources, downloads, and AI-guided troubleshooting.</span>
+              <div class="public-actions">
+                <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
+                <button class="public-secondary" type="button" data-public-target="publicPlatform">Explore platform</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="publicPlatform" class="public-section public-platform">
+            <div class="section-heading">
+              <p>Platform</p>
+              <h2>From product brief to editable plant model.</h2>
+            </div>
+            <div class="platform-grid">
+              <article>
+                <span>01</span>
+                <h3>Natural-language process brief</h3>
+                <p>Start with penicillin, cultured meat, antibodies, fermentation, vaccines, plasmids, cell therapy, water, or emissions. Axion maps the brief to a process architecture.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Flowsheet + equipment builder</h3>
+                <p>Drag equipment, connect animated streams, add CIP/SIP, recycle, heat reuse, utilities, valves, sensors, QC nodes, and support infrastructure.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Models, equations, and downloads</h3>
+                <p>Work with mass and energy balances, chemical equations, stream tables, parameters, economics, standards, reports, and downloadable datasets.</p>
+              </article>
+              <article>
+                <span>04</span>
+                <h3>AI-assisted engineering</h3>
+                <p>Ask what blocks oxygen transfer, ammonium control, media cost, scale-up, cleaning, heat recovery, or facility readiness, then jump to the right tool module.</p>
+              </article>
+            </div>
+          </section>
+
+          <section id="publicWorkflow" class="public-section public-workflow">
+            <div class="section-heading">
+              <p>Workflow</p>
+              <h2>A technical operating layer for process design.</h2>
+            </div>
+            <div class="workflow-rail">
+              <article><b>Product</b><span>Define product, organism, scale, titer, recovery, quality constraints, and uploaded data.</span></article>
+              <article><b>Process</b><span>Generate and edit the flowsheet, unit procedures, streams, utilities, cleaning loops, and recycle paths.</span></article>
+              <article><b>Physics</b><span>Check kLa, OUR, pH, DO, heat load, mixing time, cell boundaries, and CFD-style distribution risks.</span></article>
+              <article><b>Decision</b><span>Export streams, equations, parameters, balances, cost model, and readiness recommendations.</span></article>
+            </div>
+          </section>
+
+          <section id="publicEcosystem" class="public-section public-ecosystem">
+            <div class="section-heading">
+              <p>Partner-ready ecosystem</p>
+              <h2>Built for the stakeholders around a bioprocess project.</h2>
+            </div>
+            <div class="partner-strip" aria-label="Partner-ready ecosystem categories">
+              <span>Universities</span>
+              <span>Biotech startups</span>
+              <span>CDMOs</span>
+              <span>Equipment OEMs</span>
+              <span>GMP consultants</span>
+              <span>Supplier data</span>
+              <span>SCADA / Historian</span>
+              <span>Regulatory review</span>
+            </div>
+            <div class="ecosystem-grid">
+              <article>
+                <h3>Scientific reference layer</h3>
+                <p>Attach papers, supplier data, standards, assumptions, and SOP notes directly to units, streams, parameters, and scale-up decisions.</p>
+              </article>
+              <article>
+                <h3>Integration layer</h3>
+                <p>Model CSV uploads, historian data, OPC UA, SCADA, sensor streams, batch records, and source-backed parameter updates.</p>
+              </article>
+              <article>
+                <h3>Review layer</h3>
+                <p>Use structured recommendations to see what still has to be added before a full production simulation is defensible.</p>
+              </article>
+            </div>
+          </section>
+
+          <section id="loginPanel" class="public-section public-login">
+            <div class="section-heading">
+              <p>Private workspace</p>
+              <h2>Log in and continue modelling.</h2>
+            </div>
+            <form id="loginForm" class="login-card access-card">
+              <div class="login-brand">
+                <div class="brand-mark technical-logo" aria-label="Axion technical pixel logo"><span></span></div>
+                <div>
+                  <p>Process Intelligence</p>
+                  <h1>Axion Process OS</h1>
+                </div>
+              </div>
+              <p class="access-copy">A precise biochemical process modelling suite for building, editing, simulating, and improving production systems.</p>
+              <label>
+                <span>User</span>
+                <input id="loginUser" autocomplete="username" placeholder="Enter user" />
+              </label>
+              <label>
+                <span>Password</span>
+                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password" />
+              </label>
+              <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
+              <button class="login-button" type="submit">Enter Axion</button>
+              <div class="login-divider"><span>or</span></div>
+              <div id="googleLoginBox" class="google-login-box" aria-label="Google login">
+                <button id="googleLoginFallback" class="google-login-fallback" type="button">Continue with Google</button>
+                <div id="googleButtonMount" class="google-button-mount"></div>
+                <small id="googleLoginStatus">Checking Google login configuration.</small>
+              </div>
+              <p id="loginError" class="login-error" role="alert"></p>
+              <small>Backend login keeps the workspace private while you build and simulate process models.</small>
+            </form>
+          </section>
+        </main>
       </div>
     </section>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Project controls">
-        <div class="brand">
-          <div class="brand-mark technical-logo" aria-label="Axion pixel axolotl logo"><span></span></div>
+        <button id="workspaceLogo" class="brand brand-button" type="button" title="Open Axion front page">
+          <div class="brand-mark technical-logo" aria-label="Axion technical pixel logo"><span></span></div>
           <div>
             <h1>Axion Process OS</h1>
             <p>Industrial process intelligence suite</p>
           </div>
-        </div>
+        </button>
 
         <nav class="suite-nav" aria-label="Main pages">
           <button class="suite-link active" data-view="start">Start</button>
@@ -357,6 +463,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-axion-twin-tool"></script>
+    <script type="module" src="./app.js?v=20260714-frontpage"></script>
   </body>
 </html>
