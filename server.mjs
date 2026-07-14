@@ -33,6 +33,7 @@ const config = {
   sessionSecret: process.env.SESSION_SECRET || "anaxion-local-dev-secret",
   adminUser: (process.env.ANAXION_ADMIN_USER || "owner").toLowerCase(),
   adminPassword: process.env.ANAXION_ADMIN_PASSWORD || "",
+  localPasswordLogin: process.env.ANAXION_LOCAL_PASSWORD_LOGIN === "true",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS || "")
     .split(",")
@@ -421,7 +422,9 @@ async function login(req, res) {
   const licenseKey = String(body.licenseKey || password || "").trim().toUpperCase();
   const db = ensureDbShape(await loadDb());
 
-  if (safeCompare(user, config.adminUser) && safeCompare(password, config.adminPassword)) {
+  const ownerPasswordValid = config.adminPassword && safeCompare(password, config.adminPassword);
+  const ownerUserValid = safeCompare(user, config.adminUser) || (config.localPasswordLogin && Boolean(user));
+  if (ownerUserValid && ownerPasswordValid) {
     if (!config.adminPassword) {
       json(res, 503, { error: "Admin password is not configured on the backend." });
       return;
