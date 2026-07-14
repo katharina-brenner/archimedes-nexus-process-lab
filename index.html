@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-cfd-logo" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-lovable-front" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -39,14 +39,59 @@
               <i class="flow flow-d"></i>
             </div>
             <div class="public-hero-copy">
-              <p>Axion Process OS</p>
-              <h1>Engineering software for biochemical production systems.</h1>
-              <span>Describe the product, upload project data, then build a complete process model with flowsheets, equipment, balances, CFD screening, standards, sources, downloads, and AI-guided troubleshooting.</span>
-              <div class="public-actions">
-                <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
-                <button class="public-secondary" type="button" data-public-target="publicPlatform">Explore platform</button>
+              <div class="hero-badge-row">
+                <span>Axion Process OS</span>
+                <b>Private beta for bioprocess modelling</b>
+              </div>
+              <h1>Build a biomanufacturing plant from a product brief.</h1>
+              <span>Describe what you want to produce. Axion turns it into a process workspace with flowsheets, equipment, balances, CFD, standards, sources, and downloadable tables.</span>
+              <div class="hero-composer" aria-label="Product brief composer preview">
+                <div class="composer-topline">
+                  <span>What should Axion model?</span>
+                  <b>Secure workspace</b>
+                </div>
+                <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and CFD screening.</p>
+                <div class="composer-actions">
+                  <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
+                  <button class="public-secondary" type="button" data-public-target="publicPlatform">See modules</button>
+                </div>
+              </div>
+              <div class="prompt-suggestions" aria-label="Example process prompts">
+                <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
+                <button type="button" data-public-target="loginPanel">Penicillin fermentation</button>
+                <button type="button" data-public-target="loginPanel">Antibody GMP facility</button>
+                <button type="button" data-public-target="loginPanel">Wastewater + heat reuse</button>
+              </div>
+              <div class="hero-trust-strip" aria-label="Axion workspace highlights">
+                <span><strong>120+</strong> equipment items</span>
+                <span><strong>210</strong> equations</span>
+                <span><strong>CFD</strong> workbench</span>
+                <span><strong>ICS 71.120</strong> mapped</span>
               </div>
             </div>
+          </section>
+
+          <section class="public-bento" aria-label="Axion product details">
+            <article class="bento-card bento-large">
+              <span>Prompt to plant</span>
+              <h2>Start with words. Continue with an editable engineering model.</h2>
+              <p>The first step is not a template menu. Describe the product, scale, organism, quality target, and constraints; Axion chooses a process family and opens the workspace.</p>
+            </article>
+            <article class="bento-card">
+              <span>Visual builder</span>
+              <h3>Drag, connect, inspect</h3>
+              <p>Build PFD-like flows with main process, utilities, cleaning, heat reuse, recycle, QC, and emissions layers.</p>
+            </article>
+            <article class="bento-card">
+              <span>Physics layer</span>
+              <h3>CFD without leaving the tool</h3>
+              <p>Screen oxygen, nutrients, shear, feed zones, and hotspots before commissioning rigorous CFD.</p>
+            </article>
+            <article class="bento-card bento-wide">
+              <span>Engineering memory</span>
+              <h3>Sources, standards, equations, and downloads stay attached.</h3>
+              <p>Every model can connect to assumptions, SOP notes, literature, stream tables, mass balances, cost drivers, and readiness recommendations.</p>
+            </article>
           </section>
 
           <section id="publicPlatform" class="public-section public-platform">
@@ -462,6 +507,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-cfd-logo"></script>
+    <script type="module" src="./app.js?v=20260714-lovable-front"></script>
   </body>
 </html>
