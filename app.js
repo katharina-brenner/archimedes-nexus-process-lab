@@ -4176,9 +4176,39 @@ function renderStaticAccessMode() {
   }
 }
 
-function scrollPublicTarget(targetId, focusLogin = false) {
-  if (targetId === "publicHome") {
+const publicPageTargets = {
+  publicHome: "home",
+  publicPlatform: "platform",
+  publicWorkflow: "workflow",
+  publicEcosystem: "ecosystem",
+  publicReviews: "reviews",
+  publicPricing: "pricing",
+  loginPanel: "login",
+};
+
+function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {}) {
+  const targetPage = page || "home";
+  document.querySelectorAll(".public-page").forEach((section) => {
+    section.classList.toggle("active-public-page", section.dataset.publicPage === targetPage);
+  });
+  document.querySelectorAll(".public-nav [data-public-target]").forEach((button) => {
+    button.classList.toggle("active", publicPageTargets[button.dataset.publicTarget] === targetPage);
+  });
+  if (scroll) {
     els.loginGate?.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    els.loginGate?.scrollTo({ top: 0, behavior: "auto" });
+  }
+  if (focusLogin) {
+    els.loginUser?.focus({ preventScroll: true });
+    window.setTimeout(() => els.loginUser?.focus(), 260);
+  }
+}
+
+function scrollPublicTarget(targetId, focusLogin = false) {
+  const publicPage = publicPageTargets[targetId];
+  if (publicPage) {
+    showPublicPage(publicPage, { focusLogin });
     return;
   }
   const target = document.getElementById(targetId);
@@ -4192,7 +4222,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function showPublicHome() {
   document.body.classList.add("show-public");
-  window.setTimeout(() => els.loginGate?.scrollTo({ top: 0, behavior: "smooth" }), 0);
+  window.setTimeout(() => showPublicPage("home"), 0);
 }
 
 function loadGoogleScript() {
@@ -4373,6 +4403,7 @@ async function checkStoredAuth() {
 
 function bindAuth() {
   loadProductConfig().finally(() => setupGoogleLogin());
+  showPublicPage("home", { scroll: false });
 
   els.publicLogo?.addEventListener("click", () => scrollPublicTarget("publicHome"));
   els.workspaceLogo?.addEventListener("click", showPublicHome);

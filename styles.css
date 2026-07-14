@@ -169,6 +169,16 @@ body.show-public .app-shell {
   display: grid;
 }
 
+.public-page:not(.active-public-page) {
+  display: none;
+}
+
+.public-nav nav button.active {
+  border-color: rgba(117, 208, 199, 0.52);
+  color: #06192c;
+  background: linear-gradient(135deg, #e8fffb, #9be7dd);
+}
+
 .public-hero {
   position: relative;
   display: grid;
@@ -800,6 +810,130 @@ body.show-public .app-shell {
   align-content: start;
   min-height: 188px;
   padding: 20px;
+}
+
+.pricing-intro,
+.pricing-note {
+  max-width: 920px;
+  border: 1px solid rgba(160, 180, 206, 0.18);
+  border-radius: 14px;
+  padding: 18px 20px;
+  background:
+    linear-gradient(180deg, rgba(226, 238, 250, 0.08), rgba(226, 238, 250, 0.04)),
+    rgba(7, 26, 49, 0.28);
+  box-shadow: 0 24px 70px rgba(3, 14, 27, 0.16);
+}
+
+.pricing-intro {
+  margin-bottom: 16px;
+}
+
+.pricing-intro p,
+.pricing-note p {
+  margin: 0;
+  color: #b6c5d7;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pricing-grid article {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  min-height: 360px;
+  padding: 22px;
+  border: 1px solid rgba(160, 180, 206, 0.18);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(226, 238, 250, 0.08), rgba(226, 238, 250, 0.035)),
+    rgba(7, 26, 49, 0.3);
+  box-shadow: 0 24px 70px rgba(3, 14, 27, 0.16);
+}
+
+.pricing-grid article.pricing-featured {
+  border-color: rgba(117, 208, 199, 0.62);
+  background:
+    radial-gradient(circle at 82% 8%, rgba(155, 231, 221, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(226, 238, 250, 0.12), rgba(226, 238, 250, 0.045)),
+    rgba(7, 26, 49, 0.42);
+  box-shadow: 0 28px 86px rgba(31, 183, 166, 0.18);
+}
+
+.pricing-grid span {
+  width: fit-content;
+  border: 1px solid rgba(155, 231, 221, 0.28);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #9be7dd;
+  background: rgba(226, 238, 250, 0.055);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pricing-grid h3 {
+  margin: 8px 0 0;
+  color: #fff;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.pricing-grid p {
+  margin: 0;
+  color: #9fb0c5;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pricing-grid ul {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pricing-grid li {
+  position: relative;
+  padding-left: 20px;
+  color: #c7d5e5;
+  font-size: 13px;
+  line-height: 1.42;
+}
+
+.pricing-grid li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #75d0c7;
+  box-shadow: 0 0 14px rgba(117, 208, 199, 0.36);
+}
+
+.pricing-note {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pricing-note strong {
+  color: #fff;
+  font-size: 18px;
+}
+
+.pricing-note .public-primary {
+  width: fit-content;
 }
 
 .public-login {
@@ -4948,7 +5082,8 @@ th {
   .usecase-grid,
   .module-copy-grid,
   .review-grid,
-  .faq-grid {
+  .faq-grid,
+  .pricing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5198,7 +5333,8 @@ th {
   .usecase-grid,
   .module-copy-grid,
   .review-grid,
-  .faq-grid {
+  .faq-grid,
+  .pricing-grid {
     grid-template-columns: 1fr;
   }
 
@@ -5210,7 +5346,8 @@ th {
   .module-copy-grid article,
   .usecase-grid article,
   .review-grid article,
-  .faq-grid article {
+  .faq-grid article,
+  .pricing-grid article {
     min-height: auto;
     padding: 16px;
   }
