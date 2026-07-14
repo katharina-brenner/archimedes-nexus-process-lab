@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const dataDir = join(rootDir, ".data");
-const dbPath = join(dataDir, "archytas-licensing.json");
+const dbPath = join(dataDir, "anaxion-licensing.json");
 
 function loadLocalEnv() {
   const envPath = join(rootDir, ".env");
@@ -27,12 +27,12 @@ loadLocalEnv();
 const config = {
   host: process.env.HOST || "127.0.0.1",
   port: Number(process.env.PORT || 8899),
-  productName: process.env.PRODUCT_NAME || "Archytas Process OS",
-  priceCents: Number(process.env.ARCHYTAS_PRICE_CENTS || 72500),
-  currency: process.env.ARCHYTAS_CURRENCY || "EUR",
-  sessionSecret: process.env.SESSION_SECRET || "archytas-local-dev-secret",
-  adminUser: (process.env.ARCHYTAS_ADMIN_USER || "Kbrenner").toLowerCase(),
-  adminPassword: process.env.ARCHYTAS_ADMIN_PASSWORD || "",
+  productName: process.env.PRODUCT_NAME || "Anaxion Process OS",
+  priceCents: Number(process.env.ANAXION_PRICE_CENTS || 72500),
+  currency: process.env.ANAXION_CURRENCY || "EUR",
+  sessionSecret: process.env.SESSION_SECRET || "anaxion-local-dev-secret",
+  adminUser: (process.env.ANAXION_ADMIN_USER || "owner").toLowerCase(),
+  adminPassword: process.env.ANAXION_ADMIN_PASSWORD || "",
   bank: {
     accountHolder: process.env.BANK_ACCOUNT_HOLDER || "",
     iban: process.env.BANK_IBAN || "",
@@ -167,7 +167,7 @@ function getBearer(req) {
 }
 
 function makeReference() {
-  return `ARCHYTAS-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
+  return `ANAXION-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`;
 }
 
 function makeLicenseKey() {
@@ -347,7 +347,7 @@ async function login(req, res) {
       return;
     }
     const token = signSession({ sub: "admin", role: "admin", exp: Date.now() + 1000 * 60 * 60 * 12 });
-    json(res, 200, { token, account: { role: "admin", name: "K. Brenner", productName: config.productName } });
+    json(res, 200, { token, account: { role: "admin", name: "Owner", productName: config.productName } });
     return;
   }
 
