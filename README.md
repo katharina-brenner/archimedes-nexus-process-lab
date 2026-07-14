@@ -1,10 +1,47 @@
-# Archimedes Nexus Process Lab
+# Archytas Process OS
 
 A standalone high-density bioprocess flowsheet and process-intelligence studio inspired by professional process simulation tools.
 
-## Open locally
+## Open locally with backend
 
-Open `index.html` in a browser.
+```bash
+npm install
+npm run backend
+```
+
+Then open `http://127.0.0.1:8899/index.html?v=archytas-backend`.
+
+## Paid access workflow
+
+Archytas now includes a Node backend for a professional license gate:
+
+- Price: `725 EUR`
+- Checkout creates a bank-transfer order and unique payment reference
+- Bank-account details are read from environment variables, not committed to Git
+- Owner/admin login can list pending orders
+- After the incoming transfer is verified, the admin endpoint marks the order paid
+- A license key is generated and can be used to unlock the tool
+
+Set these environment variables on the machine or hosting platform before selling live access:
+
+```bash
+export BANK_ACCOUNT_HOLDER="Your account holder"
+export BANK_IBAN="Your IBAN"
+export BANK_BIC="Your BIC"
+export BANK_NAME="Your bank"
+export ARCHYTAS_ADMIN_USER="Kbrenner"
+export ARCHYTAS_ADMIN_PASSWORD="set-a-private-password"
+export SESSION_SECRET="set-a-long-random-secret"
+```
+
+## Backend API
+
+- `GET /api/product` lists product, price, bank-transfer configuration, and backend features
+- `POST /api/checkout` creates a 725 EUR bank-transfer order
+- `POST /api/auth/login` logs in the owner or an activated license holder
+- `GET /api/account` verifies a server session
+- `GET /api/admin/orders` lists orders and licenses for the owner
+- `POST /api/admin/orders/:id/mark-paid` marks an order paid and creates an active license key
 
 ## What is included
 

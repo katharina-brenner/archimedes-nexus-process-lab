@@ -65,9 +65,9 @@ const palette = [
   { type: "solvent-tank", label: "Solvent Tank Farm", isoName: "GMP solvent storage and transfer system", cls: "Hold", icon: "ST", color: "#bc6c25", residence: 8, power: 0.7, standards: ["ATEX/DSEAR", "ICH Q7", "ISO 10628"] },
   { type: "dryer-mill", label: "Mill and Sieve", isoName: "Cone mill and vibratory sieve", cls: "Finishing", icon: "MS", color: "#bc6c25", residence: 1.5, power: 2.2, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
   { type: "weigh-fill", label: "Weigh Fill", isoName: "Bulk weigh fill station", cls: "Packaging", icon: "WF", color: "#3f6173", residence: 1, power: 0.8, standards: ["EU GMP Annex 16", "21 CFR 211"] },
-  { type: "pump", label: "Transfer Pump", isoName: "Hygienic transfer pump", cls: "Piping", icon: "P", color: "#2f80ed", residence: 0.1, power: 1.6, standards: ["ASME BPE", "ISO 10628", "EU GMP Annex 15"] },
+  { type: "pump", label: "Transfer Pump", isoName: "Hygienic transfer pump", cls: "Piping", icon: "P", color: "#4b5563", residence: 0.1, power: 1.6, standards: ["ASME BPE", "ISO 10628", "EU GMP Annex 15"] },
   { type: "valve", label: "Manual Valve", isoName: "Hygienic diaphragm valve", cls: "Piping", icon: "V", color: "#4f6f8f", residence: 0.05, power: 0.02, standards: ["ASME BPE", "ISO 10628"] },
-  { type: "control-valve", label: "Control Valve", isoName: "Automated flow control valve", cls: "Piping", icon: "CV", color: "#2f80ed", residence: 0.05, power: 0.08, standards: ["ASME BPE", "ISA-88", "21 CFR Part 11"] },
+  { type: "control-valve", label: "Control Valve", isoName: "Automated flow control valve", cls: "Piping", icon: "CV", color: "#4b5563", residence: 0.05, power: 0.08, standards: ["ASME BPE", "ISA-88", "21 CFR Part 11"] },
   { type: "flowmeter", label: "Flowmeter", isoName: "Coriolis or magnetic flowmeter", cls: "Instrumentation", icon: "FM", color: "#00a88f", residence: 0.05, power: 0.05, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
   { type: "sensor", label: "PAT Sensor", isoName: "Inline pH DO conductivity or UV sensor", cls: "Instrumentation", icon: "S", color: "#8a6f3d", residence: 0.05, power: 0.08, standards: ["ICH Q8", "GAMP 5", "21 CFR Part 11"] },
   { type: "pressure-relief", label: "Pressure Relief", isoName: "Relief valve or rupture disc assembly", cls: "Piping", icon: "PR", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ASME BPE", "PED", "ISO 10628"] },
@@ -81,7 +81,7 @@ const palette = [
   { type: "anaerobic-digester", label: "Anaerobic Digester", isoName: "Anaerobic digestion reactor", cls: "Bioreactor", icon: "AD", color: "#4d908e", residence: 72, power: 5.6, standards: ["ISO 10628", "ISA-88"] },
   { type: "absorber", label: "Absorption Column", isoName: "Packed or tray absorption column", cls: "Separation", icon: "ABS", color: "#4895ef", residence: 2.2, power: 6.4, standards: ["ISO 10628", "ATEX/DSEAR"] },
   { type: "desorber", label: "Desorption Column", isoName: "Solvent regeneration desorption column", cls: "Thermal", icon: "DES", color: "#bc6c25", residence: 2.8, power: 12.5, standards: ["ISO 10628", "ATEX/DSEAR"] },
-  { type: "splitter", label: "Recycle Splitter", isoName: "Recycle purge splitter", cls: "Piping", icon: "SPL", color: "#2f80ed", residence: 0.05, power: 0.05, standards: ["ISO 10628", "ISA-88"] },
+  { type: "splitter", label: "Recycle Splitter", isoName: "Recycle purge splitter", cls: "Piping", icon: "SPL", color: "#4b5563", residence: 0.05, power: 0.05, standards: ["ISO 10628", "ISA-88"] },
   { type: "regulator", label: "Feedback Regulator", isoName: "Feedback regulatory control block", cls: "Instrumentation", icon: "REG", color: "#8a6f3d", residence: 0.05, power: 0.2, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
   { type: "tear-stream", label: "Tear Stream Marker", isoName: "Recycle loop tear stream convergence marker", cls: "Instrumentation", icon: "TS", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ISA-88", "GAMP 5"] },
   { type: "equalization", label: "Equalization Tank", isoName: "Wastewater equalization basin", cls: "Environmental", icon: "EQ", color: "#277da1", residence: 8, power: 1.2, standards: ["ISO 14001", "ISO 10628"] },
@@ -137,9 +137,20 @@ const paletteGroups = [
 ];
 
 const canvasFocusOptions = [
-  { key: "all", label: "All" },
-  { key: "main", label: "Main process" },
-  { key: "support", label: "Support systems" },
+  { key: "all", label: "L0 Full plant" },
+  { key: "main", label: "L1 Core process" },
+  { key: "upstream", label: "L2 Upstream" },
+  { key: "downstream", label: "L3 Downstream" },
+  { key: "utilities", label: "L4 Utilities + CIP" },
+  { key: "recycle", label: "L5 Recycle + heat" },
+  { key: "quality", label: "L6 QC + AI" },
+];
+
+const flowDetailOptions = [
+  { key: "standard", label: "Standard" },
+  { key: "detailed", label: "Flow labels" },
+  { key: "equipment", label: "Equipment data" },
+  { key: "full", label: "Full PFD" },
 ];
 
 const sectionPresets = [
@@ -220,6 +231,135 @@ const standards = [
   { group: "Validation", name: "GAMP 5", scope: "Risk-based computerized system validation and lifecycle controls." },
   { group: "Utilities", name: "USP <85> / <788> / <1231>", scope: "Endotoxins, particulate matter, and pharmaceutical water systems." },
   { group: "Packaging", name: "ISO 15378", scope: "Primary packaging materials for medicinal products with GMP expectations." },
+];
+
+const scientificSources = [
+  {
+    group: "Merck",
+    title: "Sterile filtration and bioburden control",
+    appliesTo: ["sterile-filter", "prefilter", "polish-filter", "media", "buffer-prep", "sterile-fill"],
+    benchmark: "Use 0.22 micron sterilizing-grade filtration as a model assumption for sterile liquid filtration and bioburden-control steps.",
+    modelUse: "Sterile filter sizing, bioburden risk tags, final fill controls, filter integrity-test checklist.",
+    source: "Merck Millipore - Sterile Filtration and Bioburden Control",
+    url: "https://www.merckmillipore.com/BG/en/products/pharma-and-biopharma-manufacturing/sterile-filtration-and-bioburden-control",
+  },
+  {
+    group: "Merck",
+    title: "Scalable tangential-flow filtration",
+    appliesTo: ["ufdf", "microfilter", "nanofilter", "virus-filter"],
+    benchmark: "TFF is modeled for concentration, diafiltration, buffer exchange, and downstream viral-vector/biologics purification.",
+    modelUse: "Membrane-area sizing, flux/TMP assumptions, diafiltration-volume planning, scale-up checklist.",
+    source: "Merck Millipore - Scalable Tangential Flow Filtration",
+    url: "https://www.merckmillipore.com/NI/es/technical-documents/technical-article/pharmaceutical-and-biopharmaceutical-manufacturing/viral-vector-downstream-processing/scalable-tangential-flow-filtration-downstream-processing",
+  },
+  {
+    group: "Cytiva",
+    title: "Dynamic binding capacity",
+    appliesTo: ["chromatography", "protein-a", "ion-exchange", "resin-prep"],
+    benchmark: "DBC is treated as the load limit before unacceptable product breakthrough under process conditions.",
+    modelUse: "Chromatography resin volume, loading cycles, breakthrough risk, elution/pool design.",
+    source: "Cytiva - How to determine dynamic binding capacity",
+    url: "https://www.cytivalifesciences.com/en/us/insights/how-to-determine-dynamic-binding-capacity-of-chromatography-resins",
+  },
+  {
+    group: "Sartorius",
+    title: "Single-use bioreactor scale range",
+    appliesTo: ["seed-reactor", "production-reactor", "fermenter", "perfusion", "wave"],
+    benchmark: "Single-use bioreactors are represented as scalable culture systems with vendor ranges from milliliter-scale systems to 2000 L class systems.",
+    modelUse: "Scale-up guardrails, working-volume constraints, single-use versus stainless utility burden.",
+    source: "Sartorius - Single-Use Bioreactors",
+    url: "https://www.sartorius.com/en/products/fermentation-bioreactors/single-use-bioreactors",
+  },
+  {
+    group: "Paper",
+    title: "Ammonia toxicity in mammalian cell culture",
+    appliesTo: ["production-reactor", "seed-reactor", "perfusion", "fermenter", "wave", "cell-bank", "media"],
+    benchmark: "Ammonia/ammonium accumulation is a known inhibitory byproduct in mammalian cell culture; growth, maximum viable density, protein processing, and product quality can be affected.",
+    modelUse: "Ammonium boundary check, metabolic waste warning, feed/glutamine strategy, quality-risk signal.",
+    source: "Schneider et al. - The importance of ammonia in mammalian cell culture",
+    url: "https://pubmed.ncbi.nlm.nih.gov/8672289/",
+  },
+  {
+    group: "Paper",
+    title: "Ammonium, lactate, and glutamine effects",
+    appliesTo: ["production-reactor", "seed-reactor", "perfusion", "fermenter", "media", "feed-tank"],
+    benchmark: "Ammonium can reduce cell growth rate and can lead to growth arrest; lactate and glutamine interactions should be constrained in cell-culture models.",
+    modelUse: "Chemical-boundary warning for ammonium, lactate, glutamine, and pH-linked metabolic stress.",
+    source: "Influence of different ammonium, lactate and glutamine concentrations on CHO culture",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC2995142/",
+  },
+  {
+    group: "Industry",
+    title: "20,000 L mammalian bioreactor scale reference",
+    appliesTo: ["production-reactor", "seed-reactor", "perfusion"],
+    benchmark: "Traditional mammalian-cell seed trains can culminate in manufacturing bioreactors around 20,000 L; above this, oxygen transfer, mixing time, shear, facility risk, and validation risk should trigger a hard design review.",
+    modelUse: "Mammalian-cell bioreactor volume boundary, scale-out recommendation, oxygen-transfer and mixing-time warning.",
+    source: "BioPharm International - Current challenges with cell culture scale-up",
+    url: "https://www.biopharminternational.com/view/current-challenges-with-cell-culture-scale-up-for-biologics-production",
+  },
+  {
+    group: "Industry",
+    title: "Oxygen transfer and shear in 20,000 L cell-culture bioreactors",
+    appliesTo: ["production-reactor", "seed-reactor", "perfusion", "gas-mixing", "sensor"],
+    benchmark: "At 20,000 L scale, mixing time, oxygen mass transfer, agitation, and shear become explicit design constraints rather than simple linear scale-up variables.",
+    modelUse: "kLa/OUR boundary, agitation/shear warning, large-bioreactor scale-up recommendation.",
+    source: "BioProcess International - Characterizing oxygen mass transfer and shear",
+    url: "https://www.bioprocessintl.com/bioreactors/characterizing-oxygen-mass-transfer-and-shear-during-cell-culture-calculating-the-maximum-cell-density-supported-by-a-20-000-liter-stirred-tank-bioreactor",
+  },
+  {
+    group: "Industry",
+    title: "Process intensification and 2,000 L scale-out",
+    appliesTo: ["production-reactor", "perfusion", "seed-reactor", "wave"],
+    benchmark: "Process-intensification strategies can reduce dependence on 20,000 L stainless-steel scale-up by moving toward smaller 2,000 L class single-use or scale-out configurations.",
+    modelUse: "Scale-out recommendation when mammalian-cell reactor volume exceeds 20,000 L or when kLa/ammonium boundaries are stressed.",
+    source: "Sartorius - seed train process intensification",
+    url: "https://www.sartorius.com/download/785210/biostat-rm-str-seed-train-process-intensification-article-pd-1--data.pdf",
+  },
+  {
+    group: "FDA",
+    title: "Process validation lifecycle",
+    appliesTo: ["report-set", "process-explorer", "qc", "pat", "stream-summary"],
+    benchmark: "Validation is modeled as a lifecycle: process design, process qualification, and continued process verification.",
+    modelUse: "Recommendations tab, validation readiness, batch-record and continued-verification gaps.",
+    source: "FDA - Process Validation: General Principles and Practices",
+    url: "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/process-validation-general-principles-and-practices",
+  },
+  {
+    group: "ICH",
+    title: "Viral safety for biotechnology products",
+    appliesTo: ["virus-filter", "low-ph", "qc", "sampling", "cell-bank"],
+    benchmark: "Viral safety is modeled as a risk-based testing, prevention, removal, and inactivation strategy for products from cell lines.",
+    modelUse: "Viral-filter, low-pH inactivation, QC release, adventitious-agent risk checks.",
+    source: "EMA / ICH Q5A(R2) - Viral safety evaluation",
+    url: "https://www.ema.europa.eu/en/ich-q5ar2-guideline-viral-safety-evaluation-biotechnology-products-derived-cell-lines-human-or-animal-origin-scientific-guideline",
+  },
+  {
+    group: "FDA",
+    title: "Viral safety guidance",
+    appliesTo: ["virus-filter", "low-ph", "protein-a", "chromatography", "qc"],
+    benchmark: "Risk-based principles and mitigation strategies are used as the logic for viral-clearance recommendations.",
+    modelUse: "Risk scoring for biologics, viral-vector, and mammalian-cell culture process templates.",
+    source: "FDA - Q5A(R2) Viral Safety Evaluation",
+    url: "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/q5ar2-viral-safety-evaluation-biotechnology-products-derived-cell-lines-human-or-animal-origin",
+  },
+  {
+    group: "ISO",
+    title: "PFD/P&ID diagram conventions",
+    appliesTo: ["visual-object", "process-explorer", "stream-summary", "pump", "valve", "control-valve", "flowmeter"],
+    benchmark: "Chemical-industry diagrams should use consistent PFD/P&ID symbols and drawing conventions.",
+    modelUse: "Standardized symbols, stream labels, equipment tags, and flowsheet-readability recommendations.",
+    source: "ISO 10628 - Diagrams for the chemical and petrochemical industry",
+    url: "https://www.iso.org/standard/51801.html",
+  },
+  {
+    group: "ICS",
+    title: "ICS 71.120 equipment classification",
+    appliesTo: ["all"],
+    benchmark: "ISO lists 71.120 as equipment for the chemical industry, with subgroups for equipment in general, reaction vessels and their components, columns, heat exchangers, and other equipment.",
+    modelUse: "Equipment-table classification, standards coverage, and Recommendations tab gap analysis.",
+    source: "ISO ICS 71.120 - Equipment for the chemical industry",
+    url: "https://www.iso.org/ics/71.120.html",
+  },
 ];
 
 const scalePresets = {
@@ -1158,6 +1298,98 @@ Object.values(templates).forEach((template) => {
   template.description = `${template.description}; CIP/SIP, recycle, heat-reuse, resource inventory, and report infrastructure`;
 });
 
+const flagshipCulturedMeatFacility = {
+  units: [
+    unit("DOCK-001", "storage", 1540, 80, "GMP Raw Material Dock"),
+    unit("WB-102", "weigh-scale", 1790, 80, "Barcode Weigh and Dispense"),
+    unit("SUM-103", "single-use-mixer", 2040, 80, "Growth Factor Premix"),
+    unit("WFI-104", "wfi", 2290, 80, "Ring Main WFI Loop"),
+    unit("CS-105", "clean-steam", 2540, 80, "Clean Steam Header"),
+    unit("HVAC-106", "hvac", 2790, 80, "Grade C/D HVAC Suite"),
+    unit("FT-210", "feed-tank", 1540, 265, "Sterile Feed Concentrate"),
+    unit("P-211", "pump", 1790, 285, "Feed Transfer Pump"),
+    unit("CV-212", "control-valve", 1960, 285, "Feed Control Valve"),
+    unit("FM-213", "flowmeter", 2130, 285, "Feed Coriolis Meter"),
+    unit("BR-202", "production-reactor", 2290, 265, "Production STR Parallel A"),
+    unit("BR-203", "production-reactor", 2540, 265, "Production STR Parallel B"),
+    unit("GM-214", "gas-mixing", 2790, 265, "Sterile Gas Manifold"),
+    unit("SENS-215", "sensor", 3040, 285, "Inline DO pH Biomass Sensor"),
+    unit("HH-310", "harvest-hold", 1540, 450, "Temperature Controlled Harvest Hold"),
+    unit("MF-311", "microfilter", 1790, 450, "Harvest Guard Microfilter"),
+    unit("MAN-312", "manifold", 2040, 470, "Downstream Transfer Manifold"),
+    unit("PF-313", "prefilter", 2210, 450, "Bioburden Reduction Prefilter"),
+    unit("UF-314", "ufdf", 2460, 450, "Concentration and Wash TFF"),
+    unit("SP-315", "sampling", 2710, 470, "IPC Microbiology Sample"),
+    unit("FV-410", "formulation", 1540, 635, "Texturization and Final Blend"),
+    unit("IS-411", "isolator", 1790, 635, "Aseptic Filling Isolator"),
+    unit("AF-412", "sterile-fill", 2040, 635, "Tray Fill and Seal"),
+    unit("INS-413", "inspection", 2290, 635, "Vision and Weight Inspection"),
+    unit("CSG-414", "cold-storage", 2540, 635, "2-8 C Dispatch Cold Room"),
+    unit("QC-415", "qc", 2790, 635, "Rapid Sterility Release"),
+    unit("CAT-510", "cleaning-agent", 1540, 820, "CIP Chemical Make-Up"),
+    unit("CIP-511", "cip", 1790, 820, "Mobile CIP Cart"),
+    unit("CIPR-512", "cip-return", 2040, 820, "Spent CIP Return Header"),
+    unit("WI-513", "waste-inactivation", 2290, 820, "Liquid Bio-Waste Kill Tank"),
+    unit("WR-514", "water-reuse", 2540, 820, "Rinse Water Recovery"),
+    unit("HR-515", "heat-recovery", 2790, 820, "Warm Effluent Heat Recovery"),
+    unit("PM-610", "power-meter", 1540, 1005, "Electrical Demand Meter"),
+    unit("PX-611", "process-explorer", 1790, 1005, "Plant Overview Navigator"),
+    unit("RPT-612", "report-set", 2040, 1005, "Batch Record and KPI Reports"),
+    unit("VO-613", "visual-object", 2290, 1005, "Suite Boundary and Pressure Cascade"),
+  ],
+  streams: [
+    stream("F-001", "DOCK-001", "WB-102", "Released raw materials", "Solid"),
+    stream("F-002", "WB-102", "SUM-103", "Dispensed supplements", "Solid"),
+    stream("F-003", "WFI-104", "SUM-103", "WFI for premix", "Aqueous"),
+    stream("F-004", "SUM-103", "PV-101", "Concentrated supplement premix", "Aqueous"),
+    stream("F-005", "WFI-104", "FT-210", "Sterile feed water", "Aqueous"),
+    stream("F-006", "FT-210", "P-211", "Feed concentrate", "Aqueous"),
+    stream("F-007", "P-211", "CV-212", "Pressurized feed", "Aqueous"),
+    stream("F-008", "CV-212", "FM-213", "Controlled feed", "Aqueous"),
+    stream("F-009", "FM-213", "BR-202", "Metered feed to STR A", "Aqueous"),
+    stream("F-010", "FM-213", "BR-203", "Metered feed to STR B", "Aqueous"),
+    stream("F-011", "BR-201", "BR-202", "Production inoculum split", "Broth"),
+    stream("F-012", "BR-201", "BR-203", "Parallel production inoculum", "Broth"),
+    stream("F-013", "GM-214", "BR-202", "Sterile O2 CO2 gas", "Gas"),
+    stream("F-014", "GM-214", "BR-203", "Sterile O2 CO2 gas", "Gas"),
+    stream("F-015", "BR-202", "SENS-215", "STR A PAT signal", "Liquid"),
+    stream("F-016", "BR-203", "SENS-215", "STR B PAT signal", "Liquid"),
+    stream("F-017", "BR-202", "HH-310", "Harvest broth A", "Broth"),
+    stream("F-018", "BR-203", "HH-310", "Harvest broth B", "Broth"),
+    stream("F-019", "HH-310", "MF-311", "Pooled chilled harvest", "Broth"),
+    stream("F-020", "MF-311", "MAN-312", "Guard-filtered harvest", "Liquid"),
+    stream("F-021", "MAN-312", "PF-313", "Downstream feed", "Liquid"),
+    stream("F-022", "PF-313", "UF-314", "Low-bioburden harvest", "Liquid"),
+    stream("F-023", "UF-314", "SP-315", "Concentrated IPC sample", "Liquid"),
+    stream("F-024", "UF-314", "FV-410", "Concentrated washed biomass", "Slurry"),
+    stream("F-025", "FV-410", "IS-411", "Final blend to isolator", "Slurry"),
+    stream("F-026", "IS-411", "AF-412", "Aseptic protected fill feed", "Slurry"),
+    stream("F-027", "AF-412", "INS-413", "Filled trays", "Solid"),
+    stream("F-028", "INS-413", "CSG-414", "Accepted chilled product", "Solid"),
+    stream("F-029", "CSG-414", "QC-415", "Cold-chain release sample", "Solid"),
+    stream("F-030", "QC-415", "QC-701", "Release result", "Solid"),
+    stream("F-031", "CAT-510", "CIP-511", "Validated cleaning chemicals", "Aqueous"),
+    stream("F-032", "CS-105", "CIP-511", "Clean steam assist", "Gas"),
+    stream("F-033", "CIP-511", "BR-202", "CIP supply to STR A", "Aqueous"),
+    stream("F-034", "CIP-511", "BR-203", "CIP supply to STR B", "Aqueous"),
+    stream("F-035", "BR-202", "CIPR-512", "Spent CIP return A", "Aqueous"),
+    stream("F-036", "BR-203", "CIPR-512", "Spent CIP return B", "Aqueous"),
+    stream("F-037", "CIPR-512", "WI-513", "Spent cleaning waste", "Aqueous"),
+    stream("F-038", "WI-513", "WR-514", "Inactivated wastewater", "Aqueous"),
+    stream("F-039", "WR-514", "HR-515", "Warm rinse reuse loop", "Aqueous"),
+    stream("F-040", "HR-515", "WFI-104", "Recovered heat credit", "Liquid"),
+    stream("F-041", "HVAC-106", "EM-901", "Cleanroom pressure and particle data", "Gas"),
+    stream("F-042", "SENS-215", "PX-611", "Live PAT and controls data", "Liquid"),
+    stream("F-043", "PM-610", "RPT-612", "Energy demand report", "Solid"),
+    stream("F-044", "PX-611", "RPT-612", "Model navigation snapshot", "Solid"),
+    stream("F-045", "VO-613", "RPT-612", "Suite boundary annotation", "Solid"),
+  ],
+};
+
+templates.culturedMeat.units.push(...flagshipCulturedMeatFacility.units);
+templates.culturedMeat.streams.push(...flagshipCulturedMeatFacility.streams);
+templates.culturedMeat.description = `${templates.culturedMeat.description}; flagship industrial plant with parallel STRs, GMP suite utilities, pressure cascade, PAT, CIP return, cold-chain, and reporting layers`;
+
 const equations = [
   eq("Cell growth", "kinetics", "mu = mu_max * S / (K_s + S)", "Monod growth rate for substrate-limited cultures."),
   eq("Logistic growth", "kinetics", "dX/dt = mu * X * (1 - X / X_max)", "Density-limited biomass growth."),
@@ -1465,19 +1697,31 @@ const state = {
   costs: [],
   paletteGroup: "core",
   paletteSearch: "",
+  parameterSearch: "",
   canvasFocus: "all",
+  flowDetail: "detailed",
+  productBrief: "",
+  productFiles: [],
+  inferredTemplate: "culturedMeat",
 };
 
 const els = {
   templateList: document.querySelector("#templateList"),
   scaleList: document.querySelector("#scaleList"),
   parameterList: document.querySelector("#parameterList"),
+  parameterSearch: document.querySelector("#parameterSearch"),
+  resetParameters: document.querySelector("#resetParameters"),
+  customParamName: document.querySelector("#customParamName"),
+  customParamValue: document.querySelector("#customParamValue"),
+  customParamUnit: document.querySelector("#customParamUnit"),
+  addCustomParameter: document.querySelector("#addCustomParameter"),
   quickAdd: document.querySelector("#quickAdd"),
   paletteSearch: document.querySelector("#paletteSearch"),
   paletteGroups: document.querySelector("#paletteGroups"),
   paletteCount: document.querySelector("#paletteCount"),
   sectionPresets: document.querySelector("#sectionPresets"),
   canvasFocus: document.querySelector("#canvasFocus"),
+  flowDetail: document.querySelector("#flowDetail"),
   equationSpotlight: document.querySelector("#equationSpotlight"),
   palette: document.querySelector("#palette"),
   canvas: document.querySelector("#flowsheetCanvas"),
@@ -1491,24 +1735,50 @@ const els = {
   titerValue: document.querySelector("#titerValue"),
   recoveryValue: document.querySelector("#recoveryValue"),
   annualProduct: document.querySelector("#annualProduct"),
+  pageTitle: document.querySelector("#pageTitle"),
+  startBoard: document.querySelector("#startBoard"),
+  overviewBoard: document.querySelector("#overviewBoard"),
   batchDuration: document.querySelector("#batchDuration"),
   directCost: document.querySelector("#directCost"),
   utilities: document.querySelector("#utilities"),
   utilization: document.querySelector("#utilization"),
   equipmentTable: document.querySelector("#equipmentTable"),
   streamsTable: document.querySelector("#streamsTable"),
+  streamSummary: document.querySelector("#streamSummary"),
+  aiBoard: document.querySelector("#aiBoard"),
   simulationBoard: document.querySelector("#simulationBoard"),
+  cfdBoard: document.querySelector("#cfdBoard"),
   equationSearch: document.querySelector("#equationSearch"),
   equationFilter: document.querySelector("#equationFilter"),
   equationList: document.querySelector("#equationList"),
   standardsList: document.querySelector("#standardsList"),
+  sourcesBoard: document.querySelector("#sourcesBoard"),
+  recommendationsBoard: document.querySelector("#recommendationsBoard"),
   costStack: document.querySelector("#costStack"),
   costNarrative: document.querySelector("#costNarrative"),
   economicDetails: document.querySelector("#economicDetails"),
-  inspectorTitle: document.querySelector("#inspectorTitle"),
-  inspectorBody: document.querySelector("#inspectorBody"),
+  reportsBoard: document.querySelector("#reportsBoard"),
+  billingBoard: document.querySelector("#billingBoard"),
   modeHint: document.querySelector("#modeHint"),
   toast: document.querySelector("#toast"),
+  helpDock: document.querySelector("#helpDock"),
+  helpToggle: document.querySelector("#helpToggle"),
+  helpPrompt: document.querySelector("#helpPrompt"),
+  askHelp: document.querySelector("#askHelp"),
+  helpResult: document.querySelector("#helpResult"),
+  loginForm: document.querySelector("#loginForm"),
+  loginUser: document.querySelector("#loginUser"),
+  loginPassword: document.querySelector("#loginPassword"),
+  loginError: document.querySelector("#loginError"),
+  loginOrigin: document.querySelector("#loginOrigin"),
+  checkoutForm: document.querySelector("#checkoutForm"),
+  checkoutName: document.querySelector("#checkoutName"),
+  checkoutEmail: document.querySelector("#checkoutEmail"),
+  checkoutCompany: document.querySelector("#checkoutCompany"),
+  checkoutResult: document.querySelector("#checkoutResult"),
+  licensePrice: document.querySelector("#licensePrice"),
+  backendFeatureList: document.querySelector("#backendFeatureList"),
+  logoutButton: document.querySelector("#logoutButton"),
 };
 
 function unit(id, type, x, y, customName) {
@@ -1561,6 +1831,23 @@ function formatMass(kg) {
   if (kg >= 1000) return `${formatNumber(kg / 1000, 2)} t`;
   if (kg < 1) return `${formatNumber(kg * 1000, 0)} g`;
   return `${formatNumber(kg, 1)} kg`;
+}
+
+function escapeAttr(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function equipmentTooltip(item) {
+  const ics = icsCodeForUnit(item);
+  return `${item.id} - ${item.name}. ${item.isoName || item.name}. ICS ${ics.code}: ${ics.label}. Role: ${unitLayerLabel(unitLayer(item))}. Size: ${unitSize(item)}; duty: ${unitPower(item)}. Standards: ${(item.standards || []).slice(0, 3).join(", ")}.`;
+}
+
+function streamTooltip(item, from, to, kind) {
+  return `${item.id}: ${item.composition}. ${from?.id || item.from} to ${to?.id || item.to}. Type: ${streamLabel(kind)}. Estimated flow: ${streamFlow(item)}.`;
 }
 
 function activeTemplate() {
@@ -1621,6 +1908,58 @@ function streamLabel(kind) {
   }[kind];
 }
 
+function icsCodeForUnit(item) {
+  const text = `${item.type} ${item.cls} ${item.name} ${item.isoName || ""}`.toLowerCase();
+  if (item.cls === "Bioreactor" || text.includes("reactor") || text.includes("vessel") || text.includes("fermenter") || text.includes("tank")) {
+    return { code: "71.120.10", label: "Reaction vessels and their components" };
+  }
+  if (text.includes("column") || text.includes("chromatography") || text.includes("absorber") || text.includes("desorber") || text.includes("distillation") || text.includes("ion exchange")) {
+    return { code: "71.120.20", label: "Columns" };
+  }
+  if (item.cls === "Thermal" || text.includes("heat exchanger") || text.includes("heat recovery") || text.includes("condensate")) {
+    return { code: "71.120.30", label: "Heat exchangers" };
+  }
+  if (["Utilities", "Piping", "Instrumentation", "Resources", "Reports", "Documentation"].includes(item.cls)) {
+    return { code: "71.120.01", label: "Equipment for the chemical industry in general" };
+  }
+  return { code: "71.120.99", label: "Other equipment for the chemical industry" };
+}
+
+function icsCoverage() {
+  const groups = new Map([
+    ["71.120.01", { code: "71.120.01", label: "Equipment for the chemical industry in general", count: 0, examples: [] }],
+    ["71.120.10", { code: "71.120.10", label: "Reaction vessels and their components", count: 0, examples: [] }],
+    ["71.120.20", { code: "71.120.20", label: "Columns", count: 0, examples: [] }],
+    ["71.120.30", { code: "71.120.30", label: "Heat exchangers", count: 0, examples: [] }],
+    ["71.120.99", { code: "71.120.99", label: "Other equipment for the chemical industry", count: 0, examples: [] }],
+  ]);
+  state.units.forEach((item) => {
+    const ics = icsCodeForUnit(item);
+    const current = groups.get(ics.code) || { ...ics, count: 0, examples: [] };
+    current.count += 1;
+    if (current.examples.length < 4) current.examples.push(item.id);
+    groups.set(ics.code, current);
+  });
+  return [...groups.values()].sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function unitSymbol(item) {
+  const text = `${item.type} ${item.cls} ${item.name}`.toLowerCase();
+  if (text.includes("bioreactor") || text.includes("fermenter") || text.includes("reactor")) return "R";
+  if (text.includes("filter") || text.includes("uf") || text.includes("df") || text.includes("membrane")) return "◇";
+  if (text.includes("chromatography") || text.includes("column") || text.includes("absorber") || text.includes("desorber")) return "││";
+  if (text.includes("heat") || text.includes("steam") || text.includes("condensate")) return "ΔT";
+  if (text.includes("pump")) return "P";
+  if (text.includes("valve")) return "⋈";
+  if (text.includes("sensor") || text.includes("pat") || text.includes("flowmeter")) return "λ";
+  if (text.includes("qc") || text.includes("report") || text.includes("summary")) return "Σ";
+  if (text.includes("cip") || text.includes("sip") || text.includes("clean") || text.includes("rinse")) return "C";
+  if (text.includes("recycle") || text.includes("reuse") || text.includes("splitter")) return "↻";
+  if (text.includes("waste") || text.includes("sludge") || text.includes("emission")) return "∇";
+  if (text.includes("tank") || text.includes("vessel") || text.includes("hold") || text.includes("prep")) return "V";
+  return item.icon;
+}
+
 function unitLayer(item) {
   const text = `${item.id} ${item.type} ${item.name} ${item.cls}`.toLowerCase();
   if (text.includes("cip") || text.includes("sip") || text.includes("clean") || text.includes("rinse") || text.includes("caustic") || text.includes("acid hold")) return "cleaning";
@@ -1644,12 +1983,23 @@ function unitLayerLabel(layer) {
   }[layer] || "Support";
 }
 
+function unitFocusLevel(item) {
+  const text = `${item.type} ${item.name} ${item.cls}`.toLowerCase();
+  const layer = unitLayer(item);
+  if (layer === "quality") return "quality";
+  if (layer === "cleaning" || layer === "support" || item.cls === "Utilities" || item.cls === "Sterilization") return "utilities";
+  if (layer === "recycle" || layer === "heat") return "recycle";
+  if (["Preparation", "Bioreactor", "Hold"].includes(item.cls) || text.includes("seed") || text.includes("media")) return "upstream";
+  if (["Solid-liquid", "Filtration", "Purification", "Concentration", "Separation", "Recovery", "Finishing", "Packaging", "Viral safety"].includes(item.cls)) return "downstream";
+  return layer === "main" ? "main" : layer;
+}
+
 function unitWidth(item) {
-  return isMinorUnit(item) ? 156 : 218;
+  return isMinorUnit(item) ? 156 : 238;
 }
 
 function unitHeight(item) {
-  return isMinorUnit(item) ? 58 : 88;
+  return isMinorUnit(item) ? 68 : 104;
 }
 
 function unitMidline(item) {
@@ -1754,6 +2104,314 @@ function streamFlow(item) {
   return `${formatNumber(state.batchSize, 0)} L / batch`;
 }
 
+function streamDirection(item) {
+  const from = state.units.find((candidate) => candidate.id === item.from);
+  const to = state.units.find((candidate) => candidate.id === item.to);
+  const incoming = state.streams.some((candidate) => candidate.to === item.from);
+  const outgoing = state.streams.some((candidate) => candidate.from === item.to);
+  const text = `${item.id} ${item.composition} ${from?.name || ""} ${to?.name || ""}`.toLowerCase();
+  if (!incoming || text.includes("raw") || text.includes("wfi") || text.includes("media feed")) return "Input";
+  if (!outgoing || text.includes("final") || text.includes("waste") || text.includes("release") || text.includes("pack")) return "Output";
+  return "Internal";
+}
+
+function streamRows() {
+  return state.streams.map((item) => {
+    const from = state.units.find((candidate) => candidate.id === item.from);
+    const to = state.units.find((candidate) => candidate.id === item.to);
+    const kind = streamKind(item, from, to);
+    return {
+      id: item.id,
+      direction: streamDirection(item),
+      role: streamLabel(kind),
+      from: item.from,
+      fromName: from?.name || "",
+      to: item.to,
+      toName: to?.name || "",
+      flow: streamFlow(item),
+      components: item.composition,
+      phase: item.phase,
+    };
+  });
+}
+
+function isCellCultureTemplate() {
+  return ["culturedMeat", "antibody", "vaccine", "cellTherapy"].includes(state.template);
+}
+
+function estimatedBioreactorVolumeL(item) {
+  if (item.cls !== "Bioreactor") return 0;
+  if (["seed-reactor", "seed-flask", "wave"].includes(item.type)) return Math.max(10, state.batchSize * 0.15);
+  if (item.type === "perfusion") return Math.max(50, state.batchSize * 0.65);
+  return Math.max(50, state.batchSize * 1.25);
+}
+
+function boundarySeverity(value, warn, critical, direction = "max") {
+  if (direction === "min") {
+    if (value <= critical) return "critical";
+    if (value <= warn) return "caution";
+    return "ok";
+  }
+  if (value >= critical) return "critical";
+  if (value >= warn) return "caution";
+  return "ok";
+}
+
+function severityLabel(severity) {
+  return {
+    ok: "Within boundary",
+    caution: "Review needed",
+    critical: "Hard boundary risk",
+  }[severity] || "Review needed";
+}
+
+function evaluatePhysicalBoundaries() {
+  const p = state.params;
+  const cellCulture = isCellCultureTemplate();
+  const bioreactors = state.units.filter((item) => item.cls === "Bioreactor");
+  const maxBioreactor = bioreactors
+    .map((item) => ({ unit: item, volume: estimatedBioreactorVolumeL(item) }))
+    .sort((a, b) => b.volume - a.volume)[0];
+  const transferIndex = (p.kla * Math.max(1, p.doSetpoint) / 100) / Math.max(0.1, p.our || 1);
+  const volumeSeverity = cellCulture && maxBioreactor ? boundarySeverity(maxBioreactor.volume, 15000, 20000) : "ok";
+  const ammoniaSeverity = cellCulture ? boundarySeverity(p.ammonia, 2, 6) : boundarySeverity(p.ammonia, 6, 10);
+  const lactateSeverity = cellCulture ? boundarySeverity(p.lactate, 2, 4) : "ok";
+  const osmolaritySeverity = cellCulture ? boundarySeverity(p.osmCrit, 0.32, 0.36) : "ok";
+  const phDeviation = Math.abs((p.ph || 7.1) - 7.1);
+  const phSeverity = phDeviation >= 0.6 ? "critical" : phDeviation >= 0.3 ? "caution" : "ok";
+  const temperatureDeviation = Math.abs((p.temperature || 36.5) - 36.8);
+  const temperatureSeverity = cellCulture ? (temperatureDeviation >= 2 ? "critical" : temperatureDeviation >= 1 ? "caution" : "ok") : "ok";
+  const doSeverity = cellCulture ? ((p.doSetpoint < 20 || p.doSetpoint > 70) ? "critical" : (p.doSetpoint < 30 || p.doSetpoint > 60) ? "caution" : "ok") : "ok";
+  const transferSeverity = cellCulture ? boundarySeverity(transferIndex, 1.6, 1.0, "min") : "ok";
+  const shearSeverity = cellCulture ? boundarySeverity(p.agitation, 2.5, 5) : "ok";
+
+  return [
+    {
+      key: "ammonium",
+      title: "Ammonium / ammonia accumulation",
+      value: `${formatNumber(p.ammonia, 1)} mM`,
+      limit: cellCulture ? "Target <2 mM; >6 mM hard review" : "Microbial process: review >6-10 mM",
+      severity: ammoniaSeverity,
+      source: "Schneider et al.; CHO ammonium/lactate/glutamine study",
+      recommendation: ammoniaSeverity === "ok" ? "Metabolic waste is inside the conservative cell-culture boundary." : "Reduce glutamine burden, intensify perfusion/bleed, adjust feed strategy, and add ammonium soft-sensor tracking.",
+    },
+    {
+      key: "bioreactor-volume",
+      title: "Mammalian-cell bioreactor volume",
+      value: maxBioreactor ? `${formatNumber(maxBioreactor.volume, 0)} L (${maxBioreactor.unit.id})` : "No bioreactor",
+      limit: cellCulture ? "Prefer scale-out/intensification above 15,000 L; hard review above 20,000 L" : "20,000 L limit is mammalian-cell specific",
+      severity: volumeSeverity,
+      source: "BioPharm International; BioProcess International; Sartorius intensification",
+      recommendation: volumeSeverity === "ok" ? "Scale is inside the conservative mammalian-cell reference boundary." : "Do not linearly scale cell culture beyond 20,000 L; use parallel reactors, 2,000 L class intensified single-use/perfusion, or a validated scale-down model.",
+    },
+    {
+      key: "oxygen-transfer",
+      title: "Oxygen transfer vs OUR",
+      value: `${formatNumber(transferIndex, 2)} transfer index`,
+      limit: "Target >1.6; review 1.0-1.6; hard risk <1.0",
+      severity: transferSeverity,
+      source: "BioProcess International 20,000 L oxygen transfer/shear analysis",
+      recommendation: transferSeverity === "ok" ? "kLa/DO/OUR relationship is inside the model boundary." : "Review sparging, oxygen enrichment, impeller selection, headspace pressure, and maximum cell-density assumption.",
+    },
+    {
+      key: "lactate",
+      title: "Lactate accumulation",
+      value: `${formatNumber(p.lactate, 1)} g/L`,
+      limit: "Target <2 g/L; hard review >4 g/L for mammalian-cell templates",
+      severity: lactateSeverity,
+      source: "CHO ammonium/lactate/glutamine study",
+      recommendation: lactateSeverity === "ok" ? "Lactate remains inside the conservative boundary." : "Review glucose feed, pH, base addition, lactate metabolic shift, and perfusion/bleed strategy.",
+    },
+    {
+      key: "ph",
+      title: "pH operating window",
+      value: `${formatNumber(p.ph, 2)}`,
+      limit: "Model target 7.1 ±0.3; hard review outside ±0.6",
+      severity: phSeverity,
+      source: "Mammalian cell-culture operating-window practice",
+      recommendation: phSeverity === "ok" ? "pH is inside the modeled cell-culture window." : "Review CO2 stripping, base addition, osmolality, lactate/ammonium formation, and control-loop tuning.",
+    },
+    {
+      key: "osmolarity",
+      title: "Osmolarity / solubility pressure",
+      value: `${formatNumber(p.osmCrit, 2)} mol/L`,
+      limit: "Target <0.32 mol/L; hard review >0.36 mol/L",
+      severity: osmolaritySeverity,
+      source: "Cell-culture media solubility and osmolarity constraints",
+      recommendation: osmolaritySeverity === "ok" ? "Osmolarity proxy is inside boundary." : "Check concentrated feeds, salts, base addition, evaporation, and precipitation risk.",
+    },
+    {
+      key: "temperature",
+      title: "Cell-culture temperature",
+      value: `${formatNumber(p.temperature, 1)} C`,
+      limit: "Model target 36.8 C; review deviation >1 C",
+      severity: temperatureSeverity,
+      source: "Mammalian cell-culture operating-window practice",
+      recommendation: temperatureSeverity === "ok" ? "Temperature is inside modeled cell-culture boundary." : "Review heat-transfer capacity, sensor placement, mixing time, and temperature-shift strategy.",
+    },
+    {
+      key: "shear",
+      title: "Agitation / shear proxy",
+      value: `${formatNumber(p.agitation, 2)} W/L`,
+      limit: "Review >2.5 W/L; hard review >5 W/L for mammalian cells",
+      severity: shearSeverity,
+      source: "BioProcess International 20,000 L oxygen transfer/shear analysis",
+      recommendation: shearSeverity === "ok" ? "Agitation proxy is inside conservative shear boundary." : "Review impeller tip speed, sparger choice, antifoam, cell fragility, and kLa alternatives.",
+    },
+    {
+      key: "do",
+      title: "Dissolved oxygen setpoint",
+      value: `${formatNumber(p.doSetpoint, 0)}% air saturation`,
+      limit: "Target 30-60%; hard review outside 20-70%",
+      severity: doSeverity,
+      source: "Mammalian cell-culture control practice",
+      recommendation: doSeverity === "ok" ? "DO setpoint is inside modeled operating window." : "Review oxygen transfer, CO2 stripping, cell-density target, and controller range.",
+    },
+  ];
+}
+
+function boundarySummary() {
+  const boundaries = evaluatePhysicalBoundaries();
+  const critical = boundaries.filter((item) => item.severity === "critical").length;
+  const caution = boundaries.filter((item) => item.severity === "caution").length;
+  return { boundaries, critical, caution, ok: boundaries.length - critical - caution };
+}
+
+function parameterGroup(item) {
+  if (item.custom) return "Custom user parameters";
+  if (["ph", "osmolality", "temperature", "viability", "cellDensity", "doublingTime", "specificGrowth", "biomassYield"].includes(item.key)) return "Cell physiology";
+  if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density"].includes(item.key)) return "Transfer + rheology";
+  if (["perfusionRate", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
+  if (["cipTime", "sipHold", "sterilityAssurance", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit"].includes(item.key)) return "GMP + cleaning";
+  if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction"].includes(item.key)) return "Scale-up + economics";
+  return "Environmental + utilities";
+}
+
+function addCustomParameter() {
+  const label = els.customParamName.value.trim();
+  const value = Number(els.customParamValue.value);
+  const unit = els.customParamUnit.value.trim();
+  if (!label || !Number.isFinite(value)) {
+    showToast("Add a parameter name and numeric value");
+    return;
+  }
+  const baseKey = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "custom";
+  let key = `custom-${baseKey}`;
+  let suffix = 2;
+  while (processParameters.some((item) => item.key === key)) key = `custom-${baseKey}-${suffix++}`;
+  const spread = Math.max(1, Math.abs(value) || 1);
+  processParameters.push({
+    key,
+    label,
+    unit,
+    min: Math.min(0, value - spread * 2),
+    max: value + spread * 2,
+    step: spread >= 10 ? 1 : 0.01,
+    value,
+    custom: true,
+  });
+  state.params[key] = value;
+  els.customParamName.value = "";
+  els.customParamValue.value = "";
+  els.customParamUnit.value = "";
+  renderAll();
+  showToast(`${label} added`);
+}
+
+function unitReactions(item) {
+  const text = `${item.type} ${item.name} ${item.cls}`.toLowerCase();
+  const base = [];
+  if (item.cls === "Bioreactor" || text.includes("fermenter")) {
+    base.push(
+      { title: "Growth stoichiometry", formula: "C6H12O6 + O2 + NH3 → biomass + CO2 + H2O", note: "Use with yield coefficients, OUR/CER, pH, kLa, and heat generation at this step." },
+      { title: "Monod kinetics", formula: "μ = μmax · S / (KS + S)", note: "Controls growth, feed strategy, washout risk, and batch duration." },
+      { title: "Product formation", formula: "dP/dt = α · dX/dt + β · X", note: "Luedeking-Piret form for coupled and non-coupled bioproduct formation." },
+    );
+  }
+  if (text.includes("dark-fermenter") || text.includes("anaerobic")) {
+    base.push({ title: "Hydrogen fermentation", formula: "C6H12O6 + 2 H2O → 2 CH3COO− + 2 CO2 + 4 H2 + 2 H+", note: "Screen gas yield, pH drift, acetate formation, and gas-liquid separation demand." });
+  }
+  if (["Filtration", "Solid-liquid", "Concentration", "Viral safety"].includes(item.cls) || text.includes("filter")) {
+    base.push(
+      { title: "Membrane flux", formula: "J = ΔP / (μ · Rtotal)", note: "Links viscosity, fouling resistance, filter area, and cycle time." },
+      { title: "Recovery", formula: "mout = min · Ystep", note: "Step yield cascades into the full mass balance and cost per kg." },
+    );
+  }
+  if (["Purification", "Separation", "Recovery"].includes(item.cls) || text.includes("column")) {
+    base.push(
+      { title: "Binding capacity", formula: "Vload = DBC10% · Vresin / Cfeed", note: "Sizes chromatography loads, cycles, resin volume, and buffer demand." },
+      { title: "Partition model", formula: "K = xi,extract / xi,raffinate", note: "Used for extraction, crystallization, phase split, and purge calculations." },
+    );
+  }
+  if (item.cls === "Thermal" || text.includes("heat") || text.includes("steril")) {
+    base.push(
+      { title: "Heat duty", formula: "Q = m · Cp · ΔT + ΔHvap · mvap", note: "Calculates heating, cooling, sterilization, evaporation, and heat recovery loads." },
+      { title: "Sterilization lethality", formula: "F0 = ∫ 10^((T(t)-121.1)/z) dt", note: "SIP/autoclave validation model for target lethality." },
+    );
+  }
+  if (unitLayer(item) === "cleaning") {
+    base.push(
+      { title: "Cleaning endpoint", formula: "Cresidue,out ≤ MACO and conductivity → baseline", note: "Validates rinse endpoint, residue removal, and campaign release." },
+      { title: "CIP mass balance", formula: "mspent = mNaOH + macid + mrinses + soil", note: "Tracks spent cleaning streams into neutralization and waste treatment." },
+    );
+  }
+  if (item.cls === "Environmental" || unitLayer(item) === "waste") {
+    base.push(
+      { title: "COD oxidation", formula: "CODremoved = Qin · (CODin - CODout)", note: "Connects waste inactivation, aeration basin load, sludge, and discharge." },
+      { title: "Emission balance", formula: "E = Σ mi · EFi · (1 - ηcontrol)", note: "Calculates VOC, CO2, particulate, and abatement efficiency." },
+    );
+  }
+  if (item.cls === "Quality" || item.cls === "Instrumentation") {
+    base.push(
+      { title: "PAT soft sensor", formula: "ŷ = f(T, pH, DO, kLa, Raman, capacitance)", note: "Machine-learning estimator constrained by physical ranges and mass balance closure." },
+      { title: "Release decision", formula: "Pass = CQA within spec ∧ data integrity verified", note: "Maps process data to GMP release and deviation handling." },
+    );
+  }
+  return base.length ? base : [
+    { title: "Unit mass balance", formula: "Σmin + generation = Σmout + accumulation", note: "Generic dynamic or batch balance for this unit operation." },
+    { title: "Unit energy balance", formula: "Q + W + ΣHin = ΣHout + ΔU", note: "Generic heat/work balance for sizing and utility demand." },
+  ];
+}
+
+function sourcesForUnit(item) {
+  if (!item) return scientificSources;
+  const text = `${item.type} ${item.cls} ${item.name} ${item.isoName || ""}`.toLowerCase();
+  const matched = scientificSources.filter((source) => {
+    if (source.appliesTo.includes("all")) return true;
+    return source.appliesTo.some((token) => text.includes(token));
+  });
+  if (matched.length) return matched;
+  return scientificSources.filter((source) => ["ICS", "ISO", "FDA"].includes(source.group)).slice(0, 3);
+}
+
+function renderSourceCards(sources, compact = false) {
+  return sources.map((item) => `
+    <article class="source-card${compact ? " compact" : ""}">
+      <span>${item.group}</span>
+      <h3>${item.title}</h3>
+      <p>${item.benchmark}</p>
+      <dl>
+        <dt>Model use</dt><dd>${item.modelUse}</dd>
+        <dt>Source</dt><dd><a href="${item.url}" target="_blank" rel="noreferrer">${item.source}</a></dd>
+      </dl>
+    </article>
+  `).join("");
+}
+
+function downloadText(filename, mime, text) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  return `"${String(value).replaceAll("\"", "\"\"")}"`;
+}
+
 function syncInputs() {
   els.batchSize.value = state.batchSize;
   els.batchCount.value = state.batchCount;
@@ -1767,7 +2425,7 @@ function syncInputs() {
 
 function renderTemplateList() {
   els.templateList.innerHTML = Object.entries(templates).map(([key, item]) => `
-    <button class="template-button${key === state.template ? " active" : ""}" data-template="${key}">
+    <button class="template-button${key === state.template ? " active" : ""}" data-template="${key}" data-tooltip="${escapeAttr(`${item.label}: ${item.product}. Opens a complete process template with equipment, streams, economics, standards, and facility support systems.`)}">
       <strong>${item.label}</strong>
       <span>${item.description}</span>
     </button>
@@ -1776,7 +2434,7 @@ function renderTemplateList() {
 
 function renderScaleList() {
   els.scaleList.innerHTML = Object.entries(scalePresets).map(([key, item]) => `
-    <button class="${key === state.scale ? "active" : ""}" data-scale="${key}">${item.label}</button>
+    <button class="${key === state.scale ? "active" : ""}" data-scale="${key}" data-tooltip="${escapeAttr(`${item.label} scale preset: changes batch size, annual batches, titer, recovery, utilization, and non-linear cost burden.`)}">${item.label}</button>
   `).join("");
 }
 
@@ -1800,7 +2458,7 @@ function filteredPalette() {
 
 function renderPaletteGroups() {
   els.paletteGroups.innerHTML = paletteGroups.map((item) => `
-    <button class="${item.key === state.paletteGroup ? "active" : ""}" data-palette-group="${item.key}">
+    <button class="${item.key === state.paletteGroup ? "active" : ""}" data-palette-group="${item.key}" data-tooltip="${escapeAttr(`Filter the equipment library to ${item.label.toLowerCase()} unit operations.`)}">
       ${item.label}
     </button>
   `).join("");
@@ -1810,7 +2468,7 @@ function renderPalette() {
   const items = filteredPalette();
   els.paletteCount.textContent = `${items.length} unit${items.length === 1 ? "" : "s"} shown`;
   els.palette.innerHTML = items.length ? items.map((item) => `
-    <button class="palette-item" draggable="true" data-type="${item.type}" title="Add ${item.label}">
+    <button class="palette-item" draggable="true" data-type="${item.type}" title="Add ${item.label}" data-tooltip="${escapeAttr(`${item.label}: ${item.isoName}. Class: ${item.cls}. Standards: ${(item.standards || []).slice(0, 3).join(", ")}. Drag to the canvas or click to add.`)}">
       <span style="background:${item.color}">${item.icon}</span>
       <strong>${item.label}</strong>
       <small><b>${unitLayerLabel(unitLayer(item))}</b>${item.cls}</small>
@@ -1825,7 +2483,15 @@ function renderPalette() {
 
 function renderCanvasFocus() {
   els.canvasFocus.innerHTML = canvasFocusOptions.map((item) => `
-    <button class="${item.key === state.canvasFocus ? "active" : ""}" data-canvas-focus="${item.key}">
+    <button class="${item.key === state.canvasFocus ? "active" : ""}" data-canvas-focus="${item.key}" data-tooltip="${escapeAttr(`Show ${item.label.toLowerCase()} units on the flowsheet canvas.`)}">
+      ${item.label}
+    </button>
+  `).join("");
+}
+
+function renderFlowDetail() {
+  els.flowDetail.innerHTML = flowDetailOptions.map((item) => `
+    <button class="${item.key === state.flowDetail ? "active" : ""}" data-flow-detail="${item.key}" data-tooltip="${escapeAttr(`Set flowsheet visibility to ${item.label.toLowerCase()}.`) }">
       ${item.label}
     </button>
   `).join("");
@@ -1833,7 +2499,7 @@ function renderCanvasFocus() {
 
 function renderSectionPresets() {
   els.sectionPresets.innerHTML = sectionPresets.map((item) => `
-    <button data-section-preset="${item.key}" title="Add ${item.label}">
+    <button data-section-preset="${item.key}" title="Add ${item.label}" data-tooltip="${escapeAttr(`${item.label}: adds ${item.types.length} connected operations for ${item.detail.toLowerCase()}.`) }">
       <b>${item.label}</b>
       <span>${item.detail}</span>
     </button>
@@ -1844,7 +2510,7 @@ function renderQuickAdd() {
   els.quickAdd.innerHTML = quickAddTypes.map((type) => {
     const item = palette.find((candidate) => candidate.type === type);
     return `
-      <button class="quick-add-button" draggable="true" data-type="${item.type}" title="Add ${item.label}">
+      <button class="quick-add-button" draggable="true" data-type="${item.type}" title="Add ${item.label}" data-tooltip="${escapeAttr(`${item.label}: add a supporting inline element near the selected unit.`)}">
         <span style="background:${item.color}">${item.icon}</span>
         <b>${item.label}</b>
       </button>
@@ -1858,7 +2524,7 @@ function renderEquationSpotlight() {
     <strong>${context}</strong>
     <div>
       ${relevantEquations().map((item) => `
-        <button class="equation-chip" data-equation-query="${item.name}">
+        <button class="equation-chip" data-equation-query="${item.name}" data-tooltip="${escapeAttr(item.note)}">
           <span>${item.category}</span>
           <b>${item.name}</b>
           <code>${item.formula}</code>
@@ -1869,16 +2535,34 @@ function renderEquationSpotlight() {
 }
 
 function renderParameters() {
-  els.parameterList.innerHTML = processParameters.map((item) => {
-    const value = state.params[item.key];
-    return `
-      <label class="parameter-row">
-        <span>${item.label}</span>
-        <input data-parameter="${item.key}" type="range" min="${item.min}" max="${item.max}" step="${item.step}" value="${value}" />
-        <b>${formatNumber(value, item.step < 1 ? 2 : 0)}${item.unit ? ` ${item.unit}` : ""}</b>
-      </label>
-    `;
-  }).join("");
+  const query = state.parameterSearch.trim().toLowerCase();
+  const filtered = processParameters.filter((item) => {
+    const haystack = `${item.label} ${item.key} ${item.unit || ""} ${parameterGroup(item)}`.toLowerCase();
+    return !query || haystack.includes(query);
+  });
+  const groups = [...new Set(filtered.map(parameterGroup))];
+  els.parameterList.innerHTML = groups.map((group) => `
+    <section class="parameter-group">
+      <h3>${group}</h3>
+      ${filtered.filter((item) => parameterGroup(item) === group).map((item) => {
+        const value = state.params[item.key];
+        const digits = item.step < 1 ? 2 : 0;
+        return `
+          <label class="parameter-row" data-tooltip="${escapeAttr(`${item.label}: ${item.min}-${item.max}${item.unit ? ` ${item.unit}` : ""}. Used in mass balance, energy balance, scale-up, and cost calculations.`)}">
+            <span>${item.label}</span>
+            <input data-parameter="${item.key}" type="range" min="${item.min}" max="${item.max}" step="${item.step}" value="${value}" />
+            <input class="parameter-number" data-parameter-number="${item.key}" type="number" min="${item.min}" max="${item.max}" step="${item.step}" value="${value}" />
+            <b>${formatNumber(value, digits)}${item.unit ? ` ${item.unit}` : ""}</b>
+          </label>
+        `;
+      }).join("")}
+    </section>
+  `).join("") || `
+    <div class="parameter-empty">
+      <strong>No parameter found</strong>
+      <span>Search pH, kLa, recovery, CAPEX, cleaning, emissions, or AI.</span>
+    </div>
+  `;
 }
 
 function renderMetrics() {
@@ -1925,10 +2609,11 @@ function renderCanvas() {
   renderProcessLanes(stage, stageHeight);
 
   stage.dataset.focus = state.canvasFocus;
+  stage.dataset.flowDetail = state.flowDetail;
   stage.insertAdjacentHTML("beforeend", `
     <div class="canvas-focus-note">
       <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
-      <span>${visibleUnits.length} units · ${visibleStreams.length} streams</span>
+      <span>${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}</span>
     </div>
   `);
 
@@ -1946,6 +2631,7 @@ function renderCanvas() {
     const kind = streamKind(item, from, to);
     line.className = `stream-line stream-${kind}`;
     line.dataset.streamId = item.id;
+    line.dataset.tooltip = streamTooltip(item, from, to, kind);
     line.style.left = `${x1}px`;
     line.style.top = `${y1}px`;
     line.style.width = `${length}px`;
@@ -1953,12 +2639,31 @@ function renderCanvas() {
     line.title = `${item.id}: ${item.composition} · ${streamLabel(kind)}`;
     line.addEventListener("click", () => {
       state.selectedId = item.id;
-      renderInspector();
       renderEquationSpotlight();
       renderCanvas();
     });
     if (state.selectedId === item.id) line.classList.add("selected");
     stage.appendChild(line);
+    if (state.flowDetail !== "standard" || state.selectedId === item.id) {
+      const label = document.createElement("button");
+      label.className = `stream-label stream-label-${kind}${state.selectedId === item.id ? " selected" : ""}`;
+      label.dataset.streamId = item.id;
+      label.dataset.tooltip = streamTooltip(item, from, to, kind);
+      label.style.left = `${(x1 + x2) / 2}px`;
+      label.style.top = `${(y1 + y2) / 2}px`;
+      const compact = state.flowDetail === "detailed";
+      label.innerHTML = compact ? `
+        <b>${item.id}</b><span>${streamLabel(kind).replace(" flow", "")}</span>
+      ` : `
+        <b>${item.id} → ${to.id}</b><span>${streamFlow(item)} · ${item.composition}</span>
+      `;
+      label.addEventListener("click", () => {
+        state.selectedId = item.id;
+        renderEquationSpotlight();
+        renderCanvas();
+      });
+      stage.appendChild(label);
+    }
   });
 
   visibleUnits.forEach((item) => {
@@ -1971,13 +2676,20 @@ function renderCanvas() {
     node.style.borderLeftColor = item.color;
     node.dataset.layer = layer;
     node.dataset.id = item.id;
+    node.dataset.tooltip = equipmentTooltip(item);
+    const ics = icsCodeForUnit(item);
+    const showEquipmentMeta = ["equipment", "full"].includes(state.flowDetail);
     node.innerHTML = `
-      <span class="unit-icon" style="background:${item.color}">${item.icon}</span>
+      <span class="unit-icon" style="background:${item.color}">
+        <strong>${unitSymbol(item)}</strong>
+        <small>${item.icon}</small>
+      </span>
       <span>
         <em class="unit-role">${unitLayerLabel(layer)}</em>
         <h3>${item.id}</h3>
         <p>${item.name}</p>
         <small>${unitSize(item)} · ${unitPower(item)}</small>
+        ${showEquipmentMeta ? `<small class="unit-ics">${ics.code} · ${item.cls}</small>` : ""}
       </span>
     `;
     wireUnitNode(node, item);
@@ -1989,8 +2701,10 @@ function isUnitVisible(item) {
   if (state.canvasFocus === "all") return true;
   const layer = unitLayer(item);
   if (state.canvasFocus === "main") return layer === "main";
-  if (state.canvasFocus === "support") return layer !== "main";
-  return true;
+  if (state.canvasFocus === "utilities") return ["utilities", "cleaning", "support"].includes(unitFocusLevel(item)) || ["cleaning", "support"].includes(layer);
+  if (state.canvasFocus === "recycle") return ["recycle", "heat"].includes(layer) || unitFocusLevel(item) === "recycle";
+  if (state.canvasFocus === "quality") return ["quality"].includes(layer) || unitFocusLevel(item) === "quality";
+  return unitFocusLevel(item) === state.canvasFocus;
 }
 
 function wireUnitNode(node, item) {
@@ -2000,7 +2714,6 @@ function wireUnitNode(node, item) {
       return;
     }
     state.selectedId = item.id;
-    renderInspector();
     renderEquationSpotlight();
     renderCanvas();
   });
@@ -2164,27 +2877,44 @@ function connectFromSelectedUnit() {
 }
 
 function renderTables() {
-  els.equipmentTable.innerHTML = state.units.map((item) => `
-    <tr>
-      <td>${item.id}</td>
-      <td>${item.name}</td>
-      <td>${item.isoName || item.name}</td>
-      <td>${item.cls}</td>
-      <td>${unitSize(item)}</td>
-      <td>${formatNumber(item.residence, 1)} h</td>
-      <td>${unitPower(item)}</td>
-      <td>${(item.standards || []).slice(0, 3).join(", ")}</td>
-      <td>${item.status}</td>
-    </tr>
-  `).join("");
+  els.equipmentTable.innerHTML = state.units.map((item) => {
+    const ics = icsCodeForUnit(item);
+    return `
+      <tr>
+        <td>${item.id}</td>
+        <td>${item.name}</td>
+        <td><span class="ics-pill">${ics.code}</span><small>${ics.label}</small></td>
+        <td>${item.isoName || item.name}</td>
+        <td>${item.cls}</td>
+        <td>${unitSize(item)}</td>
+        <td>${formatNumber(item.residence, 1)} h</td>
+        <td>${unitPower(item)}</td>
+        <td>${(item.standards || []).slice(0, 3).join(", ")}</td>
+        <td>${item.status}</td>
+      </tr>
+    `;
+  }).join("");
 
-  els.streamsTable.innerHTML = state.streams.map((item) => `
+  const rows = streamRows();
+  const counts = rows.reduce((acc, item) => {
+    acc[item.direction] = (acc[item.direction] || 0) + 1;
+    return acc;
+  }, {});
+  els.streamSummary.innerHTML = `
+    <strong>${rows.length} streams</strong>
+    <span>${counts.Input || 0} inputs</span>
+    <span>${counts.Internal || 0} internal</span>
+    <span>${counts.Output || 0} outputs</span>
+  `;
+  els.streamsTable.innerHTML = rows.map((item) => `
     <tr>
       <td>${item.id}</td>
-      <td>${item.from}</td>
-      <td>${item.to}</td>
-      <td>${streamFlow(item)}</td>
-      <td>${item.composition}</td>
+      <td><span class="stream-pill stream-pill-${item.direction.toLowerCase()}">${item.direction}</span></td>
+      <td>${item.role}</td>
+      <td>${item.from} · ${item.fromName}</td>
+      <td>${item.to} · ${item.toName}</td>
+      <td>${item.flow}</td>
+      <td>${item.components}</td>
       <td>${item.phase}</td>
     </tr>
   `).join("");
@@ -2255,14 +2985,734 @@ function renderSimulationBoard() {
   `;
 }
 
+function aiReport() {
+  const data = metrics();
+  const p = state.params;
+  const rowData = streamRows();
+  const boundary = boundarySummary();
+  const bottleneck = state.units
+    .map((unitItem) => ({
+      id: unitItem.id,
+      name: unitItem.name,
+      score: unitItem.residence * (unitItem.powerFactor + 0.4) * (unitLayer(unitItem) === "main" ? 1.3 : 0.8),
+    }))
+    .sort((a, b) => b.score - a.score)[0];
+  const yieldChain = p.harvestRecovery * p.clarificationYield * p.chromYield * p.ufdfYield / 100 ** 4;
+  const densityBasis = p.density ?? 1;
+  const closureGap = Math.max(0.02, Math.abs((densityBasis - 1) * 1.8 + (p.recycleFraction - 35) / 260 + (100 - p.harvestRecovery) / 420));
+  const riskScore = Math.min(99, Math.max(1,
+    (data.utilization * 0.32) +
+    (p.bottleneckUtil * 0.25) +
+    (p.viability < 86 ? 18 : 4) +
+    (p.kla < 120 ? 16 : 3) +
+    (state.units.length > 70 ? 9 : 2),
+  ));
+  return {
+    timestamp: new Date().toISOString(),
+    template: activeTemplate().label,
+    scale: scaleProfile().label,
+    metrics: data,
+    streamSummary: {
+      total: rowData.length,
+      inputs: rowData.filter((item) => item.direction === "Input").length,
+      outputs: rowData.filter((item) => item.direction === "Output").length,
+      internal: rowData.filter((item) => item.direction === "Internal").length,
+    },
+    boundarySummary: {
+      ok: boundary.ok,
+      caution: boundary.caution,
+      critical: boundary.critical,
+      items: boundary.boundaries,
+    },
+    physics: {
+      oxygenTransferMargin: `${formatNumber((p.kla * Math.max(1, p.doSetpoint) / 100) / Math.max(0.1, p.our || 1), 2)} x`,
+      heatDutyIndicator: `${formatNumber(data.utilities / Math.max(1, state.batchCount), 2)} MWh/batch`,
+      massClosureGap: `${formatNumber(closureGap, 3)}%`,
+      downstreamYieldChain: `${formatNumber(yieldChain * 100, 1)}%`,
+      recycleLoad: `${formatNumber(p.recycleFraction, 0)}%`,
+    },
+    ml: {
+      riskScore: formatNumber(riskScore, 0),
+      bottleneckUnit: bottleneck,
+      suggestedActions: [
+        p.kla < 120 ? "Increase kLa, sparging strategy, or oxygen enrichment before scale-up." : "kLa margin looks acceptable for this scenario.",
+        data.utilization > 90 ? "Add parallel capacity or reduce campaign time to lower utilization risk." : "Utilization is below the severe bottleneck range.",
+        p.recycleFraction > 55 ? "Check recycle convergence and purge policy with a tear-stream solver." : "Recycle fraction is moderate.",
+        p.viability < 86 ? "Investigate media, shear, osmolality, DO, and hold-time stressors." : "Cell physiology inputs are in a workable range.",
+      ],
+    },
+    scientificSources: scientificSources.map((item) => ({ group: item.group, title: item.title, source: item.source, url: item.url })),
+  };
+}
+
+function renderAiBoard() {
+  const report = aiReport();
+  const data = report.metrics;
+  const p = state.params;
+  const boundaries = report.boundarySummary.items;
+  els.aiBoard.innerHTML = `
+    <section class="ai-hero">
+      <div>
+        <p>Physics-enhanced AI</p>
+        <h3>${activeTemplate().label} model assistant</h3>
+        <span>Combines mass balance closure, energy balance, scale-up economics, PAT soft sensors, and ML-style bottleneck scoring.</span>
+      </div>
+      <button id="downloadAiReport" class="action-button primary" type="button">Download AI Report</button>
+    </section>
+    <section class="ai-grid">
+      <article>
+        <span>ML risk score</span>
+        <strong>${report.ml.riskScore}/100</strong>
+        <p>Driven by utilization, kLa, viability, recycle, and bottleneck residence time.</p>
+      </article>
+      <article>
+        <span>Bottleneck unit</span>
+        <strong>${report.ml.bottleneckUnit?.id || "n/a"}</strong>
+        <p>${report.ml.bottleneckUnit?.name || "No unit selected"} has the highest weighted duty/residence score.</p>
+      </article>
+      <article>
+        <span>Mass closure</span>
+        <strong>${report.physics.massClosureGap}</strong>
+        <p>Physical consistency gap after density, recycle, harvest, and downstream balance checks.</p>
+      </article>
+      <article>
+        <span>O2 transfer margin</span>
+        <strong>${report.physics.oxygenTransferMargin}</strong>
+        <p>kLa and DO compared with oxygen uptake pressure.</p>
+      </article>
+    </section>
+    <section class="boundary-board">
+      <div class="boundary-heading">
+        <div>
+          <span>Physical + chemical boundaries</span>
+          <h3>${report.boundarySummary.critical} critical · ${report.boundarySummary.caution} review · ${report.boundarySummary.ok} inside</h3>
+        </div>
+        <strong>${isCellCultureTemplate() ? "Mammalian/cell culture rules active" : "General bioprocess rules active"}</strong>
+      </div>
+      <div class="boundary-grid">
+        ${boundaries.map((item) => `
+          <article class="boundary-card boundary-${item.severity}">
+            <span>${severityLabel(item.severity)}</span>
+            <h4>${item.title}</h4>
+            <strong>${item.value}</strong>
+            <p><b>Boundary:</b> ${item.limit}</p>
+            <p>${item.recommendation}</p>
+            <small>${item.source}</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <section class="visualization-board">
+      <h3>Process visualizations</h3>
+      <div class="viz-row">
+        <span>Mass yield</span>
+        <b style="width:${Math.max(4, data.processYield * 100)}%"></b>
+        <em>${formatNumber(data.processYield * 100, 1)}%</em>
+      </div>
+      <div class="viz-row">
+        <span>Utilization</span>
+        <b style="width:${Math.max(4, data.utilization)}%"></b>
+        <em>${formatNumber(data.utilization, 0)}%</em>
+      </div>
+      <div class="viz-row">
+        <span>Recycle load</span>
+        <b style="width:${Math.max(4, p.recycleFraction)}%"></b>
+        <em>${formatNumber(p.recycleFraction, 0)}%</em>
+      </div>
+      <div class="viz-row">
+        <span>Automation</span>
+        <b style="width:${Math.max(4, p.automationLevel)}%"></b>
+        <em>${formatNumber(p.automationLevel, 0)}%</em>
+      </div>
+    </section>
+    <section class="ai-recommendations">
+      <h3>Recommended model actions</h3>
+      ${report.ml.suggestedActions.map((item) => `<p>${item}</p>`).join("")}
+    </section>
+  `;
+  document.querySelector("#downloadAiReport")?.addEventListener("click", () => {
+    downloadText(`${state.template}-physics-ai-report.json`, "application/json", JSON.stringify(aiReport(), null, 2));
+    showToast("AI report downloaded");
+  });
+}
+
 function renderStandards() {
-  els.standardsList.innerHTML = standards.map((item) => `
-    <article class="standard-card">
-      <span>${item.group}</span>
-      <h3>${item.name}</h3>
-      <p>${item.scope}</p>
+  const icsCards = icsCoverage().map((item) => `
+    <article class="standard-card ics-standard-card">
+      <span>ICS ${item.code}</span>
+      <h3>${item.label}</h3>
+      <p>${item.count} mapped unit${item.count === 1 ? "" : "s"} in this scenario. Examples: ${item.examples.join(", ")}.</p>
     </article>
   `).join("");
+  els.standardsList.innerHTML = `
+    <article class="standard-card standard-source">
+      <span>ISO ICS 71.120</span>
+      <h3>Equipment for the chemical industry</h3>
+      <p>Classification used here follows the ISO ICS 71.120 page: 71.120.01 equipment for the chemical industry in general, 71.120.10 reaction vessels and their components, 71.120.20 columns, 71.120.30 heat exchangers, and 71.120.99 other equipment for the chemical industry. Transport of dangerous chemicals belongs under ICS 13.300.</p>
+    </article>
+    ${icsCards}
+    ${standards.map((item) => `
+      <article class="standard-card">
+        <span>${item.group}</span>
+        <h3>${item.name}</h3>
+        <p>${item.scope}</p>
+      </article>
+    `).join("")}
+  `;
+}
+
+function renderSources() {
+  const groups = [...new Set(scientificSources.map((item) => item.group))];
+  els.sourcesBoard.innerHTML = `
+    <section class="source-hero">
+      <div>
+        <p>Scientific data layer</p>
+        <h3>Vendor, regulatory, and standards references</h3>
+        <span>These cards document where benchmark assumptions come from. They are starting points for model calibration, not validated limits for every product or facility.</span>
+      </div>
+      <strong>${scientificSources.length} sources mapped</strong>
+    </section>
+    <section class="source-summary-grid">
+      ${groups.map((group) => `
+        <article>
+          <span>${group}</span>
+          <strong>${scientificSources.filter((item) => item.group === group).length}</strong>
+          <p>reference${scientificSources.filter((item) => item.group === group).length === 1 ? "" : "s"}</p>
+        </article>
+      `).join("")}
+    </section>
+    <section class="source-card-grid">
+      ${renderSourceCards(scientificSources)}
+    </section>
+  `;
+}
+
+function templateComplexity(template) {
+  const units = template.units.length;
+  const streams = template.streams.length;
+  const bioreactors = template.units.filter((item) => item.cls === "Bioreactor").length;
+  const downstream = template.units.filter((item) => ["Filtration", "Purification", "Concentration", "Separation", "Recovery", "Solid-liquid"].includes(item.cls)).length;
+  return { units, streams, bioreactors, downstream };
+}
+
+function renderStartBoard() {
+  const featured = ["penicillin", "culturedMeat", "antibody", "fermentation", "insulin", "vaccine", "plasmid", "cellTherapy"];
+  const primaryKeys = featured.filter((key) => templates[key]);
+  const secondaryKeys = Object.keys(templates).filter((key) => !primaryKeys.includes(key));
+  els.startBoard.innerHTML = `
+    <section class="start-hero">
+      <div>
+        <p>Choose production model first</p>
+        <h3>Start with one process, then optimize the plant</h3>
+        <span>Select penicillin, cultured meat, monoclonal antibody, fermentation, or another template. After choosing, the tool opens the focused optimization workspace with flowsheet, CFD, balances, cost model, equations, and downloads.</span>
+      </div>
+      <button class="action-button primary" data-jump-view="overview" type="button">Continue with ${activeTemplate().label}</button>
+    </section>
+    <section class="process-choice-grid">
+      ${primaryKeys.map((key) => {
+        const item = templates[key];
+        const complexity = templateComplexity(item);
+        return `
+          <article class="process-choice-card${key === state.template ? " active" : ""}">
+            <span>${item.product}</span>
+            <h3>${item.label}</h3>
+            <p>${item.description}</p>
+            <dl>
+              <dt>Equipment</dt><dd>${complexity.units} units</dd>
+              <dt>Streams</dt><dd>${complexity.streams} flows</dd>
+              <dt>Bioreactors</dt><dd>${complexity.bioreactors}</dd>
+              <dt>Downstream</dt><dd>${complexity.downstream} steps</dd>
+            </dl>
+            <button class="action-button primary" data-start-template="${key}" type="button">${key === state.template ? "Selected" : "Select process"}</button>
+          </article>
+        `;
+      }).join("")}
+    </section>
+    <section class="start-secondary">
+      <h3>More process templates</h3>
+      <div>
+        ${secondaryKeys.map((key) => `<button data-start-template="${key}" type="button">${templates[key].label}</button>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function plantAreaStats() {
+  const layers = ["main", "support", "cleaning", "recycle", "heat", "waste", "quality"];
+  return layers.map((layer) => {
+    const units = state.units.filter((item) => unitLayer(item) === layer);
+    return {
+      layer,
+      label: unitLayerLabel(layer),
+      count: units.length,
+      power: units.reduce((sum, item) => sum + item.powerFactor, 0),
+      examples: units.slice(0, 4).map((item) => item.id).join(", ") || "none",
+    };
+  });
+}
+
+function renderPlantVisualization() {
+  const stats = plantAreaStats();
+  const maxCount = Math.max(1, ...stats.map((item) => item.count));
+  const stages = [
+    { key: "upstream", label: "Upstream", units: state.units.filter((item) => unitFocusLevel(item) === "upstream") },
+    { key: "bioreactor", label: "Bioreactors", units: state.units.filter((item) => item.cls === "Bioreactor") },
+    { key: "downstream", label: "Downstream", units: state.units.filter((item) => unitFocusLevel(item) === "downstream") },
+    { key: "fill-qc", label: "Fill + QC", units: state.units.filter((item) => ["Packaging", "Quality", "Containment"].includes(item.cls)) },
+  ];
+  return `
+    <section class="plant-visual">
+      <div class="plant-visual-head">
+        <div>
+          <span>Production plant map</span>
+          <h3>Production flow and support infrastructure</h3>
+        </div>
+        <button class="action-button" data-jump-view="flowsheet" type="button">Open full plant</button>
+      </div>
+      <div class="plant-flow-map">
+        ${stages.map((stage, index) => `
+          <article class="plant-stage plant-stage-${stage.key}">
+            <span>${String(index + 1).padStart(2, "0")}</span>
+            <h4>${stage.label}</h4>
+            <strong>${stage.units.length}</strong>
+            <p>${stage.units.slice(0, 4).map((item) => item.id).join(" · ") || "No mapped equipment"}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="plant-area-grid">
+        ${stats.map((item) => `
+          <article class="plant-area plant-area-${item.layer}">
+            <b style="height:${Math.max(18, item.count / maxCount * 100)}%"></b>
+            <span>${item.label}</span>
+            <strong>${item.count}</strong>
+            <small>${item.examples}</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function cfdCellColor(cell) {
+  if (cell.risk > 0.68) return "#b8534d";
+  if (cell.risk > 0.48) return "#c7922e";
+  if (cell.oxygen < 0.45) return "#4f6f8f";
+  if (cell.nutrient < 0.45) return "#8a6f3d";
+  return "#0f8f83";
+}
+
+function cfdBioreactors() {
+  return state.units.filter((item) => item.cls === "Bioreactor");
+}
+
+function cfdScore(unit, xIndex, yIndex) {
+  const p = state.params;
+  const volume = estimatedBioreactorVolumeL(unit);
+  const radius = Math.hypot(xIndex - 4.5, yIndex - 4.5) / 6.4;
+  const bottomPenalty = yIndex / 9;
+  const wallPenalty = Math.min(1, radius * 1.15);
+  const mixingPower = Math.max(0.05, p.agitation * 0.42 + p.aeration * 0.85 + p.kla / 140);
+  const scalePenalty = Math.max(0, Math.log10(Math.max(100, volume) / 2000)) * 0.22;
+  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint / Math.max(1, p.our * 95)) - wallPenalty * 0.24 - bottomPenalty * 0.16 - scalePenalty));
+  const nutrient = Math.max(0, Math.min(1, mixingPower - wallPenalty * 0.18 - bottomPenalty * 0.25 - scalePenalty * 0.8));
+  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 4.8 : 9) + (1 - radius) * 0.22));
+  const risk = Math.max(0, Math.min(1, (1 - oxygen) * 0.46 + (1 - nutrient) * 0.34 + shear * (isCellCultureTemplate() ? 0.28 : 0.12)));
+  return { oxygen, nutrient, shear, risk };
+}
+
+function cfdReport() {
+  const units = cfdBioreactors();
+  return units.map((unit) => {
+    const cells = Array.from({ length: 100 }, (_, index) => cfdScore(unit, index % 10, Math.floor(index / 10)));
+    const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
+    const lowOxygen = cells.filter((item) => item.oxygen < 0.45).length;
+    const lowNutrient = cells.filter((item) => item.nutrient < 0.45).length;
+    const highShear = cells.filter((item) => item.shear > 0.72).length;
+    const risk = avg("risk");
+    return {
+      id: unit.id,
+      name: unit.name,
+      volumeL: estimatedBioreactorVolumeL(unit),
+      oxygenIndex: avg("oxygen"),
+      nutrientIndex: avg("nutrient"),
+      shearIndex: avg("shear"),
+      riskIndex: risk,
+      lowOxygenCells: lowOxygen,
+      lowNutrientCells: lowNutrient,
+      highShearCells: highShear,
+      recommendation: risk > 0.62
+        ? "High CFD screening risk: increase kLa or aeration, review impeller layout, reduce working volume, add feed distribution points, or split into parallel reactors."
+        : risk > 0.38
+          ? "Review mixing map: verify DO probe placement, sparger design, feed-point location, viscosity, and scale-down data."
+          : "Screening result is acceptable; confirm with validated CFD or mixing-time studies before scale-up.",
+      cells,
+    };
+  });
+}
+
+function renderCfdBoard() {
+  const report = cfdReport();
+  if (!report.length) {
+    els.cfdBoard.innerHTML = `
+      <section class="empty-state">
+        <h3>No bioreactor in this process</h3>
+        <p>Add a bioreactor or fermenter in the Process Builder to enable CFD-style oxygen, nutrient, and shear screening.</p>
+      </section>
+    `;
+    return;
+  }
+  const selected = report.find((item) => item.id === state.selectedId) || report[0];
+  els.cfdBoard.innerHTML = `
+    <section class="cfd-hero">
+      <div>
+        <p>Bioreactor CFD screening</p>
+        <h3>${selected.id} · ${selected.name}</h3>
+        <span>Fast visual model for oxygen transfer, nutrient distribution, mixing dead zones, and shear risk. Use it to decide where rigorous CFD or scale-down experiments are required.</span>
+      </div>
+      <button class="action-button primary" data-download-report="cfd-json" type="button">Download CFD JSON</button>
+    </section>
+    <section class="cfd-layout">
+      <div class="cfd-map" aria-label="CFD risk heatmap">
+        ${selected.cells.map((cell) => `
+          <span style="background:${cfdCellColor(cell)}; opacity:${0.54 + cell.risk * 0.42};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
+        `).join("")}
+      </div>
+      <div class="cfd-detail">
+        <div class="cfd-unit-tabs">
+          ${report.map((item) => `<button class="${item.id === selected.id ? "active" : ""}" data-select-cfd="${item.id}" type="button">${item.id}</button>`).join("")}
+        </div>
+        <dl>
+          <dt>Working volume</dt><dd>${formatNumber(selected.volumeL, 0)} L</dd>
+          <dt>Oxygen index</dt><dd>${formatNumber(selected.oxygenIndex * 100, 0)}%</dd>
+          <dt>Nutrient index</dt><dd>${formatNumber(selected.nutrientIndex * 100, 0)}%</dd>
+          <dt>Shear index</dt><dd>${formatNumber(selected.shearIndex * 100, 0)}%</dd>
+          <dt>Low O2 cells</dt><dd>${selected.lowOxygenCells}/100</dd>
+          <dt>Low nutrient cells</dt><dd>${selected.lowNutrientCells}/100</dd>
+          <dt>High shear cells</dt><dd>${selected.highShearCells}/100</dd>
+        </dl>
+        <p>${selected.recommendation}</p>
+      </div>
+    </section>
+    <section class="cfd-legend">
+      <span class="legend-good">Good transfer</span>
+      <span class="legend-watch">Mixing watch zone</span>
+      <span class="legend-risk">O2/nutrient/shear risk</span>
+    </section>
+  `;
+}
+
+function streamNumericFlow(item) {
+  if (item.phase === "Gas") return state.batchSize * (state.params.aeration || 0.35) * 0.08;
+  if (item.phase === "Solid") return Math.max(1, metrics().productPerBatchKg);
+  if (item.phase === "Slurry") return Math.max(1, metrics().productPerBatchKg * 1.25);
+  return Math.max(1, state.batchSize);
+}
+
+function balanceRows() {
+  const data = metrics();
+  return state.units.map((unitItem) => {
+    const incoming = state.streams.filter((streamItem) => streamItem.to === unitItem.id);
+    const outgoing = state.streams.filter((streamItem) => streamItem.from === unitItem.id);
+    const inMass = incoming.reduce((sum, streamItem) => sum + streamNumericFlow(streamItem), 0);
+    const outMassRaw = outgoing.reduce((sum, streamItem) => sum + streamNumericFlow(streamItem), 0);
+    const generation = unitItem.cls === "Bioreactor" ? state.batchSize * state.titer / 1000 : 0;
+    const loss = ["Filtration", "Purification", "Concentration", "Solid-liquid", "Recovery"].includes(unitItem.cls) ? Math.max(0, inMass * (1 - data.processYield)) : 0;
+    const outMass = outMassRaw || Math.max(0, inMass + generation - loss);
+    const heatDuty = unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(1, unitItem.residence);
+    return {
+      tag: unitItem.id,
+      operation: unitItem.name,
+      class: unitItem.cls,
+      inputStreams: incoming.map((item) => item.id).join("; "),
+      outputStreams: outgoing.map((item) => item.id).join("; "),
+      massIn: inMass,
+      generation,
+      loss,
+      massOut: outMass,
+      massGap: inMass + generation - loss - outMass,
+      heatDuty,
+      power: unitItem.powerFactor,
+      equations: unitReactions(unitItem).map((item) => item.title).join("; "),
+    };
+  });
+}
+
+function costRows() {
+  const data = metrics();
+  return [
+    { item: "Installed CAPEX", value: data.scale.installedCapital, unit: "USD", note: "Scaled installed capital estimate" },
+    { item: "Annualized CAPEX", value: data.scale.annualizedCapital, unit: "USD/yr", note: "Annualized capital charge" },
+    { item: "Fixed facility burden", value: data.scale.fixedBurden, unit: "USD/yr", note: "High at lab scale; decreases non-linearly with scale" },
+    { item: "Materials", value: data.scale.materialIntensity, unit: "USD/yr", note: "Media, buffers, raw materials, consumables" },
+    { item: "Labor", value: data.scale.laborCost, unit: "USD/yr", note: "Automation-adjusted labor estimate" },
+    { item: "QA/QC validation", value: data.scale.qaCost, unit: "USD/yr", note: "GMP release, validation, and quality burden" },
+    { item: "Utilities", value: data.scale.utilityCost, unit: "USD/yr", note: "Power, WFI, steam, cooling, compressed gases" },
+    { item: "Waste", value: data.scale.wasteCost, unit: "USD/yr", note: "Wastewater, biomass, emissions, rejects" },
+    { item: "Direct cost", value: data.directCost, unit: "USD/kg", note: "Annual cost divided by annual product" },
+  ];
+}
+
+function downloadCsv(filename, rows) {
+  const headers = Object.keys(rows[0] || { empty: "" });
+  const csv = [
+    headers.map(csvEscape).join(","),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+  ].join("\n");
+  downloadText(filename, "text/csv", csv);
+}
+
+function comprehensiveReport() {
+  return {
+    template: state.template,
+    product: activeTemplate().product,
+    generatedAt: new Date().toISOString(),
+    parameters: {
+      global: { batchSize: state.batchSize, batchCount: state.batchCount, titer: state.titer, recovery: state.recovery },
+      biochemical: state.params,
+      definitions: processParameters,
+    },
+    metrics: metrics(),
+    equipment: state.units,
+    streams: streamRows(),
+    balances: balanceRows(),
+    costs: costRows(),
+    equations,
+    unitEquations: state.units.map((item) => ({ tag: item.id, name: item.name, equations: unitReactions(item) })),
+    cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ oxygen: cell.oxygen, nutrient: cell.nutrient, shear: cell.shear, risk: cell.risk })) })),
+    boundaries: evaluatePhysicalBoundaries(),
+    standards,
+    sources: scientificSources,
+    recommendations: simulationReadinessItems(),
+  };
+}
+
+function renderReportsBoard() {
+  const report = comprehensiveReport();
+  els.reportsBoard.innerHTML = `
+    <section class="reports-hero">
+      <div>
+        <p>Download center</p>
+        <h3>Balances, costs, equations, streams, CFD, and full model data</h3>
+        <span>Export structured data for Excel, Python, thesis appendices, process reviews, or future rigorous simulation engines.</span>
+      </div>
+      <button class="action-button primary" data-download-report="full-json" type="button">Download Full JSON</button>
+    </section>
+    <section class="reports-grid">
+      <article><span>Mass + energy balances</span><strong>${report.balances.length}</strong><p>Unit-level mass in/out, generation, loss, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
+      <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, materials, labor, QA/QC, utilities, waste, and direct cost.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
+      <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
+      <article><span>Input/output streams</span><strong>${report.streams.length}</strong><p>All material, utility, waste, and QC/data streams with roles and phases.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
+      <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
+      <article><span>CFD screening</span><strong>${report.cfd.length}</strong><p>Bioreactor O2, nutrient, shear, and hotspot risk maps.</p><button data-download-report="cfd-json" type="button">Download JSON</button></article>
+    </section>
+  `;
+}
+
+function pageTitle(view) {
+  return {
+    start: "Choose Process",
+    overview: "Overview",
+    flowsheet: "Process Builder",
+    equipment: "Equipment Register",
+    streams: "Input / Output Streams",
+    equations: "Equation Library",
+    simulation: "Simulation Functions",
+    cfd: "Bioreactor CFD",
+    ai: "Boundaries + AI",
+    standards: "Standards",
+    sources: "Scientific Data",
+    recommendations: "Readiness Roadmap",
+    economics: "Economics",
+    reports: "Downloads",
+  }[view] || "Choose Process";
+}
+
+function renderOverview() {
+  const data = metrics();
+  const boundary = boundarySummary();
+  const streamStats = streamRows().reduce((acc, item) => {
+    acc[item.direction] = (acc[item.direction] || 0) + 1;
+    return acc;
+  }, {});
+  const topRisks = boundary.boundaries
+    .filter((item) => item.severity !== "ok")
+    .slice(0, 3);
+  els.overviewBoard.innerHTML = `
+    <section class="overview-hero">
+      <div>
+        <p>Archytas Process OS</p>
+        <h3>${activeTemplate().label} production model</h3>
+        <span>Enterprise process modeling workspace with process builder, material streams, physical boundaries, scientific sources, standards, and economic readiness.</span>
+      </div>
+      <button class="action-button primary" data-jump-view="flowsheet" type="button">Open Process Builder</button>
+    </section>
+    <section class="overview-grid">
+      <article>
+        <span>Equipment objects</span>
+        <strong>${state.units.length}</strong>
+        <p>Mapped unit operations, support systems, instruments, utilities, and documentation nodes.</p>
+        <button data-jump-view="equipment">Review equipment</button>
+      </article>
+      <article>
+        <span>Process streams</span>
+        <strong>${state.streams.length}</strong>
+        <p>${streamStats.Input || 0} inputs · ${streamStats.Internal || 0} internal · ${streamStats.Output || 0} outputs.</p>
+        <button data-jump-view="streams">Open stream table</button>
+      </article>
+      <article class="${boundary.critical ? "overview-risk" : boundary.caution ? "overview-review" : ""}">
+        <span>Physical boundaries</span>
+        <strong>${boundary.critical}/${boundary.caution}</strong>
+        <p>${boundary.critical} critical and ${boundary.caution} review warnings across chemistry, scale-up, and cell-culture constraints.</p>
+        <button data-jump-view="ai">Inspect boundaries</button>
+      </article>
+      <article>
+        <span>Scientific sources</span>
+        <strong>${scientificSources.length}</strong>
+        <p>Vendor, paper, regulatory, and standards references mapped to assumptions.</p>
+        <button data-jump-view="sources">Open sources</button>
+      </article>
+    </section>
+    ${renderPlantVisualization()}
+    <section class="overview-split">
+      <article>
+        <div>
+          <span>Current operating case</span>
+          <h3>${formatNumber(state.batchSize)} L · ${state.batchCount} batches/year · ${formatNumber(state.titer, 1)} g/L</h3>
+        </div>
+        <dl>
+          <dt>Annual product</dt><dd>${formatMass(data.annualKg)}</dd>
+          <dt>Direct cost</dt><dd>$${formatNumber(data.directCost, 0)}/kg</dd>
+          <dt>Utilization</dt><dd>${formatNumber(data.utilization, 0)}%</dd>
+          <dt>Scale profile</dt><dd>${data.scale.profile.label}</dd>
+        </dl>
+      </article>
+      <article>
+        <div>
+          <span>Top model checks</span>
+          <h3>${topRisks.length ? "Review required" : "No major boundary warning"}</h3>
+        </div>
+        ${topRisks.length ? topRisks.map((item) => `
+          <p><b>${item.title}:</b> ${item.value}. ${item.recommendation}</p>
+        `).join("") : `<p>The current scenario is inside the conservative model boundaries. Continue with stream verification, sources, and economics.</p>`}
+      </article>
+    </section>
+  `;
+}
+
+function simulationReadinessItems() {
+  const data = metrics();
+  const boundaryItems = evaluatePhysicalBoundaries()
+    .filter((item) => item.severity !== "ok")
+    .map((item) => ({
+      group: "Physical boundary",
+      status: item.severity === "critical" ? "Must add for full simulator" : "Needs more detail",
+      title: item.title,
+      detail: `${item.value}. ${item.recommendation} Source basis: ${item.source}.`,
+    }));
+  return [
+    ...boundaryItems,
+    {
+      group: "Thermodynamics",
+      status: "Must add for full simulator",
+      title: "Component property database",
+      detail: "Add temperature-dependent Cp, density, viscosity, vapor pressure, activity coefficients, osmolarity, Henry constants, solubility, and ionic strength for every component and buffer.",
+    },
+    {
+      group: "Mass balance",
+      status: state.streams.length > 60 ? "Partially covered" : "Needs more detail",
+      title: "Component-resolved stream vectors",
+      detail: "Current streams are process-level. Full production simulation needs per-component mass fractions, impurities, biomass, host-cell proteins, DNA, metabolites, salts, cleaning residues, and batch-time profiles.",
+    },
+    {
+      group: "Energy balance",
+      status: "Partially covered",
+      title: "Dynamic heat and utility network",
+      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh. Add time-resolved heating/cooling curves, heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
+    },
+    {
+      group: "Reaction and kinetics",
+      status: "Partially covered",
+      title: "Unit-specific reaction packages",
+      detail: "Add validated Monod/Contois/logistic models, Luedeking-Piret product formation, oxygen uptake, CO2 evolution, inhibition, degradation, sterilization lethality, and cleaning residue removal kinetics.",
+    },
+    {
+      group: "Separation",
+      status: "Must add for full simulator",
+      title: "Mechanistic filtration/chromatography models",
+      detail: "Add fouling curves, cake resistance, membrane polarization, column breakthrough, resin aging, elution gradients, viral clearance log-reduction, and pool blending logic.",
+    },
+    {
+      group: "Scheduling",
+      status: "Must add for full simulator",
+      title: "Finite-capacity batch scheduler",
+      detail: "Add equipment occupancy, changeover, CIP/SIP windows, hold-time limits, campaign planning, operator shifts, QC release timing, and cleanroom suite constraints.",
+    },
+    {
+      group: "GMP validation",
+      status: "Partially covered",
+      title: "Electronic batch record and validation layer",
+      detail: "Add audit trails, deviations, alarms, recipe versions, materials genealogy, equipment qualification status, cleaning validation limits, and data-integrity checks.",
+    },
+    {
+      group: "Control",
+      status: "Must add for full simulator",
+      title: "DCS/PLC/PAT control simulation",
+      detail: "Add control loops for pH, DO, feed, temperature, pressure, level, antifoam, perfusion bleed, alarms, soft sensors, and fault handling.",
+    },
+    {
+      group: "Safety",
+      status: "Needs more detail",
+      title: "HAZOP and containment model",
+      detail: "Add pressure-relief sizing, ATEX/DSEAR zones, chemical compatibility, biosafety containment, operator exposure, spill response, and dangerous-goods links outside ICS 71.120.",
+    },
+    {
+      group: "Economics",
+      status: "Partially covered",
+      title: "Full TEA/LCA engine",
+      detail: "Add itemized CAPEX, installation factors, depreciation, labor grades, consumables, resin lifetime, media BOM, waste fees, carbon intensity, water footprint, and uncertainty ranges.",
+    },
+  ];
+}
+
+function renderRecommendations() {
+  const coverage = icsCoverage();
+  const items = simulationReadinessItems();
+  const fullCount = coverage.reduce((sum, item) => sum + item.count, 0);
+  els.recommendationsBoard.innerHTML = `
+    <section class="recommendation-hero">
+      <div>
+        <p>Industry readiness</p>
+        <h3>ICS 71.120 equipment map + full-simulation gap list</h3>
+        <span>Use this as a roadmap from impressive flowsheet prototype toward a rigorous production simulator with validated engineering models.</span>
+      </div>
+      <strong>${fullCount} mapped equipment objects</strong>
+    </section>
+    <section class="ics-coverage-grid">
+      ${coverage.map((item) => `
+        <article>
+          <span>ICS ${item.code}</span>
+          <strong>${item.count}</strong>
+          <p>${item.label}</p>
+          <small>${item.examples.length ? item.examples.join(", ") : "No mapped equipment in this active template"}</small>
+        </article>
+      `).join("")}
+    </section>
+    <section class="recommendation-list">
+      ${items.map((item) => `
+        <article>
+          <div>
+            <span>${item.group}</span>
+            <h3>${item.title}</h3>
+          </div>
+          <b class="${item.status.toLowerCase().replace(/[^a-z0-9]+/g, "-")}">${item.status}</b>
+          <p>${item.detail}</p>
+        </article>
+      `).join("")}
+    </section>
+    <section class="source-card-grid">
+      ${renderSourceCards(scientificSources.filter((item) => ["Merck", "FDA", "ICH", "ICS", "Paper", "Industry"].includes(item.group)), true)}
+    </section>
+  `;
 }
 
 function renderEconomics() {
@@ -2273,7 +3723,7 @@ function renderEconomics() {
     { label: "Materials", value: data.scale.materialIntensity, color: "#00a88f" },
     { label: "Labor", value: data.scale.laborCost, color: "#d7a229" },
     { label: "QA/QC validation", value: data.scale.qaCost, color: "#8a6f3d" },
-    { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#2f80ed" },
+    { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#0f8f83" },
   ];
   const totalCost = costItems.reduce((sum, item) => sum + item.value, 0) || 1;
   els.costStack.innerHTML = costItems.map((item) => `
@@ -2300,100 +3750,13 @@ function renderEconomics() {
   `;
 }
 
-function renderInspector() {
-  const selectedUnit = state.units.find((item) => item.id === state.selectedId);
-  const selectedStream = state.streams.find((item) => item.id === state.selectedId);
-
-  if (selectedUnit) {
-    els.inspectorTitle.textContent = `${selectedUnit.id} · ${selectedUnit.name}`;
-    els.inspectorBody.innerHTML = `
-      <label>Operation name<input id="editName" value="${selectedUnit.name}" /></label>
-      <label>Residence time<input id="editResidence" type="number" min="0.1" step="0.1" value="${selectedUnit.residence}" /></label>
-      <label>Status<select id="editStatus">
-        ${["Ready", "Active", "Queued", "CIP", "Hold", "Offline"].map((status) => `<option ${selectedUnit.status === status ? "selected" : ""}>${status}</option>`).join("")}
-      </select></label>
-      <dl>
-        <dt>ISO/PFD name</dt><dd>${selectedUnit.isoName || selectedUnit.name}</dd>
-        <dt>Class</dt><dd>${selectedUnit.cls}</dd>
-        <dt>Estimated size</dt><dd>${unitSize(selectedUnit)}</dd>
-        <dt>Estimated power</dt><dd>${unitPower(selectedUnit)}</dd>
-        <dt>Standards</dt><dd>${(selectedUnit.standards || []).join(", ")}</dd>
-      </dl>
-      <button id="connectFromUnit" class="text-button full">Connect from this unit</button>
-      <button id="duplicateUnit" class="text-button full">Duplicate</button>
-      <button id="deleteUnit" class="danger-button full">Delete unit</button>
-    `;
-    document.querySelector("#editName").addEventListener("input", (event) => {
-      selectedUnit.name = event.target.value;
-      renderCanvas();
-      renderTables();
-    });
-    document.querySelector("#editResidence").addEventListener("input", (event) => {
-      selectedUnit.residence = Number(event.target.value);
-      renderMetrics();
-      renderTables();
-      renderEconomics();
-    });
-    document.querySelector("#editStatus").addEventListener("change", (event) => {
-      selectedUnit.status = event.target.value;
-      renderCanvas();
-      renderTables();
-    });
-    document.querySelector("#connectFromUnit").addEventListener("click", connectFromSelectedUnit);
-    document.querySelector("#duplicateUnit").addEventListener("click", () => {
-      duplicateSelectedUnit();
-    });
-    document.querySelector("#deleteUnit").addEventListener("click", () => {
-      state.units = state.units.filter((item) => item.id !== selectedUnit.id);
-      state.streams = state.streams.filter((item) => item.from !== selectedUnit.id && item.to !== selectedUnit.id);
-      state.selectedId = state.units[0]?.id || null;
-      renderAll();
-    });
-    return;
-  }
-
-  if (selectedStream) {
-    els.inspectorTitle.textContent = `${selectedStream.id} · stream`;
-    els.inspectorBody.innerHTML = `
-      <label>Composition<input id="editComposition" value="${selectedStream.composition}" /></label>
-      <label>Phase<select id="editPhase">
-        ${["Aqueous", "Broth", "Liquid", "Slurry", "Solid", "Gas"].map((phase) => `<option ${selectedStream.phase === phase ? "selected" : ""}>${phase}</option>`).join("")}
-      </select></label>
-      <dl>
-        <dt>From</dt><dd>${selectedStream.from}</dd>
-        <dt>To</dt><dd>${selectedStream.to}</dd>
-        <dt>Estimated flow</dt><dd>${streamFlow(selectedStream)}</dd>
-      </dl>
-      <button id="deleteStream" class="danger-button full">Delete stream</button>
-    `;
-    document.querySelector("#editComposition").addEventListener("input", (event) => {
-      selectedStream.composition = event.target.value;
-      renderTables();
-    });
-    document.querySelector("#editPhase").addEventListener("change", (event) => {
-      selectedStream.phase = event.target.value;
-      renderTables();
-    });
-    document.querySelector("#deleteStream").addEventListener("click", () => {
-      state.streams = state.streams.filter((item) => item.id !== selectedStream.id);
-      state.selectedId = state.units[0]?.id || null;
-      renderAll();
-    });
-    return;
-  }
-
-  els.inspectorTitle.textContent = "Select a unit";
-  els.inspectorBody.innerHTML = "<p>Choose a unit operation or stream to inspect sizing, duty, status, and editable properties.</p>";
-}
-
 function setMode(mode) {
   state.mode = mode;
   state.connectFrom = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === mode));
   const hints = {
-    select: "Move & Edit Units: click any equipment block to select it, drag it to reposition, or use the library above to add new units.",
+    select: "Select & Move Units: click equipment or streams to highlight them, drag units to reposition, and use Duplicate or Connect from the top actions.",
     connect: "Draw Process Stream: click the source equipment first, then click the destination. Animated streams show process direction.",
-    inspect: "Inspect Equations: click equipment or a stream to review sizing assumptions, standards, balances, and relevant formulas.",
   };
   els.modeHint.textContent = hints[mode];
   renderCanvas();
@@ -2402,6 +3765,8 @@ function setMode(mode) {
 function setView(view) {
   document.querySelectorAll(".view").forEach((item) => item.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  if (els.pageTitle) els.pageTitle.textContent = pageTitle(view);
   document.querySelector(`#${view}View`).classList.add("active");
 }
 
@@ -2450,6 +3815,7 @@ function exportJson() {
     streams: state.streams,
     equations,
     standards,
+    scientificSources,
     simulationFunctions: spdFunctions,
   }, null, 2);
   const blob = new Blob([payload], { type: "application/json" });
@@ -2462,6 +3828,55 @@ function exportJson() {
   showToast("Scenario exported");
 }
 
+function downloadStreamsCsv() {
+  const rows = streamRows();
+  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "components", "phase"];
+  const csv = [
+    headers.map(csvEscape).join(","),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+  ].join("\n");
+  downloadText(`${state.template}-input-output-streams.csv`, "text/csv", csv);
+  showToast("Stream CSV downloaded");
+}
+
+function downloadStreamsJson() {
+  downloadText(`${state.template}-input-output-streams.json`, "application/json", JSON.stringify({
+    template: activeTemplate().label,
+    generatedAt: new Date().toISOString(),
+    streams: streamRows(),
+  }, null, 2));
+  showToast("Stream JSON downloaded");
+}
+
+function handleReportDownload(type) {
+  const report = comprehensiveReport();
+  if (type === "full-json") {
+    downloadText(`${state.template}-complete-process-report.json`, "application/json", JSON.stringify(report, null, 2));
+  } else if (type === "balances-csv") {
+    downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
+  } else if (type === "costs-csv") {
+    downloadCsv(`${state.template}-cost-model.csv`, costRows());
+  } else if (type === "equations-csv") {
+    downloadCsv(`${state.template}-chemical-equations.csv`, equations);
+  } else if (type === "streams-csv") {
+    downloadCsv(`${state.template}-input-output-streams.csv`, streamRows());
+  } else if (type === "parameters-csv") {
+    downloadCsv(`${state.template}-parameters.csv`, processParameters.map((item) => ({
+      key: item.key,
+      label: item.label,
+      value: state.params[item.key],
+      unit: item.unit || "",
+      min: item.min,
+      max: item.max,
+      custom: item.custom ? "yes" : "no",
+      group: parameterGroup(item),
+    })));
+  } else if (type === "cfd-json") {
+    downloadText(`${state.template}-bioreactor-cfd-screening.json`, "application/json", JSON.stringify(report.cfd, null, 2));
+  }
+  showToast("Download prepared");
+}
+
 function showToast(message) {
   els.toast.textContent = message;
   els.toast.classList.add("visible");
@@ -2469,7 +3884,168 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("visible"), 1800);
 }
 
+function unlockApp() {
+  document.body.classList.remove("locked");
+  document.body.classList.add("authenticated");
+}
+
+function lockApp() {
+  document.body.classList.add("locked");
+  document.body.classList.remove("authenticated");
+}
+
+const legacyAuthKeys = ["archytas-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
+
+async function apiRequest(path, options = {}) {
+  const headers = {
+    "content-type": "application/json",
+    ...(options.headers || {}),
+  };
+  const session = window.localStorage.getItem("archytas-session");
+  if (session) headers.authorization = `Bearer ${session}`;
+  const response = await fetch(path, {
+    ...options,
+    headers,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Backend request failed");
+  }
+  return payload;
+}
+
+function clearLegacyAuth() {
+  legacyAuthKeys.forEach((key) => window.localStorage.removeItem(key));
+}
+
+function storeSession(token) {
+  window.localStorage.setItem("archytas-session", token);
+  clearLegacyAuth();
+}
+
+function renderProductConfig(config) {
+  if (els.licensePrice) els.licensePrice.textContent = config.amountFormatted || "725 EUR";
+  if (els.backendFeatureList) {
+    els.backendFeatureList.innerHTML = (config.features || [])
+      .map((feature) => `<li>${feature}</li>`)
+      .join("");
+  }
+  if (els.loginOrigin) {
+    els.loginOrigin.textContent = config.bankConfigured
+      ? "Backend online. Bank-transfer checkout is configured."
+      : "Backend online. Add bank-account environment variables before selling live licenses.";
+  }
+}
+
+function renderCheckoutResult(result) {
+  if (!els.checkoutResult) return;
+  const payment = result.payment;
+  const order = result.order;
+  els.checkoutResult.innerHTML = `
+    <strong>Order created: ${order.reference}</strong>
+    <dl>
+      <dt>Amount</dt><dd>${payment.amount.toFixed(2)} ${payment.currency}</dd>
+      <dt>Recipient</dt><dd>${payment.bank.accountHolder}</dd>
+      <dt>IBAN</dt><dd>${payment.bank.iban}</dd>
+      <dt>BIC</dt><dd>${payment.bank.bic}</dd>
+      <dt>Bank</dt><dd>${payment.bank.bankName}</dd>
+      <dt>Reference</dt><dd>${payment.reference}</dd>
+    </dl>
+    <p>${payment.instruction}</p>
+    ${payment.bankConfigured ? "" : "<em>Bank details are placeholders until BANK_ACCOUNT_HOLDER, BANK_IBAN, BANK_BIC, and BANK_NAME are set on the backend.</em>"}
+  `;
+}
+
+async function loadProductConfig() {
+  try {
+    const config = await apiRequest("/api/product");
+    renderProductConfig(config);
+  } catch (error) {
+    if (els.loginOrigin) {
+      els.loginOrigin.textContent = "Backend offline. Start it with npm run backend.";
+    }
+    if (els.backendFeatureList) {
+      els.backendFeatureList.innerHTML = [
+        "Node backend required for paid access",
+        "Bank-transfer checkout",
+        "Admin activation after payment",
+        "License-key login",
+      ].map((feature) => `<li>${feature}</li>`).join("");
+    }
+  }
+}
+
+async function checkStoredAuth() {
+  clearLegacyAuth();
+  const session = window.localStorage.getItem("archytas-session");
+  if (!session) {
+    lockApp();
+    return;
+  }
+  try {
+    await apiRequest("/api/account");
+    unlockApp();
+  } catch {
+    window.localStorage.removeItem("archytas-session");
+    lockApp();
+  }
+}
+
+function bindAuth() {
+  loadProductConfig();
+
+  els.loginForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const user = els.loginUser.value.trim();
+    const password = els.loginPassword.value.trim();
+    els.loginError.textContent = "";
+    try {
+      const payload = await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ user, password, licenseKey: password }),
+      });
+      storeSession(payload.token);
+      els.loginPassword.value = "";
+      unlockApp();
+      showToast(`Logged in as ${payload.account.role}`);
+    } catch (error) {
+      els.loginError.textContent = error.message;
+    }
+  });
+
+  els.checkoutForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (els.checkoutResult) {
+      els.checkoutResult.innerHTML = "<p>Creating secure bank-transfer order...</p>";
+    }
+    try {
+      const result = await apiRequest("/api/checkout", {
+        method: "POST",
+        body: JSON.stringify({
+          customerName: els.checkoutName.value,
+          customerEmail: els.checkoutEmail.value,
+          company: els.checkoutCompany.value,
+        }),
+      });
+      renderCheckoutResult(result);
+      showToast("Order created");
+    } catch (error) {
+      if (els.checkoutResult) {
+        els.checkoutResult.innerHTML = `<p class="checkout-error">${error.message}</p>`;
+      }
+    }
+  });
+
+  els.logoutButton?.addEventListener("click", () => {
+    window.localStorage.removeItem("archytas-session");
+    clearLegacyAuth();
+    lockApp();
+    showToast("Logged out");
+  });
+}
+
 function renderAll() {
+  renderStartBoard();
   renderTemplateList();
   renderScaleList();
   els.paletteSearch.value = state.paletteSearch;
@@ -2477,17 +4053,23 @@ function renderAll() {
   renderPalette();
   renderSectionPresets();
   renderCanvasFocus();
+  renderFlowDetail();
   renderQuickAdd();
   renderEquationSpotlight();
   renderParameters();
   renderMetrics();
+  renderOverview();
   renderCanvas();
   renderTables();
   renderEquations();
   renderSimulationBoard();
+  renderCfdBoard();
+  renderAiBoard();
   renderStandards();
+  renderSources();
+  renderRecommendations();
   renderEconomics();
-  renderInspector();
+  renderReportsBoard();
 }
 
 function bindEvents() {
@@ -2496,10 +4078,36 @@ function bindEvents() {
     if (button) loadTemplate(button.dataset.template);
   });
 
+  els.startBoard.addEventListener("click", (event) => {
+    const templateButton = event.target.closest("[data-start-template]");
+    if (templateButton) {
+      loadTemplate(templateButton.dataset.startTemplate);
+      setView("overview");
+      return;
+    }
+    const jumpButton = event.target.closest("[data-jump-view]");
+    if (jumpButton) setView(jumpButton.dataset.jumpView);
+  });
+
   els.scaleList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-scale]");
     if (button) applyScale(button.dataset.scale);
   });
+
+  els.parameterSearch.addEventListener("input", (event) => {
+    state.parameterSearch = event.target.value;
+    renderParameters();
+  });
+
+  els.resetParameters.addEventListener("click", () => {
+    state.params = Object.fromEntries(processParameters.map((item) => [item.key, item.value]));
+    state.parameterSearch = "";
+    els.parameterSearch.value = "";
+    renderAll();
+    showToast("Biochemical parameters reset");
+  });
+
+  els.addCustomParameter.addEventListener("click", addCustomParameter);
 
   els.paletteSearch.addEventListener("input", (event) => {
     state.paletteSearch = event.target.value;
@@ -2520,7 +4128,14 @@ function bindEvents() {
     state.canvasFocus = button.dataset.canvasFocus;
     renderCanvasFocus();
     renderCanvas();
-    renderInspector();
+  });
+
+  els.flowDetail.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-flow-detail]");
+    if (!button) return;
+    state.flowDetail = button.dataset.flowDetail;
+    renderFlowDetail();
+    renderCanvas();
   });
 
   els.sectionPresets.addEventListener("click", (event) => {
@@ -2599,6 +4214,16 @@ function bindEvents() {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
 
+  document.querySelectorAll(".suite-link").forEach((button) => {
+    button.addEventListener("click", () => setView(button.dataset.view));
+  });
+
+  els.overviewBoard.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-jump-view]");
+    if (!button) return;
+    setView(button.dataset.jumpView);
+  });
+
   [els.batchSize, els.batchCount, els.titer, els.recovery].forEach((input) => {
     input.addEventListener("input", () => {
       state.batchSize = Number(els.batchSize.value);
@@ -2606,23 +4231,32 @@ function bindEvents() {
       state.titer = Number(els.titer.value);
       state.recovery = Number(els.recovery.value);
       renderMetrics();
+      renderOverview();
       renderCanvas();
       renderTables();
       renderEconomics();
-      renderInspector();
+      renderCfdBoard();
+      renderAiBoard();
+      renderRecommendations();
+      renderReportsBoard();
     });
   });
 
   els.parameterList.addEventListener("input", (event) => {
-    const input = event.target.closest("[data-parameter]");
+    const input = event.target.closest("[data-parameter], [data-parameter-number]");
     if (!input) return;
-    state.params[input.dataset.parameter] = Number(input.value);
+    const key = input.dataset.parameter || input.dataset.parameterNumber;
+    state.params[key] = Number(input.value);
     renderParameters();
     renderMetrics();
+    renderOverview();
     renderCanvas();
     renderTables();
     renderEconomics();
-    renderInspector();
+    renderCfdBoard();
+    renderAiBoard();
+    renderRecommendations();
+    renderReportsBoard();
   });
 
   els.equationSearch.addEventListener("input", renderEquations);
@@ -2635,8 +4269,30 @@ function bindEvents() {
   document.querySelector("#copySelected").addEventListener("click", duplicateSelectedUnit);
   document.querySelector("#connectSelected").addEventListener("click", connectFromSelectedUnit);
   document.querySelector("#exportJson").addEventListener("click", exportJson);
+  document.querySelector("#downloadStreamsCsv").addEventListener("click", downloadStreamsCsv);
+  document.querySelector("#downloadStreamsJson").addEventListener("click", downloadStreamsJson);
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
+
+  els.cfdBoard.addEventListener("click", (event) => {
+    const selectButton = event.target.closest("[data-select-cfd]");
+    if (selectButton) {
+      state.selectedId = selectButton.dataset.selectCfd;
+      renderCfdBoard();
+      renderCanvas();
+      return;
+    }
+    const downloadButton = event.target.closest("[data-download-report]");
+    if (downloadButton) handleReportDownload(downloadButton.dataset.downloadReport);
+  });
+
+  els.reportsBoard.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-download-report]");
+    if (button) handleReportDownload(button.dataset.downloadReport);
+  });
 }
 
+bindAuth();
 bindEvents();
+checkStoredAuth();
 loadTemplate("culturedMeat");
+setView("start");

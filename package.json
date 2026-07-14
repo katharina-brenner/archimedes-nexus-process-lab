@@ -1,10 +1,12 @@
 {
-  "name": "archimedes-nexus-process-lab",
+  "name": "archytas-process-os",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "backend": "node server.mjs",
+    "start": "node server.mjs",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },

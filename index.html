@@ -3,22 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Archimedes Nexus Process Lab</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-flow-builder" />
+    <title>Archytas Process OS</title>
+    <link rel="stylesheet" href="./styles.css?v=20260714-archytas-backend" />
   </head>
-  <body>
+  <body class="locked">
+    <section id="loginGate" class="login-gate" aria-label="Secure login and license purchase">
+      <div class="access-shell landing-shell">
+        <section class="landing-story access-card">
+          <div class="landing-kicker">
+            <span>Archytas Process OS</span>
+            <b>Biochemical plant modelling</b>
+          </div>
+          <h1>Describe the product. Archytas builds the process system around it.</h1>
+          <p>From cultured meat and antibiotics to antibodies, vaccines, plasmids, cell therapy, fermentation, water and emissions: start with a natural-language product brief, attach data if you have it, then move into the full engineering workspace.</p>
+          <div class="landing-proof">
+            <span>Process design</span>
+            <span>Mass and energy balances</span>
+            <span>CFD screening</span>
+            <span>GMP and ICS 71.120</span>
+          </div>
+        </section>
+        <form id="loginForm" class="login-card access-card">
+          <div class="login-brand">
+            <div class="brand-mark technical-logo" aria-label="Archytas logo"><span></span></div>
+            <div>
+              <p>Licensed Process Intelligence</p>
+              <h1>Archytas Process OS</h1>
+            </div>
+          </div>
+          <p class="access-copy">A rare Greek engineering name for a precise biochemical process modelling suite. Access is unlocked by owner login or an activated paid license.</p>
+          <label>
+            <span>User or license email</span>
+            <input id="loginUser" autocomplete="username" placeholder="Owner user or license email" />
+          </label>
+          <label>
+            <span>Password or license key</span>
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter credential" />
+          </label>
+          <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
+          <button class="login-button" type="submit">Enter Archytas</button>
+          <p id="loginError" class="login-error" role="alert"></p>
+          <small>Production-grade access requires this backend or a hosted equivalent. GitHub Pages alone cannot process payments or server sessions.</small>
+        </form>
+      </div>
+    </section>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Project controls">
         <div class="brand">
-          <div class="brand-mark">AN</div>
+          <div class="brand-mark technical-logo" aria-label="Archytas logo"><span></span></div>
           <div>
-            <h1>Archimedes Nexus</h1>
-            <p>Process intelligence lab</p>
+            <h1>Archytas Process OS</h1>
+            <p>K. Brenner industrial process suite</p>
           </div>
         </div>
 
-        <section class="control-group">
-          <h2>Process Template</h2>
+        <nav class="suite-nav" aria-label="Main pages">
+          <button class="suite-link active" data-view="start">Start</button>
+          <button class="suite-link" data-view="overview">Overview</button>
+          <button class="suite-link" data-view="flowsheet">Process Builder</button>
+          <button class="suite-link" data-view="equipment">Equipment Register</button>
+          <button class="suite-link" data-view="streams">Stream Table</button>
+          <button class="suite-link" data-view="cfd">Bioreactor CFD</button>
+          <button class="suite-link" data-view="ai">Boundaries + AI</button>
+          <button class="suite-link" data-view="sources">Scientific Data</button>
+          <button class="suite-link" data-view="recommendations">Readiness Roadmap</button>
+          <button class="suite-link" data-view="economics">Economics</button>
+          <button class="suite-link" data-view="reports">Downloads</button>
+          <button class="suite-link" data-view="billing">Billing</button>
+        </nav>
+
+        <section class="control-group template-internal">
+          <h2>Internal model engine</h2>
           <div id="templateList" class="template-list"></div>
         </section>
 
@@ -53,6 +108,17 @@
 
         <section class="control-group parameter-panel">
           <h2>Biochemical Parameters</h2>
+          <div class="parameter-tools">
+            <input id="parameterSearch" type="search" placeholder="Search pH, kLa, CAPEX..." />
+            <button id="resetParameters" type="button">Reset</button>
+          </div>
+          <div class="custom-parameter-box" aria-label="Add custom parameter">
+            <strong>Add own parameter</strong>
+            <input id="customParamName" type="text" placeholder="Parameter name" />
+            <input id="customParamValue" type="number" step="0.01" placeholder="Value" />
+            <input id="customParamUnit" type="text" placeholder="Unit" />
+            <button id="addCustomParameter" type="button">Add</button>
+          </div>
           <div id="parameterList" class="parameter-list"></div>
         </section>
 
@@ -62,16 +128,24 @@
         <header class="topbar">
           <div>
             <p class="eyebrow" id="processEyebrow">Cultured meat production</p>
-            <h2>Process Flowsheet</h2>
+            <h2 id="pageTitle">Start</h2>
           </div>
           <nav class="view-tabs" aria-label="Workspace views">
-            <button class="tab active" data-view="flowsheet">Flowsheet</button>
+            <button class="tab active" data-view="start">Start</button>
+            <button class="tab" data-view="overview">Overview</button>
+            <button class="tab" data-view="flowsheet">Builder</button>
             <button class="tab" data-view="equipment">Equipment</button>
             <button class="tab" data-view="streams">Streams</button>
             <button class="tab" data-view="equations">Equations</button>
             <button class="tab" data-view="simulation">Simulation</button>
+            <button class="tab" data-view="cfd">CFD</button>
+            <button class="tab" data-view="ai">Boundaries</button>
             <button class="tab" data-view="standards">Standards</button>
+            <button class="tab" data-view="sources">Sources + Data</button>
+            <button class="tab" data-view="recommendations">Recommendations</button>
             <button class="tab" data-view="economics">Economics</button>
+            <button class="tab" data-view="reports">Downloads</button>
+            <button class="tab" data-view="billing">Billing</button>
           </nav>
           <div class="actions">
             <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Auto Layout</span></button>
@@ -83,6 +157,7 @@
             <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect Selected</span></button>
             <button id="exportJson" class="action-button" title="Export the full process model as JSON" aria-label="Export JSON"><span>Export Model</span></button>
             <button id="resetScenario" class="text-button">Reset Scenario</button>
+            <button id="logoutButton" class="text-button">Logout</button>
           </div>
         </header>
 
@@ -109,7 +184,15 @@
           </article>
         </section>
 
-        <section id="flowsheetView" class="view active">
+        <section id="startView" class="view start-view active">
+          <div id="startBoard" class="start-board"></div>
+        </section>
+
+        <section id="overviewView" class="view overview-view">
+          <div id="overviewBoard" class="overview-board"></div>
+        </section>
+
+        <section id="flowsheetView" class="view">
           <div class="canvas-frame">
             <div class="builder-library" aria-label="Equipment builder library">
               <div class="library-intro">
@@ -134,10 +217,9 @@
               </div>
             </div>
             <div class="canvas-toolbar" aria-label="Canvas tools">
-              <button class="tool active" data-mode="select"><b>Move & Edit Units</b><span>Select a unit, drag it, or change its assumptions</span></button>
+              <button class="tool active" data-mode="select"><b>Select & Move Units</b><span>Click equipment to highlight it, drag it, or use Duplicate and Connect</span></button>
               <button class="tool" data-mode="connect"><b>Draw Process Stream</b><span>Click a source unit, then a destination unit</span></button>
-              <button class="tool" data-mode="inspect"><b>Inspect Equations</b><span>Open sizing, standards, balances, and equations</span></button>
-              <span id="modeHint">Move mode: click a unit to select it, drag it to reposition, or use Quick add for valves and instruments.</span>
+              <span id="modeHint">Select mode: click equipment or streams to highlight them. Equations update below the canvas; use the top actions to duplicate, connect, export, or reset.</span>
             </div>
             <div class="canvas-assist">
               <div class="quick-add-panel">
@@ -147,6 +229,10 @@
               <div class="canvas-focus" aria-label="Flowsheet focus">
                 <strong>Canvas focus</strong>
                 <div id="canvasFocus" class="focus-toggle"></div>
+              </div>
+              <div class="flow-detail-panel" aria-label="Flow visibility">
+                <strong>Flow visibility</strong>
+                <div id="flowDetail" class="focus-toggle flow-detail-toggle"></div>
               </div>
               <div class="flow-legend" aria-label="Flow legend">
                 <span class="legend-main">Main product</span>
@@ -166,28 +252,26 @@
             <div id="flowsheetCanvas" class="flowsheet-canvas" aria-label="Drag and drop process canvas"></div>
             <div id="equationSpotlight" class="equation-spotlight"></div>
           </div>
-          <aside class="inspector" aria-label="Inspector">
-            <div class="inspector-header">
-              <p>Inspector</p>
-              <strong id="inspectorTitle">Select a unit</strong>
-            </div>
-            <div id="inspectorBody" class="inspector-body"></div>
-          </aside>
         </section>
 
         <section id="equipmentView" class="view data-view">
           <table>
             <thead>
-              <tr><th>Tag</th><th>Operation</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Status</th></tr>
+              <tr><th>Tag</th><th>Operation</th><th>ICS 71.120</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Status</th></tr>
             </thead>
             <tbody id="equipmentTable"></tbody>
           </table>
         </section>
 
         <section id="streamsView" class="view data-view">
+          <div class="stream-toolbar">
+            <div id="streamSummary" class="stream-summary"></div>
+            <button id="downloadStreamsCsv" class="action-button primary" type="button">Download CSV</button>
+            <button id="downloadStreamsJson" class="action-button" type="button">Download JSON</button>
+          </div>
           <table>
             <thead>
-              <tr><th>ID</th><th>From</th><th>To</th><th>Flow</th><th>Key components</th><th>Phase</th></tr>
+              <tr><th>ID</th><th>Direction</th><th>Role</th><th>From</th><th>To</th><th>Flow</th><th>Key components</th><th>Phase</th></tr>
             </thead>
             <tbody id="streamsTable"></tbody>
           </table>
@@ -215,8 +299,24 @@
           <div class="simulation-board" id="simulationBoard"></div>
         </section>
 
+        <section id="cfdView" class="view cfd-view">
+          <div id="cfdBoard" class="cfd-board"></div>
+        </section>
+
+        <section id="aiView" class="view ai-view">
+          <div id="aiBoard" class="ai-board"></div>
+        </section>
+
         <section id="standardsView" class="view standards-view">
           <div id="standardsList" class="standards-list"></div>
+        </section>
+
+        <section id="sourcesView" class="view sources-view">
+          <div id="sourcesBoard" class="sources-board"></div>
+        </section>
+
+        <section id="recommendationsView" class="view recommendations-view">
+          <div id="recommendationsBoard" class="recommendations-board"></div>
         </section>
 
         <section id="economicsView" class="view economics-view">
@@ -227,10 +327,49 @@
             <dl id="economicDetails"></dl>
           </div>
         </section>
+
+        <section id="reportsView" class="view reports-view">
+          <div id="reportsBoard" class="reports-board"></div>
+        </section>
+
+        <section id="billingView" class="view billing-view">
+          <div id="billingBoard" class="billing-board">
+            <section class="license-card access-card" aria-label="Professional license checkout">
+              <div class="license-head">
+                <p>Professional License</p>
+                <strong id="licensePrice">725 EUR</strong>
+              </div>
+              <h2>Buy access by bank transfer</h2>
+              <p>Generate an order, transfer the exact amount with the reference, then activate the license after the incoming payment is verified.</p>
+              <form id="checkoutForm" class="checkout-form">
+                <input id="checkoutName" type="text" autocomplete="name" placeholder="Customer name" />
+                <input id="checkoutEmail" type="email" autocomplete="email" placeholder="Customer email" />
+                <input id="checkoutCompany" type="text" autocomplete="organization" placeholder="Company or institution" />
+                <button type="submit">Create bank-transfer order</button>
+              </form>
+              <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
+              <div class="backend-list">
+                <span>Backend included</span>
+                <ul id="backendFeatureList"></ul>
+              </div>
+            </section>
+          </div>
+        </section>
       </main>
     </div>
 
+    <aside id="helpDock" class="help-dock" aria-label="Tool help">
+      <button id="helpToggle" class="help-toggle" type="button">Help</button>
+      <div class="help-panel">
+        <strong>Ask Archytas</strong>
+        <p>Describe the problem and get direct steps inside the tool.</p>
+        <textarea id="helpPrompt" rows="3" placeholder="Example: oxygen is too low in my 20,000 L bioreactor"></textarea>
+        <button id="askHelp" type="button">Get guidance</button>
+        <div id="helpResult" class="help-result" aria-live="polite"></div>
+      </div>
+    </aside>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=20260714-archytas-backend"></script>
   </body>
 </html>
