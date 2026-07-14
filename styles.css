@@ -240,69 +240,6 @@ body.show-public .app-shell {
 .flow-c { left: 58%; top: 24%; width: 190px; transform: rotate(-12deg); animation-delay: 0.8s; }
 .flow-d { right: 12%; top: 34%; width: 132px; transform: rotate(44deg); animation-delay: 1.2s; }
 
-.mascot-card {
-  position: absolute;
-  right: 72px;
-  bottom: 76px;
-  z-index: 1;
-  display: grid;
-  width: 152px;
-  height: 152px;
-  place-items: center;
-  border: 1px solid rgba(155, 231, 221, 0.24);
-  border-radius: 28px;
-  background:
-    linear-gradient(145deg, rgba(18, 45, 73, 0.74), rgba(7, 26, 49, 0.56)),
-    linear-gradient(180deg, rgba(226, 238, 250, 0.08), rgba(226, 238, 250, 0.02));
-  box-shadow: 0 28px 80px rgba(3, 14, 27, 0.28);
-  backdrop-filter: blur(16px);
-}
-
-.mascot-mark {
-  position: relative;
-  width: 86px;
-  height: 68px;
-  border: 3px solid rgba(230, 248, 246, 0.92);
-  border-radius: 34px 34px 26px 26px;
-  background: linear-gradient(180deg, rgba(155, 231, 221, 0.14), rgba(7, 26, 49, 0.08));
-}
-
-.mascot-mark::before,
-.mascot-mark::after {
-  content: "";
-  position: absolute;
-  top: 13px;
-  width: 30px;
-  height: 40px;
-  border-top: 3px solid rgba(155, 231, 221, 0.78);
-  border-bottom: 3px solid rgba(155, 231, 221, 0.78);
-}
-
-.mascot-mark::before {
-  left: -27px;
-  border-left: 3px solid rgba(155, 231, 221, 0.78);
-  border-radius: 24px 0 0 24px;
-}
-
-.mascot-mark::after {
-  right: -27px;
-  border-right: 3px solid rgba(155, 231, 221, 0.78);
-  border-radius: 0 24px 24px 0;
-}
-
-.mascot-mark span {
-  position: absolute;
-  left: 25px;
-  top: 28px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f8fbff;
-  box-shadow:
-    29px 0 #f8fbff,
-    14px 17px 0 -2px rgba(31, 183, 166, 0.95);
-}
-
 @keyframes pulseFlow {
   0% { opacity: 0.22; filter: saturate(0.7); }
   45% { opacity: 1; filter: saturate(1.25); }
@@ -913,41 +850,41 @@ button {
 .technical-logo::before {
   content: "";
   position: absolute;
-  left: 14px;
-  top: 8px;
-  width: 5px;
-  height: 29px;
-  border-radius: 999px;
-  background: #071a31;
-  transform: rotate(24deg);
-  transform-origin: center;
-  box-shadow: none;
+  left: 11px;
+  top: 13px;
+  width: 22px;
+  height: 17px;
+  border: 3px solid #071a31;
+  border-radius: 18px 18px 14px 14px;
+  background: transparent;
+  box-shadow:
+    -7px 1px 0 -4px #1fb7a6,
+    7px 1px 0 -4px #1fb7a6;
 }
 
 .technical-logo::after {
   content: "";
   position: absolute;
-  right: 13px;
-  top: 13px;
-  width: 5px;
-  height: 24px;
+  left: 8px;
+  top: 16px;
+  width: 28px;
+  height: 12px;
+  border-left: 3px solid #1fb7a6;
+  border-right: 3px solid #1fb7a6;
   border-radius: 999px;
-  background: #071a31;
-  transform: rotate(-31deg);
-  transform-origin: center;
-  box-shadow: none;
 }
 
 .technical-logo span {
   position: absolute;
   left: 17px;
-  top: 27px;
-  width: 13px;
+  top: 22px;
+  width: 4px;
   height: 4px;
-  border-radius: 999px;
-  background: var(--teal);
-  transform: rotate(-1deg);
-  box-shadow: none;
+  border-radius: 50%;
+  background: #071a31;
+  box-shadow:
+    8px 0 #071a31,
+    4px 7px 0 -1px #1fb7a6;
 }
 
 .brand h1,
@@ -3050,22 +2987,137 @@ dd {
 
 .cfd-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.82fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(320px, 0.78fr) minmax(360px, 1fr);
   gap: 14px;
 }
 
+.cfd-vessel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(43, 58, 85, 0.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(234, 241, 249, 0.96)),
+    radial-gradient(circle at 50% 28%, rgba(31, 183, 166, 0.12), transparent 42%);
+  box-shadow: 0 18px 42px rgba(8, 23, 43, 0.1);
+}
+
+.cfd-vessel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #52647e;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfd-vessel-head strong {
+  color: #071a31;
+  font-size: 13px;
+}
+
+.cfd-vessel-body {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid rgba(43, 58, 85, 0.14);
+  border-radius: 44% 44% 28% 28%;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(155, 231, 221, 0.2), transparent 28%),
+    linear-gradient(180deg, rgba(231, 242, 250, 0.92), rgba(205, 221, 236, 0.96));
+  box-shadow:
+    inset 0 0 44px rgba(8, 23, 43, 0.16),
+    inset 0 -28px 42px rgba(8, 23, 43, 0.12);
+}
+
+.cfd-vessel-body::before {
+  content: "";
+  position: absolute;
+  inset: 16px 42px 32px;
+  border: 1px dashed rgba(43, 58, 85, 0.14);
+  border-radius: 44% 44% 28% 28%;
+}
+
+.cfd-impeller {
+  position: absolute;
+  left: 50%;
+  z-index: 3;
+  width: 98px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #071a31 18%, #1fb7a6 50%, #071a31 82%, transparent);
+  opacity: 0.72;
+  transform: translateX(-50%);
+  animation: impellerSpin 1.8s linear infinite;
+}
+
+.impeller-top { top: 33%; }
+.impeller-bottom { top: 58%; animation-delay: -0.5s; }
+
+.cfd-feed-plume {
+  position: absolute;
+  right: 24%;
+  top: 18%;
+  z-index: 2;
+  width: 92px;
+  height: 230px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(31, 183, 166, 0.28), rgba(31, 183, 166, 0));
+  filter: blur(1px);
+  transform: rotate(8deg);
+  animation: feedPulse 2.4s ease-in-out infinite;
+}
+
+.cfd-sparger {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  z-index: 3;
+  width: 140px;
+  height: 14px;
+  border: 2px solid rgba(7, 26, 49, 0.55);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.cfd-sparger::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  bottom: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(31, 183, 166, 0.72);
+  box-shadow:
+    22px -16px rgba(31, 183, 166, 0.48),
+    44px -8px rgba(31, 183, 166, 0.62),
+    66px -24px rgba(31, 183, 166, 0.4),
+    88px -12px rgba(31, 183, 166, 0.66);
+  animation: bubbleRise 2s ease-in-out infinite;
+}
+
 .cfd-map {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 4px;
+  width: min(300px, 78%);
   aspect-ratio: 1;
   padding: 14px;
-  border: 1px solid rgba(31, 42, 58, 0.16);
+  border: 1px solid rgba(43, 58, 85, 0.16);
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(215, 222, 231, 0.92)),
+    radial-gradient(circle, rgba(255, 255, 255, 0.6), rgba(215, 225, 237, 0.44)),
     #eef2f6;
-  box-shadow: inset 0 0 40px rgba(7, 17, 31, 0.18);
+  box-shadow: inset 0 0 40px rgba(8, 23, 43, 0.18);
 }
 
 .cfd-map span {
@@ -3083,10 +3135,133 @@ dd {
   background: #fff;
 }
 
+.cfd-score-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(31, 183, 166, 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(31, 183, 166, 0.08), rgba(255, 255, 255, 0.94));
+}
+
+.cfd-score-card span,
+.cfd-metric-grid span {
+  color: #0c7f75;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cfd-score-card strong {
+  color: #071a31;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.cfd-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cfd-metric-grid article {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(43, 58, 85, 0.12);
+  border-radius: 9px;
+  background: #f6f9fc;
+}
+
+.cfd-metric-grid strong,
+.cfd-metric-grid small {
+  display: block;
+}
+
+.cfd-metric-grid strong {
+  margin-top: 4px;
+  color: #071a31;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.cfd-metric-grid small {
+  margin-top: 5px;
+  color: #61708a;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.cfd-actions,
+.cfd-reactions {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(43, 58, 85, 0.12);
+  border-radius: 9px;
+  background: #fbfcfd;
+}
+
+.cfd-actions h4,
+.cfd-actions ul,
+.cfd-reactions h4,
+.cfd-reactions p {
+  margin: 0;
+}
+
+.cfd-actions h4,
+.cfd-reactions h4 {
+  color: #071a31;
+  font-size: 13px;
+}
+
+.cfd-actions ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.cfd-actions li,
+.cfd-reactions p {
+  color: #4b596b;
+  font-size: 12px;
+  line-height: 1.42;
+}
+
+.cfd-reactions p {
+  display: grid;
+  gap: 3px;
+}
+
+.cfd-reactions b {
+  color: #071a31;
+}
+
+.cfd-reactions span {
+  color: #52647e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
 .cfd-detail p {
   margin: 0;
   color: #4b596b;
   line-height: 1.5;
+}
+
+@keyframes impellerSpin {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) rotate(180deg); }
+}
+
+@keyframes feedPulse {
+  0%, 100% { opacity: 0.36; transform: rotate(8deg) translateY(0); }
+  50% { opacity: 0.72; transform: rotate(8deg) translateY(10px); }
+}
+
+@keyframes bubbleRise {
+  0%, 100% { transform: translateY(8px); opacity: 0.35; }
+  50% { transform: translateY(-18px); opacity: 0.82; }
 }
 
 .cfd-legend span {
@@ -4338,14 +4513,6 @@ th {
     font-size: 58px;
   }
 
-  .mascot-card {
-    right: 34px;
-    bottom: 48px;
-    width: 128px;
-    height: 128px;
-    border-radius: 24px;
-  }
-
   .platform-grid,
   .workflow-rail {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4569,10 +4736,6 @@ th {
   .flow-b { left: 56%; top: 13%; width: 82px; }
   .flow-c,
   .flow-d {
-    display: none;
-  }
-
-  .mascot-card {
     display: none;
   }
 

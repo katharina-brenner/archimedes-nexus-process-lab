@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-navy-ci" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-cfd-logo" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -37,9 +37,6 @@
               <i class="flow flow-b"></i>
               <i class="flow flow-c"></i>
               <i class="flow flow-d"></i>
-            </div>
-            <div class="mascot-card" aria-hidden="true">
-              <div class="mascot-mark"><span></span></div>
             </div>
             <div class="public-hero-copy">
               <p>Axion Process OS</p>
@@ -270,7 +267,7 @@
             <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
             <button id="copySelected" class="action-button" title="Duplicate the selected unit" aria-label="Duplicate selected unit"><span>Duplicate Unit</span></button>
             <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect Selected</span></button>
-            <button id="exportJson" class="action-button" title="Export the full process model as JSON" aria-label="Export JSON"><span>Export Model</span></button>
+            <button id="downloadSummaryCsv" class="action-button" title="Download a process summary table" aria-label="Download process summary CSV"><span>Download Summary</span></button>
             <button id="resetScenario" class="text-button">Reset Scenario</button>
             <button id="logoutButton" class="text-button">Logout</button>
           </div>
@@ -382,7 +379,6 @@
           <div class="stream-toolbar">
             <div id="streamSummary" class="stream-summary"></div>
             <button id="downloadStreamsCsv" class="action-button primary" type="button">Download CSV</button>
-            <button id="downloadStreamsJson" class="action-button" type="button">Download JSON</button>
           </div>
           <table>
             <thead>
@@ -466,6 +462,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-navy-ci"></script>
+    <script type="module" src="./app.js?v=20260714-cfd-logo"></script>
   </body>
 </html>

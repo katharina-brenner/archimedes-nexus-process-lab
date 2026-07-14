@@ -3096,7 +3096,7 @@ function renderAiBoard() {
         <h3>${activeTemplate().label} model assistant</h3>
         <span>Combines mass balance closure, energy balance, scale-up economics, PAT soft sensors, and ML-style bottleneck scoring.</span>
       </div>
-      <button id="downloadAiReport" class="action-button primary" type="button">Download AI Report</button>
+      <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
     <section class="ai-grid">
       <article>
@@ -3169,9 +3169,8 @@ function renderAiBoard() {
       ${report.ml.suggestedActions.map((item) => `<p>${item}</p>`).join("")}
     </section>
   `;
-  document.querySelector("#downloadAiReport")?.addEventListener("click", () => {
-    downloadText(`${state.template}-physics-ai-report.json`, "application/json", JSON.stringify(aiReport(), null, 2));
-    showToast("AI report downloaded");
+  els.aiBoard.querySelector("[data-jump-view]")?.addEventListener("click", (event) => {
+    setView(event.currentTarget.dataset.jumpView);
   });
 }
 
@@ -3519,35 +3518,64 @@ function renderCfdBoard() {
     return;
   }
   const selected = report.find((item) => item.id === state.selectedId) || report[0];
+  const hotspotCells = selected.cells.filter((cell) => cell.risk > 0.62).length;
+  const transferScore = Math.max(0, Math.min(100, (selected.oxygenIndex * 0.46 + selected.nutrientIndex * 0.34 + (1 - selected.shearIndex) * 0.2) * 100));
+  const selectedUnit = state.units.find((item) => item.id === selected.id);
+  const selectedReactions = selectedUnit ? unitReactions(selectedUnit).slice(0, 3) : [];
   els.cfdBoard.innerHTML = `
     <section class="cfd-hero">
       <div>
-        <p>Bioreactor CFD screening</p>
+        <p>Interactive bioreactor CFD workbench</p>
         <h3>${selected.id} · ${selected.name}</h3>
-        <span>Fast visual model for oxygen transfer, nutrient distribution, mixing dead zones, and shear risk. Use it to decide where rigorous CFD or scale-down experiments are required.</span>
+        <span>Screen oxygen transfer, nutrient distribution, shear, dead zones, and feed-point risk directly in the tool. This is a fast engineering model for prioritising rigorous CFD and scale-down experiments.</span>
       </div>
-      <button class="action-button primary" data-download-report="cfd-json" type="button">Download CFD JSON</button>
+      <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
     </section>
     <section class="cfd-layout">
-      <div class="cfd-map" aria-label="CFD risk heatmap">
-        ${selected.cells.map((cell) => `
-          <span style="background:${cfdCellColor(cell)}; opacity:${0.54 + cell.risk * 0.42};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
-        `).join("")}
+      <div class="cfd-vessel" aria-label="Interactive CFD vessel visualization">
+        <div class="cfd-vessel-head">
+          <span>${formatNumber(selected.volumeL, 0)} L</span>
+          <strong>${selected.id}</strong>
+        </div>
+        <div class="cfd-vessel-body">
+          <div class="cfd-impeller impeller-top"></div>
+          <div class="cfd-impeller impeller-bottom"></div>
+          <div class="cfd-feed-plume"></div>
+          <div class="cfd-sparger"></div>
+          <div class="cfd-map" aria-label="CFD risk heatmap">
+            ${selected.cells.map((cell) => `
+              <span style="background:${cfdCellColor(cell)}; opacity:${0.48 + cell.risk * 0.46};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
+            `).join("")}
+          </div>
+        </div>
       </div>
       <div class="cfd-detail">
         <div class="cfd-unit-tabs">
           ${report.map((item) => `<button class="${item.id === selected.id ? "active" : ""}" data-select-cfd="${item.id}" type="button">${item.id}</button>`).join("")}
         </div>
-        <dl>
-          <dt>Working volume</dt><dd>${formatNumber(selected.volumeL, 0)} L</dd>
-          <dt>Oxygen index</dt><dd>${formatNumber(selected.oxygenIndex * 100, 0)}%</dd>
-          <dt>Nutrient index</dt><dd>${formatNumber(selected.nutrientIndex * 100, 0)}%</dd>
-          <dt>Shear index</dt><dd>${formatNumber(selected.shearIndex * 100, 0)}%</dd>
-          <dt>Low O2 cells</dt><dd>${selected.lowOxygenCells}/100</dd>
-          <dt>Low nutrient cells</dt><dd>${selected.lowNutrientCells}/100</dd>
-          <dt>High shear cells</dt><dd>${selected.highShearCells}/100</dd>
-        </dl>
-        <p>${selected.recommendation}</p>
+        <div class="cfd-score-card">
+          <span>Transfer readiness</span>
+          <strong>${formatNumber(transferScore, 0)}%</strong>
+          <p>${selected.recommendation}</p>
+        </div>
+        <div class="cfd-metric-grid">
+          <article><span>O2</span><strong>${formatNumber(selected.oxygenIndex * 100, 0)}%</strong><small>${selected.lowOxygenCells} low-O2 cells</small></article>
+          <article><span>Nutrient</span><strong>${formatNumber(selected.nutrientIndex * 100, 0)}%</strong><small>${selected.lowNutrientCells} weak-feed cells</small></article>
+          <article><span>Shear</span><strong>${formatNumber(selected.shearIndex * 100, 0)}%</strong><small>${selected.highShearCells} high-shear cells</small></article>
+          <article><span>Hotspots</span><strong>${hotspotCells}</strong><small>risk cells / 100</small></article>
+        </div>
+        <div class="cfd-actions">
+          <h4>Suggested engineering edits</h4>
+          <ul>
+            <li>${selected.lowOxygenCells ? "Increase kLa, oxygen enrichment, sparger efficiency, or headspace pressure." : "Oxygen transfer is acceptable for this screening state."}</li>
+            <li>${selected.lowNutrientCells ? "Move feed point closer to high-circulation zones or add distributed feed points." : "Nutrient distribution is acceptable for this screening state."}</li>
+            <li>${selected.highShearCells ? "Reduce agitation, review impeller tip speed, or consider scale-out." : "Shear proxy is acceptable for this screening state."}</li>
+          </ul>
+        </div>
+        <div class="cfd-reactions">
+          <h4>Linked reactions and balances</h4>
+          ${selectedReactions.map((item) => `<p><b>${item.title}</b><span>${item.formula}</span></p>`).join("")}
+        </div>
       </div>
     </section>
     <section class="cfd-legend">
@@ -3650,10 +3678,10 @@ function renderReportsBoard() {
     <section class="reports-hero">
       <div>
         <p>Download center</p>
-        <h3>Balances, costs, equations, streams, CFD, and full model data</h3>
-        <span>Export structured data for Excel, Python, thesis appendices, process reviews, or future rigorous simulation engines.</span>
+        <h3>Balances, costs, equations, streams, and parameters</h3>
+        <span>Export spreadsheet-ready CSV files for Excel, thesis appendices, process reviews, and external modelling. CFD now runs visibly inside the workbench.</span>
       </div>
-      <button class="action-button primary" data-download-report="full-json" type="button">Download Full JSON</button>
+      <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
     <section class="reports-grid">
       <article><span>Mass + energy balances</span><strong>${report.balances.length}</strong><p>Unit-level mass in/out, generation, loss, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
@@ -3661,7 +3689,7 @@ function renderReportsBoard() {
       <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
       <article><span>Input/output streams</span><strong>${report.streams.length}</strong><p>All material, utility, waste, and QC/data streams with roles and phases.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
-      <article><span>CFD screening</span><strong>${report.cfd.length}</strong><p>Bioreactor O2, nutrient, shear, and hotspot risk maps.</p><button data-download-report="cfd-json" type="button">Download JSON</button></article>
+      <article><span>CFD screening</span><strong>${report.cfd.length}</strong><p>Bioreactor O2, nutrient, shear, and hotspot risk maps are shown interactively in the CFD workbench.</p><button data-jump-view="cfd" type="button">Open CFD</button></article>
     </section>
   `;
 }
@@ -4001,33 +4029,26 @@ function autoLayout() {
   showToast("Layout updated");
 }
 
-function exportJson() {
-  const payload = JSON.stringify({
-    template: state.template,
-    scale: state.scale,
-    parameters: {
-      batchSize: state.batchSize,
-      batchCount: state.batchCount,
-      titer: state.titer,
-      recovery: state.recovery,
-      biochemical: state.params,
-    },
-    metrics: metrics(),
-    units: state.units,
-    streams: state.streams,
-    equations,
-    standards,
-    scientificSources,
-    simulationFunctions: spdFunctions,
-  }, null, 2);
-  const blob = new Blob([payload], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${state.template}-process-design.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-  showToast("Scenario exported");
+function downloadSummaryCsv() {
+  const data = metrics();
+  downloadCsv(`${state.template}-process-summary.csv`, [
+    { metric: "Template", value: activeTemplate().label, unit: "" },
+    { metric: "Product", value: activeTemplate().product, unit: "" },
+    { metric: "Scale", value: scalePresets[state.scale].label, unit: "" },
+    { metric: "Batch volume", value: state.batchSize, unit: "L" },
+    { metric: "Annual batches", value: state.batchCount, unit: "batches/yr" },
+    { metric: "Titer", value: state.titer, unit: "g/L" },
+    { metric: "Recovery", value: state.recovery, unit: "%" },
+    { metric: "Annual product", value: data.annualKg, unit: "kg/yr" },
+    { metric: "Batch duration", value: data.batchDuration, unit: "h" },
+    { metric: "Direct cost", value: data.directCost, unit: "USD/kg" },
+    { metric: "Utilities", value: data.utilitiesMWh, unit: "MWh/yr" },
+    { metric: "Plant utilization", value: data.utilization * 100, unit: "%" },
+    { metric: "Equipment", value: state.units.length, unit: "units" },
+    { metric: "Streams", value: state.streams.length, unit: "streams" },
+    { metric: "CFD bioreactors", value: cfdReport().length, unit: "screened units" },
+  ]);
+  showToast("Process summary CSV downloaded");
 }
 
 function downloadStreamsCsv() {
@@ -4041,20 +4062,8 @@ function downloadStreamsCsv() {
   showToast("Stream CSV downloaded");
 }
 
-function downloadStreamsJson() {
-  downloadText(`${state.template}-input-output-streams.json`, "application/json", JSON.stringify({
-    template: activeTemplate().label,
-    generatedAt: new Date().toISOString(),
-    streams: streamRows(),
-  }, null, 2));
-  showToast("Stream JSON downloaded");
-}
-
 function handleReportDownload(type) {
-  const report = comprehensiveReport();
-  if (type === "full-json") {
-    downloadText(`${state.template}-complete-process-report.json`, "application/json", JSON.stringify(report, null, 2));
-  } else if (type === "balances-csv") {
+  if (type === "balances-csv") {
     downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
   } else if (type === "costs-csv") {
     downloadCsv(`${state.template}-cost-model.csv`, costRows());
@@ -4073,8 +4082,6 @@ function handleReportDownload(type) {
       custom: item.custom ? "yes" : "no",
       group: parameterGroup(item),
     })));
-  } else if (type === "cfd-json") {
-    downloadText(`${state.template}-bioreactor-cfd-screening.json`, "application/json", JSON.stringify(report.cfd, null, 2));
   }
   showToast("Download prepared");
 }
@@ -4700,12 +4707,16 @@ function bindEvents() {
   document.querySelector("#zoomIn").addEventListener("click", () => setZoom(state.zoom + 0.1));
   document.querySelector("#copySelected").addEventListener("click", duplicateSelectedUnit);
   document.querySelector("#connectSelected").addEventListener("click", connectFromSelectedUnit);
-  document.querySelector("#exportJson").addEventListener("click", exportJson);
+  document.querySelector("#downloadSummaryCsv").addEventListener("click", downloadSummaryCsv);
   document.querySelector("#downloadStreamsCsv").addEventListener("click", downloadStreamsCsv);
-  document.querySelector("#downloadStreamsJson").addEventListener("click", downloadStreamsJson);
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 
   els.cfdBoard.addEventListener("click", (event) => {
+    const jumpButton = event.target.closest("[data-jump-view]");
+    if (jumpButton) {
+      setView(jumpButton.dataset.jumpView);
+      return;
+    }
     const selectButton = event.target.closest("[data-select-cfd]");
     if (selectButton) {
       state.selectedId = selectButton.dataset.selectCfd;
@@ -4713,11 +4724,14 @@ function bindEvents() {
       renderCanvas();
       return;
     }
-    const downloadButton = event.target.closest("[data-download-report]");
-    if (downloadButton) handleReportDownload(downloadButton.dataset.downloadReport);
   });
 
   els.reportsBoard.addEventListener("click", (event) => {
+    const jumpButton = event.target.closest("[data-jump-view]");
+    if (jumpButton) {
+      setView(jumpButton.dataset.jumpView);
+      return;
+    }
     const button = event.target.closest("[data-download-report]");
     if (button) handleReportDownload(button.dataset.downloadReport);
   });
