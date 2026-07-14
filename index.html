@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260714-axion-product-sidebar" />
+    <link rel="stylesheet" href="./styles.css?v=20260714-axion-twin-tool" />
   </head>
   <body class="locked">
-    <section id="loginGate" class="login-gate" aria-label="Secure login and license purchase">
+    <section id="loginGate" class="login-gate" aria-label="Secure login">
       <div class="access-shell landing-shell">
         <section class="landing-story access-card">
           <div class="landing-kicker">
@@ -27,18 +27,18 @@
           <div class="login-brand">
             <div class="brand-mark technical-logo" aria-label="Axion pixel axolotl logo"><span></span></div>
             <div>
-              <p>Licensed Process Intelligence</p>
+              <p>Process Intelligence</p>
               <h1>Axion Process OS</h1>
             </div>
           </div>
-          <p class="access-copy">A Greek-rooted systems name for a precise biochemical process modelling suite. Access is unlocked by owner login or an activated paid license.</p>
+          <p class="access-copy">A precise biochemical process modelling suite for building, editing, simulating, and improving production systems.</p>
           <label>
-            <span>User or license email</span>
-            <input id="loginUser" autocomplete="username" placeholder="Owner user or license email" />
+            <span>User</span>
+            <input id="loginUser" autocomplete="username" placeholder="Enter user" />
           </label>
           <label>
-            <span>Password or license key</span>
-            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter credential" />
+            <span>Password</span>
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password" />
           </label>
           <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
           <button class="login-button" type="submit">Enter Axion</button>
@@ -49,7 +49,7 @@
             <small id="googleLoginStatus">Checking Google login configuration.</small>
           </div>
           <p id="loginError" class="login-error" role="alert"></p>
-          <small>Production-grade access requires this backend or a hosted equivalent. GitHub Pages alone cannot process payments or server sessions.</small>
+          <small>Backend login keeps the workspace private while you build and simulate process models.</small>
         </form>
       </div>
     </section>
@@ -73,9 +73,9 @@
           <button class="suite-link" data-view="ai">Boundaries + AI</button>
           <button class="suite-link" data-view="sources">Scientific Data</button>
           <button class="suite-link" data-view="recommendations">Readiness Roadmap</button>
+          <button class="suite-link" data-view="twin">Twin OS</button>
           <button class="suite-link" data-view="economics">Economics</button>
           <button class="suite-link" data-view="reports">Downloads</button>
-          <button class="suite-link" data-view="billing">Billing</button>
         </nav>
 
         <section class="control-group template-internal">
@@ -149,9 +149,9 @@
             <button class="tab" data-view="standards">Standards</button>
             <button class="tab" data-view="sources">Sources + Data</button>
             <button class="tab" data-view="recommendations">Recommendations</button>
+            <button class="tab" data-view="twin">Twin OS</button>
             <button class="tab" data-view="economics">Economics</button>
             <button class="tab" data-view="reports">Downloads</button>
-            <button class="tab" data-view="billing">Billing</button>
           </nav>
           <div class="actions">
             <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Auto Layout</span></button>
@@ -325,6 +325,10 @@
           <div id="recommendationsBoard" class="recommendations-board"></div>
         </section>
 
+        <section id="twinView" class="view twin-view">
+          <div id="twinBoard" class="twin-board"></div>
+        </section>
+
         <section id="economicsView" class="view economics-view">
           <div class="cost-stack" id="costStack"></div>
           <div class="economic-notes">
@@ -338,29 +342,6 @@
           <div id="reportsBoard" class="reports-board"></div>
         </section>
 
-        <section id="billingView" class="view billing-view">
-          <div id="billingBoard" class="billing-board">
-            <section class="license-card access-card" aria-label="Professional license checkout">
-              <div class="license-head">
-                <p>Professional License</p>
-                <strong id="licensePrice">725 EUR</strong>
-              </div>
-              <h2>Buy access by bank transfer</h2>
-              <p>Generate an order, transfer the exact amount with the reference, then activate the license after the incoming payment is verified.</p>
-              <form id="checkoutForm" class="checkout-form">
-                <input id="checkoutName" type="text" autocomplete="name" placeholder="Customer name" />
-                <input id="checkoutEmail" type="email" autocomplete="email" placeholder="Customer email" />
-                <input id="checkoutCompany" type="text" autocomplete="organization" placeholder="Company or institution" />
-                <button type="submit">Create bank-transfer order</button>
-              </form>
-              <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
-              <div class="backend-list">
-                <span>Backend included</span>
-                <ul id="backendFeatureList"></ul>
-              </div>
-            </section>
-          </div>
-        </section>
       </main>
     </div>
 
@@ -376,6 +357,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260714-axion-product-sidebar"></script>
+    <script type="module" src="./app.js?v=20260714-axion-twin-tool"></script>
   </body>
 </html>

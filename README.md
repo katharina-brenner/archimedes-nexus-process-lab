@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=axion-pixel-axolotl`.
+Then open `http://127.0.0.1:8899/index.html?v=axion-twin-tool`.
 
 ## Product-first workflow
 
@@ -21,26 +21,12 @@ The front of the application now works like a company-grade product entry flow:
 - Axion automatically maps the brief to the closest process model
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
 - A persistent help field lets users describe a problem in words and receive direct tool steps
-- Payment and license creation live in the `Billing` area, where users expect commercial access controls
 
-## Paid access workflow
+## Private workspace backend
 
-Axion now includes a Node backend for a professional license gate:
-
-- Price: `725 EUR`
-- Checkout creates a bank-transfer order and unique payment reference
-- Bank-account details are read from environment variables, not committed to Git
-- Owner/admin login can list pending orders
-- After the incoming transfer is verified, the admin endpoint marks the order paid
-- A license key is generated and can be used to unlock the tool
-
-Set these environment variables on the machine or hosting platform before selling live access:
+Axion includes a small Node backend for private workspace access, product briefs, uploaded data previews, Google login configuration, and contextual tool help. Set these environment variables on the machine or hosting platform:
 
 ```bash
-export BANK_ACCOUNT_HOLDER="Your account holder"
-export BANK_IBAN="Your IBAN"
-export BANK_BIC="Your BIC"
-export BANK_NAME="Your bank"
 export AXION_ADMIN_USER="owner"
 export AXION_ADMIN_PASSWORD="set-a-private-password"
 export SESSION_SECRET="set-a-long-random-secret"
@@ -53,16 +39,13 @@ Google login uses Google Identity Services in the browser and verifies the retur
 
 ## Backend API
 
-- `GET /api/product` lists product, price, bank-transfer configuration, and backend features
-- `POST /api/checkout` creates a 725 EUR bank-transfer order
-- `POST /api/auth/login` logs in the owner or an activated license holder
+- `GET /api/product` lists product and backend configuration
+- `POST /api/auth/login` logs in the owner workspace
 - `GET /api/auth/google-config` tells the frontend whether Google login is configured
 - `POST /api/auth/google` verifies a Google ID token and creates a server session
 - `GET /api/account` verifies a server session
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
-- `GET /api/admin/orders` lists orders and licenses for the owner
-- `POST /api/admin/orders/:id/mark-paid` marks an order paid and creates an active license key
 
 ## What is included
 
@@ -70,6 +53,7 @@ Google login uses Google Identity Services in the browser and verifies the retur
 - Natural-language product brief that chooses the process model automatically, so users do not have to manually choose between template families
 - Data upload capture for project briefs, including file metadata and short previews for CSV, text, JSON, and other attached data
 - Persistent help dock for natural-language troubleshooting inside the tool
+- Twin OS workspace for clickable factory-to-cell-model navigation, live-data connector mapping, process-version comparison, SOP/literature attachment, and AI-assisted process variants
 - Scale presets for lab, pilot, demo, and commercial designs
 - Click-to-add and drag-and-drop unit-operation library with 120+ ISO/PFD-style pharmaceutical, biochemical, environmental, packaging, utilities, wastewater, water-purification, air-pollution, resource, report, recycling, heat-reuse, cleaning, and documentation items
 - Granular process flowsheets with visible process-role badges for main process, support, CIP/SIP cleaning, recycle/reuse, heat reuse, waste/emissions, and QC/data elements

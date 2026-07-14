@@ -1678,6 +1678,34 @@ const spdFunctions = [
   { group: "Resources", name: "Main vs support process role model", status: "Implemented", inputs: "Unit class, stream class, utilities, cleaning, recycle, heat, QC, waste", output: "Visible unit role badges and support infrastructure layer", note: "Makes the core process visually distinct from utilities, cleaning, resource, heat-reuse, recycle, waste, and QC/data elements." },
 ];
 
+const twinWorkspace = {
+  hierarchy: [
+    { level: "Factory", focus: "Plant-wide throughput, utilities, emissions, scheduling, cost, LCA", view: "overview" },
+    { level: "Building", focus: "GMP zones, cleanroom classification, pressure cascade, material/personnel flows", view: "standards" },
+    { level: "Room", focus: "Suite layout, HVAC, WFI, clean steam, waste handling, biosafety boundaries", view: "flowsheet" },
+    { level: "Bioreactor", focus: "kLa, OUR, pH, DO, feed, ammonium, lactate, temperature, heat load", view: "cfd" },
+    { level: "Impeller", focus: "Mixing time, shear, sparging, gas-liquid transfer, dead zones", view: "cfd" },
+    { level: "Mass Transfer", focus: "Oxygen, nutrient, metabolite gradients, scale-up risk, soft sensors", view: "ai" },
+    { level: "Cell Model", focus: "Growth, viability, product formation, waste metabolites, CQAs", view: "equations" },
+  ],
+  modules: [
+    { name: "Live collaboration", status: "Tool module", detail: "Shared process workspace with comments, assignments, presence, review states, and approval gates.", action: "Open overview", view: "overview" },
+    { name: "Git-style process versions", status: "Tool module", detail: "Branches for alternative process variants, diff of equipment/streams/parameters, and merge-ready decisions.", action: "Export model", view: "reports" },
+    { name: "Live data connectors", status: "Connector map", detail: "SCADA, OSIsoft PI, Historian, OPC UA, CSV uploads, sensor streams, and batch records.", action: "Open streams", view: "streams" },
+    { name: "Literature layer", status: "Tool module", detail: "Recommended papers, typical OUR, typical kLa, best practices, and source-backed unit assumptions.", action: "Open sources", view: "sources" },
+    { name: "SOP and knowledge base", status: "Tool module", detail: "Attach SOPs, deviations, assumptions, validation notes, and experiment learnings to units and streams.", action: "Open recommendations", view: "recommendations" },
+    { name: "AI Engineer", status: "Tool module", detail: "Natural-language prompts propose process variants such as media-cost reduction, oxygen-transfer fixes, or yield improvements.", action: "Ask help", view: "ai" },
+    { name: "Equipment cost model", status: "Tool module", detail: "Equipment sizing, purchase curves, region, inflation, uncertainty, and validation burden as editable cost inputs.", action: "Open economics", view: "economics" },
+    { name: "Sustainability model", status: "Tool module", detail: "CO2, energy, water, waste, solvent recovery, heat reuse, and LCA-style indicators integrated with process flows.", action: "Open boundaries", view: "ai" },
+  ],
+  aiPrompts: [
+    "How can I reduce media cost by 20% without lowering viable cell density?",
+    "Find the highest-risk scale-up boundary in this bioreactor train.",
+    "Create a lower-water-use version with CIP rinse recovery and heat reuse.",
+    "Compare a stainless-steel 20,000 L train against parallel single-use 2,000 L trains.",
+  ],
+};
+
 const state = {
   template: "culturedMeat",
   scale: "pilot",
@@ -1754,11 +1782,11 @@ const els = {
   standardsList: document.querySelector("#standardsList"),
   sourcesBoard: document.querySelector("#sourcesBoard"),
   recommendationsBoard: document.querySelector("#recommendationsBoard"),
+  twinBoard: document.querySelector("#twinBoard"),
   costStack: document.querySelector("#costStack"),
   costNarrative: document.querySelector("#costNarrative"),
   economicDetails: document.querySelector("#economicDetails"),
   reportsBoard: document.querySelector("#reportsBoard"),
-  billingBoard: document.querySelector("#billingBoard"),
   modeHint: document.querySelector("#modeHint"),
   toast: document.querySelector("#toast"),
   helpDock: document.querySelector("#helpDock"),
@@ -1775,13 +1803,6 @@ const els = {
   googleLoginFallback: document.querySelector("#googleLoginFallback"),
   googleButtonMount: document.querySelector("#googleButtonMount"),
   googleLoginStatus: document.querySelector("#googleLoginStatus"),
-  checkoutForm: document.querySelector("#checkoutForm"),
-  checkoutName: document.querySelector("#checkoutName"),
-  checkoutEmail: document.querySelector("#checkoutEmail"),
-  checkoutCompany: document.querySelector("#checkoutCompany"),
-  checkoutResult: document.querySelector("#checkoutResult"),
-  licensePrice: document.querySelector("#licensePrice"),
-  backendFeatureList: document.querySelector("#backendFeatureList"),
   logoutButton: document.querySelector("#logoutButton"),
 };
 
@@ -3613,6 +3634,7 @@ function comprehensiveReport() {
     standards,
     sources: scientificSources,
     recommendations: simulationReadinessItems(),
+    twinWorkspace,
   };
 }
 
@@ -3652,9 +3674,9 @@ function pageTitle(view) {
     standards: "Standards",
     sources: "Scientific Data",
     recommendations: "Readiness Roadmap",
+    twin: "Twin OS",
     economics: "Economics",
     reports: "Downloads",
-    billing: "Billing",
   }[view] || "Choose Process";
 }
 
@@ -3842,6 +3864,49 @@ function renderRecommendations() {
     </section>
     <section class="source-card-grid">
       ${renderSourceCards(scientificSources.filter((item) => ["Merck", "FDA", "ICH", "ICS", "Paper", "Industry"].includes(item.group)), true)}
+    </section>
+  `;
+}
+
+function renderTwinWorkspace() {
+  const active = activeTemplate();
+  els.twinBoard.innerHTML = `
+    <section class="twin-hero">
+      <div>
+        <p>Process operating workspace</p>
+        <h3>Figma + Git-style process engineering for ${active.label}</h3>
+        <span>Use this as the working layer around the flowsheet: navigate from factory to cell model, connect live data, compare versions, attach literature and SOPs, and ask Axion to generate engineering variants.</span>
+      </div>
+      <button class="action-button primary" data-jump-view="flowsheet" type="button">Open process canvas</button>
+    </section>
+    <section class="twin-hierarchy" aria-label="Clickable factory hierarchy">
+      ${twinWorkspace.hierarchy.map((item, index) => `
+        <button data-twin-view="${item.view}" type="button">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <strong>${item.level}</strong>
+          <small>${item.focus}</small>
+        </button>
+      `).join("")}
+    </section>
+    <section class="twin-module-grid">
+      ${twinWorkspace.modules.map((item) => `
+        <article>
+          <span>${item.status}</span>
+          <h3>${item.name}</h3>
+          <p>${item.detail}</p>
+          <button data-twin-view="${item.view}" type="button">${item.action}</button>
+        </article>
+      `).join("")}
+    </section>
+    <section class="twin-ai-engineer">
+      <div>
+        <span>AI Engineer prompts</span>
+        <h3>Turn engineering questions into process variants</h3>
+        <p>These prompts move into the help dock so Axion can guide you to the right module and first model edits.</p>
+      </div>
+      <div>
+        ${twinWorkspace.aiPrompts.map((prompt) => `<button data-twin-prompt="${escapeAttr(prompt)}" type="button">${prompt}</button>`).join("")}
+      </div>
     </section>
   `;
 }
@@ -4055,16 +4120,10 @@ function storeSession(token) {
 }
 
 function renderProductConfig(config) {
-  if (els.licensePrice) els.licensePrice.textContent = config.amountFormatted || "725 EUR";
-  if (els.backendFeatureList) {
-    els.backendFeatureList.innerHTML = (config.features || [])
-      .map((feature) => `<li>${feature}</li>`)
-      .join("");
-  }
   if (els.loginOrigin) {
-    els.loginOrigin.textContent = config.bankConfigured
-      ? "Backend online. Bank-transfer checkout is configured."
-      : "Backend online. Add bank-account environment variables before selling live licenses.";
+    els.loginOrigin.textContent = config?.productName
+      ? "Backend online. Private process workspace ready."
+      : "Backend online. Private workspace ready.";
   }
 }
 
@@ -4134,25 +4193,6 @@ async function setupGoogleLogin() {
     els.googleLoginFallback.disabled = true;
     els.googleLoginStatus.textContent = `Google login unavailable: ${error.message}`;
   }
-}
-
-function renderCheckoutResult(result) {
-  if (!els.checkoutResult) return;
-  const payment = result.payment;
-  const order = result.order;
-  els.checkoutResult.innerHTML = `
-    <strong>Order created: ${order.reference}</strong>
-    <dl>
-      <dt>Amount</dt><dd>${payment.amount.toFixed(2)} ${payment.currency}</dd>
-      <dt>Recipient</dt><dd>${payment.bank.accountHolder}</dd>
-      <dt>IBAN</dt><dd>${payment.bank.iban}</dd>
-      <dt>BIC</dt><dd>${payment.bank.bic}</dd>
-      <dt>Bank</dt><dd>${payment.bank.bankName}</dd>
-      <dt>Reference</dt><dd>${payment.reference}</dd>
-    </dl>
-    <p>${payment.instruction}</p>
-    ${payment.bankConfigured ? "" : "<em>Bank details are placeholders until BANK_ACCOUNT_HOLDER, BANK_IBAN, BANK_BIC, and BANK_NAME are set on the backend.</em>"}
-  `;
 }
 
 function fallbackHelp(prompt) {
@@ -4242,14 +4282,6 @@ async function loadProductConfig() {
     if (els.loginOrigin) {
       els.loginOrigin.textContent = "Backend offline. Start it with npm run backend.";
     }
-    if (els.backendFeatureList) {
-      els.backendFeatureList.innerHTML = [
-        "Node backend required for paid access",
-        "Bank-transfer checkout",
-        "Admin activation after payment",
-        "License-key login",
-      ].map((feature) => `<li>${feature}</li>`).join("");
-    }
   }
 }
 
@@ -4289,29 +4321,6 @@ function bindAuth() {
       showToast(`Logged in as ${payload.account.role}`);
     } catch (error) {
       els.loginError.textContent = error.message;
-    }
-  });
-
-  els.checkoutForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (els.checkoutResult) {
-      els.checkoutResult.innerHTML = "<p>Creating secure bank-transfer order...</p>";
-    }
-    try {
-      const result = await apiRequest("/api/checkout", {
-        method: "POST",
-        body: JSON.stringify({
-          customerName: els.checkoutName.value,
-          customerEmail: els.checkoutEmail.value,
-          company: els.checkoutCompany.value,
-        }),
-      });
-      renderCheckoutResult(result);
-      showToast("Order created");
-    } catch (error) {
-      if (els.checkoutResult) {
-        els.checkoutResult.innerHTML = `<p class="checkout-error">${error.message}</p>`;
-      }
     }
   });
 
@@ -4365,6 +4374,7 @@ function renderAll() {
   renderStandards();
   renderSources();
   renderRecommendations();
+  renderTwinWorkspace();
   renderEconomics();
   renderReportsBoard();
 }
@@ -4538,6 +4548,18 @@ function bindEvents() {
     const button = event.target.closest("[data-jump-view]");
     if (!button) return;
     setView(button.dataset.jumpView);
+  });
+
+  els.twinBoard.addEventListener("click", (event) => {
+    const promptButton = event.target.closest("[data-twin-prompt]");
+    if (promptButton) {
+      els.helpDock?.classList.add("open");
+      els.helpPrompt.value = promptButton.dataset.twinPrompt;
+      askToolHelp();
+      return;
+    }
+    const viewButton = event.target.closest("[data-twin-view]");
+    if (viewButton) setView(viewButton.dataset.twinView);
   });
 
   [els.batchSize, els.batchCount, els.titer, els.recovery].forEach((input) => {
