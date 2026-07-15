@@ -1377,76 +1377,48 @@ button {
 .technical-logo {
   overflow: hidden;
   background:
-    radial-gradient(circle at 72% 18%, rgba(31, 183, 166, 0.24), transparent 30%),
+    radial-gradient(circle at 72% 18%, rgba(117, 208, 199, 0.2), transparent 31%),
     linear-gradient(145deg, #0b1b31 0%, #123150 58%, #071426 100%);
-  image-rendering: pixelated;
+  image-rendering: auto;
   transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .technical-logo::before {
   content: "";
   position: absolute;
-  left: 7px;
-  top: 13px;
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: #75d0c7;
-  box-shadow:
-    0 7px #75d0c7,
-    0 14px #75d0c7,
-    5px -5px #1fb7a6,
-    5px 19px #1fb7a6,
-    30px 0 #75d0c7,
-    30px 7px #75d0c7,
-    30px 14px #75d0c7,
-    25px -5px #1fb7a6,
-    25px 19px #1fb7a6;
-  filter: drop-shadow(0 0 8px rgba(117, 208, 199, 0.32));
+  left: 9px;
+  top: 8px;
+  width: 27px;
+  height: 29px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fffaf0 0%, #d8e3e8 100%);
+  clip-path: polygon(50% 0%, 94% 100%, 71% 100%, 60% 72%, 40% 72%, 29% 100%, 6% 100%);
+  filter: drop-shadow(0 0 14px rgba(245, 241, 232, 0.22));
 }
 
 .technical-logo::after {
   content: "";
   position: absolute;
-  left: 19px;
-  top: 31px;
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
+  left: 17px;
+  top: 25px;
+  width: 11px;
+  height: 4px;
+  border-radius: 999px;
   background: #1fb7a6;
-  box-shadow:
-    5px -5px #1fb7a6,
-    10px -10px #75d0c7;
+  box-shadow: 0 0 14px rgba(31, 183, 166, 0.24);
 }
 
 .technical-logo span {
   position: absolute;
-  left: 12px;
-  top: 10px;
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: #eef8f6;
+  right: 9px;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0b1b31;
   box-shadow:
-    5px 0 #eef8f6,
-    10px 0 #eef8f6,
-    15px 0 #eef8f6,
-    0 5px #eef8f6,
-    5px 5px #0b1b31,
-    10px 5px #eef8f6,
-    15px 5px #0b1b31,
-    20px 5px #eef8f6,
-    0 10px #eef8f6,
-    5px 10px #eef8f6,
-    10px 10px #eef8f6,
-    15px 10px #eef8f6,
-    20px 10px #eef8f6,
-    5px 15px #d7e1e7,
-    10px 15px #eef8f6,
-    15px 15px #d7e1e7,
-    10px 20px #eef8f6,
-    15px 20px #eef8f6;
-  filter: drop-shadow(0 0 10px rgba(245, 241, 232, 0.16));
+    0 0 0 2px rgba(117, 208, 199, 0.76),
+    0 0 14px rgba(117, 208, 199, 0.18);
 }
 
 .brand h1,
