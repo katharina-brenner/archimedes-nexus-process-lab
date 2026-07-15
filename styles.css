@@ -213,8 +213,11 @@ body.show-public .app-shell {
 
 .hero-grid {
   position: absolute;
+  display: none;
   inset: 0;
-  opacity: 0.46;
+  opacity: 0.16;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 32%, transparent 58%);
+  pointer-events: none;
 }
 
 .hero-grid .node {
@@ -234,18 +237,18 @@ body.show-public .app-shell {
   font-weight: 900;
 }
 
-.node-feed { left: 14%; top: 18%; }
-.node-seed { left: 30%; top: 8%; }
+.node-feed { left: 8%; top: 18%; }
+.node-seed { left: 28%; top: 8%; }
 .node-reactor {
   left: 48%;
-  top: 11%;
+  top: 8%;
   min-width: 148px !important;
   min-height: 82px !important;
   border-color: rgba(117, 208, 199, 0.72) !important;
   color: #fff !important;
 }
-.node-purify { right: 14%; top: 16%; }
-.node-fill { right: 8%; top: 42%; }
+.node-purify { right: 13%; top: 12%; }
+.node-fill { right: 5%; top: 30%; }
 
 .hero-grid .flow {
   position: absolute;
@@ -257,10 +260,10 @@ body.show-public .app-shell {
   animation: pulseFlow 2.4s linear infinite;
 }
 
-.flow-a { left: 24%; top: 20%; width: 150px; transform: rotate(-14deg); }
+.flow-a { left: 18%; top: 20%; width: 150px; transform: rotate(-14deg); }
 .flow-b { left: 38%; top: 16%; width: 184px; transform: rotate(12deg); animation-delay: 0.4s; }
-.flow-c { left: 58%; top: 22%; width: 190px; transform: rotate(-12deg); animation-delay: 0.8s; }
-.flow-d { right: 12%; top: 37%; width: 132px; transform: rotate(44deg); animation-delay: 1.2s; }
+.flow-c { left: 58%; top: 19%; width: 190px; transform: rotate(-12deg); animation-delay: 0.8s; }
+.flow-d { right: 10%; top: 29%; width: 132px; transform: rotate(36deg); animation-delay: 1.2s; }
 
 @keyframes pulseFlow {
   0% { opacity: 0.22; filter: saturate(0.7); }
@@ -454,6 +457,85 @@ body.show-public .app-shell {
 .hero-outcome-panel b {
   color: #ecfffb;
   font-weight: 900;
+}
+
+.hero-process-ribbon {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(44px, 1fr) auto minmax(44px, 1fr) auto minmax(44px, 1fr) auto minmax(44px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: min(960px, 100%);
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid rgba(155, 231, 221, 0.2);
+  border-radius: 999px;
+  background: rgba(7, 26, 49, 0.58);
+  box-shadow:
+    0 22px 64px rgba(3, 14, 27, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.hero-process-ribbon span {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(160, 180, 206, 0.22);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #d8e7f3;
+  background: rgba(226, 238, 250, 0.075);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.hero-process-ribbon .process-core {
+  color: #06192c;
+  background: linear-gradient(135deg, #f2fffc, #9be7dd);
+  box-shadow: 0 0 24px rgba(117, 208, 199, 0.2);
+  animation: corePulse 2.2s ease-in-out infinite;
+}
+
+.hero-process-ribbon i {
+  position: relative;
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(155, 231, 221, 0.16);
+  overflow: hidden;
+}
+
+.hero-process-ribbon i::before,
+.hero-process-ribbon i::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -34%;
+  width: 34%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #9be7dd, transparent);
+  box-shadow: 0 0 16px rgba(155, 231, 221, 0.62);
+  animation: processMove 1.9s linear infinite;
+}
+
+.hero-process-ribbon i::after {
+  animation-delay: 0.95s;
+  opacity: 0.55;
+}
+
+@keyframes processMove {
+  0% { transform: translateX(0); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translateX(390%); opacity: 0; }
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: translateY(0); box-shadow: 0 0 18px rgba(117, 208, 199, 0.16); }
+  50% { transform: translateY(-1px); box-shadow: 0 0 34px rgba(117, 208, 199, 0.36); }
 }
 
 .hero-trust-strip {
@@ -1468,60 +1550,63 @@ button {
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 14px;
-  color: #f5f1e8;
+  border-radius: 12px;
+  color: #071426;
   font-weight: 800;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
     0 0 0 1px rgba(171, 190, 210, 0.24),
-    0 14px 28px rgba(4, 12, 24, 0.28);
+    0 14px 28px rgba(4, 12, 24, 0.26);
 }
 
 .technical-logo {
   overflow: hidden;
-  background:
-    radial-gradient(circle at 72% 18%, rgba(117, 208, 199, 0.2), transparent 31%),
-    linear-gradient(145deg, #0b1b31 0%, #123150 58%, #071426 100%);
-  image-rendering: auto;
+  background: linear-gradient(145deg, #fffdf7 0%, #e9edf0 100%);
+  image-rendering: pixelated;
   transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .technical-logo::before {
   content: "";
   position: absolute;
-  left: 9px;
-  top: 8px;
-  width: 27px;
-  height: 29px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #fffaf0 0%, #d8e3e8 100%);
-  clip-path: polygon(50% 0%, 94% 100%, 71% 100%, 60% 72%, 40% 72%, 29% 100%, 6% 100%);
-  filter: drop-shadow(0 0 14px rgba(245, 241, 232, 0.22));
+  left: 10px;
+  top: 15px;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: #030508;
+  box-shadow:
+    6px 0 #030508,
+    12px 0 #030508,
+    18px 0 #030508,
+    -6px 6px #030508,
+    0 6px #030508,
+    6px 6px #030508,
+    12px 6px #030508,
+    18px 6px #030508,
+    24px 6px #030508,
+    0 12px #030508,
+    6px 12px #030508,
+    12px 12px #030508,
+    18px 12px #030508,
+    -12px 6px #030508,
+    30px 6px #030508,
+    -6px -6px #030508,
+    24px -6px #030508,
+    -12px -12px #030508,
+    30px -12px #030508,
+    -6px 18px #030508,
+    24px 18px #030508;
+  transform: scale(0.88);
+  transform-origin: 18px 12px;
 }
 
 .technical-logo::after {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: 25px;
-  width: 11px;
-  height: 4px;
-  border-radius: 999px;
-  background: #1fb7a6;
-  box-shadow: 0 0 14px rgba(31, 183, 166, 0.24);
+  display: none;
 }
 
 .technical-logo span {
-  position: absolute;
-  right: 9px;
-  top: 7px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #0b1b31;
-  box-shadow:
-    0 0 0 2px rgba(117, 208, 199, 0.76),
-    0 0 14px rgba(117, 208, 199, 0.18);
+  display: none;
 }
 
 .brand h1,
