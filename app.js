@@ -399,6 +399,7 @@ const processParameters = [
   { key: "h2Crit", label: "Dissolved H2 crit.", unit: "mmol/L", min: 0.2, max: 8, step: 0.1, value: 2.2 },
   { key: "dilutionRate", label: "CSTR dilution", unit: "1/h", min: 0.01, max: 0.8, step: 0.01, value: 0.18 },
   { key: "recycleFraction", label: "Recycle fraction", unit: "%", min: 0, max: 95, step: 1, value: 35 },
+  { key: "heatRecovery", label: "Heat recovery", unit: "%", min: 0, max: 85, step: 1, value: 22 },
   { key: "co2Removal", label: "CO2 absorption", unit: "%", min: 20, max: 99, step: 1, value: 88 },
   { key: "bodRemoval", label: "BOD removal", unit: "%", min: 20, max: 99, step: 1, value: 92 },
   { key: "codRemoval", label: "COD removal", unit: "%", min: 20, max: 99, step: 1, value: 86 },
@@ -2132,6 +2133,16 @@ function unitPower(item) {
 }
 
 const balanceComponents = ["water", "substrate", "biomass", "product", "salts", "waste", "air", "cleaning"];
+const componentProperties = {
+  water: { label: "Water / WFI", cp: 4.18, density: 997, viscosity: 0.89, osmotic: 0, heatRelease: 0, source: "Engineering handbook placeholder at 25 C" },
+  substrate: { label: "Glucose / carbon substrate", cp: 1.54, density: 1540, viscosity: 1.1, osmotic: 5.55, heatRelease: 4.1, source: "Glucose solution engineering estimate" },
+  biomass: { label: "Wet biomass / cells", cp: 3.6, density: 1060, viscosity: 2.2, osmotic: 0.3, heatRelease: 0.8, source: "Biomass slurry engineering estimate" },
+  product: { label: "Bioproduct / protein", cp: 2.1, density: 1350, viscosity: 1.4, osmotic: 0.05, heatRelease: 0, source: "Protein solution engineering estimate" },
+  salts: { label: "Buffer salts", cp: 0.85, density: 2160, viscosity: 1.2, osmotic: 17.1, heatRelease: 0, source: "Mixed salts engineering estimate" },
+  waste: { label: "Dissolved waste / metabolites", cp: 2.7, density: 1100, viscosity: 1.7, osmotic: 8.5, heatRelease: 0.2, source: "Metabolite/waste engineering estimate" },
+  air: { label: "Air / process gas", cp: 1.01, density: 1.2, viscosity: 0.018, osmotic: 0, heatRelease: 0, source: "Dry air estimate" },
+  cleaning: { label: "CIP/SIP cleaning solution", cp: 3.85, density: 1040, viscosity: 1.15, osmotic: 12, heatRelease: 0, source: "Dilute NaOH/acid/rinse blend estimate" },
+};
 let massBalanceCache = { key: "", value: null };
 
 function massBalanceCacheKey() {
@@ -2157,6 +2168,38 @@ function zeroVector() {
 
 function vectorMass(vector) {
   return balanceComponents.reduce((sum, key) => sum + Math.max(0, Number(vector[key]) || 0), 0);
+}
+
+function vectorHeatCapacity(vector) {
+  return balanceComponents.reduce((sum, key) => sum + Math.max(0, vector[key] || 0) * (componentProperties[key]?.cp || 0), 0);
+}
+
+function vectorDensity(vector) {
+  const mass = vectorMass(vector);
+  if (!mass) return 0;
+  const volumeM3 = balanceComponents.reduce((sum, key) => {
+    const density = componentProperties[key]?.density || 1000;
+    return sum + Math.max(0, vector[key] || 0) / density;
+  }, 0);
+  return volumeM3 ? mass / volumeM3 : 0;
+}
+
+function vectorViscosity(vector) {
+  const mass = vectorMass(vector);
+  if (!mass) return 0;
+  return balanceComponents.reduce((sum, key) => {
+    const fraction = Math.max(0, vector[key] || 0) / mass;
+    return sum + fraction * (componentProperties[key]?.viscosity || 1);
+  }, 0);
+}
+
+function vectorOsmoticPressure(vector) {
+  const mass = vectorMass(vector);
+  if (!mass) return 0;
+  return balanceComponents.reduce((sum, key) => {
+    const fraction = Math.max(0, vector[key] || 0) / mass;
+    return sum + fraction * (componentProperties[key]?.osmotic || 0);
+  }, 0);
 }
 
 function addVector(target, source, factor = 1) {
@@ -2227,6 +2270,47 @@ function recoveryForUnit(unitItem) {
   if (unitLayer(unitItem) === "cleaning") return 0.9;
   if (["Waste", "Environmental", "Air pollution"].includes(cls)) return 0.05;
   return 0.99;
+}
+
+function targetTemperatureForUnit(unitItem) {
+  const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  if (text.includes("sip") || text.includes("steril") || unitItem.cls === "Sterilization") return 121.1;
+  if (text.includes("pasteur") || text.includes("heat") || unitItem.cls === "Thermal") return 65;
+  if (text.includes("cold") || text.includes("hold") || text.includes("storage")) return 8;
+  if (unitItem.cls === "Bioreactor") return state.params.temperature || 36.5;
+  return 25;
+}
+
+function estimateUnitEnergy(unitItem, inputVector, outputVector, wasteVector, generation) {
+  const targetTemperature = targetTemperatureForUnit(unitItem);
+  const inletTemperature = 22;
+  const deltaT = Math.abs(targetTemperature - inletTemperature);
+  const sensibleKwh = vectorHeatCapacity(inputVector) * deltaT / 3600;
+  const reactionKwh = unitItem.cls === "Bioreactor"
+    ? balanceComponents.reduce((sum, key) => sum + (inputVector[key] || 0) * (componentProperties[key]?.heatRelease || 0), 0) * 0.18
+    : generation * 0.04;
+  const mechanicalKwh = unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(0.25, unitItem.residence);
+  const separationKwh = ["Filtration", "Solid-liquid", "Separation", "Purification", "Recovery", "Concentration"].includes(unitItem.cls)
+    ? vectorMass(outputVector) * 0.006 + vectorMass(wasteVector) * 0.003
+    : 0;
+  const recoverableKwh = ["Thermal", "Sterilization", "Preparation", "Utilities"].includes(unitItem.cls)
+    ? sensibleKwh * (state.params.heatRecovery || 0) / 100
+    : 0;
+  const grossKwh = sensibleKwh + reactionKwh + mechanicalKwh + separationKwh;
+  const netKwh = Math.max(0, grossKwh - recoverableKwh);
+  return {
+    targetTemperature,
+    sensibleKwh,
+    reactionKwh,
+    mechanicalKwh,
+    separationKwh,
+    recoverableKwh,
+    grossKwh,
+    netKwh,
+    densityKgM3: vectorDensity(outputVector),
+    viscosityCp: vectorViscosity(outputVector),
+    osmoticIndex: vectorOsmoticPressure(outputVector),
+  };
 }
 
 function solveUnitBalance(unitItem, inputVector, data) {
@@ -2306,9 +2390,13 @@ function solveMassBalance() {
   const streamMap = {};
   const unitMap = {};
   const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
-  const recycleWarnings = [];
+  const recycleStreamIds = new Set();
+  const convergenceHistory = [];
+  const tolerance = Math.max(0.0005, (state.params.zeroFlowThreshold || 0.1) / Math.max(1, state.batchSize));
+  let iterationCount = 0;
 
-  for (let pass = 0; pass < 4; pass += 1) {
+  for (let pass = 0; pass < 28; pass += 1) {
+    let passMaxDelta = 0;
     orderedUnits.forEach((unitItem) => {
       const incoming = state.streams.filter((streamItem) => streamItem.to === unitItem.id);
       const outgoing = state.streams.filter((streamItem) => streamItem.from === unitItem.id);
@@ -2340,19 +2428,33 @@ function solveMassBalance() {
         else if (kind === "utility") utilityStreams.push(streamItem);
         else if (kind === "qc") qcStreams.push(streamItem);
         else mainStreams.push(streamItem);
-        if (to && to.x < unitItem.x) recycleWarnings.push(`${streamItem.id} recycle/tear stream is solved with single-pass relaxation.`);
+        if (to && to.x < unitItem.x) recycleStreamIds.add(streamItem.id);
       });
 
       const assignStream = (streamItem, vector, kind, divider) => {
-        const components = scaleVector(vector, divider ? 1 / divider : 1);
+        const to = state.units.find((candidate) => candidate.id === streamItem.to);
+        const isRecycle = to && to.x < unitItem.x;
+        let targetComponents = scaleVector(vector, divider ? 1 / divider : 1);
+        if (isRecycle) targetComponents = scaleVector(targetComponents, Math.min(0.95, Math.max(0, (state.params.recycleFraction || 0) / 100)));
+        const previousComponents = streamMap[streamItem.id]?.components;
+        let components = targetComponents;
+        if (isRecycle && previousComponents) {
+          components = scaleVector(previousComponents, 0.35);
+          addVector(components, targetComponents, 0.65);
+        }
+        const previousMass = previousComponents ? vectorMass(previousComponents) : 0;
+        const nextMass = vectorMass(components);
+        if (isRecycle) {
+          passMaxDelta = Math.max(passMaxDelta, Math.abs(nextMass - previousMass) / Math.max(1, nextMass, previousMass));
+        }
         streamMap[streamItem.id] = {
           ...streamItem,
           role: streamLabel(kind),
-          massFlow: vectorMass(components),
-          annualMass: vectorMass(components) * state.batchCount,
+          massFlow: nextMass,
+          annualMass: nextMass * state.batchCount,
           components,
           componentText: componentSummary(components),
-          solverStatus: usedSource ? "Source estimated" : "Solved",
+          solverStatus: isRecycle ? "Relaxed recycle" : usedSource ? "Source estimated" : "Solved",
         };
       };
 
@@ -2375,6 +2477,7 @@ function solveMassBalance() {
       const closurePct = solvedUnit.inputMass + solvedUnit.generation
         ? Math.max(0, 100 - Math.abs(massGap) / Math.max(1, solvedUnit.inputMass + solvedUnit.generation) * 100)
         : 100;
+      const energy = estimateUnitEnergy(unitItem, inputVector, solvedUnit.output, solvedUnit.wasteVector, solvedUnit.generation);
 
       unitMap[unitItem.id] = {
         tag: unitItem.id,
@@ -2388,8 +2491,14 @@ function solveMassBalance() {
         massOut: materialOut,
         massGap,
         closurePct,
-        heatDuty: unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(1, unitItem.residence),
+        heatDuty: energy.netKwh,
+        grossHeatDuty: energy.grossKwh,
+        recoveredHeat: energy.recoverableKwh,
         power: unitItem.powerFactor,
+        targetTemperature: energy.targetTemperature,
+        densityKgM3: energy.densityKgM3,
+        viscosityCp: energy.viscosityCp,
+        osmoticIndex: energy.osmoticIndex,
         equation: unitReactions(unitItem)[0]?.formula || "Σm_in + generation = Σm_out + loss + accumulation",
         equations: unitReactions(unitItem).map((item) => item.title).join("; "),
         componentsIn: componentSummary(inputVector),
@@ -2398,6 +2507,9 @@ function solveMassBalance() {
         warnings: solvedUnit.warnings.join("; "),
       };
     });
+    convergenceHistory.push(passMaxDelta);
+    iterationCount = pass + 1;
+    if (pass > 1 && passMaxDelta < tolerance) break;
   }
 
   const units = state.units.map((unitItem) => unitMap[unitItem.id]).filter(Boolean);
@@ -2415,6 +2527,9 @@ function solveMassBalance() {
     ? Math.max(0, 100 - totals.absGap / Math.max(1, totals.massIn + totals.generation) * 100)
     : 100;
   totals.solvedStreams = streams.length;
+  totals.netHeatDuty = units.reduce((sum, item) => sum + (item.heatDuty || 0), 0);
+  totals.grossHeatDuty = units.reduce((sum, item) => sum + (item.grossHeatDuty || 0), 0);
+  totals.recoveredHeat = units.reduce((sum, item) => sum + (item.recoveredHeat || 0), 0);
 
   const result = {
     basis: "kg/batch",
@@ -2423,7 +2538,18 @@ function solveMassBalance() {
     units,
     streams,
     totals,
-    warnings: [...new Set(recycleWarnings)].slice(0, 8),
+    convergence: {
+      iterations: iterationCount,
+      tolerance,
+      maxRelativeDelta: convergenceHistory.at(-1) || 0,
+      history: convergenceHistory,
+      recycleStreams: [...recycleStreamIds],
+      converged: !recycleStreamIds.size || (convergenceHistory.at(-1) || 0) < tolerance,
+    },
+    warnings: recycleStreamIds.size && (convergenceHistory.at(-1) || 0) >= tolerance
+      ? [`Recycle solver stopped after ${iterationCount} iterations at ${formatNumber((convergenceHistory.at(-1) || 0) * 100, 3)}% relative delta.`]
+      : [],
+    properties: componentProperties,
   };
   massBalanceCache = { key: cacheKey, value: result };
   return result;
@@ -2470,6 +2596,9 @@ function streamRows() {
       nominalDescription: item.composition,
       phase: item.phase,
       solverStatus: solvedStream?.solverStatus || "Estimated",
+      densityKgM3: solvedStream?.components ? vectorDensity(solvedStream.components) : "",
+      viscosityCp: solvedStream?.components ? vectorViscosity(solvedStream.components) : "",
+      osmoticIndex: solvedStream?.components ? vectorOsmoticPressure(solvedStream.components) : "",
     };
   });
 }
@@ -2619,7 +2748,7 @@ function boundarySummary() {
 function parameterGroup(item) {
   if (item.custom) return "Custom user parameters";
   if (["ph", "osmolality", "temperature", "viability", "cellDensity", "doublingTime", "specificGrowth", "biomassYield"].includes(item.key)) return "Cell physiology";
-  if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density"].includes(item.key)) return "Transfer + rheology";
+  if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density", "heatRecovery"].includes(item.key)) return "Transfer + rheology";
   if (["perfusionRate", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
   if (["cipTime", "sipHold", "sterilityAssurance", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit"].includes(item.key)) return "GMP + cleaning";
   if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction"].includes(item.key)) return "Scale-up + economics";
@@ -3291,7 +3420,6 @@ function renderSimulationBoard() {
   const p = state.params;
   const data = metrics();
   const solved = solveMassBalance();
-  const convergenceError = Math.max(0.0001, (100 - p.recycleFraction) / 100000);
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
   const groups = [...new Set(spdFunctions.map((item) => item.group))];
@@ -3300,11 +3428,11 @@ function renderSimulationBoard() {
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
-      <article><span>Solver</span><strong>Mass balance v0</strong></article>
+      <article><span>Solver</span><strong>Mass + energy v1</strong></article>
       <article><span>Closure</span><strong class="${solved.totals.closurePct < 98 ? "risk" : "ok"}">${formatNumber(solved.totals.closurePct, 2)}%</strong></article>
       <article><span>Solved streams</span><strong>${solved.totals.solvedStreams}/${state.streams.length}</strong></article>
-      <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / batch</strong></article>
-      <article><span>Warnings</span><strong class="${solved.totals.warningCount || solved.warnings.length ? "risk" : "ok"}">${solved.totals.warningCount + solved.warnings.length}</strong></article>
+      <article><span>Recycle convergence</span><strong class="${solved.convergence.converged ? "ok" : "risk"}">${formatNumber(solved.convergence.maxRelativeDelta * 100, 3)}%</strong></article>
+      <article><span>Net heat duty</span><strong>${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch</strong></article>
     </section>
     <section class="operation-sequence">
       <h3>Deterministic process balance</h3>
@@ -3312,11 +3440,18 @@ function renderSimulationBoard() {
         <span>Component vectors</span>
         <span>Step recovery</span>
         <span>Bioreaction generation</span>
-        <span>Waste split</span>
-        <span>Utility side-flow</span>
+        <span>Recycle relaxation</span>
+        <span>Property package</span>
         <span>CSV export</span>
       </div>
-      <p>Basis: ${solved.basis}. This is a first engineering solver: it computes sequential water, substrate, biomass, product, salts, waste, air, and cleaning masses for every unit and stream.</p>
+      <p>Basis: ${solved.basis}. The engine computes water, substrate, biomass, product, salts, waste, air, and cleaning masses; then resolves recycle streams over ${solved.convergence.iterations} iterations and estimates heat duty from Cp, target temperature, heat recovery, and step operation class.</p>
+    </section>
+    <section class="simulation-summary">
+      <article><span>Gross heat</span><strong>${formatNumber(solved.totals.grossHeatDuty, 1)} kWh/batch</strong></article>
+      <article><span>Recovered heat</span><strong>${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch</strong></article>
+      <article><span>Recycle streams</span><strong>${solved.convergence.recycleStreams.length}</strong></article>
+      <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / batch</strong></article>
+      <article><span>Warnings</span><strong class="${solved.totals.warningCount || solved.warnings.length ? "risk" : "ok"}">${solved.totals.warningCount + solved.warnings.length}</strong></article>
     </section>
     <section class="simulation-group">
       <h3>Largest computed flows</h3>
@@ -3367,7 +3502,7 @@ function renderSimulationBoard() {
     ` : ""}
     <section class="simulation-summary">
       <article><span>Mode</span><strong>${state.template === "biohydrogen" ? "Continuous DF + recycle" : "Hybrid batch/continuous"}</strong></article>
-      <article><span>Tear convergence target</span><strong>${formatNumber(convergenceError * 100, 4)}%</strong></article>
+      <article><span>Tear convergence target</span><strong>${formatNumber(solved.convergence.tolerance * 100, 4)}%</strong></article>
       <article><span>CSTR washout</span><strong class="${washout ? "risk" : "ok"}">${washout ? "Risk" : "Clear"}</strong></article>
       <article><span>CO2 absorption</span><strong>${formatNumber(p.co2Removal, 0)}%</strong></article>
       <article><span>Adjusted output</span><strong>${formatMass(data.annualKg * (1 + absorptionBoost))}</strong></article>
@@ -3985,7 +4120,13 @@ function balanceRows() {
     massOutKgBatch: item.massOut,
     massGapKgBatch: item.massGap,
     closurePct: item.closurePct,
-    heatDutyKwhBatch: item.heatDuty,
+    netHeatDutyKwhBatch: item.heatDuty,
+    grossHeatDutyKwhBatch: item.grossHeatDuty,
+    recoveredHeatKwhBatch: item.recoveredHeat,
+    targetTemperatureC: item.targetTemperature,
+    densityKgM3: item.densityKgM3,
+    viscosityCp: item.viscosityCp,
+    osmoticIndex: item.osmoticIndex,
     powerFactor: item.power,
     componentsIn: item.componentsIn,
     componentsOut: item.componentsOut,
@@ -4032,6 +4173,7 @@ function comprehensiveReport() {
     },
     metrics: metrics(),
     solver: solved,
+    propertyPackage: componentProperties,
     equipment: state.units,
     streams: streamRows(),
     balances: balanceRows(),
@@ -4064,7 +4206,7 @@ function renderReportsBoard() {
       <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
       <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
-      <article><span>CFD screening</span><strong>${report.cfd.length}</strong><p>Bioreactor O2, nutrient, shear, and hotspot risk maps are shown interactively in the CFD workbench.</p><button data-jump-view="cfd" type="button">Open CFD</button></article>
+      <article><span>Property package</span><strong>${Object.keys(componentProperties).length}</strong><p>Cp, density, viscosity, osmotic index, heat-release placeholders, and source notes used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -4163,6 +4305,7 @@ function renderOverview() {
 
 function simulationReadinessItems() {
   const data = metrics();
+  const solved = solveMassBalance();
   const boundaryItems = evaluatePhysicalBoundaries()
     .filter((item) => item.severity !== "ok")
     .map((item) => ({
@@ -4175,21 +4318,21 @@ function simulationReadinessItems() {
     ...boundaryItems,
     {
       group: "Thermodynamics",
-      status: "Must add for full simulator",
+      status: "Partially covered",
       title: "Component property database",
-      detail: "Add temperature-dependent Cp, density, viscosity, vapor pressure, activity coefficients, osmolarity, Henry constants, solubility, and ionic strength for every component and buffer.",
+      detail: `A property-package v0 now supplies Cp, density, viscosity, osmotic index, and heat-release proxies for ${Object.keys(componentProperties).length} component classes. Full simulation still needs temperature-dependent properties, vapor pressure, activity coefficients, Henry constants, solubility, ionic strength, and buffer-specific data.`,
     },
     {
       group: "Mass balance",
       status: "Partially covered",
       title: "Component-resolved stream vectors",
-      detail: `A deterministic v0 solver now resolves water, substrate, biomass, product, salts, waste, air, and cleaning masses across ${state.streams.length} streams. Full simulation still needs validated component property data, impurities, HCP/DNA/metabolites, recycle convergence, and time profiles.`,
+      detail: `A deterministic v1 solver resolves water, substrate, biomass, product, salts, waste, air, and cleaning masses across ${state.streams.length} streams with recycle relaxation over ${solved.convergence.iterations} iterations. Full simulation still needs impurities, HCP/DNA/metabolites, rigorous nonlinear convergence, and time profiles.`,
     },
     {
       group: "Energy balance",
       status: "Partially covered",
       title: "Dynamic heat and utility network",
-      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh. Add time-resolved heating/cooling curves, heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
+      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh, while the solver estimates ${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch net heat duty after ${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch heat recovery. Add time-resolved heating/cooling curves, heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
     },
     {
       group: "Reaction and kinetics",
@@ -4421,6 +4564,10 @@ function downloadSummaryCsv() {
     { metric: "Utilities", value: data.utilities, unit: "MWh/yr" },
     { metric: "Plant utilization", value: data.utilization, unit: "%" },
     { metric: "Mass balance closure", value: solved.totals.closurePct, unit: "%" },
+    { metric: "Recycle convergence", value: solved.convergence.maxRelativeDelta * 100, unit: "% relative delta" },
+    { metric: "Recycle iterations", value: solved.convergence.iterations, unit: "iterations" },
+    { metric: "Net heat duty", value: solved.totals.netHeatDuty, unit: "kWh/batch" },
+    { metric: "Recovered heat", value: solved.totals.recoveredHeat, unit: "kWh/batch" },
     { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
     { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
@@ -4432,7 +4579,7 @@ function downloadSummaryCsv() {
 
 function downloadStreamsCsv() {
   const rows = streamRows();
-  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "massFlowKgBatch", "annualMassKg", "components", "nominalDescription", "phase", "solverStatus"];
+  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "massFlowKgBatch", "annualMassKg", "components", "nominalDescription", "phase", "solverStatus", "densityKgM3", "viscosityCp", "osmoticIndex"];
   const csv = [
     headers.map(csvEscape).join(","),
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
@@ -4460,6 +4607,17 @@ function handleReportDownload(type) {
       max: item.max,
       custom: item.custom ? "yes" : "no",
       group: parameterGroup(item),
+    })));
+  } else if (type === "properties-csv") {
+    downloadCsv(`${state.template}-property-package.csv`, Object.entries(componentProperties).map(([key, value]) => ({
+      component: key,
+      label: value.label,
+      cpKjKgK: value.cp,
+      densityKgM3: value.density,
+      viscosityCp: value.viscosity,
+      osmoticIndex: value.osmotic,
+      heatReleaseKwhKgProxy: value.heatRelease,
+      source: value.source,
     })));
   }
   showToast("Download prepared");
