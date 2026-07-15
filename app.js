@@ -4653,7 +4653,10 @@ function lockApp() {
 const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
 const staticAuth = {
   token: "axion-static-session-v1",
-  passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9",
+  users: [
+    { user: "kbrenner", passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9" },
+    { user: "mahmed", passwordHash: "5626696e19ac4b81318bf2bdc4af05efb210da38a29f0cc395eeda1c37d11ede" },
+  ],
 };
 let staticAccessMode = false;
 
@@ -4663,8 +4666,10 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function staticPasswordMatches(password) {
-  return (await sha256Hex(password)) === staticAuth.passwordHash;
+async function staticPasswordMatches(user, password) {
+  const normalizedUser = user.trim().toLowerCase();
+  const passwordHash = await sha256Hex(password);
+  return staticAuth.users.some((candidate) => candidate.user === normalizedUser && candidate.passwordHash === passwordHash);
 }
 
 async function apiRequest(path, options = {}) {
@@ -4969,7 +4974,7 @@ function bindAuth() {
     const password = els.loginPassword.value.trim();
     els.loginError.textContent = "";
     if (staticAccessMode) {
-      if (await staticPasswordMatches(password)) {
+      if (await staticPasswordMatches(user, password)) {
         storeSession(staticAuth.token);
         els.loginPassword.value = "";
         unlockApp();
@@ -4989,7 +4994,7 @@ function bindAuth() {
       unlockApp();
       showToast(`Logged in as ${payload.account.role}`);
     } catch (error) {
-      if (await staticPasswordMatches(password)) {
+      if (await staticPasswordMatches(user, password)) {
         storeSession(staticAuth.token);
         els.loginPassword.value = "";
         unlockApp();
