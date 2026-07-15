@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=recipe-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=dependencies-v1`.
 
 ## Online static access
 
@@ -67,7 +67,7 @@ Google login uses Google Identity Services in the browser and verifies the retur
 - Animated color-coded streams for main product flow, utilities, waste, QC/PAT/data paths, cleaning loops, heat-reuse loops, and recycle/purge loops
 - In-flowsheet equation spotlight that changes with the selected unit or stream and links into the full equation library
 - Interactive CFD workbench with visible bioreactor vessel, impellers, sparger, feed plume, oxygen/nutrient/shear maps, hotspot counts, and suggested engineering edits
-- Finite-capacity campaign scheduler with editable recipe timing, setup/process/CIP windows, parallel equipment pools, shared CIP/SIP skid constraints, equipment occupancy, hold-time warnings, QC release queue, bottleneck resources, and downloadable recipe/schedule/resource CSV files
+- Finite-capacity campaign scheduler with editable active/skip flags, predecessor dependencies, recipe timing, setup/process/CIP windows, parallel equipment pools, shared CIP/SIP skid constraints, equipment occupancy, hold-time warnings, QC release queue, bottleneck resources, and downloadable recipe/schedule/resource CSV files
 - SuperPro-style simulation functions from the referenced thesis and v12 manual: chemical/component register, stock mixtures, bulk/discrete streams, stream drawing and classification, procedures/operations, batch-vs-continuous mode, resource tracking, scheduling/Gantt concepts, feedback regulation, recycle loops, tear-stream convergence, breakpoints, throughput scale-up, debottlenecking, emissions, reports, databanks, and economic evaluation
 - Major remaining manual areas represented as model modules: cleaning-agent stream classification, CIP/SIP auxiliary occupancy, material inventory/storage charts, heat-transfer-agent tracking, heat reuse, condensate return, solvent and water recycle with purge, power demand/generation, labor requirement tables, process explorer/overview navigator, stream summary tables, physical-state and density toolboxes, pre-simulation checks, partition/sequencing/back-propagation, error/status output, visual annotation objects, Excel/OLE exchange concepts, report sets, database import/export/access control, currency/consumable/material/site databanks, process-library search, and emission limit checks
 - Biohydrogen-specific functions including potato-peel pre-treatment, enzymatic liquefaction/saccharification, rotary vacuum filtration, dark fermentation, anaerobic digestion, CO2 absorption/desorption, solvent recycle, osmotic inhibition, H2 inhibition, and CSTR washout checks

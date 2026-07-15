@@ -3012,6 +3012,28 @@ function recipeParallelUnits(unitItem) {
   return Math.max(1, Math.min(12, Math.round(recipeNumber(unitItem, "parallelUnits", 1, 1, 12))));
 }
 
+function orderedScheduleUnits() {
+  return [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+}
+
+function recipeActive(unitItem) {
+  return state.recipeOverrides[unitItem.id]?.active !== false;
+}
+
+function defaultRecipePredecessor(unitItem, orderedUnits = orderedScheduleUnits()) {
+  const index = orderedUnits.findIndex((item) => item.id === unitItem.id);
+  if (index <= 0) return "__batch_start";
+  const predecessor = orderedUnits.slice(0, index).reverse().find((item) => recipeActive(item));
+  return predecessor?.id || "__batch_start";
+}
+
+function recipePredecessor(unitItem, orderedUnits = orderedScheduleUnits()) {
+  const value = state.recipeOverrides[unitItem.id]?.predecessor;
+  if (value === "__batch_start") return value;
+  if (value && orderedUnits.some((item) => item.id === value)) return value;
+  return defaultRecipePredecessor(unitItem, orderedUnits);
+}
+
 function defaultScheduleOperationDuration(unitItem, data) {
   const p = state.params;
   const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
@@ -3062,11 +3084,12 @@ function scheduleSetupDuration(unitItem) {
 function campaignSchedule() {
   const p = state.params;
   const data = metrics();
-  const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const orderedUnits = orderedScheduleUnits();
+  const activeUnits = orderedUnits.filter((item) => recipeActive(item));
   const simulatedBatches = Math.min(12, Math.max(2, state.batchCount || 2));
   const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
   const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
-  const transferSlack = Math.max(0.05, (p.turnaroundTime || 8) / Math.max(8, orderedUnits.length * 2));
+  const transferSlack = Math.max(0.05, (p.turnaroundTime || 8) / Math.max(8, activeUnits.length * 2));
   const equipmentAvailable = {};
   const equipmentPools = {};
   const equipmentBusy = {};
@@ -3078,14 +3101,17 @@ function campaignSchedule() {
   let qcQueueAvailable = 0;
   const operations = [];
   const violations = [];
+  const dependencyWarnings = [];
   const batchReleases = [];
 
   for (let batchIndex = 0; batchIndex < simulatedBatches; batchIndex += 1) {
     const batchId = `B${String(batchIndex + 1).padStart(2, "0")}`;
-    let readyTime = batchIndex * plannedPitch;
+    const batchStartH = batchIndex * plannedPitch;
+    const dependencyDone = { __batch_start: batchStartH };
     let firstStart = null;
-    orderedUnits.forEach((unitItem, operationIndex) => {
+    activeUnits.forEach((unitItem, operationIndex) => {
       const group = scheduleUnitGroup(unitItem);
+      const predecessor = recipePredecessor(unitItem, orderedUnits);
       const setupH = scheduleSetupDuration(unitItem);
       const processH = scheduleOperationDuration(unitItem, data);
       const cleanH = scheduleCleaningDuration(unitItem);
@@ -3097,6 +3123,13 @@ function campaignSchedule() {
       const pool = equipmentPools[unitItem.id];
       const selectedSlot = pool.reduce((best, value, index) => value < pool[best] ? index : best, 0);
       const equipmentReady = pool[selectedSlot] || 0;
+      const dependencyReady = dependencyDone[predecessor];
+      const dependencyStatus = Number.isFinite(dependencyReady)
+        ? "linked"
+        : orderedUnits.some((item) => item.id === predecessor && !recipeActive(item))
+          ? "inactive predecessor"
+          : "unresolved predecessor";
+      const readyTime = (Number.isFinite(dependencyReady) ? dependencyReady : batchStartH) + (predecessor === "__batch_start" ? 0 : transferSlack);
       const startH = Math.max(readyTime, equipmentReady);
       const waitingH = Math.max(0, startH - readyTime);
       const processEndH = startH + setupH + processH;
@@ -3112,6 +3145,8 @@ function campaignSchedule() {
         operation: unitItem.name,
         class: unitItem.cls,
         group,
+        predecessor,
+        dependencyStatus,
         assignedEquipment: `${unitItem.id}${parallelUnits > 1 ? `-${selectedSlot + 1}/${parallelUnits}` : ""}`,
         parallelUnits,
         startH,
@@ -3138,9 +3173,12 @@ function campaignSchedule() {
       if (waitingH > holdLimit) {
         violations.push(`${batchId} ${unitItem.id}: waited ${formatNumber(waitingH, 1)} h before ${unitItem.name}`);
       }
-      readyTime = processEndH + transferSlack;
+      if (dependencyStatus !== "linked") {
+        dependencyWarnings.push(`${batchId} ${unitItem.id}: ${dependencyStatus} ${predecessor}`);
+      }
+      dependencyDone[unitItem.id] = processEndH;
     });
-    const finalProcessEnd = readyTime;
+    const finalProcessEnd = Math.max(...Object.entries(dependencyDone).filter(([key]) => key !== "__batch_start").map(([, value]) => value), batchStartH);
     const qcStart = Math.max(finalProcessEnd, qcQueueAvailable);
     const qcEnd = qcStart + Math.max(0, p.qcReleaseTime || 48);
     qcQueueAvailable = qcEnd;
@@ -3202,12 +3240,14 @@ function campaignSchedule() {
     batchTarget: state.batchCount,
     bottleneck,
     violations,
+    dependencyWarnings,
     operations,
     batchReleases,
     resourceRows,
     warnings: [
       feasibleAnnualBatches < state.batchCount ? `Schedule capacity supports ${feasibleAnnualBatches} of ${state.batchCount} target annual batches under the current AOT and uptime.` : "",
       violations.length ? `${violations.length} hold-time or waiting violations need recipe/suite review.` : "",
+      dependencyWarnings.length ? `${dependencyWarnings.length} dependency warnings need recipe review.` : "",
       bottleneck.occupancyPct > 92 ? `${bottleneck.tag} is above 92% occupancy in the simulated campaign.` : "",
     ].filter(Boolean),
   };
@@ -3221,6 +3261,8 @@ function scheduleOperationRows() {
     operation: item.operation,
     class: item.class,
     group: item.group,
+    predecessor: item.predecessor,
+    dependencyStatus: item.dependencyStatus,
     assignedEquipment: item.assignedEquipment,
     parallelUnits: item.parallelUnits,
     startH: item.startH,
@@ -3248,8 +3290,8 @@ function scheduleResourceRows() {
 
 function recipeEditorRows() {
   const data = metrics();
-  const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
-  const primaryClasses = new Set(["Preparation", "Bioreactor", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging", "Sterilization"]);
+  const orderedUnits = orderedScheduleUnits();
+  const primaryClasses = new Set(["Preparation", "Bioreactor", "Hold", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging", "Sterilization"]);
   const selected = state.selectedId ? orderedUnits.find((item) => item.id === state.selectedId) : null;
   const rows = orderedUnits.filter((item) => primaryClasses.has(item.cls) || unitLayer(item) === "cleaning").slice(0, 16);
   if (selected && !rows.some((item) => item.id === selected.id)) rows.unshift(selected);
@@ -3258,6 +3300,8 @@ function recipeEditorRows() {
     operation: unitItem.name,
     class: unitItem.cls,
     group: scheduleUnitGroup(unitItem),
+    active: recipeActive(unitItem),
+    predecessor: recipePredecessor(unitItem, orderedUnits),
     baseProcessH: defaultScheduleOperationDuration(unitItem, data),
     processH: scheduleOperationDuration(unitItem, data),
     setupH: scheduleSetupDuration(unitItem),
@@ -3278,8 +3322,11 @@ function applyRecipeInput(input) {
   const field = input.dataset.recipeField;
   const unit = state.units.find((item) => item.id === unitId);
   if (!unit) return false;
-  const value = field === "parallelUnits" ? Math.round(Number(input.value)) : Number(input.value);
-  if (!Number.isFinite(value)) return false;
+  let value;
+  if (field === "active") value = input.checked;
+  else if (field === "predecessor") value = input.value || "__batch_start";
+  else value = field === "parallelUnits" ? Math.round(Number(input.value)) : Number(input.value);
+  if (typeof value === "number" && !Number.isFinite(value)) return false;
   state.recipeOverrides[unitId] = { ...(state.recipeOverrides[unitId] || {}), [field]: value };
   return true;
 }
@@ -4281,14 +4328,16 @@ function renderSimulationBoard() {
       <h3>Editable recipe model</h3>
       <div class="recipe-editor-panel">
         <div class="recipe-editor-copy">
-          <span>Step 6 · recipe control</span>
-          <h4>Edit the generated recipe assumptions before scheduling</h4>
-          <p>Change process, setup, cleaning, and parallel equipment counts. The finite-capacity campaign schedule, bottleneck occupancy, warnings, and CSV exports update from these values.</p>
-          <button data-recipe-reset type="button">Reset recipe timing</button>
+          <span>Step 7 · dependencies + recipe control</span>
+          <h4>Edit the recipe sequence before scheduling</h4>
+          <p>Activate or skip steps, choose predecessor steps, and adjust process, setup, cleaning, and parallel equipment counts. The campaign schedule, bottlenecks, warnings, and CSV exports update from these values.</p>
+          <button data-recipe-reset type="button">Reset recipe model</button>
         </div>
         <div class="recipe-grid" role="table" aria-label="Editable recipe timing">
           <div class="recipe-grid-head" role="row">
             <span>Unit</span>
+            <span>Active</span>
+            <span>After</span>
             <span>Group</span>
             <span>Process h</span>
             <span>Setup h</span>
@@ -4296,8 +4345,15 @@ function renderSimulationBoard() {
             <span>Parallel</span>
           </div>
           ${recipeRows.map((item) => `
-            <div class="recipe-grid-row ${item.edited ? "edited" : ""}" role="row">
+            <div class="recipe-grid-row ${item.edited ? "edited" : ""} ${item.active ? "" : "inactive"}" role="row">
               <span><b>${item.tag}</b><small>${item.operation}</small></span>
+              <label class="recipe-active"><input data-recipe-field="active" data-recipe-unit="${item.tag}" type="checkbox" ${item.active ? "checked" : ""} /><small>${item.active ? "on" : "skip"}</small></label>
+              <label>
+                <select data-recipe-field="predecessor" data-recipe-unit="${item.tag}">
+                  <option value="__batch_start" ${item.predecessor === "__batch_start" ? "selected" : ""}>Batch start</option>
+                  ${recipeRows.filter((candidate) => candidate.tag !== item.tag).map((candidate) => `<option value="${candidate.tag}" ${item.predecessor === candidate.tag ? "selected" : ""}>${candidate.tag}</option>`).join("")}
+                </select>
+              </label>
               <span>${item.group}</span>
               <label><input data-recipe-field="processH" data-recipe-unit="${item.tag}" type="number" min="0.05" step="0.1" value="${item.processH.toFixed(2)}" /><small>base ${formatNumber(item.baseProcessH, 1)}</small></label>
               <label><input data-recipe-field="setupH" data-recipe-unit="${item.tag}" type="number" min="0" step="0.05" value="${item.setupH.toFixed(2)}" /></label>
@@ -5139,7 +5195,7 @@ function renderReportsBoard() {
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
-      <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
+      <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -5298,7 +5354,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs dependency editing, alternate-route assignment, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
+      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs alternate-route assignment, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
     },
     {
       group: "GMP validation",

@@ -5094,10 +5094,10 @@ th {
 .recipe-grid-head,
 .recipe-grid-row {
   display: grid;
-  grid-template-columns: minmax(126px, 1.15fr) minmax(104px, 0.9fr) repeat(4, minmax(78px, 0.62fr));
+  grid-template-columns: minmax(126px, 1.15fr) minmax(64px, 0.48fr) minmax(118px, 0.85fr) minmax(104px, 0.9fr) repeat(4, minmax(78px, 0.62fr));
   gap: 8px;
   align-items: center;
-  min-width: 760px;
+  min-width: 980px;
 }
 
 .recipe-grid-head {
@@ -5118,6 +5118,10 @@ th {
 .recipe-grid-row.edited {
   border-color: rgba(0, 168, 143, 0.42);
   background: rgba(0, 168, 143, 0.08);
+}
+
+.recipe-grid-row.inactive {
+  opacity: 0.62;
 }
 
 .recipe-grid-row > span {
@@ -5144,7 +5148,8 @@ th {
   min-width: 0;
 }
 
-.recipe-grid-row input {
+.recipe-grid-row input,
+.recipe-grid-row select {
   width: 100%;
   min-width: 0;
   height: 32px;
@@ -5155,6 +5160,17 @@ th {
   color: #07111f;
   font: inherit;
   font-size: 12px;
+}
+
+.recipe-grid-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.recipe-active {
+  align-items: center;
+  justify-items: start;
 }
 
 .standards-view.active {
