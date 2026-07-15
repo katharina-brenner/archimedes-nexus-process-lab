@@ -2272,6 +2272,13 @@ function recoveryForUnit(unitItem) {
   return 0.99;
 }
 
+function isRecycleStream(streamItem, fromUnit, toUnit, kind) {
+  const text = `${streamItem.id} ${streamItem.composition} ${fromUnit?.type || ""} ${fromUnit?.name || ""} ${toUnit?.type || ""} ${toUnit?.name || ""}`.toLowerCase();
+  const recycleIntent = ["recycle", "reuse", "recirc", "tear", "loop"].some((word) => text.includes(word));
+  const processRecycle = kind === "main" || text.includes("solvent recycle") || text.includes("water reuse");
+  return recycleIntent && processRecycle;
+}
+
 function targetTemperatureForUnit(unitItem) {
   const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
   if (text.includes("sip") || text.includes("steril") || unitItem.cls === "Sterilization") return 121.1;
@@ -2428,12 +2435,12 @@ function solveMassBalance() {
         else if (kind === "utility") utilityStreams.push(streamItem);
         else if (kind === "qc") qcStreams.push(streamItem);
         else mainStreams.push(streamItem);
-        if (to && to.x < unitItem.x) recycleStreamIds.add(streamItem.id);
+        if (isRecycleStream(streamItem, unitItem, to, kind)) recycleStreamIds.add(streamItem.id);
       });
 
       const assignStream = (streamItem, vector, kind, divider) => {
         const to = state.units.find((candidate) => candidate.id === streamItem.to);
-        const isRecycle = to && to.x < unitItem.x;
+        const isRecycle = isRecycleStream(streamItem, unitItem, to, kind);
         let targetComponents = scaleVector(vector, divider ? 1 / divider : 1);
         if (isRecycle) targetComponents = scaleVector(targetComponents, Math.min(0.95, Math.max(0, (state.params.recycleFraction || 0) / 100)));
         const previousComponents = streamMap[streamItem.id]?.components;
