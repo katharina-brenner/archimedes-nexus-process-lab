@@ -2670,6 +2670,110 @@ function solveMassBalance() {
   return result;
 }
 
+function dynamicBatchProfile() {
+  const data = metrics();
+  const solved = solveMassBalance();
+  const p = state.params;
+  const duration = Math.max(24, data.batchDuration + (p.setupTime || 0) + (p.turnaroundTime || 0));
+  const points = 49;
+  const productionStart = duration * 0.22;
+  const productionEnd = duration * 0.72;
+  const downstreamEnd = duration * 0.9;
+  const productTarget = Math.max(0.001, data.productPerBatchKg);
+  const biomassTarget = Math.max(0.1, state.batchSize * (p.cellDensity || 18) * 0.000004 * (p.viability || 90) / 100);
+  const feedBoost = Math.max(0, (p.feedRate || 0) / 100);
+  const baseSubstrate = Math.max(0.2, p.glucose || 4);
+  const maxHeatKw = Math.max(1, solved.totals.netHeatDuty / duration);
+  const rows = Array.from({ length: points }, (_, index) => {
+    const timeH = duration * index / (points - 1);
+    const progress = Math.max(0, Math.min(1, (timeH - productionStart) / Math.max(1, productionEnd - productionStart)));
+    const productionCurve = 1 / (1 + Math.exp(-10 * (progress - 0.52)));
+    const normalizedProduct = progress <= 0 ? 0 : Math.min(1, productionCurve);
+    const downstreamProgress = Math.max(0, Math.min(1, (timeH - productionEnd) / Math.max(1, downstreamEnd - productionEnd)));
+    const finalRecovery = (state.recovery || 75) / 100;
+    const recoveredFraction = timeH <= productionEnd ? normalizedProduct * 0.35 : 0.35 + downstreamProgress * (finalRecovery - 0.35);
+    const cellGrowth = Math.min(1, Math.max(0, (1 / (1 + Math.exp(-9 * (progress - 0.35))))));
+    const decay = timeH > productionEnd ? Math.min(0.28, (timeH - productionEnd) / duration * 0.55) : 0;
+    const viableDensity = Math.max(0, (p.cellDensity || 18) * cellGrowth * (p.viability || 90) / 100 * (1 - decay));
+    const substrate = Math.max(0.05, baseSubstrate * (1 - 0.82 * normalizedProduct) + feedBoost * baseSubstrate * Math.max(0, Math.sin(progress * Math.PI)) * 0.5);
+    const doValue = Math.max(5, Math.min(95, (p.doSetpoint || 40) - normalizedProduct * Math.max(4, (p.our || 4.5) * 2.4) + (p.kla || 65) * 0.035));
+    const lactate = Math.max(0, (p.lactate || 2) * normalizedProduct * (1.08 - (p.perfusionRate || 0) * 0.04));
+    const ammonia = Math.max(0, (p.ammonia || 2) * normalizedProduct * (1.05 + (p.glutamine || 3) * 0.035 - (p.perfusionRate || 0) * 0.05));
+    const heatShape = Math.max(0.12, Math.sin(Math.PI * Math.min(1, Math.max(0, (timeH - productionStart * 0.5) / Math.max(1, productionEnd - productionStart * 0.5)))));
+    const heatKw = maxHeatKw * (0.35 + heatShape * 1.15 + normalizedProduct * 0.25);
+    const cumulativeEnergyKwh = Math.min(solved.totals.netHeatDuty, solved.totals.netHeatDuty * (timeH / duration) * (0.72 + normalizedProduct * 0.28));
+    const phase = timeH < productionStart
+      ? "setup_seed_train"
+      : timeH < productionEnd
+        ? "production"
+        : timeH < downstreamEnd
+          ? "downstream_recovery"
+          : "cleaning_turnaround";
+    return {
+      timeH,
+      phase,
+      volumeL: state.batchSize * (0.72 + Math.min(0.28, feedBoost * progress)),
+      viableDensityMCellsMl: viableDensity,
+      substrateGL: substrate,
+      productKg: productTarget * normalizedProduct,
+      recoveredProductKg: productTarget * Math.max(0, Math.min(finalRecovery, recoveredFraction)),
+      biomassKg: biomassTarget * cellGrowth * (1 - decay),
+      dissolvedOxygenPct: doValue,
+      lactateGL: lactate,
+      ammoniaMm: ammonia,
+      heatLoadKw: heatKw,
+      cumulativeEnergyKwh,
+      recoveryPct: Math.max(0, Math.min(100, recoveredFraction * 100)),
+    };
+  });
+  const warnings = [
+    rows.some((row) => row.dissolvedOxygenPct < 20) ? "DO falls below 20% during the simulated production window." : "",
+    rows.some((row) => row.ammoniaMm > (isCellCultureTemplate() ? 6 : 10)) ? "Ammonium crosses the conservative hard-review boundary." : "",
+    rows.some((row) => row.lactateGL > 4) ? "Lactate crosses the conservative cell-culture review boundary." : "",
+  ].filter(Boolean);
+  return {
+    basis: "time-resolved batch profile v1",
+    durationH: duration,
+    points: rows,
+    warnings,
+    peakHeatKw: Math.max(...rows.map((row) => row.heatLoadKw)),
+    minDoPct: Math.min(...rows.map((row) => row.dissolvedOxygenPct)),
+    maxAmmoniaMm: Math.max(...rows.map((row) => row.ammoniaMm)),
+    finalRecoveredKg: rows.at(-1)?.recoveredProductKg || 0,
+  };
+}
+
+function dynamicProfileRows() {
+  return dynamicBatchProfile().points.map((row) => ({
+    timeH: row.timeH,
+    phase: row.phase,
+    volumeL: row.volumeL,
+    viableDensityMCellsMl: row.viableDensityMCellsMl,
+    substrateGL: row.substrateGL,
+    productKg: row.productKg,
+    recoveredProductKg: row.recoveredProductKg,
+    biomassKg: row.biomassKg,
+    dissolvedOxygenPct: row.dissolvedOxygenPct,
+    lactateGL: row.lactateGL,
+    ammoniaMm: row.ammoniaMm,
+    heatLoadKw: row.heatLoadKw,
+    cumulativeEnergyKwh: row.cumulativeEnergyKwh,
+    recoveryPct: row.recoveryPct,
+  }));
+}
+
+function sparklinePath(rows, key, width = 420, height = 112) {
+  const values = rows.map((row) => Number(row[key]) || 0);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(0.0001, max - min);
+  return values.map((value, index) => {
+    const x = values.length === 1 ? 0 : (index / (values.length - 1)) * width;
+    const y = height - ((value - min) / range) * height;
+    return `${index ? "L" : "M"}${formatNumber(x, 2)} ${formatNumber(y, 2)}`;
+  }).join(" ");
+}
+
 function streamFlow(item) {
   const solved = solveMassBalance().streamMap[item.id];
   if (solved) return `${formatNumber(solved.massFlow, solved.massFlow < 10 ? 2 : 1)} kg / batch`;
@@ -3535,6 +3639,8 @@ function renderSimulationBoard() {
   const p = state.params;
   const data = metrics();
   const solved = solveMassBalance();
+  const dynamic = dynamicBatchProfile();
+  const profileRows = dynamic.points;
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
   const groups = [...new Set(spdFunctions.map((item) => item.group))];
@@ -3567,6 +3673,45 @@ function renderSimulationBoard() {
       <article><span>Recycle streams</span><strong>${solved.convergence.recycleStreams.length}</strong></article>
       <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / batch</strong></article>
       <article><span>Warnings</span><strong class="${solved.totals.warningCount || solved.warnings.length ? "risk" : "ok"}">${solved.totals.warningCount + solved.warnings.length}</strong></article>
+    </section>
+    <section class="simulation-group">
+      <h3>Dynamic batch profile</h3>
+      <div class="simulation-cards">
+        <article class="simulation-card">
+          <div><span>${dynamic.basis}</span><h4>${formatNumber(dynamic.durationH, 1)} h cycle</h4></div>
+          <dl>
+            <dt>Final recovered</dt><dd>${formatMass(dynamic.finalRecoveredKg)}</dd>
+            <dt>Peak heat</dt><dd>${formatNumber(dynamic.peakHeatKw, 1)} kW</dd>
+            <dt>Min DO</dt><dd>${formatNumber(dynamic.minDoPct, 1)}%</dd>
+          </dl>
+          <p>${dynamic.warnings.length ? dynamic.warnings.join(" ") : "No dynamic DO, lactate, or ammonium hard warning in this screening profile."}</p>
+        </article>
+        <article class="simulation-card">
+          <div><span>Product formation</span><h4>${formatMass(profileRows.at(-1)?.productKg || 0)}</h4></div>
+          <svg viewBox="0 0 420 112" role="img" aria-label="Product and substrate profile">
+            <path d="${sparklinePath(profileRows, "productKg")}" fill="none" stroke="#00a88f" stroke-width="4" />
+            <path d="${sparklinePath(profileRows, "substrateGL")}" fill="none" stroke="#c04f47" stroke-width="3" opacity="0.8" />
+          </svg>
+          <p>Green: product. Red: substrate. Use this to see whether the selected titer, feed, and batch time are physically plausible.</p>
+        </article>
+        <article class="simulation-card">
+          <div><span>Cell culture stress</span><h4>${formatNumber(dynamic.minDoPct, 1)}% minimum DO</h4></div>
+          <svg viewBox="0 0 420 112" role="img" aria-label="DO ammonia lactate profile">
+            <path d="${sparklinePath(profileRows, "dissolvedOxygenPct")}" fill="none" stroke="#4f7cff" stroke-width="4" />
+            <path d="${sparklinePath(profileRows, "ammoniaMm")}" fill="none" stroke="#b98900" stroke-width="3" opacity="0.9" />
+            <path d="${sparklinePath(profileRows, "lactateGL")}" fill="none" stroke="#c04f47" stroke-width="3" opacity="0.75" />
+          </svg>
+          <p>Blue: DO. Gold: ammonium. Red: lactate. Boundary cards still decide whether these values are acceptable.</p>
+        </article>
+        <article class="simulation-card">
+          <div><span>Thermal profile</span><h4>${formatNumber(dynamic.peakHeatKw, 1)} kW peak</h4></div>
+          <svg viewBox="0 0 420 112" role="img" aria-label="Heat load and cumulative energy profile">
+            <path d="${sparklinePath(profileRows, "heatLoadKw")}" fill="none" stroke="#bc6c25" stroke-width="4" />
+            <path d="${sparklinePath(profileRows, "cumulativeEnergyKwh")}" fill="none" stroke="#51606f" stroke-width="3" opacity="0.8" />
+          </svg>
+          <p>Orange: instantaneous heat load. Grey: cumulative net energy after heat-recovery credit.</p>
+        </article>
+      </div>
     </section>
     <section class="simulation-group">
       <h3>Largest computed flows</h3>
@@ -4318,6 +4463,7 @@ function comprehensiveReport() {
     },
     metrics: metrics(),
     solver: solved,
+    dynamicProfile: dynamicBatchProfile(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -4353,6 +4499,7 @@ function renderReportsBoard() {
       <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
+      <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -4452,6 +4599,7 @@ function renderOverview() {
 function simulationReadinessItems() {
   const data = metrics();
   const solved = solveMassBalance();
+  const dynamic = dynamicBatchProfile();
   const boundaryItems = evaluatePhysicalBoundaries()
     .filter((item) => item.severity !== "ok")
     .map((item) => ({
@@ -4478,7 +4626,13 @@ function simulationReadinessItems() {
       group: "Energy balance",
       status: "Partially covered",
       title: "Dynamic heat and utility network",
-      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh, while the solver estimates ${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch net heat duty after ${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch heat recovery. Add time-resolved heating/cooling curves, heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
+      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh, while the solver estimates ${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch net heat duty after ${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch heat recovery. A ${dynamic.points.length}-point dynamic heat profile is now exported. Add heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
+    },
+    {
+      group: "Dynamic simulation",
+      status: "Partially covered",
+      title: "Time-resolved batch profile",
+      detail: `A dynamic screening profile now simulates ${formatNumber(dynamic.durationH, 1)} h with product, recovered product, biomass, substrate, DO, lactate, ammonium, heat load, and cumulative energy. Full simulation still needs validated ODE models, event-based recipes, controller dynamics, equipment hold-up, and measured batch historian calibration.`,
     },
     {
       group: "Reaction and kinetics",
@@ -4496,7 +4650,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Must add for full simulator",
       title: "Finite-capacity batch scheduler",
-      detail: "Add equipment occupancy, changeover, CIP/SIP windows, hold-time limits, campaign planning, operator shifts, QC release timing, and cleanroom suite constraints.",
+      detail: "Add multi-batch equipment occupancy, changeover, CIP/SIP windows, hold-time limits, campaign planning, operator shifts, QC release timing, and cleanroom suite constraints. The current dynamic profile is one-batch screening, not a finite-capacity plant scheduler.",
     },
     {
       group: "GMP validation",
@@ -4696,6 +4850,7 @@ function autoLayout() {
 function downloadSummaryCsv() {
   const data = metrics();
   const solved = solveMassBalance();
+  const dynamic = dynamicBatchProfile();
   downloadCsv(`${state.template}-process-summary.csv`, [
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
@@ -4714,6 +4869,11 @@ function downloadSummaryCsv() {
     { metric: "Recycle iterations", value: solved.convergence.iterations, unit: "iterations" },
     { metric: "Net heat duty", value: solved.totals.netHeatDuty, unit: "kWh/batch" },
     { metric: "Recovered heat", value: solved.totals.recoveredHeat, unit: "kWh/batch" },
+    { metric: "Dynamic profile duration", value: dynamic.durationH, unit: "h" },
+    { metric: "Dynamic profile points", value: dynamic.points.length, unit: "points" },
+    { metric: "Dynamic peak heat", value: dynamic.peakHeatKw, unit: "kW" },
+    { metric: "Dynamic min DO", value: dynamic.minDoPct, unit: "%" },
+    { metric: "Dynamic max ammonia", value: dynamic.maxAmmoniaMm, unit: "mM" },
     { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
     { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
@@ -4759,6 +4919,8 @@ function handleReportDownload(type) {
       ...propertyRows().map((item) => ({ scope: "detailed", ...item })),
       ...aggregatePropertyRows().map((item) => ({ scope: "aggregate", component: item.classKey, category: "Solver class", formula: "aggregate", vaporPressureKpa: "", henry: "", solubility: "", ionicStrengthProxy: "", ...item })),
     ]);
+  } else if (type === "dynamic-csv") {
+    downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
   }
   showToast("Download prepared");
 }

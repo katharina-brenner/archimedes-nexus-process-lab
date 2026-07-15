@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=property-v2`.
+Then open `http://127.0.0.1:8899/index.html?v=dynamic-v1`.
 
 ## Online static access
 
