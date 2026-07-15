@@ -1712,6 +1712,12 @@ const twinWorkspace = {
   ],
 };
 
+const routeOptions = [
+  { key: "primary", label: "Primary route", detail: "Default GMP process train with full downstream and release flow." },
+  { key: "intensified", label: "Intensified route", detail: "Scale-out/perfusion-style route with higher parallel capacity and shorter bottleneck residence." },
+  { key: "lean", label: "Lean route", detail: "Reduced train for screening, early development, or simplified recovery assumptions." },
+];
+
 const state = {
   template: "culturedMeat",
   scale: "pilot",
@@ -1737,6 +1743,7 @@ const state = {
   productBrief: "",
   productFiles: [],
   inferredTemplate: "culturedMeat",
+  activeRoute: "primary",
   recipeOverrides: {},
 };
 
@@ -2067,6 +2074,7 @@ function loadTemplate(key, preserveScale = false) {
   state.connectFrom = null;
   state.nextUnit = 900;
   state.nextStream = 900;
+  state.activeRoute = "primary";
   state.recipeOverrides = {};
 
   if (!preserveScale) {
@@ -3020,18 +3028,38 @@ function recipeActive(unitItem) {
   return state.recipeOverrides[unitItem.id]?.active !== false;
 }
 
-function defaultRecipePredecessor(unitItem, orderedUnits = orderedScheduleUnits()) {
+function defaultRecipeRoute(unitItem) {
+  const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  if (unitLayer(unitItem) === "cleaning" || unitItem.cls === "Utilities" || unitItem.cls === "Environmental" || unitItem.cls === "Quality") return "common";
+  if (text.includes("perfusion") || text.includes("single-use") || text.includes("wave") || text.includes("cell retention")) return "intensified";
+  if (text.includes("protein-a") || text.includes("chromatography") || text.includes("viral") || text.includes("low-ph")) return "primary";
+  if (unitItem.cls === "Packaging" || unitItem.cls === "Finishing") return "common";
+  return "common";
+}
+
+function recipeRoute(unitItem) {
+  const value = state.recipeOverrides[unitItem.id]?.route;
+  if (value === "common" || routeOptions.some((item) => item.key === value)) return value;
+  return defaultRecipeRoute(unitItem);
+}
+
+function recipeRouteEnabled(unitItem, routeKey = state.activeRoute) {
+  const route = recipeRoute(unitItem);
+  return route === "common" || route === routeKey;
+}
+
+function defaultRecipePredecessor(unitItem, orderedUnits = orderedScheduleUnits(), routeKey = state.activeRoute) {
   const index = orderedUnits.findIndex((item) => item.id === unitItem.id);
   if (index <= 0) return "__batch_start";
-  const predecessor = orderedUnits.slice(0, index).reverse().find((item) => recipeActive(item));
+  const predecessor = orderedUnits.slice(0, index).reverse().find((item) => recipeActive(item) && recipeRouteEnabled(item, routeKey));
   return predecessor?.id || "__batch_start";
 }
 
-function recipePredecessor(unitItem, orderedUnits = orderedScheduleUnits()) {
+function recipePredecessor(unitItem, orderedUnits = orderedScheduleUnits(), routeKey = state.activeRoute) {
   const value = state.recipeOverrides[unitItem.id]?.predecessor;
   if (value === "__batch_start") return value;
   if (value && orderedUnits.some((item) => item.id === value)) return value;
-  return defaultRecipePredecessor(unitItem, orderedUnits);
+  return defaultRecipePredecessor(unitItem, orderedUnits, routeKey);
 }
 
 function defaultScheduleOperationDuration(unitItem, data) {
@@ -3081,11 +3109,11 @@ function scheduleSetupDuration(unitItem) {
   return recipeNumber(unitItem, "setupH", defaultScheduleSetupDuration(unitItem), 0, 1000);
 }
 
-function campaignSchedule() {
+function campaignSchedule(routeKey = state.activeRoute) {
   const p = state.params;
   const data = metrics();
   const orderedUnits = orderedScheduleUnits();
-  const activeUnits = orderedUnits.filter((item) => recipeActive(item));
+  const activeUnits = orderedUnits.filter((item) => recipeActive(item) && recipeRouteEnabled(item, routeKey));
   const simulatedBatches = Math.min(12, Math.max(2, state.batchCount || 2));
   const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
   const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
@@ -3111,7 +3139,7 @@ function campaignSchedule() {
     let firstStart = null;
     activeUnits.forEach((unitItem, operationIndex) => {
       const group = scheduleUnitGroup(unitItem);
-      const predecessor = recipePredecessor(unitItem, orderedUnits);
+      const predecessor = recipePredecessor(unitItem, orderedUnits, routeKey);
       const setupH = scheduleSetupDuration(unitItem);
       const processH = scheduleOperationDuration(unitItem, data);
       const cleanH = scheduleCleaningDuration(unitItem);
@@ -3126,7 +3154,7 @@ function campaignSchedule() {
       const dependencyReady = dependencyDone[predecessor];
       const dependencyStatus = Number.isFinite(dependencyReady)
         ? "linked"
-        : orderedUnits.some((item) => item.id === predecessor && !recipeActive(item))
+        : orderedUnits.some((item) => item.id === predecessor && (!recipeActive(item) || !recipeRouteEnabled(item, routeKey)))
           ? "inactive predecessor"
           : "unresolved predecessor";
       const readyTime = (Number.isFinite(dependencyReady) ? dependencyReady : batchStartH) + (predecessor === "__batch_start" ? 0 : transferSlack);
@@ -3147,6 +3175,8 @@ function campaignSchedule() {
         group,
         predecessor,
         dependencyStatus,
+        route: recipeRoute(unitItem),
+        activeRoute: routeKey,
         assignedEquipment: `${unitItem.id}${parallelUnits > 1 ? `-${selectedSlot + 1}/${parallelUnits}` : ""}`,
         parallelUnits,
         startH,
@@ -3231,6 +3261,7 @@ function campaignSchedule() {
 
   return {
     basis: "finite-capacity campaign schedule v1",
+    activeRoute: routeKey,
     simulatedBatches,
     plannedPitchH: plannedPitch,
     effectiveAotH: effectiveAot,
@@ -3261,6 +3292,8 @@ function scheduleOperationRows() {
     operation: item.operation,
     class: item.class,
     group: item.group,
+    route: item.route,
+    activeRoute: item.activeRoute,
     predecessor: item.predecessor,
     dependencyStatus: item.dependencyStatus,
     assignedEquipment: item.assignedEquipment,
@@ -3275,6 +3308,24 @@ function scheduleOperationRows() {
     waitingH: item.waitingH,
     status: item.status,
   }));
+}
+
+function routeComparisonRows() {
+  return routeOptions.map((route) => {
+    const schedule = campaignSchedule(route.key);
+    return {
+      route: route.key,
+      label: route.label,
+      scheduledSteps: schedule.operations.filter((item) => item.batchId === "B01").length,
+      feasibleAnnualBatches: schedule.feasibleAnnualBatches,
+      targetAnnualBatches: state.batchCount,
+      makespanH: schedule.makespanH,
+      releasePitchH: schedule.releasePitchH,
+      bottleneck: schedule.bottleneck.tag,
+      bottleneckOccupancyPct: schedule.bottleneck.occupancyPct,
+      warnings: schedule.warnings.join("; "),
+    };
+  });
 }
 
 function scheduleResourceRows() {
@@ -3300,6 +3351,8 @@ function recipeEditorRows() {
     operation: unitItem.name,
     class: unitItem.cls,
     group: scheduleUnitGroup(unitItem),
+    route: recipeRoute(unitItem),
+    routeEnabled: recipeRouteEnabled(unitItem),
     active: recipeActive(unitItem),
     predecessor: recipePredecessor(unitItem, orderedUnits),
     baseProcessH: defaultScheduleOperationDuration(unitItem, data),
@@ -3325,6 +3378,7 @@ function applyRecipeInput(input) {
   let value;
   if (field === "active") value = input.checked;
   else if (field === "predecessor") value = input.value || "__batch_start";
+  else if (field === "route") value = input.value || "common";
   else value = field === "parallelUnits" ? Math.round(Number(input.value)) : Number(input.value);
   if (typeof value === "number" && !Number.isFinite(value)) return false;
   state.recipeOverrides[unitId] = { ...(state.recipeOverrides[unitId] || {}), [field]: value };
@@ -4211,6 +4265,7 @@ function renderSimulationBoard() {
   const dynamic = dynamicBatchProfile();
   const schedule = campaignSchedule();
   const recipeRows = recipeEditorRows();
+  const routeRows = routeComparisonRows();
   const profileRows = dynamic.points;
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
@@ -4328,15 +4383,19 @@ function renderSimulationBoard() {
       <h3>Editable recipe model</h3>
       <div class="recipe-editor-panel">
         <div class="recipe-editor-copy">
-          <span>Step 7 · dependencies + recipe control</span>
-          <h4>Edit the recipe sequence before scheduling</h4>
-          <p>Activate or skip steps, choose predecessor steps, and adjust process, setup, cleaning, and parallel equipment counts. The campaign schedule, bottlenecks, warnings, and CSV exports update from these values.</p>
+          <span>Step 8 · routes + dependencies</span>
+          <h4>Edit alternative routes before scheduling</h4>
+          <p>Select the active route, assign steps to Common or route-specific branches, activate or skip steps, choose predecessors, and adjust timing. The scheduler and downloads update from the active branch.</p>
+          <div class="route-selector" aria-label="Active process route">
+            ${routeOptions.map((route) => `<button class="${state.activeRoute === route.key ? "active" : ""}" data-route-select="${route.key}" type="button"><strong>${route.label}</strong><small>${route.detail}</small></button>`).join("")}
+          </div>
           <button data-recipe-reset type="button">Reset recipe model</button>
         </div>
         <div class="recipe-grid" role="table" aria-label="Editable recipe timing">
           <div class="recipe-grid-head" role="row">
             <span>Unit</span>
             <span>Active</span>
+            <span>Route</span>
             <span>After</span>
             <span>Group</span>
             <span>Process h</span>
@@ -4348,6 +4407,13 @@ function renderSimulationBoard() {
             <div class="recipe-grid-row ${item.edited ? "edited" : ""} ${item.active ? "" : "inactive"}" role="row">
               <span><b>${item.tag}</b><small>${item.operation}</small></span>
               <label class="recipe-active"><input data-recipe-field="active" data-recipe-unit="${item.tag}" type="checkbox" ${item.active ? "checked" : ""} /><small>${item.active ? "on" : "skip"}</small></label>
+              <label>
+                <select data-recipe-field="route" data-recipe-unit="${item.tag}">
+                  <option value="common" ${item.route === "common" ? "selected" : ""}>Common</option>
+                  ${routeOptions.map((route) => `<option value="${route.key}" ${item.route === route.key ? "selected" : ""}>${route.label}</option>`).join("")}
+                </select>
+                <small>${item.routeEnabled ? "scheduled" : "inactive route"}</small>
+              </label>
               <label>
                 <select data-recipe-field="predecessor" data-recipe-unit="${item.tag}">
                   <option value="__batch_start" ${item.predecessor === "__batch_start" ? "selected" : ""}>Batch start</option>
@@ -4362,6 +4428,22 @@ function renderSimulationBoard() {
             </div>
           `).join("")}
         </div>
+      </div>
+      <div class="simulation-cards">
+        ${routeRows.map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${state.activeRoute === item.route ? "active route" : "alternative"}</span>
+              <h4>${item.label}</h4>
+            </div>
+            <dl>
+              <dt>Steps</dt><dd>${item.scheduledSteps}</dd>
+              <dt>Capacity</dt><dd>${item.feasibleAnnualBatches}/${item.targetAnnualBatches} batches/yr</dd>
+              <dt>Bottleneck</dt><dd>${item.bottleneck} · ${formatNumber(item.bottleneckOccupancyPct, 1)}%</dd>
+            </dl>
+            <p>${item.warnings || "No major route-level scheduling warning in this screening comparison."}</p>
+          </article>
+        `).join("")}
       </div>
     </section>
     <section class="simulation-group">
@@ -5157,6 +5239,7 @@ function comprehensiveReport() {
     unitModels: unitMechanisticModels(),
     schedule: campaignSchedule(),
     recipe: recipeEditorRows(),
+    routeComparison: routeComparisonRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -5195,7 +5278,8 @@ function renderReportsBoard() {
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
-      <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
+      <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
+      <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -5354,7 +5438,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs alternate-route assignment, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
+      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, route branches, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current ${state.activeRoute} route supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs graphical route drawing, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
     },
     {
       group: "GMP validation",
@@ -5584,6 +5668,7 @@ function downloadSummaryCsv() {
     { metric: "Mechanistic unit models", value: unitModels.length, unit: "models" },
     { metric: "Mechanistic model review flags", value: unitModels.filter((item) => item.severity !== "ok").length, unit: "flags" },
     { metric: "Schedule feasible annual batches", value: schedule.feasibleAnnualBatches, unit: "batches/yr" },
+    { metric: "Active route", value: state.activeRoute, unit: "" },
     { metric: "Schedule release pitch", value: schedule.releasePitchH, unit: "h" },
     { metric: "Schedule bottleneck", value: schedule.bottleneck.tag, unit: "" },
     { metric: "Schedule warnings", value: schedule.warnings.length, unit: "warnings" },
@@ -5643,6 +5728,8 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows());
   } else if (type === "recipe-csv") {
     downloadCsv(`${state.template}-editable-recipe.csv`, recipeEditorRows());
+  } else if (type === "routes-csv") {
+    downloadCsv(`${state.template}-route-comparison.csv`, routeComparisonRows());
   }
   showToast("Download prepared");
 }
@@ -6317,6 +6404,15 @@ function bindEvents() {
   });
 
   els.simulationBoard.addEventListener("click", (event) => {
+    const routeButton = event.target.closest("[data-route-select]");
+    if (routeButton) {
+      state.activeRoute = routeButton.dataset.routeSelect;
+      renderSimulationBoard();
+      renderRecommendations();
+      renderReportsBoard();
+      showToast(`${routeOptions.find((item) => item.key === state.activeRoute)?.label || "Route"} selected`);
+      return;
+    }
     const resetButton = event.target.closest("[data-recipe-reset]");
     if (resetButton) resetRecipeOverrides();
   });
