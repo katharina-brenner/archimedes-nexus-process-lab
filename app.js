@@ -1878,7 +1878,9 @@ function equipmentTooltip(item) {
 }
 
 function streamTooltip(item, from, to, kind) {
-  return `${item.id}: ${item.composition}. ${from?.id || item.from} to ${to?.id || item.to}. Type: ${streamLabel(kind)}. Estimated flow: ${streamFlow(item)}.`;
+  const solved = solveMassBalance().streamMap[item.id];
+  const componentNote = solved?.componentText ? ` Components: ${solved.componentText}.` : "";
+  return `${item.id}: ${item.composition}. ${from?.id || item.from} to ${to?.id || item.to}. Type: ${streamLabel(kind)}. Solved flow: ${streamFlow(item)}.${componentNote}`;
 }
 
 function activeTemplate() {
@@ -2129,7 +2131,307 @@ function unitPower(item) {
   return `${formatNumber(item.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62), 1)} kW`;
 }
 
+const balanceComponents = ["water", "substrate", "biomass", "product", "salts", "waste", "air", "cleaning"];
+let massBalanceCache = { key: "", value: null };
+
+function massBalanceCacheKey() {
+  return [
+    state.template,
+    state.scale,
+    state.batchSize,
+    state.batchCount,
+    state.titer,
+    state.recovery,
+    processParameters.map((item) => `${item.key}:${state.params[item.key]}`).join(","),
+    state.units.map((item) => `${item.id}:${item.type}:${item.name}:${item.cls}:${item.residence}:${item.powerFactor}:${item.x}:${item.y}:${item.status}`).join("|"),
+    state.streams.map((item) => `${item.id}:${item.from}:${item.to}:${item.composition}:${item.phase}`).join("|"),
+  ].join("||");
+}
+
+function zeroVector() {
+  return balanceComponents.reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {});
+}
+
+function vectorMass(vector) {
+  return balanceComponents.reduce((sum, key) => sum + Math.max(0, Number(vector[key]) || 0), 0);
+}
+
+function addVector(target, source, factor = 1) {
+  balanceComponents.forEach((key) => {
+    target[key] = (target[key] || 0) + (source[key] || 0) * factor;
+  });
+  return target;
+}
+
+function scaleVector(vector, factor) {
+  const scaled = zeroVector();
+  balanceComponents.forEach((key) => {
+    scaled[key] = Math.max(0, (vector[key] || 0) * factor);
+  });
+  return scaled;
+}
+
+function componentSummary(vector) {
+  const total = vectorMass(vector);
+  if (!total) return "No material";
+  return balanceComponents
+    .map((key) => ({ key, value: vector[key] || 0 }))
+    .filter((item) => item.value / total >= 0.005 || ["product", "biomass"].includes(item.key) && item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5)
+    .map((item) => `${item.key} ${formatNumber(item.value, item.value < 1 ? 3 : 1)} kg`)
+    .join("; ");
+}
+
+function sourceVectorForUnit(unitItem) {
+  const p = state.params;
+  const vector = zeroVector();
+  const text = `${unitItem.id} ${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  const density = p.densitySafetyFactor || 1.03;
+  let mass = Math.max(1, state.batchSize * density);
+
+  if (unitItem.cls === "Utilities" || text.includes("wfi") || text.includes("steam") || text.includes("cip") || text.includes("sip")) {
+    mass = Math.max(25, state.batchSize * 0.08);
+    vector.water = mass * 0.78;
+    vector.cleaning = mass * 0.18;
+    vector.salts = mass * 0.04;
+  } else if (unitItem.cls === "Piping" || unitItem.cls === "Instrumentation" || unitItem.cls === "Quality") {
+    mass = unitItem.cls === "Quality" ? 0.25 : 0.05;
+    vector.water = mass;
+  } else if (unitItem.cls === "Air pollution" || unitItem.cls === "Environmental") {
+    mass = Math.max(10, state.batchSize * 0.01);
+    vector.waste = mass * 0.8;
+    vector.water = mass * 0.2;
+  } else if (text.includes("air") || text.includes("oxygen") || unitItem.cls === "Gas handling") {
+    mass = Math.max(5, state.batchSize * (p.aeration || 0.35) * 0.08);
+    vector.air = mass;
+  } else {
+    const glucoseMass = Math.max(0.05, state.batchSize * (p.glucose || 4) / 1000);
+    vector.water = Math.max(0, mass - glucoseMass - mass * 0.015);
+    vector.substrate = glucoseMass;
+    vector.salts = mass * 0.015;
+  }
+
+  return vector;
+}
+
+function recoveryForUnit(unitItem) {
+  const cls = unitItem.cls;
+  if (["Filtration", "Solid-liquid"].includes(cls)) return Math.max(0.72, (state.params.clarificationYield || 92) / 100);
+  if (["Purification", "Recovery", "Separation"].includes(cls)) return Math.max(0.65, (state.params.chromYield || 88) / 100);
+  if (["Concentration", "Viral safety"].includes(cls)) return Math.max(0.76, (state.params.ufdfYield || 92) / 100);
+  if (["Packaging", "Sterilization", "Thermal", "Preparation", "Hold"].includes(cls)) return 0.995;
+  if (unitLayer(unitItem) === "cleaning") return 0.9;
+  if (["Waste", "Environmental", "Air pollution"].includes(cls)) return 0.05;
+  return 0.99;
+}
+
+function solveUnitBalance(unitItem, inputVector, data) {
+  const p = state.params;
+  const output = scaleVector(inputVector, 1);
+  const wasteVector = zeroVector();
+  const warnings = [];
+  let generation = 0;
+  let loss = 0;
+  const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+
+  if (unitItem.cls === "Bioreactor" || text.includes("fermenter")) {
+    const upstreamYield = Math.max(0.12, data.processYield || 0.5);
+    const productGenerated = Math.max(0.001, data.productPerBatchKg / upstreamYield);
+    const biomassGenerated = isCellCultureTemplate()
+      ? Math.max(0.1, state.batchSize * (p.cellDensity || 18) * 0.000004 * (p.viability || 90) / 100)
+      : Math.max(0.1, state.batchSize * 0.018);
+    const substrateNeeded = (productGenerated + biomassGenerated) * (isCellCultureTemplate() ? 1.4 : 1.9);
+    const substrateConsumed = Math.min(output.substrate || 0, substrateNeeded);
+    output.substrate = Math.max(0, (output.substrate || 0) - substrateConsumed);
+    output.product += productGenerated;
+    output.biomass += biomassGenerated;
+    wasteVector.waste += substrateConsumed * 0.12 + biomassGenerated * (1 - (p.viability || 90) / 100);
+    wasteVector.air += Math.max(0, state.batchSize * (p.our || 4.5) * 0.00003);
+    generation = productGenerated + biomassGenerated;
+    if ((output.substrate || 0) < substrateNeeded * 0.1) warnings.push("Substrate nearly exhausted for selected titer and biomass target.");
+    if ((p.kla || 0) * Math.max(1, p.doSetpoint || 1) / 100 < (p.our || 1)) warnings.push("Oxygen transfer margin is below OUR pressure.");
+  } else if (["Filtration", "Solid-liquid", "Separation", "Purification", "Recovery", "Concentration", "Viral safety"].includes(unitItem.cls)) {
+    const recovery = recoveryForUnit(unitItem);
+    const productLoss = (output.product || 0) * (1 - recovery);
+    output.product = Math.max(0, (output.product || 0) - productLoss);
+    wasteVector.product += productLoss;
+    if (["Filtration", "Solid-liquid", "Separation"].includes(unitItem.cls)) {
+      const biomassRemoval = (output.biomass || 0) * 0.75;
+      const wasteRemoval = (output.waste || 0) * 0.55;
+      output.biomass -= biomassRemoval;
+      output.waste -= wasteRemoval;
+      wasteVector.biomass += biomassRemoval;
+      wasteVector.waste += wasteRemoval;
+    }
+    if (unitItem.cls === "Purification" || unitItem.cls === "Recovery") {
+      const saltRemoval = (output.salts || 0) * 0.52;
+      const impurityRemoval = (output.waste || 0) * 0.72;
+      output.salts -= saltRemoval;
+      output.waste -= impurityRemoval;
+      wasteVector.salts += saltRemoval;
+      wasteVector.waste += impurityRemoval;
+    }
+    if (unitItem.cls === "Concentration") {
+      const waterRemoval = (output.water || 0) * 0.45;
+      output.water -= waterRemoval;
+      wasteVector.water += waterRemoval;
+    }
+    if (recovery < 0.85) warnings.push("Low step recovery is materially affecting product mass.");
+  } else if (unitLayer(unitItem) === "cleaning") {
+    const spent = Math.max(5, state.batchSize * 0.015);
+    output.cleaning += spent;
+    wasteVector.cleaning += spent * 0.92;
+    wasteVector.water += spent * 0.08;
+  } else if (["Waste", "Environmental", "Air pollution"].includes(unitItem.cls)) {
+    addVector(wasteVector, output, 0.95);
+    balanceComponents.forEach((key) => { output[key] *= 0.05; });
+  }
+
+  const outputMass = vectorMass(output);
+  const wasteMass = vectorMass(wasteVector);
+  const inputMass = vectorMass(inputVector);
+  loss += Math.max(0, inputMass + generation - outputMass - wasteMass);
+
+  return { output, wasteVector, inputMass, outputMass, wasteMass, generation, loss, warnings };
+}
+
+function solveMassBalance() {
+  const cacheKey = massBalanceCacheKey();
+  if (massBalanceCache.key === cacheKey && massBalanceCache.value) return massBalanceCache.value;
+  const data = metrics();
+  const streamMap = {};
+  const unitMap = {};
+  const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const recycleWarnings = [];
+
+  for (let pass = 0; pass < 4; pass += 1) {
+    orderedUnits.forEach((unitItem) => {
+      const incoming = state.streams.filter((streamItem) => streamItem.to === unitItem.id);
+      const outgoing = state.streams.filter((streamItem) => streamItem.from === unitItem.id);
+      const inputVector = zeroVector();
+      let usedSource = incoming.length === 0;
+
+      incoming.forEach((streamItem) => {
+        if (streamMap[streamItem.id]) {
+          addVector(inputVector, streamMap[streamItem.id].components);
+        }
+      });
+
+      if (vectorMass(inputVector) === 0) {
+        addVector(inputVector, sourceVectorForUnit(unitItem));
+        usedSource = true;
+      }
+
+      const solvedUnit = solveUnitBalance(unitItem, inputVector, data);
+      const mainStreams = [];
+      const wasteStreams = [];
+      const utilityStreams = [];
+      const qcStreams = [];
+
+      outgoing.forEach((streamItem) => {
+        const from = state.units.find((candidate) => candidate.id === streamItem.from);
+        const to = state.units.find((candidate) => candidate.id === streamItem.to);
+        const kind = streamKind(streamItem, from, to);
+        if (kind === "waste") wasteStreams.push(streamItem);
+        else if (kind === "utility") utilityStreams.push(streamItem);
+        else if (kind === "qc") qcStreams.push(streamItem);
+        else mainStreams.push(streamItem);
+        if (to && to.x < unitItem.x) recycleWarnings.push(`${streamItem.id} recycle/tear stream is solved with single-pass relaxation.`);
+      });
+
+      const assignStream = (streamItem, vector, kind, divider) => {
+        const components = scaleVector(vector, divider ? 1 / divider : 1);
+        streamMap[streamItem.id] = {
+          ...streamItem,
+          role: streamLabel(kind),
+          massFlow: vectorMass(components),
+          annualMass: vectorMass(components) * state.batchCount,
+          components,
+          componentText: componentSummary(components),
+          solverStatus: usedSource ? "Source estimated" : "Solved",
+        };
+      };
+
+      const mainTargets = mainStreams.length ? mainStreams : outgoing.filter((item) => !wasteStreams.includes(item));
+      mainTargets.forEach((streamItem) => assignStream(streamItem, solvedUnit.output, "main", mainTargets.length));
+      wasteStreams.forEach((streamItem) => assignStream(streamItem, solvedUnit.wasteVector, "waste", wasteStreams.length));
+      utilityStreams.forEach((streamItem) => {
+        const utilityVector = zeroVector();
+        utilityVector.water = Math.max(0.05, solvedUnit.inputMass * 0.002);
+        utilityVector.cleaning = unitLayer(unitItem) === "cleaning" ? Math.max(0.05, solvedUnit.inputMass * 0.01) : 0;
+        assignStream(streamItem, utilityVector, "utility", utilityStreams.length);
+      });
+      qcStreams.forEach((streamItem) => {
+        const qcVector = scaleVector(solvedUnit.output, 0.0005);
+        assignStream(streamItem, qcVector, "qc", qcStreams.length);
+      });
+
+      const materialOut = solvedUnit.outputMass + solvedUnit.wasteMass;
+      const massGap = solvedUnit.inputMass + solvedUnit.generation - solvedUnit.loss - materialOut;
+      const closurePct = solvedUnit.inputMass + solvedUnit.generation
+        ? Math.max(0, 100 - Math.abs(massGap) / Math.max(1, solvedUnit.inputMass + solvedUnit.generation) * 100)
+        : 100;
+
+      unitMap[unitItem.id] = {
+        tag: unitItem.id,
+        operation: unitItem.name,
+        class: unitItem.cls,
+        inputStreams: incoming.map((item) => item.id).join("; "),
+        outputStreams: outgoing.map((item) => item.id).join("; "),
+        massIn: solvedUnit.inputMass,
+        generation: solvedUnit.generation,
+        loss: solvedUnit.loss,
+        massOut: materialOut,
+        massGap,
+        closurePct,
+        heatDuty: unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(1, unitItem.residence),
+        power: unitItem.powerFactor,
+        equation: unitReactions(unitItem)[0]?.formula || "Σm_in + generation = Σm_out + loss + accumulation",
+        equations: unitReactions(unitItem).map((item) => item.title).join("; "),
+        componentsIn: componentSummary(inputVector),
+        componentsOut: componentSummary(solvedUnit.output),
+        solverStatus: usedSource ? "Source estimated" : "Solved",
+        warnings: solvedUnit.warnings.join("; "),
+      };
+    });
+  }
+
+  const units = state.units.map((unitItem) => unitMap[unitItem.id]).filter(Boolean);
+  const streams = state.streams.map((streamItem) => streamMap[streamItem.id]).filter(Boolean);
+  const totals = units.reduce((acc, item) => {
+    acc.massIn += item.massIn;
+    acc.generation += item.generation;
+    acc.loss += item.loss;
+    acc.massOut += item.massOut;
+    acc.absGap += Math.abs(item.massGap);
+    if (item.warnings) acc.warningCount += item.warnings.split(";").filter(Boolean).length;
+    return acc;
+  }, { massIn: 0, generation: 0, loss: 0, massOut: 0, absGap: 0, warningCount: 0 });
+  totals.closurePct = totals.massIn + totals.generation
+    ? Math.max(0, 100 - totals.absGap / Math.max(1, totals.massIn + totals.generation) * 100)
+    : 100;
+  totals.solvedStreams = streams.length;
+
+  const result = {
+    basis: "kg/batch",
+    streamMap,
+    unitMap,
+    units,
+    streams,
+    totals,
+    warnings: [...new Set(recycleWarnings)].slice(0, 8),
+  };
+  massBalanceCache = { key: cacheKey, value: result };
+  return result;
+}
+
 function streamFlow(item) {
+  const solved = solveMassBalance().streamMap[item.id];
+  if (solved) return `${formatNumber(solved.massFlow, solved.massFlow < 10 ? 2 : 1)} kg / batch`;
   if (item.phase === "Solid") return `${formatMass(metrics().productPerBatchKg)} / batch`;
   if (item.phase === "Slurry") return `${formatNumber(metrics().productPerBatchKg * 1.25, 1)} kg / batch`;
   return `${formatNumber(state.batchSize, 0)} L / batch`;
@@ -2147,10 +2449,12 @@ function streamDirection(item) {
 }
 
 function streamRows() {
+  const solved = solveMassBalance();
   return state.streams.map((item) => {
     const from = state.units.find((candidate) => candidate.id === item.from);
     const to = state.units.find((candidate) => candidate.id === item.to);
     const kind = streamKind(item, from, to);
+    const solvedStream = solved.streamMap[item.id];
     return {
       id: item.id,
       direction: streamDirection(item),
@@ -2160,8 +2464,12 @@ function streamRows() {
       to: item.to,
       toName: to?.name || "",
       flow: streamFlow(item),
-      components: item.composition,
+      massFlowKgBatch: solvedStream?.massFlow || streamNumericFlow(item),
+      annualMassKg: solvedStream?.annualMass || streamNumericFlow(item) * state.batchCount,
+      components: solvedStream?.componentText || item.composition,
+      nominalDescription: item.composition,
       phase: item.phase,
+      solverStatus: solvedStream?.solverStatus || "Estimated",
     };
   });
 }
@@ -2982,15 +3290,84 @@ function renderEquations() {
 function renderSimulationBoard() {
   const p = state.params;
   const data = metrics();
+  const solved = solveMassBalance();
   const convergenceError = Math.max(0.0001, (100 - p.recycleFraction) / 100000);
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
   const groups = [...new Set(spdFunctions.map((item) => item.group))];
+  const weakBalances = solved.units.filter((item) => item.closurePct < 98).slice(0, 6);
+  const topFlows = [...solved.streams].sort((a, b) => b.massFlow - a.massFlow).slice(0, 6);
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
+      <article><span>Solver</span><strong>Mass balance v0</strong></article>
+      <article><span>Closure</span><strong class="${solved.totals.closurePct < 98 ? "risk" : "ok"}">${formatNumber(solved.totals.closurePct, 2)}%</strong></article>
+      <article><span>Solved streams</span><strong>${solved.totals.solvedStreams}/${state.streams.length}</strong></article>
+      <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / batch</strong></article>
+      <article><span>Warnings</span><strong class="${solved.totals.warningCount || solved.warnings.length ? "risk" : "ok"}">${solved.totals.warningCount + solved.warnings.length}</strong></article>
+    </section>
+    <section class="operation-sequence">
+      <h3>Deterministic process balance</h3>
+      <div>
+        <span>Component vectors</span>
+        <span>Step recovery</span>
+        <span>Bioreaction generation</span>
+        <span>Waste split</span>
+        <span>Utility side-flow</span>
+        <span>CSV export</span>
+      </div>
+      <p>Basis: ${solved.basis}. This is a first engineering solver: it computes sequential water, substrate, biomass, product, salts, waste, air, and cleaning masses for every unit and stream.</p>
+    </section>
+    <section class="simulation-group">
+      <h3>Largest computed flows</h3>
+      <div class="simulation-cards">
+        ${topFlows.map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${item.id}</span>
+              <h4>${item.massFlow < 0.01 ? "<0.01" : formatNumber(item.massFlow, item.massFlow < 10 ? 2 : 1)} kg/batch</h4>
+            </div>
+            <dl>
+              <dt>Role</dt><dd>${item.role}</dd>
+              <dt>Composition</dt><dd>${item.componentText}</dd>
+            </dl>
+            <p>${item.from} → ${item.to}. ${item.solverStatus}.</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    ${weakBalances.length || solved.warnings.length ? `
+      <section class="simulation-group">
+        <h3>Solver warnings</h3>
+        <div class="simulation-cards">
+          ${weakBalances.map((item) => `
+            <article class="simulation-card">
+              <div>
+                <span>${item.class}</span>
+                <h4>${item.tag} · ${formatNumber(item.closurePct, 2)}% closure</h4>
+              </div>
+              <dl>
+                <dt>Mass gap</dt><dd>${formatNumber(item.massGap, 3)} kg/batch</dd>
+                <dt>Warning</dt><dd>${item.warnings || "Balance is outside the preferred closure band."}</dd>
+              </dl>
+              <p>${item.equation}</p>
+            </article>
+          `).join("")}
+          ${solved.warnings.map((item) => `
+            <article class="simulation-card">
+              <div>
+                <span>Recycle</span>
+                <h4>Tear stream approximation</h4>
+              </div>
+              <p>${item}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    ` : ""}
+    <section class="simulation-summary">
       <article><span>Mode</span><strong>${state.template === "biohydrogen" ? "Continuous DF + recycle" : "Hybrid batch/continuous"}</strong></article>
-      <article><span>Tear convergence</span><strong>${formatNumber(convergenceError * 100, 4)}%</strong></article>
+      <article><span>Tear convergence target</span><strong>${formatNumber(convergenceError * 100, 4)}%</strong></article>
       <article><span>CSTR washout</span><strong class="${washout ? "risk" : "ok"}">${washout ? "Risk" : "Clear"}</strong></article>
       <article><span>CO2 absorption</span><strong>${formatNumber(p.co2Removal, 0)}%</strong></article>
       <article><span>Adjusted output</span><strong>${formatMass(data.annualKg * (1 + absorptionBoost))}</strong></article>
@@ -3028,6 +3405,7 @@ function aiReport() {
   const data = metrics();
   const p = state.params;
   const rowData = streamRows();
+  const solved = solveMassBalance();
   const boundary = boundarySummary();
   const bottleneck = state.units
     .map((unitItem) => ({
@@ -3037,8 +3415,7 @@ function aiReport() {
     }))
     .sort((a, b) => b.score - a.score)[0];
   const yieldChain = p.harvestRecovery * p.clarificationYield * p.chromYield * p.ufdfYield / 100 ** 4;
-  const densityBasis = p.density ?? 1;
-  const closureGap = Math.max(0.02, Math.abs((densityBasis - 1) * 1.8 + (p.recycleFraction - 35) / 260 + (100 - p.harvestRecovery) / 420));
+  const closureGap = Math.max(0.001, 100 - solved.totals.closurePct);
   const riskScore = Math.min(99, Math.max(1,
     (data.utilization * 0.32) +
     (p.bottleneckUtil * 0.25) +
@@ -3587,6 +3964,8 @@ function renderCfdBoard() {
 }
 
 function streamNumericFlow(item) {
+  const solved = solveMassBalance().streamMap[item.id];
+  if (solved) return solved.massFlow;
   if (item.phase === "Gas") return state.batchSize * (state.params.aeration || 0.35) * 0.08;
   if (item.phase === "Solid") return Math.max(1, metrics().productPerBatchKg);
   if (item.phase === "Slurry") return Math.max(1, metrics().productPerBatchKg * 1.25);
@@ -3594,32 +3973,26 @@ function streamNumericFlow(item) {
 }
 
 function balanceRows() {
-  const data = metrics();
-  return state.units.map((unitItem) => {
-    const incoming = state.streams.filter((streamItem) => streamItem.to === unitItem.id);
-    const outgoing = state.streams.filter((streamItem) => streamItem.from === unitItem.id);
-    const inMass = incoming.reduce((sum, streamItem) => sum + streamNumericFlow(streamItem), 0);
-    const outMassRaw = outgoing.reduce((sum, streamItem) => sum + streamNumericFlow(streamItem), 0);
-    const generation = unitItem.cls === "Bioreactor" ? state.batchSize * state.titer / 1000 : 0;
-    const loss = ["Filtration", "Purification", "Concentration", "Solid-liquid", "Recovery"].includes(unitItem.cls) ? Math.max(0, inMass * (1 - data.processYield)) : 0;
-    const outMass = outMassRaw || Math.max(0, inMass + generation - loss);
-    const heatDuty = unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(1, unitItem.residence);
-    return {
-      tag: unitItem.id,
-      operation: unitItem.name,
-      class: unitItem.cls,
-      inputStreams: incoming.map((item) => item.id).join("; "),
-      outputStreams: outgoing.map((item) => item.id).join("; "),
-      massIn: inMass,
-      generation,
-      loss,
-      massOut: outMass,
-      massGap: inMass + generation - loss - outMass,
-      heatDuty,
-      power: unitItem.powerFactor,
-      equations: unitReactions(unitItem).map((item) => item.title).join("; "),
-    };
-  });
+  return solveMassBalance().units.map((item) => ({
+    tag: item.tag,
+    operation: item.operation,
+    class: item.class,
+    inputStreams: item.inputStreams,
+    outputStreams: item.outputStreams,
+    massInKgBatch: item.massIn,
+    generationKgBatch: item.generation,
+    lossKgBatch: item.loss,
+    massOutKgBatch: item.massOut,
+    massGapKgBatch: item.massGap,
+    closurePct: item.closurePct,
+    heatDutyKwhBatch: item.heatDuty,
+    powerFactor: item.power,
+    componentsIn: item.componentsIn,
+    componentsOut: item.componentsOut,
+    solverStatus: item.solverStatus,
+    warnings: item.warnings,
+    equations: item.equations,
+  }));
 }
 
 function costRows() {
@@ -3647,6 +4020,7 @@ function downloadCsv(filename, rows) {
 }
 
 function comprehensiveReport() {
+  const solved = solveMassBalance();
   return {
     template: state.template,
     product: activeTemplate().product,
@@ -3657,6 +4031,7 @@ function comprehensiveReport() {
       definitions: processParameters,
     },
     metrics: metrics(),
+    solver: solved,
     equipment: state.units,
     streams: streamRows(),
     balances: balanceRows(),
@@ -3684,10 +4059,10 @@ function renderReportsBoard() {
       <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
     <section class="reports-grid">
-      <article><span>Mass + energy balances</span><strong>${report.balances.length}</strong><p>Unit-level mass in/out, generation, loss, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
+      <article><span>Mass + energy balances</span><strong>${formatNumber(report.solver.totals.closurePct, 2)}%</strong><p>${report.balances.length} unit balances with component inputs/outputs, generation, loss, closure, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
       <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, materials, labor, QA/QC, utilities, waste, and direct cost.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
       <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
-      <article><span>Input/output streams</span><strong>${report.streams.length}</strong><p>All material, utility, waste, and QC/data streams with roles and phases.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
+      <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
       <article><span>CFD screening</span><strong>${report.cfd.length}</strong><p>Bioreactor O2, nutrient, shear, and hotspot risk maps are shown interactively in the CFD workbench.</p><button data-jump-view="cfd" type="button">Open CFD</button></article>
     </section>
@@ -3806,9 +4181,9 @@ function simulationReadinessItems() {
     },
     {
       group: "Mass balance",
-      status: state.streams.length > 60 ? "Partially covered" : "Needs more detail",
+      status: "Partially covered",
       title: "Component-resolved stream vectors",
-      detail: "Current streams are process-level. Full production simulation needs per-component mass fractions, impurities, biomass, host-cell proteins, DNA, metabolites, salts, cleaning residues, and batch-time profiles.",
+      detail: `A deterministic v0 solver now resolves water, substrate, biomass, product, salts, waste, air, and cleaning masses across ${state.streams.length} streams. Full simulation still needs validated component property data, impurities, HCP/DNA/metabolites, recycle convergence, and time profiles.`,
     },
     {
       group: "Energy balance",
@@ -4031,6 +4406,7 @@ function autoLayout() {
 
 function downloadSummaryCsv() {
   const data = metrics();
+  const solved = solveMassBalance();
   downloadCsv(`${state.template}-process-summary.csv`, [
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
@@ -4042,8 +4418,11 @@ function downloadSummaryCsv() {
     { metric: "Annual product", value: data.annualKg, unit: "kg/yr" },
     { metric: "Batch duration", value: data.batchDuration, unit: "h" },
     { metric: "Direct cost", value: data.directCost, unit: "USD/kg" },
-    { metric: "Utilities", value: data.utilitiesMWh, unit: "MWh/yr" },
-    { metric: "Plant utilization", value: data.utilization * 100, unit: "%" },
+    { metric: "Utilities", value: data.utilities, unit: "MWh/yr" },
+    { metric: "Plant utilization", value: data.utilization, unit: "%" },
+    { metric: "Mass balance closure", value: solved.totals.closurePct, unit: "%" },
+    { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
+    { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
     { metric: "Streams", value: state.streams.length, unit: "streams" },
     { metric: "CFD bioreactors", value: cfdReport().length, unit: "screened units" },
@@ -4053,7 +4432,7 @@ function downloadSummaryCsv() {
 
 function downloadStreamsCsv() {
   const rows = streamRows();
-  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "components", "phase"];
+  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "massFlowKgBatch", "annualMassKg", "components", "nominalDescription", "phase", "solverStatus"];
   const csv = [
     headers.map(csvEscape).join(","),
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
