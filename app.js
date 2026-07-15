@@ -2133,17 +2133,119 @@ function unitPower(item) {
 }
 
 const balanceComponents = ["water", "substrate", "biomass", "product", "salts", "waste", "air", "cleaning"];
-const componentProperties = {
-  water: { label: "Water / WFI", cp: 4.18, density: 997, viscosity: 0.89, osmotic: 0, heatRelease: 0, source: "Engineering handbook placeholder at 25 C" },
-  substrate: { label: "Glucose / carbon substrate", cp: 1.54, density: 1540, viscosity: 1.1, osmotic: 5.55, heatRelease: 4.1, source: "Glucose solution engineering estimate" },
-  biomass: { label: "Wet biomass / cells", cp: 3.6, density: 1060, viscosity: 2.2, osmotic: 0.3, heatRelease: 0.8, source: "Biomass slurry engineering estimate" },
-  product: { label: "Bioproduct / protein", cp: 2.1, density: 1350, viscosity: 1.4, osmotic: 0.05, heatRelease: 0, source: "Protein solution engineering estimate" },
-  salts: { label: "Buffer salts", cp: 0.85, density: 2160, viscosity: 1.2, osmotic: 17.1, heatRelease: 0, source: "Mixed salts engineering estimate" },
-  waste: { label: "Dissolved waste / metabolites", cp: 2.7, density: 1100, viscosity: 1.7, osmotic: 8.5, heatRelease: 0.2, source: "Metabolite/waste engineering estimate" },
-  air: { label: "Air / process gas", cp: 1.01, density: 1.2, viscosity: 0.018, osmotic: 0, heatRelease: 0, source: "Dry air estimate" },
-  cleaning: { label: "CIP/SIP cleaning solution", cp: 3.85, density: 1040, viscosity: 1.15, osmotic: 12, heatRelease: 0, source: "Dilute NaOH/acid/rinse blend estimate" },
+const propertyDatabase = {
+  water: { classKey: "water", label: "Water / WFI", category: "Solvent", formula: "H2O", cp: 4.18, cpSlope: -0.002, density: 997, densitySlope: -0.31, viscosity: 0.89, viscositySlope: -0.019, osmotic: 0, heatRelease: 0, vaporPressureKpa: 3.17, henry: "", solubility: "miscible", ionicStrength: 0, source: "NIST/IAPWS engineering estimate at 25 C" },
+  glucose: { classKey: "substrate", label: "D-Glucose", category: "Carbon source", formula: "C6H12O6", cp: 1.54, cpSlope: 0.001, density: 1540, densitySlope: -0.28, viscosity: 1.15, viscositySlope: -0.01, osmotic: 5.55, heatRelease: 4.1, vaporPressureKpa: 0, henry: "", solubility: "high", ionicStrength: 0, source: "CRC/Merck-style engineering estimate" },
+  lactose: { classKey: "substrate", label: "Lactose", category: "Carbon source", formula: "C12H22O11", cp: 1.25, cpSlope: 0.001, density: 1530, densitySlope: -0.2, viscosity: 1.2, viscositySlope: -0.009, osmotic: 2.9, heatRelease: 3.9, vaporPressureKpa: 0, henry: "", solubility: "moderate", ionicStrength: 0, source: "Bioprocess media engineering estimate" },
+  glutamine: { classKey: "substrate", label: "L-Glutamine", category: "Nitrogen source", formula: "C5H10N2O3", cp: 1.6, cpSlope: 0.001, density: 1460, densitySlope: -0.2, viscosity: 1.1, viscositySlope: -0.008, osmotic: 6.8, heatRelease: 2.6, vaporPressureKpa: 0, henry: "", solubility: "moderate", ionicStrength: 0, source: "Cell-culture media engineering estimate" },
+  aminoAcids: { classKey: "substrate", label: "Amino acid pool", category: "Media nutrient", formula: "mixed", cp: 1.75, cpSlope: 0.001, density: 1350, densitySlope: -0.2, viscosity: 1.15, viscositySlope: -0.008, osmotic: 7.2, heatRelease: 2.2, vaporPressureKpa: 0, henry: "", solubility: "mixed", ionicStrength: 0.04, source: "Cell-culture media engineering estimate" },
+  wetCells: { classKey: "biomass", label: "Wet mammalian cells", category: "Biomass", formula: "CH1.8O0.5N0.2 proxy", cp: 3.6, cpSlope: -0.001, density: 1060, densitySlope: -0.22, viscosity: 2.2, viscositySlope: -0.012, osmotic: 0.3, heatRelease: 0.8, vaporPressureKpa: 0, henry: "", solubility: "suspension", ionicStrength: 0.02, source: "Wet-cell slurry engineering estimate" },
+  microbialBiomass: { classKey: "biomass", label: "Microbial biomass", category: "Biomass", formula: "CH1.8O0.5N0.2 proxy", cp: 3.2, cpSlope: -0.001, density: 1080, densitySlope: -0.2, viscosity: 2.6, viscositySlope: -0.014, osmotic: 0.4, heatRelease: 1.1, vaporPressureKpa: 0, henry: "", solubility: "suspension", ionicStrength: 0.03, source: "Fermentation broth engineering estimate" },
+  proteinProduct: { classKey: "product", label: "Protein / mAb product", category: "Product", formula: "protein", cp: 2.1, cpSlope: 0.0005, density: 1350, densitySlope: -0.18, viscosity: 1.4, viscositySlope: -0.006, osmotic: 0.05, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "aqueous", ionicStrength: 0.01, source: "Protein solution engineering estimate" },
+  penicillinG: { classKey: "product", label: "Penicillin G", category: "Product", formula: "C16H18N2O4S", cp: 1.25, cpSlope: 0.0008, density: 1410, densitySlope: -0.18, viscosity: 1.25, viscositySlope: -0.006, osmotic: 0.2, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "pH-dependent", ionicStrength: 0.02, source: "API engineering estimate" },
+  sodiumChloride: { classKey: "salts", label: "Sodium chloride", category: "Salt", formula: "NaCl", cp: 0.86, cpSlope: 0.0003, density: 2160, densitySlope: -0.1, viscosity: 1.15, viscositySlope: -0.006, osmotic: 34.2, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "359 g/L", ionicStrength: 1, source: "CRC/NIST engineering estimate" },
+  phosphateBuffer: { classKey: "salts", label: "Phosphate buffer", category: "Buffer", formula: "Na/K phosphate", cp: 0.95, cpSlope: 0.0003, density: 1800, densitySlope: -0.12, viscosity: 1.18, viscositySlope: -0.006, osmotic: 18, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "high", ionicStrength: 0.12, source: "USP/bioprocess buffer engineering estimate" },
+  bicarbonate: { classKey: "salts", label: "Sodium bicarbonate", category: "Buffer", formula: "NaHCO3", cp: 1.0, cpSlope: 0.0004, density: 2200, densitySlope: -0.1, viscosity: 1.16, viscositySlope: -0.006, osmotic: 20, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "96 g/L", ionicStrength: 0.1, source: "Cell-culture buffer engineering estimate" },
+  oxygen: { classKey: "air", label: "Oxygen", category: "Gas", formula: "O2", cp: 0.92, cpSlope: 0.0002, density: 1.33, densitySlope: -0.004, viscosity: 0.020, viscositySlope: 0.00004, osmotic: 0, heatRelease: 0, vaporPressureKpa: "", henry: "low mg/L at ambient", solubility: "sparging-limited", ionicStrength: 0, source: "Perry/NIST gas estimate" },
+  carbonDioxide: { classKey: "air", label: "Carbon dioxide", category: "Gas", formula: "CO2", cp: 0.84, cpSlope: 0.0004, density: 1.84, densitySlope: -0.006, viscosity: 0.015, viscositySlope: 0.00003, osmotic: 0, heatRelease: 0, vaporPressureKpa: "", henry: "pH-dependent", solubility: "absorbs into buffer", ionicStrength: 0, source: "Perry/NIST gas estimate" },
+  lactate: { classKey: "waste", label: "Lactate", category: "Metabolite", formula: "C3H5O3-", cp: 2.2, cpSlope: 0.0008, density: 1200, densitySlope: -0.18, viscosity: 1.35, viscositySlope: -0.008, osmotic: 11, heatRelease: 0.1, vaporPressureKpa: 0, henry: "", solubility: "high", ionicStrength: 0.1, source: "CHO metabolite engineering estimate" },
+  ammonium: { classKey: "waste", label: "Ammonium / ammonia", category: "Metabolite", formula: "NH4+/NH3", cp: 4.0, cpSlope: -0.001, density: 1000, densitySlope: -0.25, viscosity: 1.0, viscositySlope: -0.012, osmotic: 17, heatRelease: 0, vaporPressureKpa: "pH-dependent", henry: "pH-dependent", solubility: "high", ionicStrength: 0.1, source: "Cell-culture waste engineering estimate" },
+  hostCellProtein: { classKey: "waste", label: "Host-cell protein", category: "Impurity", formula: "protein mix", cp: 2.2, cpSlope: 0.0005, density: 1320, densitySlope: -0.16, viscosity: 1.45, viscositySlope: -0.006, osmotic: 0.05, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "aqueous/colloidal", ionicStrength: 0.01, source: "Downstream impurity engineering estimate" },
+  dna: { classKey: "waste", label: "Host-cell DNA", category: "Impurity", formula: "DNA", cp: 1.7, cpSlope: 0.0004, density: 1700, densitySlope: -0.12, viscosity: 4.5, viscositySlope: -0.018, osmotic: 0.03, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "aqueous", ionicStrength: 0.02, source: "Nucleic-acid impurity engineering estimate" },
+  ethanol: { classKey: "waste", label: "Ethanol", category: "Solvent/metabolite", formula: "C2H6O", cp: 2.44, cpSlope: 0.002, density: 789, densitySlope: -0.85, viscosity: 1.07, viscositySlope: -0.016, osmotic: 21.7, heatRelease: 7.4, vaporPressureKpa: 7.9, henry: "volatile", solubility: "miscible", ionicStrength: 0, source: "NIST/Perry solvent estimate" },
+  acetate: { classKey: "waste", label: "Acetate", category: "Metabolite", formula: "CH3COO-", cp: 2.0, cpSlope: 0.0008, density: 1180, densitySlope: -0.18, viscosity: 1.25, viscositySlope: -0.008, osmotic: 12, heatRelease: 0.2, vaporPressureKpa: 0, henry: "", solubility: "high", ionicStrength: 0.1, source: "Fermentation metabolite engineering estimate" },
+  sodiumHydroxide: { classKey: "cleaning", label: "Sodium hydroxide CIP", category: "Cleaning", formula: "NaOH", cp: 3.8, cpSlope: -0.001, density: 1100, densitySlope: -0.45, viscosity: 1.25, viscositySlope: -0.01, osmotic: 50, heatRelease: 0, vaporPressureKpa: 2.8, henry: "", solubility: "high", ionicStrength: 1, source: "CIP chemical engineering estimate" },
+  hydrochloricAcid: { classKey: "cleaning", label: "Hydrochloric acid / acid rinse", category: "Cleaning", formula: "HCl", cp: 3.9, cpSlope: -0.001, density: 1050, densitySlope: -0.42, viscosity: 1.05, viscositySlope: -0.01, osmotic: 40, heatRelease: 0, vaporPressureKpa: 3.2, henry: "volatile acid", solubility: "high", ionicStrength: 1, source: "CIP acid engineering estimate" },
+  ipa: { classKey: "cleaning", label: "Isopropanol / solvent", category: "Solvent", formula: "C3H8O", cp: 2.68, cpSlope: 0.002, density: 786, densitySlope: -0.8, viscosity: 2.04, viscositySlope: -0.024, osmotic: 16.6, heatRelease: 8.3, vaporPressureKpa: 6.0, henry: "volatile", solubility: "miscible", ionicStrength: 0, source: "NIST/Perry solvent estimate" },
+  antifoam: { classKey: "cleaning", label: "Antifoam / silicone oil", category: "Additive", formula: "polymer mix", cp: 1.6, cpSlope: 0.001, density: 970, densitySlope: -0.35, viscosity: 100, viscositySlope: -0.9, osmotic: 0, heatRelease: 0, vaporPressureKpa: 0, henry: "", solubility: "emulsion", ionicStrength: 0, source: "Antifoam engineering estimate" },
 };
+const componentProperties = aggregateComponentProperties();
 let massBalanceCache = { key: "", value: null };
+
+function propertyAtTemperature(record, temperatureC = state.params.temperature || 25) {
+  const delta = temperatureC - 25;
+  return {
+    ...record,
+    cp: Math.max(0.1, record.cp + (record.cpSlope || 0) * delta),
+    density: Math.max(0.01, record.density + (record.densitySlope || 0) * delta),
+    viscosity: Math.max(0.001, record.viscosity + (record.viscositySlope || 0) * delta),
+  };
+}
+
+function aggregateComponentProperties(temperatureC = 25) {
+  const grouped = balanceComponents.reduce((acc, key) => {
+    acc[key] = [];
+    return acc;
+  }, {});
+  Object.values(propertyDatabase).forEach((item) => {
+    grouped[item.classKey]?.push(propertyAtTemperature(item, temperatureC));
+  });
+
+  return Object.fromEntries(balanceComponents.map((key) => {
+    const items = grouped[key] || [];
+    const count = items.length || 1;
+    const average = (field) => items.reduce((sum, item) => sum + (Number(item[field]) || 0), 0) / count;
+    return [key, {
+      label: {
+        water: "Water / aqueous solvent",
+        substrate: "Nutrient and carbon source pool",
+        biomass: "Wet biomass / cells",
+        product: "Product pool",
+        salts: "Salts and buffers",
+        waste: "Metabolites and impurities",
+        air: "Air and process gases",
+        cleaning: "Cleaning chemicals and additives",
+      }[key],
+      cp: average("cp"),
+      density: average("density"),
+      viscosity: average("viscosity"),
+      osmotic: average("osmotic"),
+      heatRelease: average("heatRelease"),
+      source: `${items.length} detailed property records aggregated`,
+      records: items.length,
+    }];
+  }));
+}
+
+function propertyRows(temperatureC = state.params.temperature || 25) {
+  return Object.entries(propertyDatabase).map(([key, value]) => {
+    const corrected = propertyAtTemperature(value, temperatureC);
+    return {
+      component: key,
+      classKey: value.classKey,
+      label: value.label,
+      category: value.category,
+      formula: value.formula,
+      temperatureC,
+      cpKjKgK: corrected.cp,
+      densityKgM3: corrected.density,
+      viscosityCp: corrected.viscosity,
+      osmoticIndex: value.osmotic,
+      heatReleaseKwhKgProxy: value.heatRelease,
+      vaporPressureKpa: value.vaporPressureKpa,
+      henry: value.henry,
+      solubility: value.solubility,
+      ionicStrengthProxy: value.ionicStrength,
+      source: value.source,
+    };
+  });
+}
+
+function aggregatePropertyRows(temperatureC = state.params.temperature || 25) {
+  const aggregate = aggregateComponentProperties(temperatureC);
+  return Object.entries(aggregate).map(([key, value]) => ({
+    classKey: key,
+    label: value.label,
+    records: value.records,
+    temperatureC,
+    cpKjKgK: value.cp,
+    densityKgM3: value.density,
+    viscosityCp: value.viscosity,
+    osmoticIndex: value.osmotic,
+    heatReleaseKwhKgProxy: value.heatRelease,
+    source: value.source,
+  }));
+}
 
 function massBalanceCacheKey() {
   return [
@@ -2171,34 +2273,38 @@ function vectorMass(vector) {
 }
 
 function vectorHeatCapacity(vector) {
-  return balanceComponents.reduce((sum, key) => sum + Math.max(0, vector[key] || 0) * (componentProperties[key]?.cp || 0), 0);
+  const aggregate = aggregateComponentProperties(state.params.temperature || 25);
+  return balanceComponents.reduce((sum, key) => sum + Math.max(0, vector[key] || 0) * (aggregate[key]?.cp || 0), 0);
 }
 
-function vectorDensity(vector) {
+function vectorDensity(vector, temperatureC = state.params.temperature || 25) {
+  const aggregate = aggregateComponentProperties(temperatureC);
   const mass = vectorMass(vector);
   if (!mass) return 0;
   const volumeM3 = balanceComponents.reduce((sum, key) => {
-    const density = componentProperties[key]?.density || 1000;
+    const density = aggregate[key]?.density || 1000;
     return sum + Math.max(0, vector[key] || 0) / density;
   }, 0);
   return volumeM3 ? mass / volumeM3 : 0;
 }
 
-function vectorViscosity(vector) {
+function vectorViscosity(vector, temperatureC = state.params.temperature || 25) {
+  const aggregate = aggregateComponentProperties(temperatureC);
   const mass = vectorMass(vector);
   if (!mass) return 0;
   return balanceComponents.reduce((sum, key) => {
     const fraction = Math.max(0, vector[key] || 0) / mass;
-    return sum + fraction * (componentProperties[key]?.viscosity || 1);
+    return sum + fraction * (aggregate[key]?.viscosity || 1);
   }, 0);
 }
 
-function vectorOsmoticPressure(vector) {
+function vectorOsmoticPressure(vector, temperatureC = state.params.temperature || 25) {
+  const aggregate = aggregateComponentProperties(temperatureC);
   const mass = vectorMass(vector);
   if (!mass) return 0;
   return balanceComponents.reduce((sum, key) => {
     const fraction = Math.max(0, vector[key] || 0) / mass;
-    return sum + fraction * (componentProperties[key]?.osmotic || 0);
+    return sum + fraction * (aggregate[key]?.osmotic || 0);
   }, 0);
 }
 
@@ -2289,12 +2395,13 @@ function targetTemperatureForUnit(unitItem) {
 }
 
 function estimateUnitEnergy(unitItem, inputVector, outputVector, wasteVector, generation) {
+  const aggregate = aggregateComponentProperties(targetTemperatureForUnit(unitItem));
   const targetTemperature = targetTemperatureForUnit(unitItem);
   const inletTemperature = 22;
   const deltaT = Math.abs(targetTemperature - inletTemperature);
   const sensibleKwh = vectorHeatCapacity(inputVector) * deltaT / 3600;
   const reactionKwh = unitItem.cls === "Bioreactor"
-    ? balanceComponents.reduce((sum, key) => sum + (inputVector[key] || 0) * (componentProperties[key]?.heatRelease || 0), 0) * 0.18
+    ? balanceComponents.reduce((sum, key) => sum + (inputVector[key] || 0) * (aggregate[key]?.heatRelease || 0), 0) * 0.18
     : generation * 0.04;
   const mechanicalKwh = unitItem.powerFactor * Math.pow(Math.max(1, state.batchSize / 1000), 0.62) * Math.max(0.25, unitItem.residence);
   const separationKwh = ["Filtration", "Solid-liquid", "Separation", "Purification", "Recovery", "Concentration"].includes(unitItem.cls)
@@ -2314,9 +2421,9 @@ function estimateUnitEnergy(unitItem, inputVector, outputVector, wasteVector, ge
     recoverableKwh,
     grossKwh,
     netKwh,
-    densityKgM3: vectorDensity(outputVector),
-    viscosityCp: vectorViscosity(outputVector),
-    osmoticIndex: vectorOsmoticPressure(outputVector),
+    densityKgM3: vectorDensity(outputVector, targetTemperature),
+    viscosityCp: vectorViscosity(outputVector, targetTemperature),
+    osmoticIndex: vectorOsmoticPressure(outputVector, targetTemperature),
   };
 }
 
@@ -2556,7 +2663,8 @@ function solveMassBalance() {
     warnings: recycleStreamIds.size && (convergenceHistory.at(-1) || 0) >= tolerance
       ? [`Recycle solver stopped after ${iterationCount} iterations at ${formatNumber((convergenceHistory.at(-1) || 0) * 100, 3)}% relative delta.`]
       : [],
-    properties: componentProperties,
+    properties: aggregateComponentProperties(state.params.temperature || 25),
+    detailedProperties: propertyRows(),
   };
   massBalanceCache = { key: cacheKey, value: result };
   return result;
@@ -3720,14 +3828,16 @@ function renderStandards() {
 
 function renderSources() {
   const groups = [...new Set(scientificSources.map((item) => item.group))];
+  const propertyCategories = [...new Set(propertyRows().map((item) => item.category))];
+  const previewProperties = propertyRows().slice(0, 12);
   els.sourcesBoard.innerHTML = `
     <section class="source-hero">
       <div>
         <p>Scientific data layer</p>
-        <h3>Vendor, regulatory, and standards references</h3>
-        <span>These cards document where benchmark assumptions come from. They are starting points for model calibration, not validated limits for every product or facility.</span>
+        <h3>Vendor, regulatory, standards, and property references</h3>
+        <span>These cards document where benchmark assumptions and property-package estimates come from. They are starting points for model calibration, not validated limits for every product or facility.</span>
       </div>
-      <strong>${scientificSources.length} sources mapped</strong>
+      <strong>${scientificSources.length} sources · ${propertyRows().length} properties</strong>
     </section>
     <section class="source-summary-grid">
       ${groups.map((group) => `
@@ -3737,6 +3847,34 @@ function renderSources() {
           <p>reference${scientificSources.filter((item) => item.group === group).length === 1 ? "" : "s"}</p>
         </article>
       `).join("")}
+    </section>
+    <section class="source-summary-grid">
+      ${propertyCategories.map((category) => `
+        <article>
+          <span>${category}</span>
+          <strong>${propertyRows().filter((item) => item.category === category).length}</strong>
+          <p>property record${propertyRows().filter((item) => item.category === category).length === 1 ? "" : "s"}</p>
+        </article>
+      `).join("")}
+    </section>
+    <section class="simulation-group">
+      <h3>Property database v2 preview</h3>
+      <div class="simulation-cards">
+        ${previewProperties.map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${item.category}</span>
+              <h4>${item.label}</h4>
+            </div>
+            <dl>
+              <dt>Cp</dt><dd>${formatNumber(item.cpKjKgK, 2)} kJ/kg/K</dd>
+              <dt>Density</dt><dd>${formatNumber(item.densityKgM3, 0)} kg/m3</dd>
+              <dt>Viscosity</dt><dd>${formatNumber(item.viscosityCp, 2)} cP</dd>
+            </dl>
+            <p>${item.formula} · ${item.source}</p>
+          </article>
+        `).join("")}
+      </div>
     </section>
     <section class="source-card-grid">
       ${renderSourceCards(scientificSources)}
@@ -4180,7 +4318,8 @@ function comprehensiveReport() {
     },
     metrics: metrics(),
     solver: solved,
-    propertyPackage: componentProperties,
+    propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
+    detailedPropertyPackage: propertyRows(),
     equipment: state.units,
     streams: streamRows(),
     balances: balanceRows(),
@@ -4213,7 +4352,7 @@ function renderReportsBoard() {
       <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
       <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
-      <article><span>Property package</span><strong>${Object.keys(componentProperties).length}</strong><p>Cp, density, viscosity, osmotic index, heat-release placeholders, and source notes used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
+      <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -4327,7 +4466,7 @@ function simulationReadinessItems() {
       group: "Thermodynamics",
       status: "Partially covered",
       title: "Component property database",
-      detail: `A property-package v0 now supplies Cp, density, viscosity, osmotic index, and heat-release proxies for ${Object.keys(componentProperties).length} component classes. Full simulation still needs temperature-dependent properties, vapor pressure, activity coefficients, Henry constants, solubility, ionic strength, and buffer-specific data.`,
+      detail: `A property-package v2 now supplies ${propertyRows().length} detailed records plus ${aggregatePropertyRows().length} aggregate solver classes with temperature-corrected Cp, density, viscosity, osmotic index, vapor-pressure, Henry, solubility, ionic-strength, and heat-release proxies. Full simulation still needs validated coefficients, electrolyte speciation, activity coefficients, and product-specific calibration.`,
     },
     {
       group: "Mass balance",
@@ -4616,16 +4755,10 @@ function handleReportDownload(type) {
       group: parameterGroup(item),
     })));
   } else if (type === "properties-csv") {
-    downloadCsv(`${state.template}-property-package.csv`, Object.entries(componentProperties).map(([key, value]) => ({
-      component: key,
-      label: value.label,
-      cpKjKgK: value.cp,
-      densityKgM3: value.density,
-      viscosityCp: value.viscosity,
-      osmoticIndex: value.osmotic,
-      heatReleaseKwhKgProxy: value.heatRelease,
-      source: value.source,
-    })));
+    downloadCsv(`${state.template}-property-package.csv`, [
+      ...propertyRows().map((item) => ({ scope: "detailed", ...item })),
+      ...aggregatePropertyRows().map((item) => ({ scope: "aggregate", component: item.classKey, category: "Solver class", formula: "aggregate", vaporPressureKpa: "", henry: "", solubility: "", ionicStrengthProxy: "", ...item })),
+    ]);
   }
   showToast("Download prepared");
 }
