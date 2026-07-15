@@ -5110,6 +5110,218 @@ th {
   line-height: 1.35;
 }
 
+.route-topology-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(620px, 1.58fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.06);
+}
+
+.route-topology-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.route-topology-copy span,
+.route-optimizer-hero span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.route-topology-copy h4,
+.route-topology-copy p,
+.route-optimizer-hero h4,
+.route-optimizer-hero p,
+.route-score-card h4,
+.route-score-card p {
+  margin: 0;
+}
+
+.route-topology-copy h4,
+.route-optimizer-hero h4 {
+  color: #07111f;
+  font-size: 16px;
+}
+
+.route-topology-copy p,
+.route-optimizer-hero p,
+.route-score-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.route-map-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.route-lane {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(7, 17, 31, 0.08);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.route-lane.active {
+  border-color: rgba(0, 168, 143, 0.45);
+  background: rgba(0, 168, 143, 0.08);
+}
+
+.route-lane header,
+.route-lane footer,
+.route-score-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.route-lane header {
+  align-items: start;
+}
+
+.route-lane header span,
+.route-score-card span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 8px;
+  color: #06311f;
+  background: rgba(88, 199, 124, 0.18);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.route-lane header strong {
+  color: #07111f;
+  font-size: 14px;
+}
+
+.route-lane header small {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.route-node-strip {
+  display: flex;
+  gap: 8px;
+  min-height: 58px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.route-node {
+  position: relative;
+  display: grid;
+  flex: 0 0 104px;
+  align-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid rgba(7, 17, 31, 0.1);
+  border-radius: 8px;
+  background: #fff;
+  color: #07111f;
+  text-align: left;
+}
+
+.route-node::after {
+  content: "";
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  width: 9px;
+  height: 2px;
+  background: rgba(0, 168, 143, 0.55);
+}
+
+.route-node:last-child::after {
+  display: none;
+}
+
+.route-node.branch {
+  border-color: rgba(99, 102, 241, 0.28);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.route-node b,
+.route-node small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-node small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.route-lane footer button,
+.route-optimizer-hero button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #07111f;
+  font-weight: 850;
+}
+
+.route-optimizer-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) repeat(3, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.route-optimizer-hero,
+.route-score-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.06);
+}
+
+.route-score-card strong {
+  color: #07111f;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.route-score-card.review span {
+  color: #4b2b00;
+  background: rgba(215, 162, 41, 0.2);
+}
+
+.score-bar {
+  height: 9px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--teal) var(--score), rgba(7, 17, 31, 0.09) var(--score)),
+    rgba(7, 17, 31, 0.08);
+}
+
+.route-score-card dl {
+  grid-template-columns: 86px 1fr;
+  font-size: 12px;
+}
+
 .recipe-grid {
   display: grid;
   gap: 6px;
@@ -5622,6 +5834,8 @@ th {
   .cfd-hero,
   .reports-hero,
   .recipe-editor-panel,
+  .route-topology-panel,
+  .route-optimizer-grid,
   .schedule-panel {
     grid-template-columns: 1fr;
   }
@@ -5865,7 +6079,9 @@ th {
   .equation-toolbar,
   .kpi-strip,
   .simulation-summary,
-  .simulation-cards {
+  .simulation-cards,
+  .route-topology-panel,
+  .route-optimizer-grid {
     grid-template-columns: 1fr;
   }
 
@@ -5935,7 +6151,8 @@ th {
   .overview-split,
   .plant-flow-map,
   .plant-area-grid,
-  .cfd-layout {
+  .cfd-layout,
+  .route-map-grid {
     grid-template-columns: 1fr;
   }
 

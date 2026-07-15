@@ -1566,6 +1566,9 @@ const equations = [
   eq("Cycle time slack", "economics", "slack_RCT = RCT_available - RCT_minimum", "Scheduling slack between available and minimum recipe cycle time."),
   eq("Equivalent procedure cycles", "economics", "N_equiv = procedure_cycles_per_batch / main_recipe_cycles", "Equivalent number of cycles used for independently cycling procedures."),
   eq("Start time shift", "economics", "t_start,i = t_reference + shift_i", "Operation start-time reference and shift used in scheduling views."),
+  eq("Route branch activation", "economics", "active_i(route) = route_i in {common, route}", "Route-specific recipe activation for branch and merge process alternatives."),
+  eq("Route predecessor constraint", "economics", "t_start,i >= t_finish,pred + transfer_slack", "Predecessor dependency constraint used by the route topology and finite-capacity scheduler."),
+  eq("Route optimization score", "economics", "Score = 0.28*C + 0.18*B + 0.16*W + 0.16*E + 0.14*Q + 0.08*S", "Weighted route recommendation score combining capacity, bottleneck, warnings, economics, quality, and sustainability."),
   eq("Size utilization factor", "economics", "SUF = required_batch_size / rated_batch_size", "Sizing utilization factor for equipment design versus selected rating."),
   eq("Throughput utilization factor", "economics", "TUF = required_rate / rated_rate", "Throughput utilization factor for continuous or rate-limited equipment."),
   eq("Auxiliary relative load", "economics", "RL_aux = required_aux_load / rated_aux_load", "Relative load for auxiliary equipment such as vacuum pumps or HVAC."),
@@ -3328,6 +3331,114 @@ function routeComparisonRows() {
   });
 }
 
+function routeTopologyRows() {
+  return routeOptions.map((route) => {
+    const schedule = campaignSchedule(route.key);
+    const firstBatch = schedule.operations.filter((item) => item.batchId === "B01");
+    const nodes = firstBatch.map((item, index) => {
+      const unitItem = state.units.find((candidate) => candidate.id === item.tag);
+      const branchRoute = unitItem ? recipeRoute(unitItem) : "common";
+      return {
+        index: index + 1,
+        tag: item.tag,
+        operation: item.operation,
+        group: item.group,
+        route: branchRoute,
+        predecessor: item.predecessor,
+        status: item.status,
+        startH: item.startH,
+        finishH: item.finishH,
+        lane: branchRoute === "common" ? "shared" : "branch",
+      };
+    });
+    const branchNodes = nodes.filter((item) => item.route === route.key);
+    const sharedNodes = nodes.filter((item) => item.route === "common");
+    const firstBranchIndex = branchNodes[0]?.index || 0;
+    const finalSharedAfterBranch = firstBranchIndex
+      ? sharedNodes.filter((item) => item.index > firstBranchIndex).at(-1)
+      : sharedNodes.at(-1);
+    const branchEntry = branchNodes[0] || nodes.find((item) => item.route === "common") || nodes[0];
+    return {
+      route: route.key,
+      label: route.label,
+      entry: branchEntry?.tag || "batch start",
+      merge: finalSharedAfterBranch?.tag || nodes.at(-1)?.tag || "release",
+      sharedSteps: sharedNodes.length,
+      branchSteps: branchNodes.length,
+      totalSteps: nodes.length,
+      nodes,
+      edges: nodes.map((item) => `${item.predecessor === "__batch_start" ? "Batch start" : item.predecessor} -> ${item.tag}`),
+    };
+  });
+}
+
+function routeOptimizationRows() {
+  const data = metrics();
+  const routeCostFactors = {
+    primary: 1,
+    intensified: 0.9,
+    lean: 0.74,
+  };
+  const routeQualityFactors = {
+    primary: 96,
+    intensified: 91,
+    lean: state.scale === "lab" || state.scale === "pilot" ? 84 : 68,
+  };
+  const routeSustainabilityFactors = {
+    primary: 78,
+    intensified: 88,
+    lean: 72,
+  };
+  return routeOptions.map((route) => {
+    const schedule = campaignSchedule(route.key);
+    const topology = routeTopologyRows().find((item) => item.route === route.key);
+    const capacityRatio = Math.min(1.25, schedule.feasibleAnnualBatches / Math.max(1, state.batchCount));
+    const capacityScore = Math.min(100, capacityRatio * 82);
+    const bottleneckScore = Math.max(0, 100 - Math.max(0, schedule.bottleneck.occupancyPct - 62) * 2.1);
+    const warningScore = Math.max(0, 100 - schedule.warnings.length * 22 - schedule.violations.length * 8);
+    const economyCost = data.directCost * (routeCostFactors[route.key] || 1);
+    const bestCost = data.directCost * Math.min(...Object.values(routeCostFactors));
+    const economicsScore = Math.max(0, Math.min(100, bestCost / Math.max(1, economyCost) * 100));
+    const qualityScore = routeQualityFactors[route.key] || 80;
+    const sustainabilityScore = routeSustainabilityFactors[route.key] || 75;
+    const score = (
+      capacityScore * 0.28
+      + bottleneckScore * 0.18
+      + warningScore * 0.16
+      + economicsScore * 0.16
+      + qualityScore * 0.14
+      + sustainabilityScore * 0.08
+    );
+    const rationale = [
+      capacityRatio < 1 ? "capacity below annual target" : "capacity target covered",
+      schedule.bottleneck.occupancyPct > 92 ? "bottleneck overload" : "bottleneck acceptable",
+      schedule.warnings.length ? `${schedule.warnings.length} schedule warnings` : "no major schedule warning",
+      route.key === "lean" ? "lower screening cost but weaker GMP readiness" : "",
+      route.key === "intensified" ? "higher parallelization and lower release pitch" : "",
+    ].filter(Boolean).join("; ");
+    return {
+      route: route.key,
+      label: route.label,
+      score,
+      recommendation: score >= 82 ? "recommended" : score >= 70 ? "viable" : "review",
+      capacityScore,
+      bottleneckScore,
+      warningScore,
+      economicsScore,
+      qualityScore,
+      sustainabilityScore,
+      estimatedDirectCost: economyCost,
+      feasibleAnnualBatches: schedule.feasibleAnnualBatches,
+      releasePitchH: schedule.releasePitchH,
+      bottleneck: schedule.bottleneck.tag,
+      bottleneckOccupancyPct: schedule.bottleneck.occupancyPct,
+      totalSteps: topology?.totalSteps || 0,
+      branchSteps: topology?.branchSteps || 0,
+      rationale,
+    };
+  }).sort((a, b) => b.score - a.score);
+}
+
 function scheduleResourceRows() {
   return campaignSchedule().resourceRows.map((item) => ({
     resource: item.resource,
@@ -4266,6 +4377,9 @@ function renderSimulationBoard() {
   const schedule = campaignSchedule();
   const recipeRows = recipeEditorRows();
   const routeRows = routeComparisonRows();
+  const topologyRows = routeTopologyRows();
+  const optimizationRows = routeOptimizationRows();
+  const bestRoute = optimizationRows[0];
   const profileRows = dynamic.points;
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
@@ -4301,6 +4415,13 @@ function renderSimulationBoard() {
       <article><span>Release pitch</span><strong>${formatNumber(schedule.releasePitchH, 1)} h</strong></article>
       <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
       <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
+    </section>
+    <section class="simulation-summary">
+      <article><span>Route optimizer</span><strong>${bestRoute.label}</strong></article>
+      <article><span>Route score</span><strong class="${bestRoute.score < 70 ? "risk" : "ok"}">${formatNumber(bestRoute.score, 0)}/100</strong></article>
+      <article><span>Route capacity</span><strong>${bestRoute.feasibleAnnualBatches}/${state.batchCount}</strong></article>
+      <article><span>Branch steps</span><strong>${bestRoute.branchSteps}</strong></article>
+      <article><span>Est. direct cost</span><strong>$${formatNumber(bestRoute.estimatedDirectCost, 0)}/kg</strong></article>
     </section>
     <section class="operation-sequence">
       <h3>Deterministic process balance</h3>
@@ -4383,9 +4504,9 @@ function renderSimulationBoard() {
       <h3>Editable recipe model</h3>
       <div class="recipe-editor-panel">
         <div class="recipe-editor-copy">
-          <span>Step 8 · routes + dependencies</span>
+          <span>Step 9/10 · topology + optimizer</span>
           <h4>Edit alternative routes before scheduling</h4>
-          <p>Select the active route, assign steps to Common or route-specific branches, activate or skip steps, choose predecessors, and adjust timing. The scheduler and downloads update from the active branch.</p>
+          <p>Select the active route, assign steps to Common or route-specific branches, activate or skip steps, choose predecessors, and adjust timing. The topology map, optimizer, scheduler, and downloads update from the active branch.</p>
           <div class="route-selector" aria-label="Active process route">
             ${routeOptions.map((route) => `<button class="${state.activeRoute === route.key ? "active" : ""}" data-route-select="${route.key}" type="button"><strong>${route.label}</strong><small>${route.detail}</small></button>`).join("")}
           </div>
@@ -4442,6 +4563,67 @@ function renderSimulationBoard() {
               <dt>Bottleneck</dt><dd>${item.bottleneck} · ${formatNumber(item.bottleneckOccupancyPct, 1)}%</dd>
             </dl>
             <p>${item.warnings || "No major route-level scheduling warning in this screening comparison."}</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <section class="simulation-group">
+      <h3>Visual route topology</h3>
+      <div class="route-topology-panel">
+        <div class="route-topology-copy">
+          <span>Step 9 · branch / merge model</span>
+          <h4>${topologyRows.find((item) => item.route === state.activeRoute)?.label || "Active route"} topology</h4>
+          <p>Shared nodes are common to all routes. Branch nodes are route-specific alternatives. Use this to see where the process splits, where it merges, and which units define the current route before scheduling.</p>
+        </div>
+        <div class="route-map-grid">
+          ${topologyRows.map((route) => `
+            <article class="route-lane ${state.activeRoute === route.route ? "active" : ""}">
+              <header>
+                <span>${state.activeRoute === route.route ? "active" : "alternative"}</span>
+                <strong>${route.label}</strong>
+                <small>${route.sharedSteps} shared · ${route.branchSteps} branch · merge ${route.merge}</small>
+              </header>
+              <div class="route-node-strip">
+                ${route.nodes.slice(0, 14).map((node) => `
+                  <button class="route-node ${node.lane}" data-route-node="${node.tag}" type="button" title="${escapeAttr(`${node.tag}: after ${node.predecessor === "__batch_start" ? "batch start" : node.predecessor}; ${formatNumber(node.startH, 1)}-${formatNumber(node.finishH, 1)} h`)}">
+                    <b>${node.tag}</b>
+                    <small>${node.group}</small>
+                  </button>
+                `).join("")}
+              </div>
+              <footer>
+                <button data-route-select="${route.route}" type="button">Open route</button>
+                <button data-route-assign-selected="${route.route}" type="button">Assign selected unit</button>
+              </footer>
+            </article>
+          `).join("")}
+        </div>
+      </div>
+    </section>
+    <section class="simulation-group">
+      <h3>Automatic route optimization</h3>
+      <div class="route-optimizer-grid">
+        <article class="route-optimizer-hero">
+          <span>Step 10 · decision engine</span>
+          <h4>${bestRoute.label} is currently recommended</h4>
+          <p>${bestRoute.rationale}. The score balances annual capacity, bottleneck occupancy, warnings, cost, GMP readiness, and sustainability. It is still a screening optimizer, not a validated design decision.</p>
+          <button class="action-button primary" data-route-optimizer-apply="${bestRoute.route}" type="button">Apply recommended route</button>
+        </article>
+        ${optimizationRows.map((item) => `
+          <article class="route-score-card ${item.recommendation}">
+            <div>
+              <span>${item.recommendation}</span>
+              <h4>${item.label}</h4>
+            </div>
+            <strong>${formatNumber(item.score, 0)}</strong>
+            <div class="score-bar" style="--score:${Math.max(0, Math.min(100, item.score))}%"></div>
+            <dl>
+              <dt>Capacity</dt><dd>${formatNumber(item.capacityScore, 0)}</dd>
+              <dt>Bottleneck</dt><dd>${formatNumber(item.bottleneckScore, 0)}</dd>
+              <dt>Economics</dt><dd>${formatNumber(item.economicsScore, 0)}</dd>
+              <dt>Quality</dt><dd>${formatNumber(item.qualityScore, 0)}</dd>
+            </dl>
+            <p>${item.rationale}</p>
           </article>
         `).join("")}
       </div>
@@ -5240,6 +5422,8 @@ function comprehensiveReport() {
     schedule: campaignSchedule(),
     recipe: recipeEditorRows(),
     routeComparison: routeComparisonRows(),
+    routeTopology: routeTopologyRows(),
+    routeOptimization: routeOptimizationRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -5280,6 +5464,8 @@ function renderReportsBoard() {
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
+      <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
+      <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -5438,7 +5624,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, route branches, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current ${state.activeRoute} route supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs graphical route drawing, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
+      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, route branches, visual branch/merge topology, automatic route optimization, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current ${state.activeRoute} route supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs operator calendars, suite-level cleanroom constraints, campaign changeovers, validated site calendars, and a mathematical optimizer with hard constraints.`,
     },
     {
       group: "GMP validation",
@@ -5730,6 +5916,27 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-editable-recipe.csv`, recipeEditorRows());
   } else if (type === "routes-csv") {
     downloadCsv(`${state.template}-route-comparison.csv`, routeComparisonRows());
+  } else if (type === "route-topology-csv") {
+    downloadCsv(`${state.template}-route-topology.csv`, routeTopologyRows().flatMap((route) => route.nodes.map((node) => ({
+      route: route.route,
+      label: route.label,
+      entry: route.entry,
+      merge: route.merge,
+      sharedSteps: route.sharedSteps,
+      branchSteps: route.branchSteps,
+      totalSteps: route.totalSteps,
+      nodeIndex: node.index,
+      tag: node.tag,
+      operation: node.operation,
+      group: node.group,
+      nodeRoute: node.route,
+      predecessor: node.predecessor,
+      startH: node.startH,
+      finishH: node.finishH,
+      status: node.status,
+    }))));
+  } else if (type === "route-optimizer-csv") {
+    downloadCsv(`${state.template}-route-optimizer.csv`, routeOptimizationRows());
   }
   showToast("Download prepared");
 }
@@ -6404,6 +6611,41 @@ function bindEvents() {
   });
 
   els.simulationBoard.addEventListener("click", (event) => {
+    const nodeButton = event.target.closest("[data-route-node]");
+    if (nodeButton) {
+      state.selectedId = nodeButton.dataset.routeNode;
+      renderEquationSpotlight();
+      renderCanvas();
+      renderSimulationBoard();
+      showToast(`${state.selectedId} selected`);
+      return;
+    }
+    const assignRouteButton = event.target.closest("[data-route-assign-selected]");
+    if (assignRouteButton) {
+      const current = selectedUnit();
+      if (!current) {
+        showToast("Select a unit on the flowsheet first");
+        return;
+      }
+      state.recipeOverrides[current.id] = {
+        ...(state.recipeOverrides[current.id] || {}),
+        route: assignRouteButton.dataset.routeAssignSelected,
+      };
+      renderSimulationBoard();
+      renderRecommendations();
+      renderReportsBoard();
+      showToast(`${current.id} assigned to ${routeOptions.find((item) => item.key === assignRouteButton.dataset.routeAssignSelected)?.label || "route"}`);
+      return;
+    }
+    const optimizerApply = event.target.closest("[data-route-optimizer-apply]");
+    if (optimizerApply) {
+      state.activeRoute = optimizerApply.dataset.routeOptimizerApply;
+      renderSimulationBoard();
+      renderRecommendations();
+      renderReportsBoard();
+      showToast(`${routeOptions.find((item) => item.key === state.activeRoute)?.label || "Route"} applied`);
+      return;
+    }
     const routeButton = event.target.closest("[data-route-select]");
     if (routeButton) {
       state.activeRoute = routeButton.dataset.routeSelect;
