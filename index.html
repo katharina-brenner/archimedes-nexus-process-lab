@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260715-minimal-axion-logo" />
+    <link rel="stylesheet" href="./styles.css?v=20260715-lovable-principles" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -44,20 +44,27 @@
             <div class="public-hero-copy">
               <div class="hero-badge-row">
                 <span>Axion Process OS</span>
-                <b>Private beta for bioprocess modelling</b>
+                <b>Describe · Generate · Refine</b>
               </div>
               <h1>Build a biomanufacturing plant from a product brief.</h1>
-              <span>Describe what you want to produce. Axion turns it into a process workspace with flowsheets, equipment, balances, CFD, standards, sources, and downloadable tables.</span>
+              <span>Write the plant you want. Axion opens a technical workspace with flowsheets, equipment, balances, CFD, standards, sources, and downloadable tables.</span>
               <div class="hero-composer" aria-label="Product brief composer preview">
                 <div class="composer-topline">
                   <span>What should Axion model?</span>
-                  <b>Secure workspace</b>
+                  <b>Prompt-to-process</b>
                 </div>
                 <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and CFD screening.</p>
                 <div class="composer-actions">
                   <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
                   <button class="public-secondary" type="button" data-public-target="publicPlatform">See modules</button>
                 </div>
+              </div>
+              <div class="hero-outcome-panel" aria-label="Generated workspace preview">
+                <span>Generated workspace includes</span>
+                <b>76 units</b>
+                <b>81 streams</b>
+                <b>39 boundary checks</b>
+                <b>12 report tables</b>
               </div>
               <div class="prompt-suggestions" aria-label="Example process prompts">
                 <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
@@ -95,6 +102,30 @@
               <h3>Sources, standards, equations, and downloads stay attached.</h3>
               <p>Every model can connect to assumptions, SOP notes, literature, stream tables, mass balances, cost drivers, and readiness recommendations.</p>
             </article>
+          </section>
+
+          <section class="public-build-loop public-page active-public-page" data-public-page="home" aria-label="Prompt to workspace loop">
+            <div class="section-heading">
+              <p>Build Loop</p>
+              <h2>Less configuration. More direct creation.</h2>
+            </div>
+            <div class="build-loop-grid">
+              <article>
+                <span>01</span>
+                <h3>Prompt the process</h3>
+                <p>Describe product, organism, scale, constraints, and production intent in one sentence or a detailed brief.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>Get a workspace</h3>
+                <p>Axion turns the brief into an editable model with equipment, process logic, streams, balances, and assumptions.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>Refine by editing</h3>
+                <p>Adjust the flowsheet, add support systems, inspect equations, export tables, and ask the help panel what to improve.</p>
+              </article>
+            </div>
           </section>
 
           <section id="publicPlatform" class="public-section public-platform public-page" data-public-page="platform">
@@ -722,6 +753,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260715-minimal-axion-logo"></script>
+    <script type="module" src="./app.js?v=20260715-lovable-principles"></script>
   </body>
 </html>
