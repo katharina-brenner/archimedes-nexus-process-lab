@@ -394,6 +394,11 @@ const processParameters = [
   { key: "ufdfYield", label: "UF/DF yield", unit: "%", min: 50, max: 99, step: 1, value: 91 },
   { key: "sterileFilterFlux", label: "Sterile filter flux", unit: "LMH", min: 20, max: 600, step: 5, value: 180 },
   { key: "bioburden", label: "Bioburden limit", unit: "CFU/mL", min: 0, max: 100, step: 1, value: 10 },
+  { key: "cipTime", label: "CIP cycle time", unit: "h", min: 0.2, max: 16, step: 0.1, value: 2.5 },
+  { key: "sipHold", label: "SIP hold time", unit: "min", min: 5, max: 90, step: 1, value: 30 },
+  { key: "sterilityAssurance", label: "Sterility assurance", unit: "log", min: 2, max: 12, step: 0.5, value: 6 },
+  { key: "qcReleaseTime", label: "QC release time", unit: "h", min: 0, max: 240, step: 1, value: 48 },
+  { key: "operatorShiftHours", label: "Operator shift", unit: "h", min: 4, max: 12, step: 0.5, value: 8 },
   { key: "hydrogenProductivity", label: "H2 productivity", unit: "mmol/L/h", min: 1, max: 80, step: 0.5, value: 45.8 },
   { key: "osmCrit", label: "Critical osmolarity", unit: "mol/L", min: 0.05, max: 0.6, step: 0.01, value: 0.28 },
   { key: "h2Crit", label: "Dissolved H2 crit.", unit: "mmol/L", min: 0.2, max: 8, step: 0.1, value: 2.2 },
@@ -2983,6 +2988,226 @@ function mechanisticModelRows() {
   }));
 }
 
+function scheduleUnitGroup(item) {
+  const layer = unitLayer(item);
+  if (item.cls === "Bioreactor" || item.cls === "Preparation" || item.cls === "Hold") return "Upstream";
+  if (["Solid-liquid", "Filtration", "Purification", "Concentration", "Separation", "Recovery", "Viral safety"].includes(item.cls)) return "Downstream";
+  if (["Finishing", "Packaging", "Quality"].includes(item.cls)) return "Fill finish + QC";
+  if (layer === "cleaning" || item.cls === "Sterilization") return "CIP/SIP";
+  if (layer === "recycle" || layer === "heat" || item.cls === "Thermal") return "Heat + recycle";
+  if (item.cls === "Utilities" || layer === "support") return "Utilities";
+  if (item.cls === "Environmental" || layer === "waste" || item.cls === "Air pollution") return "Waste + emissions";
+  return "Support";
+}
+
+function scheduleOperationDuration(unitItem, data) {
+  const p = state.params;
+  const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  if (unitItem.cls === "Bioreactor") return Math.max(18, data.batchDuration * (text.includes("seed") ? 0.18 : 0.48), unitItem.residence || 0);
+  if (unitItem.cls === "Preparation") return Math.max(1.2, unitItem.residence || 0, state.batchSize / 45000);
+  if (unitItem.cls === "Hold") return Math.max(0.8, unitItem.residence || 0, Math.min(p.holdupTime || 12, 8));
+  if (["Solid-liquid", "Filtration"].includes(unitItem.cls)) return Math.max(1.5, unitItem.residence || 0, state.batchSize / Math.max(12000, (p.sterileFilterFlux || 180) * 80));
+  if (["Purification", "Recovery", "Separation"].includes(unitItem.cls)) return Math.max(2.5, unitItem.residence || 0, data.productPerBatchKg / 35);
+  if (["Concentration", "Viral safety"].includes(unitItem.cls)) return Math.max(2, unitItem.residence || 0, data.productPerBatchKg / 55);
+  if (unitItem.cls === "Thermal") return Math.max(0.8, unitItem.residence || 0, state.batchSize / 80000);
+  if (unitItem.cls === "Sterilization" || text.includes("sip")) return Math.max(0.6, (p.sipHold || 30) / 60 + 0.6);
+  if (unitItem.cls === "Packaging" || unitItem.cls === "Finishing") return Math.max(1.5, unitItem.residence || 0, data.productPerBatchKg / 80);
+  if (unitItem.cls === "Quality") return Math.max(1, unitItem.residence || 0, (p.qcReleaseTime || 48) * 0.08);
+  if (unitItem.cls === "Environmental" || unitItem.cls === "Air pollution") return Math.max(0.8, unitItem.residence || 0);
+  if (unitItem.cls === "Utilities") return Math.max(0.4, unitItem.residence || 0);
+  return Math.max(0.35, unitItem.residence || 0.7);
+}
+
+function scheduleCleaningDuration(unitItem) {
+  const p = state.params;
+  const layer = unitLayer(unitItem);
+  if (layer === "cleaning") return Math.max(0.25, p.cipTime || 2.5);
+  if (["Preparation", "Bioreactor", "Hold", "Solid-liquid", "Filtration", "Purification", "Concentration", "Separation", "Recovery", "Viral safety", "Finishing"].includes(unitItem.cls)) {
+    return Math.max(0.15, (p.cipTime || 2.5) * (unitItem.cls === "Bioreactor" ? 1.15 : 0.55));
+  }
+  if (unitItem.cls === "Packaging" || unitItem.cls === "Quality") return Math.max(0.05, (p.cipTime || 2.5) * 0.12);
+  return 0;
+}
+
+function scheduleSetupDuration(unitItem) {
+  const p = state.params;
+  const major = ["Preparation", "Bioreactor", "Purification", "Concentration", "Packaging", "Finishing"].includes(unitItem.cls);
+  return Math.max(0.03, (p.setupTime || 4) * (major ? 0.08 : 0.025));
+}
+
+function campaignSchedule() {
+  const p = state.params;
+  const data = metrics();
+  const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const simulatedBatches = Math.min(12, Math.max(2, state.batchCount || 2));
+  const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
+  const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
+  const transferSlack = Math.max(0.05, (p.turnaroundTime || 8) / Math.max(8, orderedUnits.length * 2));
+  const equipmentAvailable = {};
+  const equipmentBusy = {};
+  const groupBusy = {};
+  const shiftHours = Math.max(1, p.operatorShiftHours || 8);
+  const resourceBusy = { "CIP/SIP skid": 0, "QC release queue": 0, "Operator shifts": 0 };
+  let cipSkidAvailable = 0;
+  let qcQueueAvailable = 0;
+  const operations = [];
+  const violations = [];
+  const batchReleases = [];
+
+  for (let batchIndex = 0; batchIndex < simulatedBatches; batchIndex += 1) {
+    const batchId = `B${String(batchIndex + 1).padStart(2, "0")}`;
+    let readyTime = batchIndex * plannedPitch;
+    let firstStart = null;
+    orderedUnits.forEach((unitItem, operationIndex) => {
+      const group = scheduleUnitGroup(unitItem);
+      const setupH = scheduleSetupDuration(unitItem);
+      const processH = scheduleOperationDuration(unitItem, data);
+      const cleanH = scheduleCleaningDuration(unitItem);
+      const equipmentReady = equipmentAvailable[unitItem.id] || 0;
+      const startH = Math.max(readyTime, equipmentReady);
+      const waitingH = Math.max(0, startH - readyTime);
+      const processEndH = startH + setupH + processH;
+      const cleanStartH = cleanH > 0 ? Math.max(processEndH, cipSkidAvailable) : processEndH;
+      const cleanEndH = cleanStartH + cleanH;
+      const finishH = cleanH > 0 ? cleanEndH : processEndH;
+      const holdLimit = Math.max(0.5, p.holdupTime || 12);
+      const status = waitingH > holdLimit ? "hold violation" : cleanH && cleanStartH > processEndH + holdLimit ? "CIP wait" : "scheduled";
+      const row = {
+        batchId,
+        operationNo: operationIndex + 1,
+        tag: unitItem.id,
+        operation: unitItem.name,
+        class: unitItem.cls,
+        group,
+        startH,
+        setupH,
+        processH,
+        processEndH,
+        cleanStartH,
+        cleanH,
+        finishH,
+        waitingH,
+        status,
+      };
+      operations.push(row);
+      if (firstStart == null) firstStart = startH;
+      equipmentAvailable[unitItem.id] = finishH + transferSlack;
+      equipmentBusy[unitItem.id] = (equipmentBusy[unitItem.id] || 0) + setupH + processH + cleanH;
+      groupBusy[group] = (groupBusy[group] || 0) + setupH + processH;
+      resourceBusy["Operator shifts"] += (setupH + processH) * (unitItem.cls === "Bioreactor" || unitItem.cls === "Purification" ? 0.35 : 0.18) / shiftHours;
+      if (cleanH > 0) {
+        cipSkidAvailable = cleanEndH;
+        resourceBusy["CIP/SIP skid"] += cleanH;
+      }
+      if (waitingH > holdLimit) {
+        violations.push(`${batchId} ${unitItem.id}: waited ${formatNumber(waitingH, 1)} h before ${unitItem.name}`);
+      }
+      readyTime = processEndH + transferSlack;
+    });
+    const finalProcessEnd = readyTime;
+    const qcStart = Math.max(finalProcessEnd, qcQueueAvailable);
+    const qcEnd = qcStart + Math.max(0, p.qcReleaseTime || 48);
+    qcQueueAvailable = qcEnd;
+    resourceBusy["QC release queue"] += Math.max(0, p.qcReleaseTime || 48);
+    batchReleases.push({
+      batchId,
+      firstStartH: firstStart || 0,
+      processCompleteH: finalProcessEnd,
+      qcReleaseH: qcEnd,
+      cycleTimeH: qcEnd - (firstStart || 0),
+      releaseStatus: qcStart - finalProcessEnd > Math.max(1, p.holdupTime || 12) ? "QC queue review" : "release scheduled",
+    });
+  }
+
+  const makespanH = Math.max(...operations.map((item) => item.finishH), ...batchReleases.map((item) => item.qcReleaseH), 1);
+  const feasibleAnnualBatches = Math.max(0, Math.floor(simulatedBatches / makespanH * effectiveAot));
+  const releasePitch = batchReleases.length > 1
+    ? (batchReleases.at(-1).qcReleaseH - batchReleases[0].qcReleaseH) / (batchReleases.length - 1)
+    : makespanH;
+  const maxEquipmentOccupancy = Object.entries(equipmentBusy)
+    .map(([tag, busyH]) => ({ tag, busyH, occupancyPct: busyH / makespanH * 100 }))
+    .sort((a, b) => b.occupancyPct - a.occupancyPct);
+  const bottleneck = maxEquipmentOccupancy[0] || { tag: "none", occupancyPct: 0, busyH: 0 };
+  const resourceRows = [
+    ...maxEquipmentOccupancy.slice(0, 16).map((item) => ({
+      resource: item.tag,
+      type: "Equipment",
+      busyH: item.busyH,
+      availableH: makespanH,
+      occupancyPct: item.occupancyPct,
+      status: item.occupancyPct > 92 ? "bottleneck" : item.occupancyPct > 75 ? "review" : "ok",
+    })),
+    ...Object.entries(groupBusy).map(([group, busyH]) => ({
+      resource: group,
+      type: "Process area",
+      busyH,
+      availableH: makespanH,
+      occupancyPct: busyH / makespanH * 100,
+      status: busyH / makespanH > 0.92 ? "bottleneck" : busyH / makespanH > 0.75 ? "review" : "ok",
+    })),
+    ...Object.entries(resourceBusy).map(([resource, busyH]) => ({
+      resource,
+      type: "Shared resource",
+      busyH,
+      availableH: resource === "Operator shifts" ? makespanH / shiftHours : makespanH,
+      occupancyPct: busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) * 100,
+      status: busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) > 0.92 ? "bottleneck" : busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) > 0.75 ? "review" : "ok",
+    })),
+  ];
+
+  return {
+    basis: "finite-capacity campaign schedule v1",
+    simulatedBatches,
+    plannedPitchH: plannedPitch,
+    effectiveAotH: effectiveAot,
+    makespanH,
+    releasePitchH: Math.max(0, releasePitch),
+    feasibleAnnualBatches,
+    batchTarget: state.batchCount,
+    bottleneck,
+    violations,
+    operations,
+    batchReleases,
+    resourceRows,
+    warnings: [
+      feasibleAnnualBatches < state.batchCount ? `Schedule capacity supports ${feasibleAnnualBatches} of ${state.batchCount} target annual batches under the current AOT and uptime.` : "",
+      violations.length ? `${violations.length} hold-time or waiting violations need recipe/suite review.` : "",
+      bottleneck.occupancyPct > 92 ? `${bottleneck.tag} is above 92% occupancy in the simulated campaign.` : "",
+    ].filter(Boolean),
+  };
+}
+
+function scheduleOperationRows() {
+  return campaignSchedule().operations.map((item) => ({
+    batchId: item.batchId,
+    operationNo: item.operationNo,
+    tag: item.tag,
+    operation: item.operation,
+    class: item.class,
+    group: item.group,
+    startH: item.startH,
+    setupH: item.setupH,
+    processH: item.processH,
+    processEndH: item.processEndH,
+    cleanStartH: item.cleanStartH,
+    cleanH: item.cleanH,
+    finishH: item.finishH,
+    waitingH: item.waitingH,
+    status: item.status,
+  }));
+}
+
+function scheduleResourceRows() {
+  return campaignSchedule().resourceRows.map((item) => ({
+    resource: item.resource,
+    type: item.type,
+    busyH: item.busyH,
+    availableH: item.availableH,
+    occupancyPct: item.occupancyPct,
+    status: item.status,
+  }));
+}
+
 function sparklinePath(rows, key, width = 420, height = 112) {
   const values = rows.map((row) => Number(row[key]) || 0);
   const min = Math.min(...values);
@@ -3190,7 +3415,7 @@ function parameterGroup(item) {
   if (["ph", "osmolality", "temperature", "viability", "cellDensity", "doublingTime", "specificGrowth", "biomassYield"].includes(item.key)) return "Cell physiology";
   if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density", "heatRecovery"].includes(item.key)) return "Transfer + rheology";
   if (["perfusionRate", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
-  if (["cipTime", "sipHold", "sterilityAssurance", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit"].includes(item.key)) return "GMP + cleaning";
+  if (["cipTime", "sipHold", "sterilityAssurance", "bioburden", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit", "qcReleaseTime", "operatorShiftHours"].includes(item.key)) return "GMP + cleaning";
   if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction"].includes(item.key)) return "Scale-up + economics";
   return "Environmental + utilities";
 }
@@ -3861,6 +4086,7 @@ function renderSimulationBoard() {
   const data = metrics();
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
+  const schedule = campaignSchedule();
   const profileRows = dynamic.points;
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
@@ -3889,6 +4115,13 @@ function renderSimulationBoard() {
       <article><span>Model review flags</span><strong class="${modelRiskCount ? "risk" : "ok"}">${modelRiskCount}</strong></article>
       <article><span>Median confidence</span><strong>${formatNumber([...unitModels].sort((a, b) => a.confidence - b.confidence)[Math.floor(unitModels.length / 2)]?.confidence || 0, 0)}%</strong></article>
       <article><span>Download</span><strong>Unit CSV</strong></article>
+    </section>
+    <section class="simulation-summary">
+      <article><span>Campaign scheduler</span><strong>${schedule.simulatedBatches} batches</strong></article>
+      <article><span>Feasible annual batches</span><strong class="${schedule.feasibleAnnualBatches < state.batchCount ? "risk" : "ok"}">${schedule.feasibleAnnualBatches}/${state.batchCount}</strong></article>
+      <article><span>Release pitch</span><strong>${formatNumber(schedule.releasePitchH, 1)} h</strong></article>
+      <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
+      <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
     </section>
     <section class="operation-sequence">
       <h3>Deterministic process balance</h3>
@@ -3963,6 +4196,45 @@ function renderSimulationBoard() {
               <dt>Equation</dt><dd>${item.equation}</dd>
             </dl>
             <p>${item.warnings || item.recommendation}</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <section class="simulation-group">
+      <h3>Finite-capacity campaign schedule</h3>
+      <div class="schedule-panel">
+        <div class="schedule-panel-copy">
+          <span>${schedule.basis}</span>
+          <h4>${formatNumber(schedule.makespanH, 1)} h simulated campaign · ${formatNumber(schedule.effectiveAotH, 0)} h/yr effective AOT</h4>
+          <p>${schedule.warnings.length ? schedule.warnings.join(" ") : "The selected annual batch target is inside the current finite-capacity screening schedule."}</p>
+        </div>
+        <div class="schedule-timeline" aria-label="First batch operation timeline">
+          ${schedule.operations.filter((item) => item.batchId === "B01").slice(0, 18).map((item) => {
+            const left = Math.max(0, item.startH / Math.max(1, schedule.makespanH) * 100);
+            const width = Math.max(2.2, (item.finishH - item.startH) / Math.max(1, schedule.makespanH) * 100);
+            return `
+              <div class="schedule-row">
+                <span>${item.tag}</span>
+                <i style="--start:${left}%; --width:${Math.min(100 - left, width)}%;" title="${escapeAttr(`${item.batchId} ${item.operation}: start ${formatNumber(item.startH, 1)} h, finish ${formatNumber(item.finishH, 1)} h, clean ${formatNumber(item.cleanH, 1)} h`)}"></i>
+                <b>${formatNumber(item.finishH - item.startH, 1)} h</b>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+      <div class="simulation-cards">
+        ${schedule.resourceRows.slice(0, 6).map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${item.status}</span>
+              <h4>${item.resource} · ${item.type}</h4>
+            </div>
+            <dl>
+              <dt>Busy</dt><dd>${formatNumber(item.busyH, 1)} h</dd>
+              <dt>Available</dt><dd>${formatNumber(item.availableH, 1)} h</dd>
+              <dt>Occupancy</dt><dd>${formatNumber(item.occupancyPct, 1)}%</dd>
+            </dl>
+            <p>${item.status === "bottleneck" ? "This resource is likely capacity-limiting." : item.status === "review" ? "Review this occupancy before scaling the campaign." : "No major occupancy warning in this screening schedule."}</p>
           </article>
         `).join("")}
       </div>
@@ -4719,6 +4991,7 @@ function comprehensiveReport() {
     solver: solved,
     dynamicProfile: dynamicBatchProfile(),
     unitModels: unitMechanisticModels(),
+    schedule: campaignSchedule(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -4756,6 +5029,7 @@ function renderReportsBoard() {
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
+      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
     </section>
   `;
 }
@@ -4857,6 +5131,7 @@ function simulationReadinessItems() {
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
   const unitModels = unitMechanisticModels();
+  const schedule = campaignSchedule();
   const boundaryItems = evaluatePhysicalBoundaries()
     .filter((item) => item.severity !== "ok")
     .map((item) => ({
@@ -4911,9 +5186,9 @@ function simulationReadinessItems() {
     },
     {
       group: "Scheduling",
-      status: "Must add for full simulator",
+      status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: "Add multi-batch equipment occupancy, changeover, CIP/SIP windows, hold-time limits, campaign planning, operator shifts, QC release timing, and cleanroom suite constraints. The current dynamic profile is one-batch screening, not a finite-capacity plant scheduler.",
+      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, setup/process/CIP timing, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs editable recipes, alternate equipment assignments, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
     },
     {
       group: "GMP validation",
@@ -5115,6 +5390,7 @@ function downloadSummaryCsv() {
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
   const unitModels = unitMechanisticModels();
+  const schedule = campaignSchedule();
   downloadCsv(`${state.template}-process-summary.csv`, [
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
@@ -5140,6 +5416,10 @@ function downloadSummaryCsv() {
     { metric: "Dynamic max ammonia", value: dynamic.maxAmmoniaMm, unit: "mM" },
     { metric: "Mechanistic unit models", value: unitModels.length, unit: "models" },
     { metric: "Mechanistic model review flags", value: unitModels.filter((item) => item.severity !== "ok").length, unit: "flags" },
+    { metric: "Schedule feasible annual batches", value: schedule.feasibleAnnualBatches, unit: "batches/yr" },
+    { metric: "Schedule release pitch", value: schedule.releasePitchH, unit: "h" },
+    { metric: "Schedule bottleneck", value: schedule.bottleneck.tag, unit: "" },
+    { metric: "Schedule warnings", value: schedule.warnings.length, unit: "warnings" },
     { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
     { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
@@ -5189,6 +5469,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
+  } else if (type === "schedule-csv") {
+    downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows());
+  } else if (type === "schedule-resources-csv") {
+    downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows());
   }
   showToast("Download prepared");
 }

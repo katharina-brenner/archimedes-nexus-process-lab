@@ -4958,6 +4958,80 @@ th {
   line-height: 1.45;
 }
 
+.schedule-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(360px, 1.2fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.06);
+}
+
+.schedule-panel-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.schedule-panel-copy span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.schedule-panel-copy h4,
+.schedule-panel-copy p {
+  margin: 0;
+}
+
+.schedule-panel-copy h4 {
+  color: #07111f;
+  font-size: 16px;
+}
+
+.schedule-panel-copy p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.schedule-timeline {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 72px minmax(160px, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 11px;
+}
+
+.schedule-row > span,
+.schedule-row > b {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-row > i {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, transparent var(--start), rgba(0, 168, 143, 0.88) var(--start), rgba(0, 168, 143, 0.88) calc(var(--start) + var(--width)), transparent calc(var(--start) + var(--width))),
+    repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.06) 0 1px, transparent 1px 12.5%);
+}
+
 .standards-view.active {
   display: block;
   overflow: auto;
