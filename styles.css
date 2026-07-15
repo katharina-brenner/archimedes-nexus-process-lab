@@ -5032,6 +5032,131 @@ th {
     repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.06) 0 1px, transparent 1px 12.5%);
 }
 
+.recipe-editor-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(520px, 1.45fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(7, 17, 31, 0.06);
+}
+
+.recipe-editor-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.recipe-editor-copy span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recipe-editor-copy h4,
+.recipe-editor-copy p {
+  margin: 0;
+}
+
+.recipe-editor-copy h4 {
+  color: #07111f;
+  font-size: 16px;
+}
+
+.recipe-editor-copy p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recipe-editor-copy button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #07111f;
+  font-weight: 800;
+}
+
+.recipe-grid {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.recipe-grid-head,
+.recipe-grid-row {
+  display: grid;
+  grid-template-columns: minmax(126px, 1.15fr) minmax(104px, 0.9fr) repeat(4, minmax(78px, 0.62fr));
+  gap: 8px;
+  align-items: center;
+  min-width: 760px;
+}
+
+.recipe-grid-head {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recipe-grid-row {
+  padding: 7px;
+  border: 1px solid rgba(7, 17, 31, 0.08);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.recipe-grid-row.edited {
+  border-color: rgba(0, 168, 143, 0.42);
+  background: rgba(0, 168, 143, 0.08);
+}
+
+.recipe-grid-row > span {
+  min-width: 0;
+  color: #07111f;
+  font-size: 11px;
+}
+
+.recipe-grid-row b,
+.recipe-grid-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-grid-row small {
+  color: var(--muted);
+}
+
+.recipe-grid-row label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recipe-grid-row input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #07111f;
+  font: inherit;
+  font-size: 12px;
+}
+
 .standards-view.active {
   display: block;
   overflow: auto;
@@ -5453,7 +5578,9 @@ th {
 
   .start-hero,
   .cfd-hero,
-  .reports-hero {
+  .reports-hero,
+  .recipe-editor-panel,
+  .schedule-panel {
     grid-template-columns: 1fr;
   }
 

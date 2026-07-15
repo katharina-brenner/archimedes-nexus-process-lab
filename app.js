@@ -1737,6 +1737,7 @@ const state = {
   productBrief: "",
   productFiles: [],
   inferredTemplate: "culturedMeat",
+  recipeOverrides: {},
 };
 
 const els = {
@@ -2066,6 +2067,7 @@ function loadTemplate(key, preserveScale = false) {
   state.connectFrom = null;
   state.nextUnit = 900;
   state.nextStream = 900;
+  state.recipeOverrides = {};
 
   if (!preserveScale) {
     state.batchSize = template.batchSize;
@@ -3000,7 +3002,17 @@ function scheduleUnitGroup(item) {
   return "Support";
 }
 
-function scheduleOperationDuration(unitItem, data) {
+function recipeNumber(unitItem, key, fallback, min = 0, max = 100000) {
+  const value = Number(state.recipeOverrides[unitItem.id]?.[key]);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+
+function recipeParallelUnits(unitItem) {
+  return Math.max(1, Math.min(12, Math.round(recipeNumber(unitItem, "parallelUnits", 1, 1, 12))));
+}
+
+function defaultScheduleOperationDuration(unitItem, data) {
   const p = state.params;
   const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
   if (unitItem.cls === "Bioreactor") return Math.max(18, data.batchDuration * (text.includes("seed") ? 0.18 : 0.48), unitItem.residence || 0);
@@ -3018,7 +3030,11 @@ function scheduleOperationDuration(unitItem, data) {
   return Math.max(0.35, unitItem.residence || 0.7);
 }
 
-function scheduleCleaningDuration(unitItem) {
+function scheduleOperationDuration(unitItem, data) {
+  return recipeNumber(unitItem, "processH", defaultScheduleOperationDuration(unitItem, data), 0.05, 10000);
+}
+
+function defaultScheduleCleaningDuration(unitItem) {
   const p = state.params;
   const layer = unitLayer(unitItem);
   if (layer === "cleaning") return Math.max(0.25, p.cipTime || 2.5);
@@ -3029,10 +3045,18 @@ function scheduleCleaningDuration(unitItem) {
   return 0;
 }
 
-function scheduleSetupDuration(unitItem) {
+function scheduleCleaningDuration(unitItem) {
+  return recipeNumber(unitItem, "cleanH", defaultScheduleCleaningDuration(unitItem), 0, 1000);
+}
+
+function defaultScheduleSetupDuration(unitItem) {
   const p = state.params;
   const major = ["Preparation", "Bioreactor", "Purification", "Concentration", "Packaging", "Finishing"].includes(unitItem.cls);
   return Math.max(0.03, (p.setupTime || 4) * (major ? 0.08 : 0.025));
+}
+
+function scheduleSetupDuration(unitItem) {
+  return recipeNumber(unitItem, "setupH", defaultScheduleSetupDuration(unitItem), 0, 1000);
 }
 
 function campaignSchedule() {
@@ -3044,7 +3068,9 @@ function campaignSchedule() {
   const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
   const transferSlack = Math.max(0.05, (p.turnaroundTime || 8) / Math.max(8, orderedUnits.length * 2));
   const equipmentAvailable = {};
+  const equipmentPools = {};
   const equipmentBusy = {};
+  const equipmentCapacity = {};
   const groupBusy = {};
   const shiftHours = Math.max(1, p.operatorShiftHours || 8);
   const resourceBusy = { "CIP/SIP skid": 0, "QC release queue": 0, "Operator shifts": 0 };
@@ -3063,7 +3089,14 @@ function campaignSchedule() {
       const setupH = scheduleSetupDuration(unitItem);
       const processH = scheduleOperationDuration(unitItem, data);
       const cleanH = scheduleCleaningDuration(unitItem);
-      const equipmentReady = equipmentAvailable[unitItem.id] || 0;
+      const parallelUnits = recipeParallelUnits(unitItem);
+      equipmentCapacity[unitItem.id] = parallelUnits;
+      if (!equipmentPools[unitItem.id] || equipmentPools[unitItem.id].length !== parallelUnits) {
+        equipmentPools[unitItem.id] = Array.from({ length: parallelUnits }, (_, index) => equipmentPools[unitItem.id]?.[index] || 0);
+      }
+      const pool = equipmentPools[unitItem.id];
+      const selectedSlot = pool.reduce((best, value, index) => value < pool[best] ? index : best, 0);
+      const equipmentReady = pool[selectedSlot] || 0;
       const startH = Math.max(readyTime, equipmentReady);
       const waitingH = Math.max(0, startH - readyTime);
       const processEndH = startH + setupH + processH;
@@ -3079,6 +3112,8 @@ function campaignSchedule() {
         operation: unitItem.name,
         class: unitItem.cls,
         group,
+        assignedEquipment: `${unitItem.id}${parallelUnits > 1 ? `-${selectedSlot + 1}/${parallelUnits}` : ""}`,
+        parallelUnits,
         startH,
         setupH,
         processH,
@@ -3091,7 +3126,8 @@ function campaignSchedule() {
       };
       operations.push(row);
       if (firstStart == null) firstStart = startH;
-      equipmentAvailable[unitItem.id] = finishH + transferSlack;
+      pool[selectedSlot] = finishH + transferSlack;
+      equipmentAvailable[unitItem.id] = Math.min(...pool);
       equipmentBusy[unitItem.id] = (equipmentBusy[unitItem.id] || 0) + setupH + processH + cleanH;
       groupBusy[group] = (groupBusy[group] || 0) + setupH + processH;
       resourceBusy["Operator shifts"] += (setupH + processH) * (unitItem.cls === "Bioreactor" || unitItem.cls === "Purification" ? 0.35 : 0.18) / shiftHours;
@@ -3125,7 +3161,7 @@ function campaignSchedule() {
     ? (batchReleases.at(-1).qcReleaseH - batchReleases[0].qcReleaseH) / (batchReleases.length - 1)
     : makespanH;
   const maxEquipmentOccupancy = Object.entries(equipmentBusy)
-    .map(([tag, busyH]) => ({ tag, busyH, occupancyPct: busyH / makespanH * 100 }))
+    .map(([tag, busyH]) => ({ tag, busyH, availableH: makespanH * (equipmentCapacity[tag] || 1), occupancyPct: busyH / (makespanH * (equipmentCapacity[tag] || 1)) * 100 }))
     .sort((a, b) => b.occupancyPct - a.occupancyPct);
   const bottleneck = maxEquipmentOccupancy[0] || { tag: "none", occupancyPct: 0, busyH: 0 };
   const resourceRows = [
@@ -3133,7 +3169,7 @@ function campaignSchedule() {
       resource: item.tag,
       type: "Equipment",
       busyH: item.busyH,
-      availableH: makespanH,
+      availableH: item.availableH,
       occupancyPct: item.occupancyPct,
       status: item.occupancyPct > 92 ? "bottleneck" : item.occupancyPct > 75 ? "review" : "ok",
     })),
@@ -3185,6 +3221,8 @@ function scheduleOperationRows() {
     operation: item.operation,
     class: item.class,
     group: item.group,
+    assignedEquipment: item.assignedEquipment,
+    parallelUnits: item.parallelUnits,
     startH: item.startH,
     setupH: item.setupH,
     processH: item.processH,
@@ -3206,6 +3244,44 @@ function scheduleResourceRows() {
     occupancyPct: item.occupancyPct,
     status: item.status,
   }));
+}
+
+function recipeEditorRows() {
+  const data = metrics();
+  const orderedUnits = [...state.units].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const primaryClasses = new Set(["Preparation", "Bioreactor", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging", "Sterilization"]);
+  const selected = state.selectedId ? orderedUnits.find((item) => item.id === state.selectedId) : null;
+  const rows = orderedUnits.filter((item) => primaryClasses.has(item.cls) || unitLayer(item) === "cleaning").slice(0, 16);
+  if (selected && !rows.some((item) => item.id === selected.id)) rows.unshift(selected);
+  return rows.slice(0, 16).map((unitItem) => ({
+    tag: unitItem.id,
+    operation: unitItem.name,
+    class: unitItem.cls,
+    group: scheduleUnitGroup(unitItem),
+    baseProcessH: defaultScheduleOperationDuration(unitItem, data),
+    processH: scheduleOperationDuration(unitItem, data),
+    setupH: scheduleSetupDuration(unitItem),
+    cleanH: scheduleCleaningDuration(unitItem),
+    parallelUnits: recipeParallelUnits(unitItem),
+    edited: !!state.recipeOverrides[unitItem.id],
+  }));
+}
+
+function resetRecipeOverrides() {
+  state.recipeOverrides = {};
+  renderAll();
+  showToast("Recipe timing reset");
+}
+
+function applyRecipeInput(input) {
+  const unitId = input.dataset.recipeUnit;
+  const field = input.dataset.recipeField;
+  const unit = state.units.find((item) => item.id === unitId);
+  if (!unit) return false;
+  const value = field === "parallelUnits" ? Math.round(Number(input.value)) : Number(input.value);
+  if (!Number.isFinite(value)) return false;
+  state.recipeOverrides[unitId] = { ...(state.recipeOverrides[unitId] || {}), [field]: value };
+  return true;
 }
 
 function sparklinePath(rows, key, width = 420, height = 112) {
@@ -4087,6 +4163,7 @@ function renderSimulationBoard() {
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
   const schedule = campaignSchedule();
+  const recipeRows = recipeEditorRows();
   const profileRows = dynamic.points;
   const washout = p.dilutionRate >= p.specificGrowth;
   const absorptionBoost = p.co2Removal / 2000;
@@ -4198,6 +4275,37 @@ function renderSimulationBoard() {
             <p>${item.warnings || item.recommendation}</p>
           </article>
         `).join("")}
+      </div>
+    </section>
+    <section class="simulation-group">
+      <h3>Editable recipe model</h3>
+      <div class="recipe-editor-panel">
+        <div class="recipe-editor-copy">
+          <span>Step 6 · recipe control</span>
+          <h4>Edit the generated recipe assumptions before scheduling</h4>
+          <p>Change process, setup, cleaning, and parallel equipment counts. The finite-capacity campaign schedule, bottleneck occupancy, warnings, and CSV exports update from these values.</p>
+          <button data-recipe-reset type="button">Reset recipe timing</button>
+        </div>
+        <div class="recipe-grid" role="table" aria-label="Editable recipe timing">
+          <div class="recipe-grid-head" role="row">
+            <span>Unit</span>
+            <span>Group</span>
+            <span>Process h</span>
+            <span>Setup h</span>
+            <span>Clean h</span>
+            <span>Parallel</span>
+          </div>
+          ${recipeRows.map((item) => `
+            <div class="recipe-grid-row ${item.edited ? "edited" : ""}" role="row">
+              <span><b>${item.tag}</b><small>${item.operation}</small></span>
+              <span>${item.group}</span>
+              <label><input data-recipe-field="processH" data-recipe-unit="${item.tag}" type="number" min="0.05" step="0.1" value="${item.processH.toFixed(2)}" /><small>base ${formatNumber(item.baseProcessH, 1)}</small></label>
+              <label><input data-recipe-field="setupH" data-recipe-unit="${item.tag}" type="number" min="0" step="0.05" value="${item.setupH.toFixed(2)}" /></label>
+              <label><input data-recipe-field="cleanH" data-recipe-unit="${item.tag}" type="number" min="0" step="0.05" value="${item.cleanH.toFixed(2)}" /></label>
+              <label><input data-recipe-field="parallelUnits" data-recipe-unit="${item.tag}" type="number" min="1" max="12" step="1" value="${item.parallelUnits}" /></label>
+            </div>
+          `).join("")}
+        </div>
       </div>
     </section>
     <section class="simulation-group">
@@ -4992,6 +5100,7 @@ function comprehensiveReport() {
     dynamicProfile: dynamicBatchProfile(),
     unitModels: unitMechanisticModels(),
     schedule: campaignSchedule(),
+    recipe: recipeEditorRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -5030,6 +5139,7 @@ function renderReportsBoard() {
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
+      <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -5188,7 +5298,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, setup/process/CIP timing, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs editable recipes, alternate equipment assignments, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
+      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current case supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs dependency editing, alternate-route assignment, operator calendars, suite-level cleanroom constraints, campaign changeovers, and validated site calendars.`,
     },
     {
       group: "GMP validation",
@@ -5391,6 +5501,7 @@ function downloadSummaryCsv() {
   const dynamic = dynamicBatchProfile();
   const unitModels = unitMechanisticModels();
   const schedule = campaignSchedule();
+  const recipeRows = recipeEditorRows();
   downloadCsv(`${state.template}-process-summary.csv`, [
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
@@ -5420,6 +5531,7 @@ function downloadSummaryCsv() {
     { metric: "Schedule release pitch", value: schedule.releasePitchH, unit: "h" },
     { metric: "Schedule bottleneck", value: schedule.bottleneck.tag, unit: "" },
     { metric: "Schedule warnings", value: schedule.warnings.length, unit: "warnings" },
+    { metric: "Edited recipe rows", value: recipeRows.filter((item) => item.edited).length, unit: "rows" },
     { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
     { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
@@ -5473,6 +5585,8 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows());
   } else if (type === "schedule-resources-csv") {
     downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows());
+  } else if (type === "recipe-csv") {
+    downloadCsv(`${state.template}-editable-recipe.csv`, recipeEditorRows());
   }
   showToast("Download prepared");
 }
@@ -6123,6 +6237,32 @@ function bindEvents() {
     renderAiBoard();
     renderRecommendations();
     renderReportsBoard();
+  });
+
+  els.simulationBoard.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-recipe-field]");
+    if (!input) return;
+    if (!applyRecipeInput(input)) return;
+    renderSimulationBoard();
+    renderRecommendations();
+    renderReportsBoard();
+    showToast(`${input.dataset.recipeUnit} recipe updated`);
+  });
+
+  els.simulationBoard.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-recipe-field]");
+    if (!input || !applyRecipeInput(input)) return;
+    window.clearTimeout(els.simulationBoard.recipeInputTimer);
+    els.simulationBoard.recipeInputTimer = window.setTimeout(() => {
+      renderSimulationBoard();
+      renderRecommendations();
+      renderReportsBoard();
+    }, 350);
+  });
+
+  els.simulationBoard.addEventListener("click", (event) => {
+    const resetButton = event.target.closest("[data-recipe-reset]");
+    if (resetButton) resetRecipeOverrides();
   });
 
   els.equationSearch.addEventListener("input", renderEquations);
