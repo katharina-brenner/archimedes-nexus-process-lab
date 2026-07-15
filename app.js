@@ -2762,6 +2762,227 @@ function dynamicProfileRows() {
   }));
 }
 
+function modelStatusLabel(severity) {
+  return {
+    ok: "Inside screening range",
+    caution: "Review recommended",
+    critical: "Hard review",
+  }[severity] || "Review recommended";
+}
+
+function modelConfidence(severity, base = 72) {
+  const adjustment = severity === "critical" ? -24 : severity === "caution" ? -12 : 8;
+  return Math.max(35, Math.min(92, base + adjustment));
+}
+
+function unitMechanisticModels() {
+  const p = state.params;
+  const data = metrics();
+  const solved = solveMassBalance();
+  const dynamic = dynamicBatchProfile();
+  const productKgBatch = Math.max(0.001, data.productPerBatchKg);
+
+  return state.units.map((unitItem) => {
+    const solvedUnit = solved.unitMap[unitItem.id] || {};
+    const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+    const layer = unitLayer(unitItem);
+    const unitVolumeL = Math.max(1, estimatedBioreactorVolumeL(unitItem) || unitItem.size || state.batchSize * 0.1);
+    const incomingMass = Math.max(0.001, solvedUnit.massIn || unitVolumeL * (p.density || 1000) / 1000);
+    let model = {
+      tag: unitItem.id,
+      operation: unitItem.name,
+      class: unitItem.cls,
+      modelType: "Generic dynamic hold-up",
+      status: "Inside screening range",
+      severity: "ok",
+      confidence: 68,
+      keyMetric: "Residence time",
+      metricValue: unitItem.residence || 1,
+      metricUnit: "h",
+      equation: "dM/dt = min - mout + rV",
+      inputs: `Mass in ${formatNumber(incomingMass, 1)} kg/batch; residence ${formatNumber(unitItem.residence || 1, 2)} h`,
+      outputs: `Heat ${formatNumber(solvedUnit.heatDuty || 0, 1)} kWh/batch; closure ${formatNumber(solvedUnit.closurePct || 100, 2)}%`,
+      warnings: "",
+      recommendation: "Use this as a unit hold-up and pass-through screening model until a class-specific validated model is added.",
+    };
+
+    if (unitItem.cls === "Bioreactor" || text.includes("fermenter") || text.includes("reactor")) {
+      const substrate = Math.max(0.01, p.glucose || 4);
+      const oxygenFactor = Math.max(0.05, (p.doSetpoint || 40) / 100);
+      const muEff = (p.specificGrowth || 0.05) * substrate / (0.45 + substrate) * oxygenFactor / (0.18 + oxygenFactor);
+      const transferIndex = ((p.kla || 65) * Math.max(1, p.doSetpoint || 40) / 100) / Math.max(0.1, p.our || 4.5);
+      const stress = Math.max(0, 1 - transferIndex / 1.6) + Math.max(0, dynamic.maxAmmoniaMm - (isCellCultureTemplate() ? 2 : 6)) * 0.08 + Math.max(0, 20 - dynamic.minDoPct) * 0.04;
+      const severity = transferIndex < 1 ? "critical" : transferIndex < 1.6 || stress > 0.65 ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "Bioreactor kinetic + oxygen-transfer screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 76),
+        keyMetric: "O2 transfer margin",
+        metricValue: transferIndex,
+        metricUnit: "index",
+        equation: "mu = mumax*S/(Ks+S)*DO/(Kdo+DO); OTR = kLa*(Cstar - CL); dP/dt = alpha*dX/dt + beta*X",
+        inputs: `V ${formatNumber(unitVolumeL, 0)} L; kLa ${formatNumber(p.kla, 0)} 1/h; OUR ${formatNumber(p.our, 1)} mmol/L/h; glucose ${formatNumber(substrate, 1)} g/L`,
+        outputs: `mu_eff ${formatNumber(muEff, 3)} 1/h; min DO ${formatNumber(dynamic.minDoPct, 1)}%; max NH4 ${formatNumber(dynamic.maxAmmoniaMm, 1)} mM`,
+        warnings: severity === "ok" ? "" : "Oxygen transfer, ammonium, or DO approaches the conservative mechanistic boundary.",
+        recommendation: severity === "ok" ? "Proceed to scale-down validation and controller tuning." : "Review sparging, oxygen enrichment, impeller power, feed strategy, perfusion/bleed, and reactor scale-out before treating this as feasible.",
+      };
+    } else if (["Filtration", "Solid-liquid", "Concentration", "Viral safety"].includes(unitItem.cls) || text.includes("filter") || text.includes("ufdf")) {
+      const flux = Math.max(5, p.sterileFilterFlux || 180);
+      const viscosityPenalty = Math.max(0.35, 1 / Math.max(0.4, p.viscosity || 1.2));
+      const foulingIndex = Math.max(0.2, incomingMass / Math.max(100, state.batchSize / 8) * (1 + (p.cellDensity || 18) / 120));
+      const effectiveFlux = flux * viscosityPenalty / (1 + foulingIndex * 0.18);
+      const areaM2 = incomingMass / Math.max(1, effectiveFlux * Math.max(0.5, unitItem.residence || 1));
+      const severity = effectiveFlux < 45 ? "critical" : effectiveFlux < 90 || areaM2 > 80 ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "Flux, fouling, and area sizing screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 73),
+        keyMetric: "Effective flux",
+        metricValue: effectiveFlux,
+        metricUnit: "LMH",
+        equation: "J = dV/(A*dt) = DeltaP/(mu*(Rm + Rc + Rf)); A = V/(J*t)",
+        inputs: `Feed ${formatNumber(incomingMass, 1)} kg/batch; clean flux ${formatNumber(flux, 0)} LMH; viscosity ${formatNumber(p.viscosity || 1.2, 2)} cP`,
+        outputs: `Area screen ${formatNumber(areaM2, 1)} m2; fouling index ${formatNumber(foulingIndex, 2)}; yield ${(unitItem.cls === "Concentration" ? p.ufdfYield : p.clarificationYield) || p.harvestRecovery}%`,
+        warnings: severity === "ok" ? "" : "Flux or membrane area is outside the preferred screening band.",
+        recommendation: severity === "ok" ? "Use vendor capsules/cassettes to refine area and hold-up." : "Add parallel modules, reduce solids loading, split harvest, include prefilter depth, and validate fouling curves with vendor data.",
+      };
+    } else if (["Purification", "Recovery", "Separation"].includes(unitItem.cls) || text.includes("chrom") || text.includes("protein-a") || text.includes("column")) {
+      const dbc = Math.max(5, p.resinCapacity || 35);
+      const feedConcentration = Math.max(0.05, state.titer * (p.harvestRecovery || 88) / 100);
+      const loadL = productKgBatch * 1000 / feedConcentration;
+      const resinL = Math.max(0.1, productKgBatch * 1000 / dbc);
+      const cycles = Math.max(1, Math.ceil(loadL / Math.max(1, resinL * 8)));
+      const yieldPct = unitItem.cls === "Recovery" ? p.harvestRecovery : p.chromYield;
+      const severity = cycles > 8 || yieldPct < 70 ? "critical" : cycles > 4 || yieldPct < 82 ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "Chromatography / partition screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 70),
+        keyMetric: "Cycles",
+        metricValue: cycles,
+        metricUnit: "per batch",
+        equation: "Vload = DBC*Vresin/Cfeed; recovery = product_pool/product_feed; K = xi_extract/xi_raffinate",
+        inputs: `Product ${formatMass(productKgBatch)} per batch; DBC ${formatNumber(dbc, 1)} g/L; feed ${formatNumber(feedConcentration, 2)} g/L`,
+        outputs: `Resin screen ${formatNumber(resinL, 1)} L; ${cycles} cycles; yield ${formatNumber(yieldPct, 0)}%`,
+        warnings: severity === "ok" ? "" : "Binding capacity, cycle count, or step yield is not in a comfortable screening range.",
+        recommendation: severity === "ok" ? "Proceed to breakthrough, wash, elution, and pool-volume calibration." : "Increase column volume, use parallel skids, reduce load, improve capture yield, or test alternative resin/partition conditions.",
+      };
+    } else if (unitItem.cls === "Thermal" || unitItem.cls === "Sterilization" || text.includes("heat") || text.includes("sip") || text.includes("autoclave")) {
+      const deltaT = Math.max(0, (solvedUnit.targetTemperature || p.temperature || 25) - 20);
+      const heatKwh = Math.max(0, solvedUnit.grossHeatDuty || solvedUnit.heatDuty || incomingMass * 4.18 * deltaT / 3600);
+      const recoveryPct = Math.min(85, Math.max(0, p.heatRecovery || 0));
+      const lethalityF0 = text.includes("sip") || text.includes("steril") ? Math.max(0, p.sipHold || 20) * Math.pow(10, ((121 - 121.1) / 10)) : 0;
+      const severity = heatKwh > Math.max(2500, state.batchSize * 0.08) && recoveryPct < 25 ? "caution" : lethalityF0 && lethalityF0 < 12 ? "critical" : "ok";
+      model = {
+        ...model,
+        modelType: "Heat duty, SIP lethality, and reuse screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 74),
+        keyMetric: lethalityF0 ? "F0 lethality" : "Gross heat",
+        metricValue: lethalityF0 || heatKwh,
+        metricUnit: lethalityF0 ? "min" : "kWh/batch",
+        equation: "Q = m*Cp*DeltaT + Hvap*mvap; F0 = integral(10^((T-121.1)/z) dt); Qnet = Qgross*(1 - heat_recovery)",
+        inputs: `Mass ${formatNumber(incomingMass, 1)} kg; target ${formatNumber(solvedUnit.targetTemperature || p.temperature || 25, 1)} C; recovery ${formatNumber(recoveryPct, 0)}%`,
+        outputs: `Gross heat ${formatNumber(heatKwh, 1)} kWh; recovered ${formatNumber(solvedUnit.recoveredHeat || 0, 1)} kWh; F0 ${formatNumber(lethalityF0, 1)} min`,
+        warnings: severity === "ok" ? "" : "Heat recovery or sterilization hold time needs engineering review.",
+        recommendation: severity === "ok" ? "Refine with exchanger area, approach temperature, steam pressure, and condensate-return constraints." : "Add heat integration, verify SIP temperature distribution, and size clean steam/chilled utilities before scale-up.",
+      };
+    } else if (layer === "cleaning" || text.includes("cip") || text.includes("clean")) {
+      const cleaningLoad = Math.max(5, state.batchSize * 0.015);
+      const rinseEndpoint = Math.max(0.01, (p.bioburden || 10) / Math.max(1, p.sterilityAssurance || 6));
+      const cipHours = Math.max(0.1, p.cipTime || 2.5);
+      const severity = cipHours < 1.2 || rinseEndpoint > 3 ? "critical" : cipHours < 2 || rinseEndpoint > 1 ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "CIP residue and cleaning validation screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 72),
+        keyMetric: "Rinse endpoint",
+        metricValue: rinseEndpoint,
+        metricUnit: "proxy",
+        equation: "Cresidue(t) = C0*exp(-k*t); MACO = ADE*batch_size/safety_factor; spent = caustic + acid + rinse + soil",
+        inputs: `CIP ${formatNumber(cipHours, 1)} h; cleaning load ${formatNumber(cleaningLoad, 1)} kg/batch; bioburden ${formatNumber(p.bioburden || 10, 1)} CFU/mL`,
+        outputs: `Endpoint proxy ${formatNumber(rinseEndpoint, 2)}; spent stream ${formatNumber(cleaningLoad * 1.08, 1)} kg/batch`,
+        warnings: severity === "ok" ? "" : "Cleaning hold, bioburden, or residue endpoint is weak for GMP screening.",
+        recommendation: severity === "ok" ? "Add product-specific MACO, swab/rinse limits, and conductivity/TOC endpoint data." : "Increase rinse validation detail, extend CIP/SIP window, define MACO limits, and add dirty/clean hold-time checks.",
+      };
+    } else if (unitItem.cls === "Utilities" || unitItem.cls === "Environmental" || unitItem.cls === "Air pollution" || layer === "waste" || layer === "support") {
+      const removal = unitItem.cls === "Environmental" ? Math.max(p.codRemoval || 86, p.bodRemoval || 92) : unitItem.cls === "Air pollution" ? p.vocRemoval || 96 : p.heatRecovery || 22;
+      const utilityIntensity = Math.max(0.01, (solvedUnit.heatDuty || 0) / Math.max(1, productKgBatch));
+      const severity = unitItem.cls === "Environmental" && removal < 80 ? "critical" : removal < 90 && ["Environmental", "Air pollution"].includes(unitItem.cls) ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "Utility, abatement, and resource screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 66),
+        keyMetric: "Removal / reuse",
+        metricValue: removal,
+        metricUnit: "%",
+        equation: "load_out = load_in*(1 - eta); E = sum(mi*EF_i)*(1 - eta_control); utility_intensity = Q/product",
+        inputs: `Load ${formatNumber(incomingMass, 1)} kg/batch; heat ${formatNumber(solvedUnit.heatDuty || 0, 1)} kWh/batch`,
+        outputs: `Removal/reuse ${formatNumber(removal, 1)}%; utility intensity ${formatNumber(utilityIntensity, 2)} kWh/kg`,
+        warnings: severity === "ok" ? "" : "Removal or reuse efficiency is too low for the active production scale.",
+        recommendation: severity === "ok" ? "Calibrate with site utility headers, emission permits, and wastewater assays." : "Add equalization, polishing, heat recovery, or abatement capacity and validate discharge limits.",
+      };
+    } else if (unitItem.cls === "Quality" || unitItem.cls === "Instrumentation" || text.includes("pat") || text.includes("qc")) {
+      const dataCompleteness = Math.min(100, 45 + processParameters.length * 0.8 + equations.length * 0.05);
+      const releaseLoad = Math.max(1, state.batchCount / Math.max(1, p.annualOperatingTime || 7200) * 24);
+      const severity = dataCompleteness < 70 ? "caution" : "ok";
+      model = {
+        ...model,
+        modelType: "PAT, release, and data-integrity screen",
+        status: modelStatusLabel(severity),
+        severity,
+        confidence: modelConfidence(severity, 64),
+        keyMetric: "Data completeness",
+        metricValue: dataCompleteness,
+        metricUnit: "%",
+        equation: "CQA_hat = f(PAT, pH, DO, feed, temperature); release = specs_pass and audit_trail_complete",
+        inputs: `${processParameters.length} parameters; ${equations.length} equations; ${state.streams.length} streams`,
+        outputs: `Release load ${formatNumber(releaseLoad, 2)} batches/day; completeness ${formatNumber(dataCompleteness, 0)}%`,
+        warnings: severity === "ok" ? "" : "The data model still needs validated CQAs, calibration ranges, and audit-trail logic.",
+        recommendation: "Attach CQA specs, calibration files, historian tags, audit trails, and method-validation records before production release use.",
+      };
+    }
+
+    return {
+      ...model,
+      metricValue: Number.isFinite(model.metricValue) ? model.metricValue : 0,
+      sourceBasis: sourcesForUnit(unitItem).slice(0, 2).map((source) => source.group).join("; ") || "Engineering screening assumption",
+    };
+  });
+}
+
+function mechanisticModelRows() {
+  return unitMechanisticModels().map((item) => ({
+    tag: item.tag,
+    operation: item.operation,
+    class: item.class,
+    modelType: item.modelType,
+    status: item.status,
+    severity: item.severity,
+    confidencePct: item.confidence,
+    keyMetric: item.keyMetric,
+    metricValue: item.metricValue,
+    metricUnit: item.metricUnit,
+    equation: item.equation,
+    inputs: item.inputs,
+    outputs: item.outputs,
+    warnings: item.warnings,
+    recommendation: item.recommendation,
+    sourceBasis: item.sourceBasis,
+  }));
+}
+
 function sparklinePath(rows, key, width = 420, height = 112) {
   const values = rows.map((row) => Number(row[key]) || 0);
   const min = Math.min(...values);
@@ -3646,6 +3867,13 @@ function renderSimulationBoard() {
   const groups = [...new Set(spdFunctions.map((item) => item.group))];
   const weakBalances = solved.units.filter((item) => item.closurePct < 98).slice(0, 6);
   const topFlows = [...solved.streams].sort((a, b) => b.massFlow - a.massFlow).slice(0, 6);
+  const unitModels = unitMechanisticModels();
+  const severityRank = { critical: 3, caution: 2, ok: 1 };
+  const priorityModels = [...unitModels]
+    .sort((a, b) => (severityRank[b.severity] - severityRank[a.severity]) || (a.confidence - b.confidence))
+    .slice(0, 8);
+  const modelRiskCount = unitModels.filter((item) => item.severity !== "ok").length;
+  const modelTypes = new Set(unitModels.map((item) => item.modelType));
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -3654,6 +3882,13 @@ function renderSimulationBoard() {
       <article><span>Solved streams</span><strong>${solved.totals.solvedStreams}/${state.streams.length}</strong></article>
       <article><span>Recycle convergence</span><strong class="${solved.convergence.converged ? "ok" : "risk"}">${formatNumber(solved.convergence.maxRelativeDelta * 100, 3)}%</strong></article>
       <article><span>Net heat duty</span><strong>${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch</strong></article>
+    </section>
+    <section class="simulation-summary">
+      <article><span>Mechanistic unit models</span><strong>${unitModels.length}</strong></article>
+      <article><span>Model families</span><strong>${modelTypes.size}</strong></article>
+      <article><span>Model review flags</span><strong class="${modelRiskCount ? "risk" : "ok"}">${modelRiskCount}</strong></article>
+      <article><span>Median confidence</span><strong>${formatNumber([...unitModels].sort((a, b) => a.confidence - b.confidence)[Math.floor(unitModels.length / 2)]?.confidence || 0, 0)}%</strong></article>
+      <article><span>Download</span><strong>Unit CSV</strong></article>
     </section>
     <section class="operation-sequence">
       <h3>Deterministic process balance</h3>
@@ -3711,6 +3946,25 @@ function renderSimulationBoard() {
           </svg>
           <p>Orange: instantaneous heat load. Grey: cumulative net energy after heat-recovery credit.</p>
         </article>
+      </div>
+    </section>
+    <section class="simulation-group">
+      <h3>Mechanistic unit-operation models</h3>
+      <div class="simulation-cards">
+        ${priorityModels.map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${item.status}</span>
+              <h4>${item.tag} · ${item.modelType}</h4>
+            </div>
+            <dl>
+              <dt>${item.keyMetric}</dt><dd>${formatNumber(item.metricValue, item.metricValue < 10 ? 2 : 1)} ${item.metricUnit}</dd>
+              <dt>Confidence</dt><dd>${formatNumber(item.confidence, 0)}%</dd>
+              <dt>Equation</dt><dd>${item.equation}</dd>
+            </dl>
+            <p>${item.warnings || item.recommendation}</p>
+          </article>
+        `).join("")}
       </div>
     </section>
     <section class="simulation-group">
@@ -4464,6 +4718,7 @@ function comprehensiveReport() {
     metrics: metrics(),
     solver: solved,
     dynamicProfile: dynamicBatchProfile(),
+    unitModels: unitMechanisticModels(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -4500,6 +4755,7 @@ function renderReportsBoard() {
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
+      <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
     </section>
   `;
 }
@@ -4600,6 +4856,7 @@ function simulationReadinessItems() {
   const data = metrics();
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
+  const unitModels = unitMechanisticModels();
   const boundaryItems = evaluatePhysicalBoundaries()
     .filter((item) => item.severity !== "ok")
     .map((item) => ({
@@ -4635,16 +4892,22 @@ function simulationReadinessItems() {
       detail: `A dynamic screening profile now simulates ${formatNumber(dynamic.durationH, 1)} h with product, recovered product, biomass, substrate, DO, lactate, ammonium, heat load, and cumulative energy. Full simulation still needs validated ODE models, event-based recipes, controller dynamics, equipment hold-up, and measured batch historian calibration.`,
     },
     {
+      group: "Unit operations",
+      status: "Partially covered",
+      title: "Mechanistic equipment model layer",
+      detail: `${unitModels.length} unit operations now receive class-specific screening models for bioreactor kinetics/oxygen transfer, flux/fouling, chromatography capacity, thermal/SIP lethality, CIP residue removal, utility abatement, PAT/release, and generic hold-up. Full simulation still needs validated coefficients, vendor sizing curves, calibration data, and nonlinear dynamic solvers.`,
+    },
+    {
       group: "Reaction and kinetics",
       status: "Partially covered",
       title: "Unit-specific reaction packages",
-      detail: "Add validated Monod/Contois/logistic models, Luedeking-Piret product formation, oxygen uptake, CO2 evolution, inhibition, degradation, sterilization lethality, and cleaning residue removal kinetics.",
+      detail: "Screening equations now include Monod-style effective growth, Luedeking-Piret product formation, oxygen transfer, sterilization lethality, and cleaning residue removal. Full simulation still needs validated Monod/Contois/logistic coefficients, CO2 evolution, inhibition, degradation, and organism/product-specific calibration.",
     },
     {
       group: "Separation",
-      status: "Must add for full simulator",
+      status: "Partially covered",
       title: "Mechanistic filtration/chromatography models",
-      detail: "Add fouling curves, cake resistance, membrane polarization, column breakthrough, resin aging, elution gradients, viral clearance log-reduction, and pool blending logic.",
+      detail: "Filtration, UF/DF, chromatography, and partition steps now receive flux, fouling, area, DBC, resin-volume, cycle-count, and yield screens. Full simulation still needs measured fouling curves, cake resistance, membrane polarization, column breakthrough, resin aging, elution gradients, viral clearance log-reduction, and pool blending logic.",
     },
     {
       group: "Scheduling",
@@ -4851,6 +5114,7 @@ function downloadSummaryCsv() {
   const data = metrics();
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
+  const unitModels = unitMechanisticModels();
   downloadCsv(`${state.template}-process-summary.csv`, [
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
@@ -4874,6 +5138,8 @@ function downloadSummaryCsv() {
     { metric: "Dynamic peak heat", value: dynamic.peakHeatKw, unit: "kW" },
     { metric: "Dynamic min DO", value: dynamic.minDoPct, unit: "%" },
     { metric: "Dynamic max ammonia", value: dynamic.maxAmmoniaMm, unit: "mM" },
+    { metric: "Mechanistic unit models", value: unitModels.length, unit: "models" },
+    { metric: "Mechanistic model review flags", value: unitModels.filter((item) => item.severity !== "ok").length, unit: "flags" },
     { metric: "Solved streams", value: solved.totals.solvedStreams, unit: "streams" },
     { metric: "Solver warnings", value: solved.totals.warningCount + solved.warnings.length, unit: "warnings" },
     { metric: "Equipment", value: state.units.length, unit: "units" },
@@ -4921,6 +5187,8 @@ function handleReportDownload(type) {
     ]);
   } else if (type === "dynamic-csv") {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
+  } else if (type === "unit-models-csv") {
+    downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
   }
   showToast("Download prepared");
 }
