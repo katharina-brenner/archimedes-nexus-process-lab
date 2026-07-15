@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260715-route-optimizer-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260715-projects-collab-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -473,6 +473,7 @@
 
         <nav class="suite-nav" aria-label="Main pages">
           <button class="suite-link active" data-view="start">Start</button>
+          <button class="suite-link" data-view="projects">Projects</button>
           <button class="suite-link" data-view="overview">Overview</button>
           <button class="suite-link" data-view="flowsheet">Process Builder</button>
           <button class="suite-link" data-view="equipment">Equipment Register</button>
@@ -546,6 +547,7 @@
           </div>
           <nav class="view-tabs" aria-label="Workspace views">
             <button class="tab active" data-view="start">Start</button>
+            <button class="tab" data-view="projects">Projects</button>
             <button class="tab" data-view="overview">Overview</button>
             <button class="tab" data-view="flowsheet">Builder</button>
             <button class="tab" data-view="equipment">Equipment</button>
@@ -600,6 +602,10 @@
 
         <section id="startView" class="view start-view active">
           <div id="startBoard" class="start-board"></div>
+        </section>
+
+        <section id="projectsView" class="view projects-view">
+          <div id="projectsBoard" class="projects-board"></div>
         </section>
 
         <section id="overviewView" class="view overview-view">
@@ -764,6 +770,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260715-route-optimizer-v1"></script>
+    <script type="module" src="./app.js?v=20260715-projects-collab-v1"></script>
   </body>
 </html>

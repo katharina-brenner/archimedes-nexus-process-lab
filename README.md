@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=route-optimizer-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=projects-collab-v1`.
 
 ## Online static access
 
@@ -49,6 +49,14 @@ Google login uses Google Identity Services in the browser and verifies the retur
 - `GET /api/auth/google-config` tells the frontend whether Google login is configured
 - `POST /api/auth/google` verifies a Google ID token and creates a server session
 - `GET /api/account` verifies a server session
+- `GET /api/projects` lists projects, invitations, integration definitions, and model folders
+- `POST /api/projects` creates a user-owned project
+- `GET /api/projects/:id` opens a saved model and its old versions
+- `POST /api/projects/:id/save` saves the current model and archives the previous one
+- `POST /api/projects/:id/archive` moves a project out of the active list
+- `POST /api/projects/:id/invites` invites a collaborator by username or email
+- `POST /api/projects/:id/versions/:versionId/restore` restores an archived model version
+- `GET /api/integrations` lists prepared API connector targets
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
 
@@ -56,6 +64,8 @@ Google login uses Google Identity Services in the browser and verifies the retur
 
 - Process templates for cultured meat, penicillin, monoclonal antibody, industrial fermentation, recombinant insulin, viral vaccine, plasmid DNA, autologous cell therapy, small-molecule API, biohydrogen dark-fermentation, industrial wastewater, water purification, and air pollution control
 - Natural-language product brief that chooses the process model automatically, so users do not have to manually choose between template families
+- Project workspace with multi-user backend accounts, per-user projects, active model files, archived old model versions, project restore, and invite-by-email/username collaboration records
+- API connector registry for SuperPro Designer, Aspen, COMSOL, STAR-CCM+, OPC UA/SCADA, AVEVA PI/OSIsoft PI, Benchling, and generic LIMS/ELN handoff targets
 - Data upload capture for project briefs, including file metadata and short previews for CSV, text, JSON, and other attached data
 - Persistent help dock for natural-language troubleshooting inside the tool
 - Twin OS workspace for clickable factory-to-cell-model navigation, live-data connector mapping, process-version comparison, SOP/literature attachment, and AI-assisted process variants
@@ -66,7 +76,7 @@ Google login uses Google Identity Services in the browser and verifies the retur
 - Moveable flowsheet nodes, copy selected unit, clearer move/connect/inspect modes, canvas quick-add for valves, pumps, flowmeters, sensors, manifolds, and pressure relief elements
 - Animated color-coded streams for main product flow, utilities, waste, QC/PAT/data paths, cleaning loops, heat-reuse loops, and recycle/purge loops
 - In-flowsheet equation spotlight that changes with the selected unit or stream and links into the full equation library
-- Interactive CFD workbench with visible bioreactor vessel, impellers, sparger, feed plume, oxygen/nutrient/shear maps, hotspot counts, and suggested engineering edits
+- Interactive CFD workbench with a more technical bioreactor vessel section, shaft, baffles, dual impellers, sparger ring, circulation loops, feed zone, 12x12 oxygen/nutrient/shear screening map, hotspot counts, and suggested engineering edits
 - Finite-capacity campaign scheduler with editable active/skip flags, route branches, visual branch/merge topology, automatic route optimizer, predecessor dependencies, recipe timing, setup/process/CIP windows, parallel equipment pools, shared CIP/SIP skid constraints, equipment occupancy, hold-time warnings, QC release queue, bottleneck resources, route comparison, and downloadable recipe/schedule/resource/route/topology/optimizer CSV files
 - SuperPro-style simulation functions from the referenced thesis and v12 manual: chemical/component register, stock mixtures, bulk/discrete streams, stream drawing and classification, procedures/operations, batch-vs-continuous mode, resource tracking, scheduling/Gantt concepts, feedback regulation, recycle loops, tear-stream convergence, breakpoints, throughput scale-up, debottlenecking, emissions, reports, databanks, and economic evaluation
 - Major remaining manual areas represented as model modules: cleaning-agent stream classification, CIP/SIP auxiliary occupancy, material inventory/storage charts, heat-transfer-agent tracking, heat reuse, condensate return, solvent and water recycle with purge, power demand/generation, labor requirement tables, process explorer/overview navigator, stream summary tables, physical-state and density toolboxes, pre-simulation checks, partition/sequencing/back-propagation, error/status output, visual annotation objects, Excel/OLE exchange concepts, report sets, database import/export/access control, currency/consumable/material/site databanks, process-library search, and emission limit checks

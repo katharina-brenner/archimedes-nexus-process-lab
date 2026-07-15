@@ -3295,6 +3295,7 @@ dd {
 }
 
 .start-view.active,
+.projects-view.active,
 .cfd-view.active,
 .reports-view.active {
   display: block;
@@ -3302,6 +3303,7 @@ dd {
 }
 
 .start-board,
+.projects-board,
 .cfd-board,
 .reports-board {
   display: grid;
@@ -3310,6 +3312,7 @@ dd {
 }
 
 .start-hero,
+.projects-hero,
 .cfd-hero,
 .reports-hero,
 .plant-visual {
@@ -3317,6 +3320,197 @@ dd {
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 14px 28px rgba(7, 17, 31, 0.08);
+}
+
+.projects-hero,
+.project-save-panel,
+.collaboration-panel {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.projects-hero p,
+.projects-hero h3,
+.projects-hero span,
+.collaboration-panel p,
+.collaboration-panel h3,
+.collaboration-panel span {
+  margin: 0;
+}
+
+.projects-hero p,
+.collaboration-panel p {
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.projects-hero h3,
+.collaboration-panel h3 {
+  margin-top: 6px;
+  color: #071a31;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.projects-hero span,
+.collaboration-panel span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.project-save-panel,
+.collaboration-panel,
+.project-card,
+.project-version-card,
+.integration-card {
+  border: 1px solid rgba(31, 42, 58, 0.14);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(7, 17, 31, 0.06);
+}
+
+.project-save-panel {
+  grid-template-columns: minmax(260px, 1.2fr) repeat(2, minmax(220px, 0.8fr));
+  align-items: stretch;
+}
+
+.project-save-panel article {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(31, 42, 58, 0.08);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.project-save-panel span,
+.project-card span,
+.project-version-card span,
+.integration-card span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.project-save-panel input,
+.collaboration-panel input,
+.collaboration-panel select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.project-save-panel strong {
+  color: #071a31;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.project-save-panel p,
+.project-card p,
+.project-version-card p,
+.integration-card p,
+.integration-card small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-save-panel article > div,
+.project-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-save-panel button,
+.project-card button,
+.project-version-card button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #071a31;
+  background: #fff;
+  font-weight: 850;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr);
+  gap: 14px;
+}
+
+.project-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.project-column h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.project-card,
+.project-version-card,
+.integration-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.project-card.active {
+  border-color: rgba(15, 143, 131, 0.48);
+  background: rgba(15, 143, 131, 0.06);
+}
+
+.project-card h4,
+.integration-card h4 {
+  margin: 4px 0 0;
+  color: #071a31;
+  font-size: 16px;
+}
+
+.project-card dl {
+  grid-template-columns: 86px 1fr;
+  font-size: 12px;
+}
+
+.project-version-card strong {
+  color: #071a31;
+  font-size: 14px;
+}
+
+.collaboration-panel {
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.6fr) minmax(120px, 0.3fr) auto;
+}
+
+.collaboration-panel label {
+  display: grid;
+  gap: 6px;
 }
 
 .start-hero,
@@ -3774,13 +3968,13 @@ dd {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 420px;
+  min-height: 500px;
   overflow: hidden;
   border: 1px solid rgba(43, 58, 85, 0.14);
-  border-radius: 44% 44% 28% 28%;
+  border-radius: 34% 34% 18% 18% / 10% 10% 7% 7%;
   background:
-    radial-gradient(circle at 50% 24%, rgba(155, 231, 221, 0.2), transparent 28%),
-    linear-gradient(180deg, rgba(231, 242, 250, 0.92), rgba(205, 221, 236, 0.96));
+    linear-gradient(90deg, rgba(7, 26, 49, 0.1), transparent 12%, transparent 88%, rgba(7, 26, 49, 0.12)),
+    linear-gradient(180deg, rgba(238, 247, 251, 0.96), rgba(208, 224, 238, 0.98));
   box-shadow:
     inset 0 0 44px rgba(8, 23, 43, 0.16),
     inset 0 -28px 42px rgba(8, 23, 43, 0.12);
@@ -3789,90 +3983,156 @@ dd {
 .cfd-vessel-body::before {
   content: "";
   position: absolute;
-  inset: 16px 42px 32px;
-  border: 1px dashed rgba(43, 58, 85, 0.14);
-  border-radius: 44% 44% 28% 28%;
+  inset: 28px 48px 44px;
+  border: 1px solid rgba(43, 58, 85, 0.12);
+  border-radius: 32% 32% 18% 18% / 8% 8% 7% 7%;
+  background:
+    repeating-linear-gradient(180deg, rgba(7, 26, 49, 0.04) 0 1px, transparent 1px 38px);
+}
+
+.cfd-baffle {
+  position: absolute;
+  top: 74px;
+  z-index: 4;
+  width: 10px;
+  height: 318px;
+  border-radius: 999px;
+  background: rgba(7, 26, 49, 0.28);
+}
+
+.baffle-left { left: 18%; }
+.baffle-right { right: 18%; }
+
+.cfd-shaft {
+  position: absolute;
+  left: 50%;
+  top: 38px;
+  bottom: 102px;
+  z-index: 5;
+  width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #071a31, #4f6177);
+  transform: translateX(-50%);
 }
 
 .cfd-impeller {
   position: absolute;
   left: 50%;
-  z-index: 3;
-  width: 98px;
-  height: 14px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, #071a31 18%, #1fb7a6 50%, #071a31 82%, transparent);
-  opacity: 0.72;
+  z-index: 6;
+  width: 128px;
+  height: 128px;
+  border: 2px solid rgba(7, 26, 49, 0.48);
+  border-radius: 50%;
   transform: translateX(-50%);
-  animation: impellerSpin 1.8s linear infinite;
+  animation: impellerSlow 6s linear infinite;
 }
 
-.impeller-top { top: 33%; }
-.impeller-bottom { top: 58%; animation-delay: -0.5s; }
-
-.cfd-feed-plume {
+.cfd-impeller i {
   position: absolute;
-  right: 24%;
-  top: 18%;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 12px;
+  border-radius: 2px 999px 999px 2px;
+  background: linear-gradient(90deg, rgba(7, 26, 49, 0.92), rgba(31, 183, 166, 0.7));
+  transform-origin: 0 50%;
+}
+
+.cfd-impeller i:nth-child(1) { transform: rotate(0deg); }
+.cfd-impeller i:nth-child(2) { transform: rotate(90deg); }
+.cfd-impeller i:nth-child(3) { transform: rotate(180deg); }
+.cfd-impeller i:nth-child(4) { transform: rotate(270deg); }
+
+.impeller-top { top: 32%; }
+.impeller-bottom { top: 56%; animation-delay: -2s; }
+
+.cfd-circulation {
+  position: absolute;
+  left: 50%;
   z-index: 2;
-  width: 92px;
-  height: 230px;
+  width: 245px;
+  height: 126px;
+  border: 2px solid rgba(31, 183, 166, 0.22);
+  border-right-color: rgba(31, 183, 166, 0.58);
+  border-bottom-color: rgba(31, 183, 166, 0.42);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  animation: circulationPulse 4.6s ease-in-out infinite;
+}
+
+.circulation-a { top: 27%; }
+.circulation-b { top: 52%; animation-delay: -1.8s; }
+
+.cfd-feed-line {
+  position: absolute;
+  right: 26%;
+  top: 46px;
+  z-index: 7;
+  width: 5px;
+  height: 148px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(31, 183, 166, 0.28), rgba(31, 183, 166, 0));
-  filter: blur(1px);
-  transform: rotate(8deg);
-  animation: feedPulse 2.4s ease-in-out infinite;
+  background: #0f8f83;
+}
+
+.cfd-feed-zone {
+  position: absolute;
+  right: 25%;
+  top: 188px;
+  z-index: 3;
+  width: 108px;
+  height: 112px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 143, 131, 0.32), rgba(15, 143, 131, 0));
+  animation: feedZonePulse 3.8s ease-in-out infinite;
 }
 
 .cfd-sparger {
   position: absolute;
   left: 50%;
-  bottom: 48px;
-  z-index: 3;
-  width: 140px;
-  height: 14px;
+  bottom: 62px;
+  z-index: 6;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 164px;
+  height: 20px;
   border: 2px solid rgba(7, 26, 49, 0.55);
   border-radius: 999px;
   transform: translateX(-50%);
 }
 
-.cfd-sparger::before {
-  content: "";
-  position: absolute;
-  left: 20px;
-  bottom: 12px;
-  width: 6px;
-  height: 6px;
+.cfd-sparger i {
+  display: block;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: rgba(31, 183, 166, 0.72);
-  box-shadow:
-    22px -16px rgba(31, 183, 166, 0.48),
-    44px -8px rgba(31, 183, 166, 0.62),
-    66px -24px rgba(31, 183, 166, 0.4),
-    88px -12px rgba(31, 183, 166, 0.66);
-  animation: bubbleRise 2s ease-in-out infinite;
+  box-shadow: 0 -18px 0 rgba(31, 183, 166, 0.28), 0 -38px 0 rgba(31, 183, 166, 0.16);
+  animation: bubbleRise 3.2s ease-in-out infinite;
 }
 
+.cfd-sparger i:nth-child(2) { animation-delay: -0.4s; }
+.cfd-sparger i:nth-child(3) { animation-delay: -0.8s; }
+.cfd-sparger i:nth-child(4) { animation-delay: -1.2s; }
+.cfd-sparger i:nth-child(5) { animation-delay: -1.6s; }
+
 .cfd-map {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  inset: 64px 76px 92px;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
-  width: min(300px, 78%);
-  aspect-ratio: 1;
-  padding: 14px;
-  border: 1px solid rgba(43, 58, 85, 0.16);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.6), rgba(215, 225, 237, 0.44)),
-    #eef2f6;
-  box-shadow: inset 0 0 40px rgba(8, 23, 43, 0.18);
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid rgba(43, 58, 85, 0.12);
+  border-radius: 28% 28% 16% 16% / 8% 8% 6% 6%;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .cfd-map span {
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
+  border-radius: 3px;
+  background: var(--cell);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 .cfd-detail {
@@ -3999,19 +4259,24 @@ dd {
   line-height: 1.5;
 }
 
-@keyframes impellerSpin {
+@keyframes impellerSlow {
   0% { transform: translateX(-50%) rotate(0deg); }
-  100% { transform: translateX(-50%) rotate(180deg); }
+  100% { transform: translateX(-50%) rotate(360deg); }
 }
 
-@keyframes feedPulse {
-  0%, 100% { opacity: 0.36; transform: rotate(8deg) translateY(0); }
-  50% { opacity: 0.72; transform: rotate(8deg) translateY(10px); }
+@keyframes circulationPulse {
+  0%, 100% { opacity: 0.36; transform: translateX(-50%) scale(0.96); }
+  50% { opacity: 0.72; transform: translateX(-50%) scale(1.04); }
+}
+
+@keyframes feedZonePulse {
+  0%, 100% { opacity: 0.34; transform: scale(0.92); }
+  50% { opacity: 0.68; transform: scale(1.08); }
 }
 
 @keyframes bubbleRise {
-  0%, 100% { transform: translateY(8px); opacity: 0.35; }
-  50% { transform: translateY(-18px); opacity: 0.82; }
+  0%, 100% { transform: translateY(7px); opacity: 0.36; }
+  50% { transform: translateY(-12px); opacity: 0.78; }
 }
 
 .cfd-legend span {
@@ -5831,6 +6096,10 @@ th {
   }
 
   .start-hero,
+  .projects-hero,
+  .project-save-panel,
+  .project-grid,
+  .collaboration-panel,
   .cfd-hero,
   .reports-hero,
   .recipe-editor-panel,
@@ -6122,6 +6391,7 @@ th {
   }
 
   .start-board,
+  .projects-board,
   .overview-board,
   .cfd-board,
   .reports-board {
@@ -6129,6 +6399,10 @@ th {
   }
 
   .start-hero,
+  .projects-hero,
+  .project-save-panel,
+  .project-grid,
+  .collaboration-panel,
   .overview-hero,
   .cfd-hero,
   .reports-hero {

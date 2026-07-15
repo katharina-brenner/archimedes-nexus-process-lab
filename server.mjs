@@ -1,6 +1,6 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const dataDir = join(rootDir, ".data");
 const dbPath = join(dataDir, "axion-licensing.json");
+const modelsDir = join(dataDir, "models");
+const projectsDir = join(modelsDir, "projects");
+const archiveDir = join(modelsDir, "archive");
 
 function loadLocalEnv() {
   const envPath = join(rootDir, ".env");
@@ -64,8 +67,12 @@ const staticTypes = new Map([
 ]);
 
 const defaultDb = {
+  users: [],
   orders: [],
   licenses: [],
+  projects: [],
+  projectVersions: [],
+  invites: [],
   projectBriefs: [],
   audit: [],
 };
@@ -78,6 +85,10 @@ function backendFeatures() {
     "License-key generation",
     "Server-side login tokens",
     "Google OAuth login with backend token verification",
+    "Multi-user project workspaces",
+    "Project archives for old model versions",
+    "Username/email invitations for collaboration",
+    "External integration registry for modelling and data tools",
     "Admin order and license listing",
     "Static app hosting from the same backend",
     "Bank account configuration via environment variables",
@@ -114,15 +125,20 @@ function publicConfig() {
 
 async function loadDb() {
   await mkdir(dataDir, { recursive: true });
+  await mkdir(projectsDir, { recursive: true });
+  await mkdir(archiveDir, { recursive: true });
   if (!existsSync(dbPath)) {
-    await writeFile(dbPath, JSON.stringify(defaultDb, null, 2));
-    return structuredClone(defaultDb);
+    const seeded = ensureDbShape(structuredClone(defaultDb));
+    await writeFile(dbPath, JSON.stringify(seeded, null, 2));
+    return seeded;
   }
-  return JSON.parse(await readFile(dbPath, "utf8"));
+  return ensureDbShape(JSON.parse(await readFile(dbPath, "utf8")));
 }
 
 async function saveDb(db) {
   await mkdir(dataDir, { recursive: true });
+  await mkdir(projectsDir, { recursive: true });
+  await mkdir(archiveDir, { recursive: true });
   await writeFile(dbPath, `${JSON.stringify(db, null, 2)}\n`);
 }
 
@@ -186,6 +202,109 @@ function makeReference() {
 
 function makeLicenseKey() {
   return `ARX-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}-${randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function userPasswordHash(password) {
+  return createHash("sha256").update(`${config.sessionSecret}:${password}`).digest("hex");
+}
+
+function normalizePrincipal(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function seedUsers(db) {
+  const seeds = [
+    { username: "kbrenner", email: "kbrenner@local.axion", name: "Workspace Owner", password: "0105", role: "admin" },
+    { username: "mahmed", email: "mahmed@local.axion", name: "M. Ahmed", password: "1402", role: "user" },
+  ];
+  seeds.forEach((seed) => {
+    const existing = db.users.find((user) => user.username === seed.username || user.email === seed.email);
+    if (existing) return;
+    db.users.push({
+      id: randomUUID(),
+      username: seed.username,
+      email: seed.email,
+      name: seed.name,
+      role: seed.role,
+      passwordHash: userPasswordHash(seed.password),
+      createdAt: new Date().toISOString(),
+      status: "active",
+    });
+  });
+}
+
+function sanitizeUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    status: user.status,
+  };
+}
+
+function sessionPrincipal(session) {
+  return normalizePrincipal(session?.email || session?.username || session?.sub || session?.licenseKey || "unknown");
+}
+
+function sessionDisplayName(session) {
+  return session?.name || session?.username || session?.email || session?.sub || "Axion user";
+}
+
+function projectFilePath(projectId) {
+  return join(projectsDir, `${projectId}.json`);
+}
+
+function versionFilePath(projectId, versionId) {
+  return join(archiveDir, `${projectId}-${versionId}.json`);
+}
+
+function canAccessProject(session, project) {
+  if (!session || !project) return false;
+  if (session.role === "admin") return true;
+  const principal = sessionPrincipal(session);
+  return project.owner === principal || project.collaborators?.some((item) => normalizePrincipal(item.principal) === principal);
+}
+
+function sanitizeProject(project) {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description || "",
+    owner: project.owner,
+    ownerName: project.ownerName || project.owner,
+    template: project.template || "",
+    scale: project.scale || "",
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    archived: Boolean(project.archived),
+    collaborators: (project.collaborators || []).map((item) => ({
+      principal: item.principal,
+      role: item.role,
+      invitedAt: item.invitedAt,
+      status: item.status,
+    })),
+    currentVersionId: project.currentVersionId || "",
+    versionCount: project.versionCount || 0,
+  };
+}
+
+async function readProjectModel(projectId) {
+  const filePath = projectFilePath(projectId);
+  if (!existsSync(filePath)) return null;
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+async function writeProjectModel(projectId, payload) {
+  await mkdir(projectsDir, { recursive: true });
+  await writeFile(projectFilePath(projectId), `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+async function writeArchivedVersion(projectId, versionId, payload) {
+  await mkdir(archiveDir, { recursive: true });
+  await writeFile(versionFilePath(projectId, versionId), `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function sanitizeOrder(order) {
@@ -258,10 +377,15 @@ async function createCheckout(req, res) {
 }
 
 function ensureDbShape(db) {
+  db.users ||= [];
   db.orders ||= [];
   db.licenses ||= [];
+  db.projects ||= [];
+  db.projectVersions ||= [];
+  db.invites ||= [];
   db.projectBriefs ||= [];
   db.audit ||= [];
+  seedUsers(db);
   return db;
 }
 
@@ -348,6 +472,332 @@ async function help(req, res) {
   json(res, 200, { guide: inferHelpGuide(body.prompt, body.context || {}) });
 }
 
+function integrationRegistry() {
+  return [
+    {
+      key: "superpro",
+      name: "SuperPro Designer",
+      category: "Process simulation",
+      status: "import-export scaffold",
+      direction: "Import reports / export Axion model",
+      auth: "file",
+      description: "Use CSV/Excel/report exchange as the first bridge; native proprietary model editing requires vendor-supported formats.",
+    },
+    {
+      key: "aspen",
+      name: "Aspen Plus / Aspen Batch",
+      category: "Process simulation",
+      status: "connector planned",
+      direction: "Export streams, property package, and economics basis",
+      auth: "enterprise API or file",
+      description: "Prepared for stream/property-package export and future enterprise connector configuration.",
+    },
+    {
+      key: "comsol",
+      name: "COMSOL Multiphysics",
+      category: "CFD / multiphysics",
+      status: "connector planned",
+      direction: "Export reactor geometry and boundary conditions",
+      auth: "file/API",
+      description: "Exports reactor geometry assumptions, kLa targets, feed zones, and sparger/impeller metadata for rigorous CFD setup.",
+    },
+    {
+      key: "starccm",
+      name: "Simcenter STAR-CCM+",
+      category: "CFD",
+      status: "connector planned",
+      direction: "Export CFD screening cases",
+      auth: "file/API",
+      description: "Prepared for oxygen, nutrient, shear, sparger, and agitation case handoff.",
+    },
+    {
+      key: "opcua",
+      name: "OPC UA / SCADA",
+      category: "Live plant data",
+      status: "connector planned",
+      direction: "Read historian tags",
+      auth: "server credentials",
+      description: "Maps live pH, DO, temperature, flow, pressure, feed, and batch-state tags to Axion model parameters.",
+    },
+    {
+      key: "osisoft-pi",
+      name: "AVEVA PI / OSIsoft PI",
+      category: "Historian",
+      status: "connector planned",
+      direction: "Read batch historian",
+      auth: "enterprise connector",
+      description: "Prepared for batch profile calibration, soft sensors, deviations, and continued process verification.",
+    },
+    {
+      key: "benchling",
+      name: "Benchling",
+      category: "ELN/LIMS",
+      status: "connector planned",
+      direction: "Read experiments and assays",
+      auth: "API key/OAuth",
+      description: "Prepared for titer, viability, media, assay, and strain/cell-line metadata transfer.",
+    },
+    {
+      key: "limsid",
+      name: "LIMS / ELN generic",
+      category: "Quality data",
+      status: "connector planned",
+      direction: "Read/write assay metadata",
+      auth: "API key",
+      description: "Generic connector shell for HCP, DNA, endotoxin, sterility, bioburden, and release-test tables.",
+    },
+  ];
+}
+
+async function listProjects(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const projects = db.projects
+    .filter((project) => canAccessProject(session, project))
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .map(sanitizeProject);
+  const invites = db.invites
+    .filter((invite) => normalizePrincipal(invite.recipient) === sessionPrincipal(session) || session.role === "admin")
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  json(res, 200, {
+    projects,
+    invites,
+    integrations: integrationRegistry(),
+    folders: {
+      activeModels: projectsDir,
+      archivedModels: archiveDir,
+    },
+  });
+}
+
+async function createProject(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const now = new Date().toISOString();
+  const db = ensureDbShape(await loadDb());
+  const id = randomUUID();
+  const versionId = randomUUID();
+  const project = {
+    id,
+    name: String(body.name || body.modelState?.projectName || "Untitled Axion model").trim().slice(0, 120),
+    description: String(body.description || body.modelState?.productBrief || "").trim().slice(0, 2000),
+    owner: sessionPrincipal(session),
+    ownerName: sessionDisplayName(session),
+    template: String(body.modelState?.template || body.template || ""),
+    scale: String(body.modelState?.scale || body.scale || ""),
+    createdAt: now,
+    updatedAt: now,
+    archived: false,
+    collaborators: [],
+    currentVersionId: versionId,
+    versionCount: 1,
+  };
+  const modelPayload = {
+    project: sanitizeProject(project),
+    savedAt: now,
+    savedBy: sessionPrincipal(session),
+    summary: body.summary || {},
+    modelState: body.modelState || {},
+  };
+  db.projects.unshift(project);
+  db.projectVersions.unshift({
+    id: versionId,
+    projectId: id,
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    label: "Initial model",
+    summary: body.summary || {},
+  });
+  db.audit.unshift({ at: now, type: "project.created", projectId: id, by: sessionPrincipal(session) });
+  await writeProjectModel(id, modelPayload);
+  await writeArchivedVersion(id, versionId, modelPayload);
+  await saveDb(db);
+  json(res, 201, { project: sanitizeProject(project), versionId });
+}
+
+async function loadProject(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  json(res, 200, {
+    project: sanitizeProject(project),
+    model: await readProjectModel(projectId),
+    versions: db.projectVersions.filter((item) => item.projectId === projectId),
+    invites: db.invites.filter((item) => item.projectId === projectId),
+  });
+}
+
+async function saveProject(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const now = new Date().toISOString();
+  const versionId = randomUUID();
+  const previous = await readProjectModel(projectId);
+  if (previous) {
+    await writeArchivedVersion(projectId, versionId, previous);
+  }
+  project.name = String(body.name || project.name).trim().slice(0, 120);
+  project.description = String(body.description || project.description || "").trim().slice(0, 2000);
+  project.template = String(body.modelState?.template || project.template || "");
+  project.scale = String(body.modelState?.scale || project.scale || "");
+  project.updatedAt = now;
+  project.currentVersionId = versionId;
+  project.versionCount = (project.versionCount || 0) + 1;
+  const payload = {
+    project: sanitizeProject(project),
+    savedAt: now,
+    savedBy: sessionPrincipal(session),
+    summary: body.summary || {},
+    modelState: body.modelState || {},
+  };
+  await writeProjectModel(projectId, payload);
+  db.projectVersions.unshift({
+    id: versionId,
+    projectId,
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    label: String(body.label || `Saved ${project.versionCount}`).slice(0, 120),
+    summary: body.summary || {},
+  });
+  db.audit.unshift({ at: now, type: "project.saved", projectId, versionId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { project: sanitizeProject(project), versionId });
+}
+
+async function archiveProject(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  project.archived = true;
+  project.updatedAt = new Date().toISOString();
+  db.audit.unshift({ at: project.updatedAt, type: "project.archived", projectId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { project: sanitizeProject(project) });
+}
+
+async function restoreVersion(req, res, projectId, versionId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const filePath = versionFilePath(projectId, versionId);
+  if (!existsSync(filePath)) {
+    json(res, 404, { error: "Archived model version not found" });
+    return;
+  }
+  const archived = JSON.parse(await readFile(filePath, "utf8"));
+  const now = new Date().toISOString();
+  await writeProjectModel(projectId, { ...archived, restoredAt: now, restoredBy: sessionPrincipal(session) });
+  project.updatedAt = now;
+  db.audit.unshift({ at: now, type: "project.version.restored", projectId, versionId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { project: sanitizeProject(project), model: archived });
+}
+
+async function inviteCollaborator(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const recipient = normalizePrincipal(body.recipient || body.email || body.username);
+  if (!recipient) {
+    json(res, 400, { error: "Enter an email address or username to invite." });
+    return;
+  }
+  const role = ["viewer", "editor", "owner"].includes(body.role) ? body.role : "editor";
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const now = new Date().toISOString();
+  const matchedUser = db.users.find((user) => user.username === recipient || user.email === recipient);
+  const invite = {
+    id: randomUUID(),
+    projectId,
+    projectName: project.name,
+    recipient,
+    matchedUserId: matchedUser?.id || "",
+    role,
+    status: matchedUser ? "accepted" : "pending",
+    createdAt: now,
+    invitedBy: sessionPrincipal(session),
+    delivery: "recorded",
+    note: "SMTP delivery is not configured; this invite is stored for in-app collaboration.",
+  };
+  db.invites.unshift(invite);
+  if (matchedUser && !project.collaborators?.some((item) => normalizePrincipal(item.principal) === recipient || normalizePrincipal(item.principal) === matchedUser.email)) {
+    project.collaborators ||= [];
+    project.collaborators.push({
+      principal: matchedUser.email,
+      username: matchedUser.username,
+      role,
+      invitedAt: now,
+      status: "accepted",
+    });
+  }
+  project.updatedAt = now;
+  db.audit.unshift({ at: now, type: "project.invite.created", projectId, recipient, role, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 201, { invite, project: sanitizeProject(project) });
+}
+
+async function listIntegrations(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  json(res, 200, {
+    integrations: integrationRegistry(),
+    note: "These are connector definitions and API handoff targets. Live third-party connections need customer credentials and vendor API access.",
+  });
+}
+
 function googleConfig(req, res) {
   json(res, 200, {
     enabled: Boolean(config.googleClientId),
@@ -397,18 +847,37 @@ async function googleLogin(req, res) {
   }
 
   const email = String(profile.email || "").toLowerCase();
+  const db = ensureDbShape(await loadDb());
+  let user = db.users.find((item) => item.email === email);
+  if (!user) {
+    user = {
+      id: randomUUID(),
+      username: email.split("@")[0],
+      email,
+      name: profile.name || email,
+      role: "user",
+      passwordHash: "",
+      createdAt: new Date().toISOString(),
+      status: "active",
+    };
+    db.users.push(user);
+    db.audit.unshift({ at: user.createdAt, type: "user.google.created", userId: user.id, email });
+    await saveDb(db);
+  }
   const token = signSession({
-    sub: email,
-    role: "google",
+    sub: user.id,
+    role: user.role || "user",
     email,
-    name: profile.name || email,
+    username: user.username,
+    name: user.name || profile.name || email,
     exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
   });
   json(res, 200, {
     token,
     account: {
-      role: "google",
-      name: profile.name || email,
+      role: user.role || "user",
+      name: user.name || profile.name || email,
+      username: user.username,
       email,
       productName: config.productName,
     },
@@ -434,10 +903,33 @@ async function login(req, res) {
     return;
   }
 
+  const localUser = db.users.find((item) => item.status === "active" && (item.username === user || item.email === user));
+  if (localUser?.passwordHash && safeCompare(localUser.passwordHash, userPasswordHash(password))) {
+    const token = signSession({
+      sub: localUser.id,
+      role: localUser.role || "user",
+      username: localUser.username,
+      email: localUser.email,
+      name: localUser.name,
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
+    });
+    json(res, 200, {
+      token,
+      account: {
+        role: localUser.role || "user",
+        name: localUser.name,
+        username: localUser.username,
+        email: localUser.email,
+        productName: config.productName,
+      },
+    });
+    return;
+  }
+
   const license = db.licenses.find((item) => item.key === licenseKey && item.status === "active");
   const emailMatches = !user || license?.customerEmail === user;
   if (license && emailMatches) {
-    const token = signSession({ sub: license.key, role: "customer", licenseKey: license.key, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 });
+    const token = signSession({ sub: license.key, role: "customer", email: license.customerEmail, name: license.customerName, licenseKey: license.key, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 });
     json(res, 200, { token, account: { role: "customer", name: license.customerName, productName: config.productName, licenseKey: license.key } });
     return;
   }
@@ -451,7 +943,17 @@ async function account(req, res) {
     json(res, 401, { error: "Not authenticated" });
     return;
   }
-  json(res, 200, { account: { role: session.role, productName: config.productName, licenseKey: session.licenseKey || "" } });
+  json(res, 200, {
+    account: {
+      role: session.role,
+      name: sessionDisplayName(session),
+      username: session.username || "",
+      email: session.email || "",
+      principal: sessionPrincipal(session),
+      productName: config.productName,
+      licenseKey: session.licenseKey || "",
+    },
+  });
 }
 
 async function listOrders(req, res) {
@@ -518,6 +1020,43 @@ async function routeApi(req, res, pathname) {
   }
   if (req.method === "POST" && pathname === "/api/project/brief") {
     await createProjectBrief(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/projects") {
+    await listProjects(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/projects") {
+    await createProject(req, res);
+    return;
+  }
+  const projectMatch = pathname.match(/^\/api\/projects\/([^/]+)$/);
+  if (projectMatch && req.method === "GET") {
+    await loadProject(req, res, decodeURIComponent(projectMatch[1]));
+    return;
+  }
+  const projectSaveMatch = pathname.match(/^\/api\/projects\/([^/]+)\/save$/);
+  if (projectSaveMatch && req.method === "POST") {
+    await saveProject(req, res, decodeURIComponent(projectSaveMatch[1]));
+    return;
+  }
+  const projectArchiveMatch = pathname.match(/^\/api\/projects\/([^/]+)\/archive$/);
+  if (projectArchiveMatch && req.method === "POST") {
+    await archiveProject(req, res, decodeURIComponent(projectArchiveMatch[1]));
+    return;
+  }
+  const projectInviteMatch = pathname.match(/^\/api\/projects\/([^/]+)\/invites$/);
+  if (projectInviteMatch && req.method === "POST") {
+    await inviteCollaborator(req, res, decodeURIComponent(projectInviteMatch[1]));
+    return;
+  }
+  const restoreMatch = pathname.match(/^\/api\/projects\/([^/]+)\/versions\/([^/]+)\/restore$/);
+  if (restoreMatch && req.method === "POST") {
+    await restoreVersion(req, res, decodeURIComponent(restoreMatch[1]), decodeURIComponent(restoreMatch[2]));
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/integrations") {
+    await listIntegrations(req, res);
     return;
   }
   if (req.method === "POST" && pathname === "/api/help") {

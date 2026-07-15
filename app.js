@@ -1748,6 +1748,14 @@ const state = {
   inferredTemplate: "culturedMeat",
   activeRoute: "primary",
   recipeOverrides: {},
+  account: null,
+  currentProjectId: null,
+  projectName: "Untitled Axion model",
+  projects: [],
+  projectVersions: [],
+  projectInvites: [],
+  integrations: [],
+  projectFolders: {},
 };
 
 const els = {
@@ -1782,6 +1790,7 @@ const els = {
   annualProduct: document.querySelector("#annualProduct"),
   pageTitle: document.querySelector("#pageTitle"),
   startBoard: document.querySelector("#startBoard"),
+  projectsBoard: document.querySelector("#projectsBoard"),
   overviewBoard: document.querySelector("#overviewBoard"),
   batchDuration: document.querySelector("#batchDuration"),
   directCost: document.querySelector("#directCost"),
@@ -2091,6 +2100,89 @@ function loadTemplate(key, preserveScale = false) {
   renderAll();
   window.requestAnimationFrame(() => fitCanvas(true));
   showToast(`${template.label} template loaded`);
+}
+
+function currentModelSummary() {
+  const data = metrics();
+  const schedule = campaignSchedule();
+  return {
+    template: state.template,
+    templateLabel: activeTemplate().label,
+    scale: state.scale,
+    batchSize: state.batchSize,
+    batchCount: state.batchCount,
+    titer: state.titer,
+    recovery: state.recovery,
+    units: state.units.length,
+    streams: state.streams.length,
+    annualKg: data.annualKg,
+    directCost: data.directCost,
+    feasibleAnnualBatches: schedule.feasibleAnnualBatches,
+    activeRoute: state.activeRoute,
+  };
+}
+
+function exportCurrentModelState() {
+  return {
+    appVersion: "route-optimizer-v1",
+    projectName: state.projectName,
+    template: state.template,
+    scale: state.scale,
+    selectedId: state.selectedId,
+    zoom: state.zoom,
+    nextUnit: state.nextUnit,
+    nextStream: state.nextStream,
+    batchSize: state.batchSize,
+    batchCount: state.batchCount,
+    titer: state.titer,
+    recovery: state.recovery,
+    params: clone(state.params),
+    units: clone(state.units),
+    streams: clone(state.streams),
+    costs: clone(state.costs),
+    paletteGroup: state.paletteGroup,
+    paletteSearch: state.paletteSearch,
+    parameterSearch: state.parameterSearch,
+    canvasFocus: state.canvasFocus,
+    flowDetail: state.flowDetail,
+    productBrief: state.productBrief,
+    productFiles: clone(state.productFiles),
+    inferredTemplate: state.inferredTemplate,
+    activeRoute: state.activeRoute,
+    recipeOverrides: clone(state.recipeOverrides),
+  };
+}
+
+function importModelState(modelState = {}) {
+  const template = templates[modelState.template] ? modelState.template : state.template;
+  state.template = template;
+  state.scale = scalePresets[modelState.scale] ? modelState.scale : state.scale;
+  state.projectName = String(modelState.projectName || state.projectName || activeTemplate().label);
+  state.units = Array.isArray(modelState.units) ? clone(modelState.units) : clone(templates[template].units);
+  state.streams = Array.isArray(modelState.streams) ? clone(modelState.streams) : clone(templates[template].streams);
+  state.costs = Array.isArray(modelState.costs) ? clone(modelState.costs) : clone(templates[template].costs);
+  state.selectedId = modelState.selectedId || state.units[0]?.id || null;
+  state.zoom = Number(modelState.zoom) || state.zoom;
+  state.nextUnit = Number(modelState.nextUnit) || 900;
+  state.nextStream = Number(modelState.nextStream) || 900;
+  state.batchSize = Number(modelState.batchSize) || state.batchSize;
+  state.batchCount = Number(modelState.batchCount) || state.batchCount;
+  state.titer = Number(modelState.titer) || state.titer;
+  state.recovery = Number(modelState.recovery) || state.recovery;
+  state.params = { ...Object.fromEntries(processParameters.map((item) => [item.key, item.value])), ...(modelState.params || {}) };
+  state.paletteGroup = modelState.paletteGroup || state.paletteGroup;
+  state.paletteSearch = modelState.paletteSearch || "";
+  state.parameterSearch = modelState.parameterSearch || "";
+  state.canvasFocus = modelState.canvasFocus || "all";
+  state.flowDetail = modelState.flowDetail || "detailed";
+  state.productBrief = modelState.productBrief || "";
+  state.productFiles = Array.isArray(modelState.productFiles) ? clone(modelState.productFiles) : [];
+  state.inferredTemplate = modelState.inferredTemplate || template;
+  state.activeRoute = modelState.activeRoute || "primary";
+  state.recipeOverrides = modelState.recipeOverrides || {};
+  syncInputs();
+  renderAll();
+  window.requestAnimationFrame(() => fitCanvas(true));
 }
 
 function applyScale(key) {
@@ -5149,6 +5241,122 @@ function renderStartBoard() {
   `;
 }
 
+function renderProjectsBoard() {
+  if (!els.projectsBoard) return;
+  const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
+  const openProjects = state.projects.filter((item) => !item.archived);
+  const archivedProjects = state.projects.filter((item) => item.archived);
+  els.projectsBoard.innerHTML = `
+    <section class="projects-hero">
+      <div>
+        <p>Project workspace</p>
+        <h3>Save models, reopen old versions, and collaborate by username or email.</h3>
+        <span>Axion stores the current model as a project and keeps previous versions in an archive folder so old process models can be restored and continued later.</span>
+      </div>
+      <button class="action-button primary" data-save-project type="button">Save current model</button>
+    </section>
+    <section class="project-save-panel">
+      <article>
+        <span>Current project</span>
+        <input id="projectNameInput" type="text" value="${escapeAttr(activeProject?.name || state.projectName || `${activeTemplate().label} model`)}" placeholder="Project name" />
+        <p>${activeProject ? `Loaded project ${activeProject.id}` : "No backend project is loaded yet. Saving creates one."}</p>
+        <div>
+          <button data-save-project type="button">Save version</button>
+          <button data-refresh-projects type="button">Refresh projects</button>
+        </div>
+      </article>
+      <article>
+        <span>Old model folder</span>
+        <strong>${state.projectFolders.archivedModels || ".data/models/archive"}</strong>
+        <p>Every backend save archives the previous model JSON here. Static mode uses browser localStorage as a fallback.</p>
+      </article>
+      <article>
+        <span>Active model folder</span>
+        <strong>${state.projectFolders.activeModels || ".data/models/projects"}</strong>
+        <p>Each project has a current model file plus version entries for older process states.</p>
+      </article>
+    </section>
+    <section class="project-grid">
+      <div class="project-column">
+        <h3>Open projects</h3>
+        ${openProjects.length ? openProjects.map((project) => `
+          <article class="project-card ${project.id === state.currentProjectId ? "active" : ""}">
+            <div>
+              <span>${project.template || "model"} · ${project.scale || "scale"}</span>
+              <h4>${project.name}</h4>
+              <p>${project.description || `${project.versionCount || 0} saved model versions`}</p>
+            </div>
+            <dl>
+              <dt>Owner</dt><dd>${project.ownerName || project.owner}</dd>
+              <dt>Updated</dt><dd>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : "n/a"}</dd>
+              <dt>Versions</dt><dd>${project.versionCount || 0}</dd>
+            </dl>
+            <footer>
+              <button data-load-project="${project.id}" type="button">Open</button>
+              <button data-archive-project="${project.id}" type="button">Archive</button>
+            </footer>
+          </article>
+        `).join("") : `<article class="project-card"><p>No saved backend projects yet. Save the current model to create one.</p></article>`}
+      </div>
+      <div class="project-column">
+        <h3>Old versions</h3>
+        ${state.projectVersions.length ? state.projectVersions.slice(0, 8).map((version) => `
+          <article class="project-version-card">
+            <span>${version.label || "Saved model"}</span>
+            <strong>${new Date(version.createdAt).toLocaleString()}</strong>
+            <p>${version.createdBy || "user"} · ${version.summary?.units || 0} units · ${version.summary?.streams || 0} streams</p>
+            <button data-restore-version="${version.id}" type="button">Restore this model</button>
+          </article>
+        `).join("") : `<article class="project-version-card"><p>Open a project to see its old model versions.</p></article>`}
+        ${archivedProjects.length ? `<h3>Archived projects</h3>${archivedProjects.slice(0, 6).map((project) => `<article class="project-version-card"><span>${project.name}</span><p>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : ""}</p></article>`).join("")}` : ""}
+      </div>
+    </section>
+    <section class="collaboration-panel">
+      <div>
+        <p>Collaboration</p>
+        <h3>Invite by email or username</h3>
+        <span>If the user already exists, Axion adds them to the project. Otherwise the invite is stored as pending until a real email provider is connected.</span>
+      </div>
+      <label>
+        <span>Email or username</span>
+        <input id="inviteRecipient" type="text" placeholder="mahmed or person@company.com" />
+      </label>
+      <label>
+        <span>Role</span>
+        <select id="inviteRole">
+          <option value="editor">Editor</option>
+          <option value="viewer">Viewer</option>
+          <option value="owner">Owner</option>
+        </select>
+      </label>
+      <button class="action-button primary" data-invite-collaborator type="button">Invite collaborator</button>
+    </section>
+    <section class="project-grid">
+      <div class="project-column">
+        <h3>Invites</h3>
+        ${state.projectInvites.length ? state.projectInvites.slice(0, 10).map((invite) => `
+          <article class="project-version-card">
+            <span>${invite.status}</span>
+            <strong>${invite.recipient}</strong>
+            <p>${invite.projectName || invite.projectId} · ${invite.role} · ${invite.delivery || "recorded"}</p>
+          </article>
+        `).join("") : `<article class="project-version-card"><p>No invitations yet.</p></article>`}
+      </div>
+      <div class="project-column">
+        <h3>API connector registry</h3>
+        ${state.integrations.map((item) => `
+          <article class="integration-card">
+            <span>${item.category}</span>
+            <h4>${item.name}</h4>
+            <p>${item.direction || item.description}</p>
+            <small>${item.status} · auth: ${item.auth}</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function plantAreaStats() {
   const layers = ["main", "support", "cleaning", "recycle", "heat", "waste", "quality"];
   return layers.map((layer) => {
@@ -5208,8 +5416,8 @@ function renderPlantVisualization() {
 function cfdCellColor(cell) {
   if (cell.risk > 0.68) return "#b8534d";
   if (cell.risk > 0.48) return "#c7922e";
-  if (cell.oxygen < 0.45) return "#4f6f8f";
-  if (cell.nutrient < 0.45) return "#8a6f3d";
+  if (cell.oxygen < 0.45) return "#3e6d9c";
+  if (cell.nutrient < 0.45) return "#7d6a42";
   return "#0f8f83";
 }
 
@@ -5220,14 +5428,21 @@ function cfdBioreactors() {
 function cfdScore(unit, xIndex, yIndex) {
   const p = state.params;
   const volume = estimatedBioreactorVolumeL(unit);
-  const radius = Math.hypot(xIndex - 4.5, yIndex - 4.5) / 6.4;
-  const bottomPenalty = yIndex / 9;
-  const wallPenalty = Math.min(1, radius * 1.15);
-  const mixingPower = Math.max(0.05, p.agitation * 0.42 + p.aeration * 0.85 + p.kla / 140);
+  const radial = Math.abs(xIndex - 5.5) / 5.5;
+  const height = 1 - yIndex / 11;
+  const wallPenalty = Math.min(1, radial * 1.08);
+  const bottomDeadZone = yIndex > 8 ? (yIndex - 8) / 3 : 0;
+  const topFoamZone = yIndex < 2 ? (2 - yIndex) / 3 : 0;
+  const impellerBand = Math.min(
+    Math.abs(yIndex - 4.2),
+    Math.abs(yIndex - 7.1),
+  );
+  const circulationBoost = Math.max(0, 1 - impellerBand / 2.8) * (1 - wallPenalty * 0.36);
+  const mixingPower = Math.max(0.05, p.agitation * 0.36 + p.aeration * 0.62 + p.kla / 165);
   const scalePenalty = Math.max(0, Math.log10(Math.max(100, volume) / 2000)) * 0.22;
-  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint / Math.max(1, p.our * 95)) - wallPenalty * 0.24 - bottomPenalty * 0.16 - scalePenalty));
-  const nutrient = Math.max(0, Math.min(1, mixingPower - wallPenalty * 0.18 - bottomPenalty * 0.25 - scalePenalty * 0.8));
-  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 4.8 : 9) + (1 - radius) * 0.22));
+  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint / Math.max(1, p.our * 98)) + circulationBoost * 0.18 - wallPenalty * 0.17 - bottomDeadZone * 0.22 - topFoamZone * 0.06 - scalePenalty));
+  const nutrient = Math.max(0, Math.min(1, mixingPower + circulationBoost * 0.24 - wallPenalty * 0.16 - bottomDeadZone * 0.25 - scalePenalty * 0.72));
+  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 5.4 : 9.8) + circulationBoost * 0.26 - wallPenalty * 0.06 + height * 0.03));
   const risk = Math.max(0, Math.min(1, (1 - oxygen) * 0.46 + (1 - nutrient) * 0.34 + shear * (isCellCultureTemplate() ? 0.28 : 0.12)));
   return { oxygen, nutrient, shear, risk };
 }
@@ -5235,7 +5450,7 @@ function cfdScore(unit, xIndex, yIndex) {
 function cfdReport() {
   const units = cfdBioreactors();
   return units.map((unit) => {
-    const cells = Array.from({ length: 100 }, (_, index) => cfdScore(unit, index % 10, Math.floor(index / 10)));
+    const cells = Array.from({ length: 144 }, (_, index) => cfdScore(unit, index % 12, Math.floor(index / 12)));
     const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
     const lowOxygen = cells.filter((item) => item.oxygen < 0.45).length;
     const lowNutrient = cells.filter((item) => item.nutrient < 0.45).length;
@@ -5288,19 +5503,25 @@ function renderCfdBoard() {
       <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
     </section>
     <section class="cfd-layout">
-      <div class="cfd-vessel" aria-label="Interactive CFD vessel visualization">
+      <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
           <strong>${selected.id}</strong>
         </div>
         <div class="cfd-vessel-body">
-          <div class="cfd-impeller impeller-top"></div>
-          <div class="cfd-impeller impeller-bottom"></div>
-          <div class="cfd-feed-plume"></div>
-          <div class="cfd-sparger"></div>
+          <div class="cfd-baffle baffle-left"></div>
+          <div class="cfd-baffle baffle-right"></div>
+          <div class="cfd-shaft"></div>
+          <div class="cfd-impeller impeller-top"><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-impeller impeller-bottom"><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-circulation circulation-a"></div>
+          <div class="cfd-circulation circulation-b"></div>
+          <div class="cfd-feed-line"></div>
+          <div class="cfd-feed-zone"></div>
+          <div class="cfd-sparger"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="cfd-map" aria-label="CFD risk heatmap">
             ${selected.cells.map((cell) => `
-              <span style="background:${cfdCellColor(cell)}; opacity:${0.48 + cell.risk * 0.46};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
+              <span style="--cell:${cfdCellColor(cell)}; opacity:${0.42 + cell.risk * 0.5};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
             `).join("")}
           </div>
         </div>
@@ -5318,14 +5539,14 @@ function renderCfdBoard() {
           <article><span>O2</span><strong>${formatNumber(selected.oxygenIndex * 100, 0)}%</strong><small>${selected.lowOxygenCells} low-O2 cells</small></article>
           <article><span>Nutrient</span><strong>${formatNumber(selected.nutrientIndex * 100, 0)}%</strong><small>${selected.lowNutrientCells} weak-feed cells</small></article>
           <article><span>Shear</span><strong>${formatNumber(selected.shearIndex * 100, 0)}%</strong><small>${selected.highShearCells} high-shear cells</small></article>
-          <article><span>Hotspots</span><strong>${hotspotCells}</strong><small>risk cells / 100</small></article>
+          <article><span>Hotspots</span><strong>${hotspotCells}</strong><small>risk zones / ${selected.cells.length}</small></article>
         </div>
         <div class="cfd-actions">
           <h4>Suggested engineering edits</h4>
           <ul>
-            <li>${selected.lowOxygenCells ? "Increase kLa, oxygen enrichment, sparger efficiency, or headspace pressure." : "Oxygen transfer is acceptable for this screening state."}</li>
-            <li>${selected.lowNutrientCells ? "Move feed point closer to high-circulation zones or add distributed feed points." : "Nutrient distribution is acceptable for this screening state."}</li>
-            <li>${selected.highShearCells ? "Reduce agitation, review impeller tip speed, or consider scale-out." : "Shear proxy is acceptable for this screening state."}</li>
+            <li>${selected.lowOxygenCells ? "Review gas-flow rate, oxygen enrichment, sparger hole velocity, kLa target, and headspace pressure." : "Oxygen-transfer proxy is acceptable for this screening state."}</li>
+            <li>${selected.lowNutrientCells ? "Move feed addition toward the upper circulation loop or use a ring/distributed feed manifold." : "Nutrient-distribution proxy is acceptable for this screening state."}</li>
+            <li>${selected.highShearCells ? "Check impeller tip speed, power density, shear-sensitive cell limits, and whether scale-out is safer than scale-up." : "Shear proxy is acceptable for this screening state."}</li>
           </ul>
         </div>
         <div class="cfd-reactions">
@@ -5473,6 +5694,7 @@ function renderReportsBoard() {
 function pageTitle(view) {
   return {
     start: "Choose Process",
+    projects: "Projects",
     overview: "Overview",
     flowsheet: "Process Builder",
     equipment: "Equipment Register",
@@ -6208,6 +6430,173 @@ function renderHelpResult(payload) {
   `;
 }
 
+function localProjectStore() {
+  return JSON.parse(window.localStorage.getItem("axion-local-projects") || '{"projects":[],"versions":[],"invites":[]}');
+}
+
+function saveLocalProjectStore(store) {
+  window.localStorage.setItem("axion-local-projects", JSON.stringify(store));
+}
+
+function localIntegrations() {
+  return [
+    { key: "superpro", name: "SuperPro Designer", category: "Process simulation", status: "import-export scaffold", direction: "CSV/report exchange", auth: "file" },
+    { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "connector planned", direction: "stream/property export", auth: "enterprise API" },
+    { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "connector planned", direction: "reactor geometry export", auth: "file/API" },
+    { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "connector planned", direction: "CFD case export", auth: "file/API" },
+    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "connector planned", direction: "historian tags", auth: "server credentials" },
+    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "connector planned", direction: "batch profile import", auth: "enterprise connector" },
+    { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "connector planned", direction: "experiments and assays", auth: "API key/OAuth" },
+  ];
+}
+
+async function refreshProjects() {
+  try {
+    const payload = await apiRequest("/api/projects");
+    state.projects = payload.projects || [];
+    state.projectInvites = payload.invites || [];
+    state.integrations = payload.integrations || [];
+    state.projectFolders = payload.folders || {};
+  } catch {
+    const store = localProjectStore();
+    state.projects = store.projects || [];
+    state.projectInvites = store.invites || [];
+    state.integrations = localIntegrations();
+    state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
+  }
+  renderProjectsBoard();
+}
+
+async function saveCurrentProject() {
+  const nameInput = document.querySelector("#projectNameInput");
+  const name = (nameInput?.value || state.projectName || `${activeTemplate().label} model`).trim();
+  state.projectName = name;
+  const modelState = exportCurrentModelState();
+  const summary = currentModelSummary();
+  try {
+    if (!state.currentProjectId) {
+      const payload = await apiRequest("/api/projects", {
+        method: "POST",
+        body: JSON.stringify({ name, description: state.productBrief, modelState, summary }),
+      });
+      state.currentProjectId = payload.project.id;
+    } else {
+      await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/save`, {
+        method: "POST",
+        body: JSON.stringify({ name, description: state.productBrief, modelState, summary, label: "Manual save" }),
+      });
+    }
+    await refreshProjects();
+    showToast("Project saved");
+  } catch {
+    const store = localProjectStore();
+    const now = new Date().toISOString();
+    let project = store.projects.find((item) => item.id === state.currentProjectId);
+    if (!project) {
+      project = { id: `local-${Date.now()}`, name, description: state.productBrief, owner: "static-user", ownerName: "Static user", createdAt: now, collaborators: [], versionCount: 0 };
+      store.projects.unshift(project);
+      state.currentProjectId = project.id;
+    }
+    if (project.modelState) {
+      store.versions.unshift({ id: `v-${Date.now()}`, projectId: project.id, createdAt: now, createdBy: "static-user", label: "Archived local model", modelState: project.modelState, summary: project.summary });
+    }
+    project.name = name;
+    project.updatedAt = now;
+    project.template = state.template;
+    project.scale = state.scale;
+    project.versionCount = (project.versionCount || 0) + 1;
+    project.modelState = modelState;
+    project.summary = summary;
+    saveLocalProjectStore(store);
+    await refreshProjects();
+    showToast("Project saved locally");
+  }
+}
+
+async function loadProject(projectId) {
+  try {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(projectId)}`);
+    state.currentProjectId = payload.project.id;
+    state.projectName = payload.project.name;
+    state.projectVersions = payload.versions || [];
+    state.projectInvites = payload.invites || state.projectInvites;
+    importModelState(payload.model?.modelState || {});
+    setView("overview");
+    showToast(`${payload.project.name} loaded`);
+  } catch {
+    const store = localProjectStore();
+    const project = store.projects.find((item) => item.id === projectId);
+    if (!project) return showToast("Project not found");
+    state.currentProjectId = project.id;
+    state.projectName = project.name;
+    state.projectVersions = store.versions.filter((item) => item.projectId === projectId);
+    importModelState(project.modelState || {});
+    setView("overview");
+    showToast(`${project.name} loaded`);
+  }
+}
+
+async function archiveProject(projectId) {
+  try {
+    await apiRequest(`/api/projects/${encodeURIComponent(projectId)}/archive`, { method: "POST", body: "{}" });
+    await refreshProjects();
+    showToast("Project archived");
+  } catch {
+    const store = localProjectStore();
+    const project = store.projects.find((item) => item.id === projectId);
+    if (project) project.archived = true;
+    saveLocalProjectStore(store);
+    await refreshProjects();
+    showToast("Project archived locally");
+  }
+}
+
+async function inviteToProject() {
+  if (!state.currentProjectId) {
+    showToast("Save or load a project first");
+    return;
+  }
+  const recipient = document.querySelector("#inviteRecipient")?.value.trim();
+  const role = document.querySelector("#inviteRole")?.value || "editor";
+  if (!recipient) {
+    showToast("Enter email or username");
+    return;
+  }
+  try {
+    await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/invites`, {
+      method: "POST",
+      body: JSON.stringify({ recipient, role }),
+    });
+    await refreshProjects();
+    showToast("Invite recorded");
+  } catch {
+    const store = localProjectStore();
+    store.invites.unshift({ id: `invite-${Date.now()}`, projectId: state.currentProjectId, recipient, role, status: "pending", createdAt: new Date().toISOString(), delivery: "local" });
+    saveLocalProjectStore(store);
+    await refreshProjects();
+    showToast("Invite saved locally");
+  }
+}
+
+async function restoreProjectVersion(versionId) {
+  if (!state.currentProjectId) return;
+  try {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/versions/${encodeURIComponent(versionId)}/restore`, {
+      method: "POST",
+      body: "{}",
+    });
+    importModelState(payload.model?.modelState || {});
+    showToast("Archived model restored");
+  } catch {
+    const store = localProjectStore();
+    const version = store.versions.find((item) => item.id === versionId && item.projectId === state.currentProjectId);
+    if (version) {
+      importModelState(version.modelState || {});
+      showToast("Local archived model restored");
+    }
+  }
+}
+
 async function askToolHelp() {
   const prompt = els.helpPrompt?.value.trim() || "";
   if (prompt.length < 5) {
@@ -6253,8 +6642,10 @@ async function checkStoredAuth() {
     return;
   }
   try {
-    await apiRequest("/api/account");
+    const payload = await apiRequest("/api/account");
+    state.account = payload.account || null;
     unlockApp();
+    refreshProjects();
   } catch {
     window.localStorage.removeItem("axion-session");
     lockApp();
@@ -6287,8 +6678,10 @@ function bindAuth() {
     if (staticAccessMode) {
       if (await staticPasswordMatches(user, password)) {
         storeSession(staticAuth.token);
+        state.account = { role: "static", username: user.toLowerCase(), principal: user.toLowerCase() };
         els.loginPassword.value = "";
         unlockApp();
+        refreshProjects();
         showToast("Workspace unlocked");
       } else {
         els.loginError.textContent = "Access denied. Use the workspace password.";
@@ -6301,14 +6694,18 @@ function bindAuth() {
         body: JSON.stringify({ user, password, licenseKey: password }),
       });
       storeSession(payload.token);
+      state.account = payload.account || null;
       els.loginPassword.value = "";
       unlockApp();
+      refreshProjects();
       showToast(`Logged in as ${payload.account.role}`);
     } catch (error) {
       if (await staticPasswordMatches(user, password)) {
         storeSession(staticAuth.token);
+        state.account = { role: "static", username: user.toLowerCase(), principal: user.toLowerCase() };
         els.loginPassword.value = "";
         unlockApp();
+        refreshProjects();
         showToast("Workspace unlocked");
       } else {
         els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
@@ -6344,6 +6741,7 @@ function bindAuth() {
 
 function renderAll() {
   renderStartBoard();
+  renderProjectsBoard();
   renderTemplateList();
   renderScaleList();
   els.paletteSearch.value = state.paletteSearch;
@@ -6405,6 +6803,37 @@ function bindEvents() {
     }
     const jumpButton = event.target.closest("[data-jump-view]");
     if (jumpButton) setView(jumpButton.dataset.jumpView);
+  });
+
+  els.projectsBoard?.addEventListener("click", (event) => {
+    const saveButton = event.target.closest("[data-save-project]");
+    if (saveButton) {
+      saveCurrentProject();
+      return;
+    }
+    const refreshButton = event.target.closest("[data-refresh-projects]");
+    if (refreshButton) {
+      refreshProjects();
+      showToast("Projects refreshed");
+      return;
+    }
+    const loadButton = event.target.closest("[data-load-project]");
+    if (loadButton) {
+      loadProject(loadButton.dataset.loadProject);
+      return;
+    }
+    const archiveButton = event.target.closest("[data-archive-project]");
+    if (archiveButton) {
+      archiveProject(archiveButton.dataset.archiveProject);
+      return;
+    }
+    const restoreButton = event.target.closest("[data-restore-version]");
+    if (restoreButton) {
+      restoreProjectVersion(restoreButton.dataset.restoreVersion);
+      return;
+    }
+    const inviteButton = event.target.closest("[data-invite-collaborator]");
+    if (inviteButton) inviteToProject();
   });
 
   els.scaleList.addEventListener("click", (event) => {
