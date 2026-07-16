@@ -153,6 +153,51 @@ const flowDetailOptions = [
   { key: "full", label: "Full PFD" },
 ];
 
+const gpromsModelCapabilities = [
+  {
+    name: "Equation-oriented plant model",
+    status: "Axion scaffold",
+    inputs: "Units, streams, reaction kinetics, property package, recycle loops",
+    output: "High-fidelity equation set and variable map",
+    example: "mAb: connect growth, substrate uptake, kLa, harvest recovery, chromatography yield, utilities, and recycle equations into one solvable model.",
+  },
+  {
+    name: "Parameter estimation",
+    status: "Axion scaffold",
+    inputs: "Batch data, PAT tags, lab runs, CSV uploads, literature priors",
+    output: "Estimated kinetic, transfer, yield, and cost parameters with confidence flags",
+    example: "Fit mu max, qO2, kLa correction, resin capacity, filter fouling and media-consumption coefficients from uploaded batches.",
+  },
+  {
+    name: "Dynamic optimization",
+    status: "Axion scaffold",
+    inputs: "Objective, constraints, batch schedule, feed profile, control bounds",
+    output: "Optimized feed, DO, temperature, harvest, cleaning, and utility strategy",
+    example: "Minimize cost per kg while respecting ammonium, lactate, DO, shear, hold-time, sterility and bottleneck constraints.",
+  },
+  {
+    name: "Uncertainty and design-space",
+    status: "Axion scaffold",
+    inputs: "Parameter ranges, scale assumptions, yield uncertainty, CAPEX/OPEX factors",
+    output: "Risk-ranked design envelope and sensitivity map",
+    example: "Show whether titer, recovery, resin lifetime, media cost or utility carbon intensity dominates LCA/TEA uncertainty.",
+  },
+  {
+    name: "Soft sensors and online twin",
+    status: "Axion scaffold",
+    inputs: "SCADA / historian tags, Raman, capacitance, pH, DO, airflow, feed mass",
+    output: "Live state estimates, deviation warnings, and model-vs-plant residuals",
+    example: "Estimate biomass, OUR, substrate depletion, oxygen limitation and heat-load drift during production.",
+  },
+  {
+    name: "Utilities and sustainability optimizer",
+    status: "Axion scaffold",
+    inputs: "Steam, WFI, chilled water, heat recovery, wastewater, solvent recovery, power",
+    output: "Utility pinch, heat reuse, water reuse, CO2e and cost improvement ideas",
+    example: "Rank heat-recovery loop, condensate return, water reuse and solvent recycle by cost, carbon and implementation impact.",
+  },
+];
+
 const sectionPresets = [
   {
     key: "upstream",
@@ -359,6 +404,24 @@ const scientificSources = [
     modelUse: "Equipment-table classification, standards coverage, and Recommendations tab gap analysis.",
     source: "ISO ICS 71.120 - Equipment for the chemical industry",
     url: "https://www.iso.org/ics/71.120.html",
+  },
+  {
+    group: "Siemens",
+    title: "Bioprocess digital twins and gPROMS-style modelling",
+    appliesTo: ["process-explorer", "pat", "sensor", "report-set", "utility", "power-demand", "bioreactor"],
+    benchmark: "Bioprocess digital twins support in-silico design, optimization, scale-up, soft sensing, monitoring, real-time optimization, and manufacturing decision support.",
+    modelUse: "Advanced process modelling panel, soft-sensor telemetry, parameter-estimation scaffold, model-predictive optimization path, and utility/sustainability optimizer.",
+    source: "Siemens - Bioprocess digital twins",
+    url: "https://resources.sw.siemens.com/en-US/bioprocess-digital-twins/",
+  },
+  {
+    group: "Paper",
+    title: "CFD parameters for stirred-tank bioreactors",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "sparger", "gas-mixing", "sensor"],
+    benchmark: "Relevant CFD screening variables include power input, gas hold-up, mixing time, shear stress, oxygen transfer, kLa/OTR, impeller configuration, baffles, and sparging.",
+    modelUse: "CFD workbench vessel layout, OTR margin, mixing-time, gas-hold-up, tip-speed, oxygen/nutrient/shear heatmap, and dead-zone recommendations.",
+    source: "PMC - Oxygen mass transfer in a stirred tank bioreactor",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3561095/",
   },
 ];
 
@@ -4219,14 +4282,14 @@ function renderCanvas() {
     });
     if (state.selectedId === item.id) line.classList.add("selected");
     stage.appendChild(line);
-    if (state.flowDetail !== "standard" || state.selectedId === item.id) {
+    if (state.flowDetail !== "standard" || state.selectedId === item.id || kind === "main") {
       const label = document.createElement("button");
       label.className = `stream-label stream-label-${kind}${state.selectedId === item.id ? " selected" : ""}`;
       label.dataset.streamId = item.id;
       label.dataset.tooltip = streamTooltip(item, from, to, kind);
       label.style.left = `${(x1 + x2) / 2}px`;
       label.style.top = `${(y1 + y2) / 2}px`;
-      const compact = state.flowDetail === "detailed";
+      const compact = state.flowDetail === "detailed" || state.flowDetail === "standard";
       label.innerHTML = compact ? `
         <b>${item.id}</b><span>${streamLabel(kind).replace(" flow", "")}</span>
       ` : `
@@ -4255,6 +4318,8 @@ function renderCanvas() {
     const ics = icsCodeForUnit(item);
     const showEquipmentMeta = ["equipment", "full"].includes(state.flowDetail);
     node.innerHTML = `
+      <i class="unit-port port-in" title="Input port"></i>
+      <i class="unit-port port-out" title="Output port"></i>
       <span class="unit-icon" style="background:${item.color}">
         <strong>${unitSymbol(item)}</strong>
         <small>${item.icon}</small>
@@ -4266,6 +4331,7 @@ function renderCanvas() {
         <small>${unitSize(item)} · ${unitPower(item)}</small>
         ${showEquipmentMeta ? `<small class="unit-ics">${ics.code} · ${item.cls}</small>` : ""}
       </span>
+      <em class="unit-pfd-tag">${item.cls}</em>
     `;
     wireUnitNode(node, item);
     stage.appendChild(node);
@@ -4568,6 +4634,31 @@ function renderSimulationBoard() {
       <article><span>Route capacity</span><strong>${bestRoute.feasibleAnnualBatches}/${state.batchCount}</strong></article>
       <article><span>Branch steps</span><strong>${bestRoute.branchSteps}</strong></article>
       <article><span>Est. direct cost</span><strong>$${formatNumber(bestRoute.estimatedDirectCost, 0)}/kg</strong></article>
+    </section>
+    ${renderRealtimeTelemetry(true)}
+    <section class="simulation-group gproms-panel">
+      <div class="simulation-group-heading">
+        <div>
+          <span>Advanced process modelling</span>
+          <h3>gPROMS-style high-fidelity modelling path</h3>
+        </div>
+        <strong>${gpromsModelCapabilities.length} model capabilities</strong>
+      </div>
+      <div class="simulation-cards">
+        ${gpromsModelCapabilities.map((item) => `
+          <article class="simulation-card gproms-card">
+            <div>
+              <span>${item.status}</span>
+              <h4>${item.name}</h4>
+            </div>
+            <dl>
+              <dt>Inputs</dt><dd>${item.inputs}</dd>
+              <dt>Output</dt><dd>${item.output}</dd>
+            </dl>
+            <p>${item.example}</p>
+          </article>
+        `).join("")}
+      </div>
     </section>
     <section class="operation-sequence">
       <h3>Deterministic process balance</h3>
@@ -5468,6 +5559,68 @@ function renderPlantVisualization() {
   `;
 }
 
+function realtimeTelemetryRows() {
+  const p = state.params;
+  const data = metrics();
+  const phase = Date.now() / 1000;
+  const wave = (offset = 0, amplitude = 1) => Math.sin(phase * 0.85 + offset) * amplitude;
+  const bioreactor = cfdReport()[0];
+  const oxygenMargin = (p.kla * Math.max(1, p.doSetpoint) / 100) / Math.max(0.1, p.our || 1);
+  const heatPerBatch = data.utilities * 1000 / Math.max(1, state.batchCount);
+  return [
+    { key: "do", label: "DO probe", value: Math.max(0, Math.min(100, p.doSetpoint + wave(0, 2.7))), unit: "% air sat.", status: oxygenMargin < 1.2 ? "risk" : oxygenMargin < 1.8 ? "watch" : "ok" },
+    { key: "ph", label: "pH loop", value: p.ph + wave(1.7, 0.025), unit: "pH", status: Math.abs(p.ph - 7.1) > 0.45 ? "watch" : "ok" },
+    { key: "otr", label: "OTR margin", value: oxygenMargin + wave(2.5, 0.04), unit: "x OUR", status: oxygenMargin < 1.15 ? "risk" : oxygenMargin < 1.6 ? "watch" : "ok" },
+    { key: "mix", label: "Mixing time", value: cfdMixingTimeMinutes(bioreactor || { volumeL: state.batchSize }), unit: "min", status: cfdMixingTimeMinutes(bioreactor || { volumeL: state.batchSize }) > 9 ? "watch" : "ok" },
+    { key: "heat", label: "Heat load", value: heatPerBatch + wave(3.1, heatPerBatch * 0.025), unit: "kWh/batch", status: heatPerBatch > 900 ? "watch" : "ok" },
+    { key: "closure", label: "Mass closure", value: solveMassBalance().totals.closurePct + wave(4.2, 0.03), unit: "%", status: solveMassBalance().totals.closurePct < 98 ? "risk" : "ok" },
+  ];
+}
+
+function renderRealtimeTelemetry(compact = false) {
+  const rows = realtimeTelemetryRows();
+  return `
+    <section class="realtime-panel${compact ? " compact" : ""}" data-live-telemetry>
+      <div class="realtime-head">
+        <div>
+          <span>Live model telemetry</span>
+          <h3>Digital-twin signal layer</h3>
+        </div>
+        <b>refreshing</b>
+      </div>
+      <div class="realtime-grid">
+        ${rows.map((row) => `
+          <article class="realtime-tile realtime-${row.status}" data-live-key="${row.key}">
+            <span>${row.label}</span>
+            <strong data-live-value>${formatNumber(row.value, row.value < 10 ? 2 : 1)}</strong>
+            <small>${row.unit}</small>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function updateRealtimeTelemetry() {
+  const panels = document.querySelectorAll("[data-live-telemetry]");
+  if (!panels.length) return;
+  const rows = realtimeTelemetryRows();
+  panels.forEach((panel) => {
+    rows.forEach((row) => {
+      const tile = panel.querySelector(`[data-live-key="${row.key}"]`);
+      if (!tile) return;
+      tile.className = `realtime-tile realtime-${row.status}`;
+      const value = tile.querySelector("[data-live-value]");
+      if (value) value.textContent = formatNumber(row.value, row.value < 10 ? 2 : 1);
+    });
+  });
+}
+
+function startRealtimeTelemetry() {
+  window.clearInterval(startRealtimeTelemetry.timer);
+  startRealtimeTelemetry.timer = window.setInterval(updateRealtimeTelemetry, 1800);
+}
+
 function cfdCellColor(cell) {
   if (cell.risk > 0.68) return "#b8534d";
   if (cell.risk > 0.48) return "#c7922e";
@@ -5478,6 +5631,46 @@ function cfdCellColor(cell) {
 
 function cfdBioreactors() {
   return state.units.filter((item) => item.cls === "Bioreactor");
+}
+
+function cfdMixingTimeMinutes(item) {
+  const p = state.params;
+  const volumeL = Number(item.volumeL || estimatedBioreactorVolumeL(item)) || state.batchSize;
+  const scaleTerm = Math.pow(Math.max(0.05, volumeL / 1000), 0.22);
+  const powerTerm = Math.max(0.25, p.agitation + p.aeration * 1.8 + p.kla / 180);
+  return Math.max(0.8, 5.8 * scaleTerm / Math.sqrt(powerTerm));
+}
+
+function cfdEngineeringMetrics(unit, cells) {
+  const p = state.params;
+  const volumeL = estimatedBioreactorVolumeL(unit);
+  const volumeM3 = Math.max(0.05, volumeL / 1000);
+  const diameterM = Math.cbrt(volumeM3 / 1.6);
+  const impellerM = diameterM * 0.38;
+  const rpm = Math.max(28, Math.min(260, 52 + p.agitation * 18 + p.aeration * 24));
+  const tipSpeed = Math.PI * impellerM * rpm / 60;
+  const superficialGasVelocity = p.aeration * volumeM3 / Math.max(0.05, Math.PI * (diameterM / 2) ** 2) / 60;
+  const mixingTimeMin = cfdMixingTimeMinutes({ volumeL });
+  const powerDensityWm3 = p.agitation * 1000;
+  const gasHoldUpPct = Math.min(18, Math.max(0.4, p.aeration * 4.6 + p.kla / 70));
+  const otrMmolLh = p.kla * (p.doSetpoint / 100) * 0.21;
+  const otrMargin = otrMmolLh / Math.max(0.1, p.our);
+  const deadZonePct = cells.filter((cell) => cell.oxygen < 0.45 || cell.nutrient < 0.45).length / cells.length * 100;
+  const shearLimit = isCellCultureTemplate() ? 1.8 : 3.5;
+  return {
+    diameterM,
+    impellerM,
+    rpm,
+    tipSpeed,
+    superficialGasVelocity,
+    mixingTimeMin,
+    powerDensityWm3,
+    gasHoldUpPct,
+    otrMmolLh,
+    otrMargin,
+    deadZonePct,
+    shearLimit,
+  };
 }
 
 function cfdScore(unit, xIndex, yIndex) {
@@ -5506,6 +5699,7 @@ function cfdReport() {
   const units = cfdBioreactors();
   return units.map((unit) => {
     const cells = Array.from({ length: 144 }, (_, index) => cfdScore(unit, index % 12, Math.floor(index / 12)));
+    const engineering = cfdEngineeringMetrics(unit, cells);
     const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
     const lowOxygen = cells.filter((item) => item.oxygen < 0.45).length;
     const lowNutrient = cells.filter((item) => item.nutrient < 0.45).length;
@@ -5522,6 +5716,7 @@ function cfdReport() {
       lowOxygenCells: lowOxygen,
       lowNutrientCells: lowNutrient,
       highShearCells: highShear,
+      engineering,
       recommendation: risk > 0.62
         ? "High CFD screening risk: increase kLa or aeration, review impeller layout, reduce working volume, add feed distribution points, or split into parallel reactors."
         : risk > 0.38
@@ -5548,6 +5743,7 @@ function renderCfdBoard() {
   const transferScore = Math.max(0, Math.min(100, (selected.oxygenIndex * 0.46 + selected.nutrientIndex * 0.34 + (1 - selected.shearIndex) * 0.2) * 100));
   const selectedUnit = state.units.find((item) => item.id === selected.id);
   const selectedReactions = selectedUnit ? unitReactions(selectedUnit).slice(0, 3) : [];
+  const eng = selected.engineering;
   els.cfdBoard.innerHTML = `
     <section class="cfd-hero">
       <div>
@@ -5564,16 +5760,27 @@ function renderCfdBoard() {
           <strong>${selected.id}</strong>
         </div>
         <div class="cfd-vessel-body">
+          <div class="cfd-liquid-level"><span>working volume</span></div>
           <div class="cfd-baffle baffle-left"></div>
           <div class="cfd-baffle baffle-right"></div>
+          <div class="cfd-baffle baffle-back"></div>
+          <div class="cfd-probe probe-do" title="DO probe"></div>
+          <div class="cfd-probe probe-ph" title="pH / conductivity probe"></div>
           <div class="cfd-shaft"></div>
+          <div class="cfd-motor"></div>
           <div class="cfd-impeller impeller-top"><i></i><i></i><i></i><i></i></div>
           <div class="cfd-impeller impeller-bottom"><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-axial-flow axial-up"></div>
+          <div class="cfd-axial-flow axial-down"></div>
           <div class="cfd-circulation circulation-a"></div>
           <div class="cfd-circulation circulation-b"></div>
+          <div class="cfd-gas-plume"></div>
           <div class="cfd-feed-line"></div>
           <div class="cfd-feed-zone"></div>
           <div class="cfd-sparger"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-zone-label zone-top">foam / gas disengagement</div>
+          <div class="cfd-zone-label zone-mid">bulk mixing</div>
+          <div class="cfd-zone-label zone-bottom">sparger + dead-zone watch</div>
           <div class="cfd-map" aria-label="CFD risk heatmap">
             ${selected.cells.map((cell) => `
               <span style="--cell:${cfdCellColor(cell)}; opacity:${0.42 + cell.risk * 0.5};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
@@ -5595,13 +5802,19 @@ function renderCfdBoard() {
           <article><span>Nutrient</span><strong>${formatNumber(selected.nutrientIndex * 100, 0)}%</strong><small>${selected.lowNutrientCells} weak-feed cells</small></article>
           <article><span>Shear</span><strong>${formatNumber(selected.shearIndex * 100, 0)}%</strong><small>${selected.highShearCells} high-shear cells</small></article>
           <article><span>Hotspots</span><strong>${hotspotCells}</strong><small>risk zones / ${selected.cells.length}</small></article>
+          <article><span>Mixing time</span><strong>${formatNumber(eng.mixingTimeMin, 1)}</strong><small>min, CFD screening</small></article>
+          <article><span>Tip speed</span><strong>${formatNumber(eng.tipSpeed, 2)}</strong><small>m/s, ${formatNumber(eng.rpm, 0)} rpm</small></article>
+          <article><span>OTR margin</span><strong>${formatNumber(eng.otrMargin, 2)}x</strong><small>${formatNumber(eng.otrMmolLh, 2)} mmol/L/h proxy</small></article>
+          <article><span>Gas hold-up</span><strong>${formatNumber(eng.gasHoldUpPct, 1)}%</strong><small>sparger/aeration proxy</small></article>
         </div>
+        ${renderRealtimeTelemetry(true)}
         <div class="cfd-actions">
           <h4>Suggested engineering edits</h4>
           <ul>
             <li>${selected.lowOxygenCells ? "Review gas-flow rate, oxygen enrichment, sparger hole velocity, kLa target, and headspace pressure." : "Oxygen-transfer proxy is acceptable for this screening state."}</li>
             <li>${selected.lowNutrientCells ? "Move feed addition toward the upper circulation loop or use a ring/distributed feed manifold." : "Nutrient-distribution proxy is acceptable for this screening state."}</li>
             <li>${selected.highShearCells ? "Check impeller tip speed, power density, shear-sensitive cell limits, and whether scale-out is safer than scale-up." : "Shear proxy is acceptable for this screening state."}</li>
+            <li>${eng.deadZonePct > 12 ? "Dead-zone proxy is elevated; verify baffle layout, bottom clearance, sparger ring coverage, viscosity, and probe placement." : "Dead-zone proxy is within the current screening envelope."}</li>
           </ul>
         </div>
         <div class="cfd-reactions">
@@ -6152,6 +6365,7 @@ function renderOverview() {
         <button data-jump-view="sources">Open sources</button>
       </article>
     </section>
+    ${renderRealtimeTelemetry()}
     ${renderPlantVisualization()}
     <section class="overview-split">
       <article>
@@ -7681,4 +7895,5 @@ bindAuth();
 bindEvents();
 checkStoredAuth();
 loadTemplate("culturedMeat");
+startRealtimeTelemetry();
 setView("start");

@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=20260716-canvas-site-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=20260716-realtime-cfd-v1`.
 
 ## Online static access
 
@@ -27,6 +27,8 @@ The front of the application now works like a company-grade product entry flow:
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
 - The download center exports detailed LCA inventory CSVs, LCA impact summaries, TEA-ready cost tables, and downloadable SVG visualizations for plant architecture, LCA flows, and cost stacks
 - The Process Builder can be opened directly from Twin OS and automatically fits the full process canvas
+- Platform, Workflow, and Ecosystem pages include concrete tool examples for mAb, cultured meat, penicillin, LCA/TEA handoff, SCADA/historian, supplier quotes, and gPROMS-style modelling paths
+- Real-time digital-twin telemetry cards show live DO, pH, OTR margin, mixing time, heat load, and mass-closure signals in Overview, Simulation, and CFD
 - A persistent help field lets users describe a problem in words and receive direct tool steps
 
 ## Private workspace backend
@@ -104,10 +106,11 @@ curl -sS -X POST http://127.0.0.1:8899/api/admin/orders/ORDER_REFERENCE/mark-pai
 - Click-to-add and drag-and-drop unit-operation library with 120+ ISO/PFD-style pharmaceutical, biochemical, environmental, packaging, utilities, wastewater, water-purification, air-pollution, resource, report, recycling, heat-reuse, cleaning, and documentation items
 - Granular process flowsheets with visible process-role badges for main process, support, CIP/SIP cleaning, recycle/reuse, heat reuse, waste/emissions, and QC/data elements
 - Universal support-infrastructure layer for CIP/SIP, cleaning-agent and rinse-water supply, CIP return/neutralization, heat-transfer-agent reuse, condensate return, recycle/purge, water reuse, solvent recycle, material inventory, power demand/generation, and report sets
-- Moveable flowsheet nodes, copy selected unit, clearer move/connect/inspect modes, canvas quick-add for valves, pumps, flowmeters, sensors, manifolds, and pressure relief elements
+- Moveable PFD-style flowsheet nodes, visible input/output ports, animated stream arrows, stream tags, copy selected unit, clearer move/connect/inspect modes, canvas quick-add for valves, pumps, flowmeters, sensors, manifolds, and pressure relief elements
 - Animated color-coded streams for main product flow, utilities, waste, QC/PAT/data paths, cleaning loops, heat-reuse loops, and recycle/purge loops
 - In-flowsheet equation spotlight that changes with the selected unit or stream and links into the full equation library
-- Interactive CFD workbench with a more technical bioreactor vessel section, shaft, baffles, dual impellers, sparger ring, circulation loops, feed zone, 12x12 oxygen/nutrient/shear screening map, hotspot counts, and suggested engineering edits
+- Interactive CFD workbench with a more technical bioreactor vessel section, liquid level, shaft, motor, baffles, DO/pH probes, dual impellers, axial/radial circulation loops, gas plume, sparger ring, feed zone, 12x12 oxygen/nutrient/shear screening map, hotspot counts, mixing time, tip speed, gas hold-up, OTR margin, dead-zone proxy, live telemetry, and suggested engineering edits
+- gPROMS-style advanced modelling scaffold for equation-oriented plant models, parameter estimation, dynamic optimization, uncertainty/design-space analysis, soft sensors, online digital twins, utility optimization, and sustainability optimization
 - Finite-capacity campaign scheduler with editable active/skip flags, route branches, visual branch/merge topology, automatic route optimizer, predecessor dependencies, recipe timing, setup/process/CIP windows, parallel equipment pools, shared CIP/SIP skid constraints, equipment occupancy, hold-time warnings, QC release queue, bottleneck resources, route comparison, and downloadable recipe/schedule/resource/route/topology/optimizer CSV files
 - SuperPro-style simulation functions from the referenced thesis and v12 manual: chemical/component register, stock mixtures, bulk/discrete streams, stream drawing and classification, procedures/operations, batch-vs-continuous mode, resource tracking, scheduling/Gantt concepts, feedback regulation, recycle loops, tear-stream convergence, breakpoints, throughput scale-up, debottlenecking, emissions, reports, databanks, and economic evaluation
 - Major remaining manual areas represented as model modules: cleaning-agent stream classification, CIP/SIP auxiliary occupancy, material inventory/storage charts, heat-transfer-agent tracking, heat reuse, condensate return, solvent and water recycle with purge, power demand/generation, labor requirement tables, process explorer/overview navigator, stream summary tables, physical-state and density toolboxes, pre-simulation checks, partition/sequencing/back-propagation, error/status output, visual annotation objects, Excel/OLE exchange concepts, report sets, database import/export/access control, currency/consumable/material/site databanks, process-library search, and emission limit checks

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260716-canvas-site-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260716-realtime-cfd-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -166,6 +166,23 @@
                 <p>Ask what blocks oxygen transfer, ammonium control, media cost, scale-up, cleaning, heat recovery, or facility readiness, then jump to the right tool module.</p>
               </article>
             </div>
+            <div class="public-example-grid" aria-label="Concrete platform examples">
+              <article>
+                <span>Example in Axion</span>
+                <h3>10,000 L mAb fed-batch model</h3>
+                <p>Generates seed train, production STR, harvest, depth filtration, Protein A, low-pH viral inactivation, polishing, UF/DF, fill, QC release, CIP/SIP, mass balance, LCA inventory, and TEA cost stack.</p>
+              </article>
+              <article>
+                <span>Example in Axion</span>
+                <h3>Cultured meat perfusion plant</h3>
+                <p>Shows media preparation, seed expansion, perfusion bioreactor, cell-retention, harvest wash, formulation, packaging, ammonia and lactate boundaries, heat reuse, wastewater, and water-reuse loops.</p>
+              </article>
+              <article>
+                <span>Example in Axion</span>
+                <h3>Penicillin fermentation route</h3>
+                <p>Builds sterile media, aerobic fermentation, cell removal, extraction, solvent recycle, crystallization, drying, emissions, hazardous solvent checks, route scheduling, and downstream yield sensitivity.</p>
+              </article>
+            </div>
           </section>
 
           <section id="publicWorkflow" class="public-section public-workflow public-page" data-public-page="workflow">
@@ -178,6 +195,23 @@
               <article><b>Process</b><span>Generate and edit the flowsheet, unit procedures, streams, utilities, cleaning loops, and recycle paths.</span></article>
               <article><b>Physics</b><span>Check kLa, OUR, pH, DO, heat load, mixing time, cell boundaries, and CFD-style distribution risks.</span></article>
               <article><b>Decision</b><span>Export streams, equations, parameters, balances, LCA inventory, LCA impacts, TEA-ready cost model, SVG visuals, and readiness recommendations.</span></article>
+            </div>
+            <div class="public-example-grid workflow-examples" aria-label="Concrete workflow examples">
+              <article>
+                <span>Workflow example</span>
+                <h3>“Reduce media cost by 20%”</h3>
+                <p>Open parameters, lower media intensity, test titer/recovery tradeoffs, inspect ammonium/osmolality warnings, compare direct cost, then download TEA-ready CSV for the new scenario.</p>
+              </article>
+              <article>
+                <span>Workflow example</span>
+                <h3>“Can I scale this reactor?”</h3>
+                <p>Jump to CFD, check kLa/OTR margin, mixing time, gas hold-up, shear and dead zones, then return to Process Builder to split the reactor into parallel scale-out trains.</p>
+              </article>
+              <article>
+                <span>Workflow example</span>
+                <h3>“Prepare an LCA handoff”</h3>
+                <p>Use streams and reports to export water, WFI, media, chemicals, utilities, waste, emissions, per-batch values, annual values, per-kg values, and screening CO2e factors.</p>
+              </article>
             </div>
           </section>
 
@@ -256,6 +290,23 @@
               <article>
                 <h3>Review layer</h3>
                 <p>Use structured recommendations to see what still has to be added before a full production simulation is defensible.</p>
+              </article>
+            </div>
+            <div class="public-example-grid ecosystem-examples" aria-label="Concrete ecosystem examples">
+              <article>
+                <span>Integration example</span>
+                <h3>SCADA / historian handoff</h3>
+                <p>Map DO, pH, temperature, airflow, agitation, pressure, feed mass and conductivity tags to live digital-twin variables and compare them with the model envelope.</p>
+              </article>
+              <article>
+                <span>Partner example</span>
+                <h3>Supplier quote review</h3>
+                <p>Attach bioreactor, filter, resin, membrane, CIP skid and clean-utility assumptions to CAPEX/OPEX rows so TEA reviewers can replace screening factors with quoted values.</p>
+              </article>
+              <article>
+                <span>Model example</span>
+                <h3>gPROMS-style high-fidelity path</h3>
+                <p>Use Axion’s model cards to decide where equation-oriented modelling, parameter estimation, optimization, soft sensors, web apps and utility optimization should be connected next.</p>
               </article>
             </div>
           </section>
@@ -803,6 +854,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260716-canvas-site-v1"></script>
+    <script type="module" src="./app.js?v=20260716-realtime-cfd-v1"></script>
   </body>
 </html>
