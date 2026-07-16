@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260715-projects-collab-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260716-paywall-profile-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -457,6 +457,31 @@
               <p id="loginError" class="login-error" role="alert"></p>
               <small>Backend login keeps the workspace private while you build and simulate process models.</small>
             </form>
+            <form id="checkoutForm" class="login-card access-card checkout-card">
+              <div class="login-brand">
+                <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>
+                <div>
+                  <p>Paid access</p>
+                  <h1>Activate Axion</h1>
+                </div>
+              </div>
+              <p class="access-copy">For all users except KBrenner and MAhmed, access is activated after payment. Submit the billing contact to generate a bank-transfer reference and license order.</p>
+              <label>
+                <span>Name</span>
+                <input id="checkoutName" autocomplete="name" placeholder="Customer name" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input id="checkoutEmail" type="email" autocomplete="email" placeholder="billing@company.com" />
+              </label>
+              <label>
+                <span>Company</span>
+                <input id="checkoutCompany" autocomplete="organization" placeholder="Company or university" />
+              </label>
+              <button class="login-button" type="submit">Generate payment reference</button>
+              <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
+              <small>After the bank transfer is received, the admin marks the order paid and Axion issues a license key.</small>
+            </form>
           </section>
         </main>
       </div>
@@ -541,9 +566,18 @@
 
       <main class="workspace">
         <header class="topbar">
-          <div>
-            <p class="eyebrow" id="processEyebrow">Cultured meat production</p>
-            <h2 id="pageTitle">Start</h2>
+          <div class="topbar-main">
+            <div>
+              <p class="eyebrow" id="processEyebrow">Cultured meat production</p>
+              <h2 id="pageTitle">Start</h2>
+            </div>
+            <div class="profile-menu">
+              <button id="profileButton" class="profile-button" type="button" aria-expanded="false" aria-controls="profilePanel">
+                <span id="profileInitials">AX</span>
+                <strong id="profileName">Profile</strong>
+              </button>
+              <div id="profilePanel" class="profile-panel" hidden></div>
+            </div>
           </div>
           <nav class="view-tabs" aria-label="Workspace views">
             <button class="tab active" data-view="start">Start</button>
@@ -573,7 +607,6 @@
             <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect Selected</span></button>
             <button id="downloadSummaryCsv" class="action-button" title="Download a process summary table" aria-label="Download process summary CSV"><span>Download Summary</span></button>
             <button id="resetScenario" class="text-button">Reset Scenario</button>
-            <button id="logoutButton" class="text-button">Logout</button>
           </div>
         </header>
 
@@ -770,6 +803,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260715-projects-collab-v1"></script>
+    <script type="module" src="./app.js?v=20260716-paywall-profile-v1"></script>
   </body>
 </html>

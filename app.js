@@ -1749,6 +1749,7 @@ const state = {
   activeRoute: "primary",
   recipeOverrides: {},
   account: null,
+  productConfig: null,
   currentProjectId: null,
   projectName: "Untitled Axion model",
   projects: [],
@@ -1821,6 +1822,11 @@ const els = {
   askHelp: document.querySelector("#askHelp"),
   helpResult: document.querySelector("#helpResult"),
   loginForm: document.querySelector("#loginForm"),
+  checkoutForm: document.querySelector("#checkoutForm"),
+  checkoutName: document.querySelector("#checkoutName"),
+  checkoutEmail: document.querySelector("#checkoutEmail"),
+  checkoutCompany: document.querySelector("#checkoutCompany"),
+  checkoutResult: document.querySelector("#checkoutResult"),
   loginUser: document.querySelector("#loginUser"),
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
@@ -1830,6 +1836,10 @@ const els = {
   googleButtonMount: document.querySelector("#googleButtonMount"),
   googleLoginStatus: document.querySelector("#googleLoginStatus"),
   loginGate: document.querySelector("#loginGate"),
+  profileButton: document.querySelector("#profileButton"),
+  profilePanel: document.querySelector("#profilePanel"),
+  profileInitials: document.querySelector("#profileInitials"),
+  profileName: document.querySelector("#profileName"),
   publicLogo: document.querySelector("#publicLogo"),
   openLoginHero: document.querySelector("#openLoginHero"),
   loginPanel: document.querySelector("#loginPanel"),
@@ -5071,6 +5081,7 @@ function renderSources() {
       ${renderSourceCards(scientificSources)}
     </section>
   `;
+  renderProfileMenu();
 }
 
 function templateComplexity(template) {
@@ -6208,7 +6219,7 @@ async function staticPasswordMatches(user, password) {
 async function apiRequest(path, options = {}) {
   const session = window.localStorage.getItem("axion-session");
   if (session === staticAuth.token && path === "/api/account") {
-    return { account: { role: "static", productName: "Axion Process OS" } };
+    return { account: { role: "static", name: "Static workspace user", username: "static", principal: "static", productName: "Axion Process OS", billing: { plan: "Static private workspace", paymentStatus: "password access", amountFormatted: "725,00 EUR" } } };
   }
   if (path === "/api/auth/google-config" && session === staticAuth.token) {
     return { enabled: false, clientId: "" };
@@ -6238,23 +6249,112 @@ function storeSession(token) {
   clearLegacyAuth();
 }
 
+function accountName() {
+  const account = state.account || {};
+  return account.name || account.username || account.email || account.principal || "Axion user";
+}
+
+function accountInitials() {
+  const parts = accountName().split(/[\s@._-]+/).filter(Boolean);
+  return (parts[0]?.[0] || "A") + (parts[1]?.[0] || "X");
+}
+
+function renderProfileMenu() {
+  if (!els.profileButton || !els.profilePanel) return;
+  const account = state.account || {};
+  const config = state.productConfig || {};
+  const billing = account.billing || {};
+  const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
+  const amount = billing.amountFormatted || config.amountFormatted || "725,00 EUR";
+  const paymentStatus = billing.paymentStatus || (account.licenseKey ? "active license" : account.role === "static" ? "static access" : "workspace access");
+  const plan = billing.plan || (account.role === "admin" ? "Owner workspace" : account.role === "customer" ? "Professional license" : "Private workspace");
+  els.profileInitials.textContent = accountInitials().toUpperCase().slice(0, 2);
+  els.profileName.textContent = accountName();
+  els.profilePanel.innerHTML = `
+    <section class="profile-card">
+      <div class="profile-card-head">
+        <span>${accountInitials().toUpperCase().slice(0, 2)}</span>
+        <div>
+          <strong>${accountName()}</strong>
+          <small>${account.email || account.username || account.principal || "local workspace"}</small>
+        </div>
+      </div>
+      <dl>
+        <dt>Role</dt><dd>${account.role || "static"}</dd>
+        <dt>Plan</dt><dd>${plan}</dd>
+        <dt>Status</dt><dd>${paymentStatus}</dd>
+        <dt>Price</dt><dd>${amount}</dd>
+        <dt>License</dt><dd>${account.licenseKey || billing.licenseKey || "not assigned"}</dd>
+        <dt>Billing email</dt><dd>${billing.billingEmail || account.email || "not set"}</dd>
+        <dt>Customer ID</dt><dd>${billing.customerId || account.principal || "local-session"}</dd>
+        <dt>Project</dt><dd>${activeProject?.name || state.projectName || "unsaved model"}</dd>
+      </dl>
+      <div class="profile-actions">
+        <button data-profile-view="projects" type="button">Projects</button>
+        <button data-profile-view="reports" type="button">Invoices / Exports</button>
+        <button id="logoutButton" data-profile-logout type="button">Logout</button>
+      </div>
+    </section>
+  `;
+}
+
 function renderProductConfig(config) {
+  state.productConfig = config || null;
   staticAccessMode = false;
   if (els.loginOrigin) {
     els.loginOrigin.textContent = config?.productName
       ? "Backend online. Private process workspace ready."
       : "Backend online. Private workspace ready.";
   }
+  renderProfileMenu();
 }
 
 function renderStaticAccessMode() {
   staticAccessMode = true;
+  state.productConfig = null;
   if (els.loginOrigin) {
     els.loginOrigin.textContent = "Online static mode. Enter the workspace password to unlock Axion.";
   }
   if (els.googleLoginFallback) els.googleLoginFallback.disabled = true;
   if (els.googleLoginStatus) {
     els.googleLoginStatus.textContent = "Google login requires the backend; password login is available for this hosted static version.";
+  }
+  renderProfileMenu();
+}
+
+function renderCheckoutResult(payload) {
+  if (!els.checkoutResult) return;
+  const order = payload.order || {};
+  const payment = payload.payment || {};
+  const bank = payment.bank || {};
+  els.checkoutResult.innerHTML = `
+    <strong>Payment reference created</strong>
+    <dl>
+      <dt>Reference</dt><dd>${order.reference || payment.reference}</dd>
+      <dt>Amount</dt><dd>${payment.amount || order.amount} ${payment.currency || order.currency || "EUR"}</dd>
+      <dt>Recipient</dt><dd>${bank.accountHolder || "Configure bank account"}</dd>
+      <dt>IBAN</dt><dd>${bank.iban || "Configure BANK_IBAN"}</dd>
+      <dt>BIC</dt><dd>${bank.bic || "Configure BANK_BIC"}</dd>
+      <dt>Bank</dt><dd>${bank.bankName || "Configure BANK_NAME"}</dd>
+    </dl>
+    <p>${payment.instruction || "Transfer the amount with the reference. Access is activated after manual confirmation."}</p>
+  `;
+}
+
+async function createCheckoutOrder() {
+  if (!els.checkoutResult) return;
+  const customerName = els.checkoutName?.value.trim() || "";
+  const customerEmail = els.checkoutEmail?.value.trim() || "";
+  const company = els.checkoutCompany?.value.trim() || "";
+  els.checkoutResult.innerHTML = "<p>Creating payment reference...</p>";
+  try {
+    const payload = await apiRequest("/api/checkout", {
+      method: "POST",
+      body: JSON.stringify({ customerName, customerEmail, company }),
+    });
+    renderCheckoutResult(payload);
+  } catch (error) {
+    els.checkoutResult.innerHTML = `<p>${error.message || "Could not create payment reference."}</p>`;
   }
 }
 
@@ -6465,6 +6565,7 @@ async function refreshProjects() {
     state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
   }
   renderProjectsBoard();
+  renderProfileMenu();
 }
 
 async function saveCurrentProject() {
@@ -6713,11 +6814,44 @@ function bindAuth() {
     }
   });
 
-  els.logoutButton?.addEventListener("click", () => {
-    window.localStorage.removeItem("axion-session");
-    clearLegacyAuth();
-    lockApp();
-    showToast("Logged out");
+  els.checkoutForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    createCheckoutOrder();
+  });
+
+  els.profileButton?.addEventListener("click", () => {
+    const expanded = els.profileButton.getAttribute("aria-expanded") === "true";
+    els.profileButton.setAttribute("aria-expanded", String(!expanded));
+    if (els.profilePanel) els.profilePanel.hidden = expanded;
+    renderProfileMenu();
+  });
+
+  els.profilePanel?.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-profile-view]");
+    if (viewButton) {
+      setView(viewButton.dataset.profileView);
+      els.profilePanel.hidden = true;
+      els.profileButton?.setAttribute("aria-expanded", "false");
+      return;
+    }
+    const logoutButton = event.target.closest("[data-profile-logout]");
+    if (logoutButton) {
+      window.localStorage.removeItem("axion-session");
+      clearLegacyAuth();
+      state.account = null;
+      els.profilePanel.hidden = true;
+      els.profileButton?.setAttribute("aria-expanded", "false");
+      renderProfileMenu();
+      lockApp();
+      showToast("Logged out");
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!els.profilePanel || els.profilePanel.hidden) return;
+    if (event.target.closest(".profile-menu")) return;
+    els.profilePanel.hidden = true;
+    els.profileButton?.setAttribute("aria-expanded", "false");
   });
 
   els.helpToggle?.addEventListener("click", () => {
@@ -6767,6 +6901,7 @@ function renderAll() {
   renderTwinWorkspace();
   renderEconomics();
   renderReportsBoard();
+  renderProfileMenu();
 }
 
 function bindEvents() {

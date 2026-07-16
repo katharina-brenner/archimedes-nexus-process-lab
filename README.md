@@ -42,9 +42,36 @@ export GOOGLE_ALLOWED_DOMAINS=""
 
 Google login uses Google Identity Services in the browser and verifies the returned ID token on the backend. It only renders as active when `GOOGLE_CLIENT_ID` is configured.
 
+## Paywall setup
+
+The paywall is backend-enforced. Do not use a static GitHub Pages deployment for real paid access, because static HTML cannot securely verify payment. Use `npm run backend` or deploy `server.mjs` to a Node hosting provider.
+
+1. Copy `.env.example` to `.env`.
+2. Set `SESSION_SECRET` to a long private random string.
+3. Set `AXION_PRICE_CENTS=72500` and `AXION_CURRENCY=EUR`.
+4. Fill `BANK_ACCOUNT_HOLDER`, `BANK_IBAN`, `BANK_BIC`, and `BANK_NAME`.
+5. Start the backend with `npm run backend`.
+6. New paying users open the login page and submit the paid-access form.
+7. The backend creates a bank-transfer order with a unique reference.
+8. After the bank transfer arrives, the admin marks the order paid:
+
+```bash
+TOKEN=$(curl -sS -X POST http://127.0.0.1:8899/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"user":"owner","password":"YOUR_ADMIN_PASSWORD"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+
+curl -sS -X POST http://127.0.0.1:8899/api/admin/orders/ORDER_REFERENCE/mark-paid \
+  -H "authorization: Bearer $TOKEN"
+```
+
+9. The response contains the activated license key. The user can then log in with their email and the license key.
+
+`KBrenner/kbrenner` and `MAhmed/mahmed` are seeded as payment-exempt internal users and do not need payment.
+
 ## Backend API
 
 - `GET /api/product` lists product and backend configuration
+- `POST /api/checkout` creates a 725 EUR bank-transfer order and payment reference
 - `POST /api/auth/login` logs in the owner workspace
 - `GET /api/auth/google-config` tells the frontend whether Google login is configured
 - `POST /api/auth/google` verifies a Google ID token and creates a server session
@@ -59,6 +86,8 @@ Google login uses Google Identity Services in the browser and verifies the retur
 - `GET /api/integrations` lists prepared API connector targets
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
+- `GET /api/admin/orders` lists orders and licenses for admins
+- `POST /api/admin/orders/:id-or-reference/mark-paid` activates a paid order and creates a license key
 
 ## What is included
 

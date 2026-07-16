@@ -214,8 +214,8 @@ function normalizePrincipal(value) {
 
 function seedUsers(db) {
   const seeds = [
-    { username: "kbrenner", email: "kbrenner@local.axion", name: "Workspace Owner", password: "0105", role: "admin" },
-    { username: "mahmed", email: "mahmed@local.axion", name: "M. Ahmed", password: "1402", role: "user" },
+    { username: "kbrenner", email: "kbrenner@local.axion", name: "Workspace Owner", password: "0105", role: "admin", paymentExempt: true },
+    { username: "mahmed", email: "mahmed@local.axion", name: "M. Ahmed", password: "1402", role: "user", paymentExempt: true },
   ];
   seeds.forEach((seed) => {
     const existing = db.users.find((user) => user.username === seed.username || user.email === seed.email);
@@ -226,10 +226,14 @@ function seedUsers(db) {
       email: seed.email,
       name: seed.name,
       role: seed.role,
+      paymentExempt: seed.paymentExempt,
       passwordHash: userPasswordHash(seed.password),
       createdAt: new Date().toISOString(),
       status: "active",
     });
+  });
+  db.users.forEach((user) => {
+    if (["kbrenner", "mahmed"].includes(user.username)) user.paymentExempt = true;
   });
 }
 
@@ -241,8 +245,14 @@ function sanitizeUser(user) {
     email: user.email,
     name: user.name,
     role: user.role,
+    paymentExempt: Boolean(user.paymentExempt),
     status: user.status,
   };
+}
+
+function activeLicenseForEmail(db, email) {
+  const normalized = normalizePrincipal(email);
+  return db.licenses.find((item) => item.status === "active" && normalizePrincipal(item.customerEmail) === normalized);
 }
 
 function sessionPrincipal(session) {
@@ -332,6 +342,27 @@ function sanitizeLicense(license) {
     orderId: license.orderId,
     createdAt: license.createdAt,
     status: license.status,
+  };
+}
+
+function billingProfileForSession(session) {
+  const amount = config.priceCents / 100;
+  const amountFormatted = new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency }).format(amount);
+  const isCustomer = session.role === "customer";
+  const isAdmin = session.role === "admin";
+  const isExempt = Boolean(session.paymentExempt);
+  return {
+    plan: isAdmin ? "Owner workspace" : isCustomer ? "Professional license" : isExempt ? "Internal free access" : "Private workspace",
+    paymentStatus: isCustomer ? "paid active" : isAdmin ? "payment exempt" : isExempt ? "payment exempt" : "workspace access",
+    amount,
+    amountFormatted,
+    currency: config.currency,
+    billingEmail: session.email || "",
+    customerId: session.licenseKey || sessionPrincipal(session),
+    licenseKey: session.licenseKey || "",
+    paymentExempt: isExempt || isAdmin,
+    bankConfigured: publicConfig().bankConfigured,
+    renewal: "manual annual review",
   };
 }
 
@@ -849,13 +880,18 @@ async function googleLogin(req, res) {
   const email = String(profile.email || "").toLowerCase();
   const db = ensureDbShape(await loadDb());
   let user = db.users.find((item) => item.email === email);
+  const license = activeLicenseForEmail(db, email);
+  if (!user && !license) {
+    json(res, 402, { error: "Payment required. Create a paid order or ask an admin to activate this email before using Google login." });
+    return;
+  }
   if (!user) {
     user = {
       id: randomUUID(),
       username: email.split("@")[0],
       email,
       name: profile.name || email,
-      role: "user",
+      role: license ? "customer" : "user",
       passwordHash: "",
       createdAt: new Date().toISOString(),
       status: "active",
@@ -870,6 +906,8 @@ async function googleLogin(req, res) {
     email,
     username: user.username,
     name: user.name || profile.name || email,
+    paymentExempt: Boolean(user.paymentExempt),
+    licenseKey: license?.key || "",
     exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
   });
   json(res, 200, {
@@ -880,6 +918,8 @@ async function googleLogin(req, res) {
       username: user.username,
       email,
       productName: config.productName,
+      licenseKey: license?.key || "",
+      billing: billingProfileForSession({ role: user.role || "user", email, username: user.username, name: user.name, paymentExempt: Boolean(user.paymentExempt), licenseKey: license?.key || "" }),
     },
   });
 }
@@ -898,8 +938,8 @@ async function login(req, res) {
       json(res, 503, { error: "Admin password is not configured on the backend." });
       return;
     }
-    const token = signSession({ sub: "admin", role: "admin", exp: Date.now() + 1000 * 60 * 60 * 12 });
-    json(res, 200, { token, account: { role: "admin", name: "Owner", productName: config.productName } });
+    const token = signSession({ sub: "admin", role: "admin", name: "Owner", paymentExempt: true, exp: Date.now() + 1000 * 60 * 60 * 12 });
+    json(res, 200, { token, account: { role: "admin", name: "Owner", productName: config.productName, billing: billingProfileForSession({ role: "admin", name: "Owner", paymentExempt: true }) } });
     return;
   }
 
@@ -911,6 +951,7 @@ async function login(req, res) {
       username: localUser.username,
       email: localUser.email,
       name: localUser.name,
+      paymentExempt: Boolean(localUser.paymentExempt),
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
     });
     json(res, 200, {
@@ -921,6 +962,7 @@ async function login(req, res) {
         username: localUser.username,
         email: localUser.email,
         productName: config.productName,
+        billing: billingProfileForSession({ role: localUser.role || "user", username: localUser.username, email: localUser.email, name: localUser.name, paymentExempt: Boolean(localUser.paymentExempt) }),
       },
     });
     return;
@@ -930,11 +972,11 @@ async function login(req, res) {
   const emailMatches = !user || license?.customerEmail === user;
   if (license && emailMatches) {
     const token = signSession({ sub: license.key, role: "customer", email: license.customerEmail, name: license.customerName, licenseKey: license.key, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 });
-    json(res, 200, { token, account: { role: "customer", name: license.customerName, productName: config.productName, licenseKey: license.key } });
+    json(res, 200, { token, account: { role: "customer", name: license.customerName, email: license.customerEmail, productName: config.productName, licenseKey: license.key, billing: billingProfileForSession({ role: "customer", email: license.customerEmail, name: license.customerName, licenseKey: license.key }) } });
     return;
   }
 
-  json(res, 401, { error: "Access denied. Use the owner login or an activated license key." });
+  json(res, 402, { error: "Payment required. Use KBrenner/MAhmed internal access, an activated license key, or create a paid order." });
 }
 
 async function account(req, res) {
@@ -952,6 +994,7 @@ async function account(req, res) {
       principal: sessionPrincipal(session),
       productName: config.productName,
       licenseKey: session.licenseKey || "",
+      billing: billingProfileForSession(session),
     },
   });
 }
