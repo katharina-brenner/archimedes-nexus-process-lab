@@ -1879,6 +1879,7 @@ const els = {
   reportsBoard: document.querySelector("#reportsBoard"),
   modeHint: document.querySelector("#modeHint"),
   toast: document.querySelector("#toast"),
+  detailDrawer: document.querySelector("#detailDrawer"),
   helpDock: document.querySelector("#helpDock"),
   helpToggle: document.querySelector("#helpToggle"),
   helpPrompt: document.querySelector("#helpPrompt"),
@@ -5621,6 +5622,134 @@ function startRealtimeTelemetry() {
   startRealtimeTelemetry.timer = window.setInterval(updateRealtimeTelemetry, 1800);
 }
 
+const exploreSelector = [
+  ".bento-card",
+  ".platform-grid article",
+  ".workflow-rail article",
+  ".public-example-grid article",
+  ".ecosystem-grid article",
+  ".usecase-grid article",
+  ".module-copy-grid article",
+  ".review-grid article",
+  ".faq-grid article",
+  ".pricing-grid article",
+  ".overview-grid article",
+  ".overview-split article",
+  ".plant-stage",
+  ".plant-area",
+  ".realtime-tile",
+  ".simulation-card",
+  ".boundary-card",
+  ".source-card",
+  ".standard-card",
+  ".recommendation-list article",
+  ".reports-grid article",
+  ".cfd-score-card",
+  ".cfd-metric-grid article",
+  ".route-score-card",
+  ".cost-row",
+  "tbody tr",
+].join(", ");
+
+function enhanceInteractiveSurfaces() {
+  document.querySelectorAll(exploreSelector).forEach((item) => {
+    if (item.closest(".detail-drawer") || item.matches("button, a, input, textarea, select")) return;
+    item.classList.add("clickable-surface");
+    item.setAttribute("tabindex", "0");
+    item.setAttribute("role", "button");
+    item.setAttribute("aria-label", `Open details for ${exploreTitle(item)}`);
+  });
+}
+
+function exploreTitle(item) {
+  const preferred = item.querySelector("h1, h2, h3, h4, strong, b")?.textContent?.trim()
+    || item.getAttribute("aria-label")
+    || item.dataset.id
+    || item.textContent?.trim().split(/\s+/).slice(0, 7).join(" ")
+    || "selected item";
+  return preferred.replace(/\s+/g, " ").slice(0, 96);
+}
+
+function exploreEyebrow(item) {
+  return item.querySelector("span, em, small")?.textContent?.trim().replace(/\s+/g, " ").slice(0, 80)
+    || item.className.toString().split(/\s+/).find((name) => !["clickable-surface", "surface-pop"].includes(name))?.replaceAll("-", " ")
+    || "Axion detail";
+}
+
+function exploreBody(item) {
+  const parts = [
+    ...Array.from(item.querySelectorAll("p")).map((node) => node.textContent.trim()),
+    ...Array.from(item.querySelectorAll("dd")).map((node) => node.textContent.trim()),
+    ...Array.from(item.querySelectorAll("li")).map((node) => node.textContent.trim()),
+  ].filter(Boolean);
+  if (parts.length) return parts.slice(0, 4).join(" ");
+  return item.textContent.trim().replace(/\s+/g, " ").slice(0, 420);
+}
+
+function exploreMetrics(item) {
+  const metrics = [
+    ...Array.from(item.querySelectorAll("strong, b")).map((node) => node.textContent.trim()),
+    ...Array.from(item.querySelectorAll("small")).map((node) => node.textContent.trim()),
+  ].filter(Boolean);
+  return [...new Set(metrics)].slice(0, 6);
+}
+
+function exploreContext(item) {
+  const text = item.textContent.toLowerCase();
+  if (text.includes("cfd") || text.includes("oxygen") || text.includes("otr") || text.includes("mixing")) return { view: "cfd", label: "Open CFD", note: "Use this when a detail depends on oxygen transfer, mixing, shear, gas hold-up, or reactor scale-up." };
+  if (text.includes("lca") || text.includes("co2") || text.includes("water") || text.includes("waste")) return { view: "reports", label: "Open LCA exports", note: "This connects to inventory, impact summaries, water, waste, utilities, and downloadable CSV/SVG outputs." };
+  if (text.includes("tea") || text.includes("cost") || text.includes("capex") || text.includes("price")) return { view: "economics", label: "Open economics", note: "This connects to cost stack, annual values, per-kg values, scale exponent, and uncertainty assumptions." };
+  if (text.includes("gproms") || text.includes("optimization") || text.includes("parameter") || text.includes("soft sensor")) return { view: "simulation", label: "Open simulation", note: "This connects to equation-oriented modelling, parameter estimation, dynamic optimization, soft sensors, and design-space analysis." };
+  if (text.includes("stream") || text.includes("flow") || text.includes("input") || text.includes("output")) return { view: "streams", label: "Open streams", note: "This connects to process streams, components, annual quantities, per-kg product values, and solver status." };
+  if (text.includes("equipment") || text.includes("unit") || text.includes("reactor") || text.includes("filter")) return { view: "flowsheet", label: "Open canvas", note: "This connects to the editable flowsheet, equipment ports, stream labels, and drag/drop process building." };
+  if (text.includes("source") || text.includes("standard") || text.includes("iso") || text.includes("gmp")) return { view: "sources", label: "Open sources", note: "This connects to standards, scientific references, supplier assumptions, and model-use notes." };
+  return { view: "overview", label: "Open overview", note: "This is connected to the active model, its assumptions, visuals, downloads, and next-step tools." };
+}
+
+function showExploreDetails(item) {
+  if (!els.detailDrawer) return;
+  const title = exploreTitle(item);
+  const body = exploreBody(item);
+  const metrics = exploreMetrics(item);
+  const context = exploreContext(item);
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>${exploreEyebrow(item)}</span>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(body || context.note)}</p>
+      ${metrics.length ? `<div class="detail-metrics">${metrics.map((metric) => `<b>${escapeHtml(metric)}</b>`).join("")}</div>` : ""}
+      <div class="detail-next">
+        <small>${escapeHtml(context.note)}</small>
+        <button data-detail-jump="${context.view}" type="button">${context.label}</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;");
+}
+
+function animateSurfaceClick(item, event) {
+  item.classList.remove("surface-pop");
+  void item.offsetWidth;
+  item.classList.add("surface-pop");
+  const pulse = document.createElement("span");
+  pulse.className = "interaction-pulse";
+  const rect = item.getBoundingClientRect();
+  pulse.style.left = `${Math.max(0, (event?.clientX || rect.left + rect.width / 2) - rect.left)}px`;
+  pulse.style.top = `${Math.max(0, (event?.clientY || rect.top + rect.height / 2) - rect.top)}px`;
+  item.appendChild(pulse);
+  window.setTimeout(() => pulse.remove(), 720);
+  window.setTimeout(() => item.classList.remove("surface-pop"), 420);
+}
+
 function cfdCellColor(cell) {
   if (cell.risk > 0.68) return "#b8534d";
   if (cell.risk > 0.48) return "#c7922e";
@@ -7526,9 +7655,42 @@ function renderAll() {
   renderEconomics();
   renderReportsBoard();
   renderProfileMenu();
+  enhanceInteractiveSurfaces();
 }
 
 function bindEvents() {
+  document.addEventListener("pointerdown", (event) => {
+    const surface = event.target.closest(".clickable-surface, .unit, .stream-line, .stream-label");
+    if (!surface || surface.closest(".detail-drawer") || event.target.closest("button, a, input, textarea, select")) return;
+    animateSurfaceClick(surface, event);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    const surface = event.target.closest(".clickable-surface");
+    if (!surface) return;
+    event.preventDefault();
+    animateSurfaceClick(surface);
+    showExploreDetails(surface);
+  });
+
+  document.addEventListener("click", (event) => {
+    const closeButton = event.target.closest("[data-close-detail]");
+    if (closeButton) {
+      els.detailDrawer?.classList.remove("open");
+      return;
+    }
+    const jumpButton = event.target.closest("[data-detail-jump]");
+    if (jumpButton) {
+      setView(jumpButton.dataset.detailJump);
+      els.detailDrawer?.classList.remove("open");
+      return;
+    }
+    const surface = event.target.closest(".clickable-surface");
+    if (!surface || surface.closest(".detail-drawer") || event.target.closest("button, a, input, textarea, select")) return;
+    showExploreDetails(surface);
+  });
+
   els.templateList.addEventListener("click", (event) => {
     const productsButton = event.target.closest("[data-open-products]");
     if (productsButton) {
