@@ -6402,11 +6402,23 @@ function setMode(mode) {
 }
 
 function setView(view) {
+  const target = document.querySelector(`#${view}View`);
+  if (!target) return;
   document.querySelectorAll(".view").forEach((item) => item.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   if (els.pageTitle) els.pageTitle.textContent = pageTitle(view);
-  document.querySelector(`#${view}View`).classList.add("active");
+  target.classList.add("active");
+  if (view === "flowsheet") openProcessCanvas();
+}
+
+function openProcessCanvas() {
+  window.requestAnimationFrame(() => {
+    fitCanvas(true);
+    document.querySelector("#flowsheetView")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    els.canvas?.focus?.({ preventScroll: true });
+    showToast("Process canvas opened");
+  });
 }
 
 function setZoom(value) {
@@ -7510,6 +7522,11 @@ function bindEvents() {
       els.helpDock?.classList.add("open");
       els.helpPrompt.value = promptButton.dataset.twinPrompt;
       askToolHelp();
+      return;
+    }
+    const jumpButton = event.target.closest("[data-jump-view]");
+    if (jumpButton) {
+      setView(jumpButton.dataset.jumpView);
       return;
     }
     const viewButton = event.target.closest("[data-twin-view]");

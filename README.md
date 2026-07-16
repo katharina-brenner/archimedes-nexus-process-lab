@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=20260716-lca-tea-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=20260716-canvas-site-v1`.
 
 ## Online static access
 
@@ -26,6 +26,7 @@ The front of the application now works like a company-grade product entry flow:
 - Axion automatically maps the brief to the closest process model
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
 - The download center exports detailed LCA inventory CSVs, LCA impact summaries, TEA-ready cost tables, and downloadable SVG visualizations for plant architecture, LCA flows, and cost stacks
+- The Process Builder can be opened directly from Twin OS and automatically fits the full process canvas
 - A persistent help field lets users describe a problem in words and receive direct tool steps
 
 ## Private workspace backend
@@ -119,6 +120,6 @@ curl -sS -X POST http://127.0.0.1:8899/api/admin/orders/ORDER_REFERENCE/mark-pai
 - Searchable equation library with 210 formulas for stoichiometry, kinetics, mass balances, energy balances, separations, cleaning, CIP/SIP, heat reuse, recycle/purge, aseptic filling, utilities, scheduling, resources, physical-state calculations, emissions, cash flow, profitability, and economics
 - Standards library covering EU GMP Annex 1/15, FDA 21 CFR, ICH Q-series guidance, ISO 14644, ISO 13408, ISO 10628, ASME BPE, ISA-88/95, GAMP 5, USP chapters, and ISO 15378
 - Cost-driver economics view with annualized CAPEX, fixed facility burden, materials, labor, QA/QC validation, utilities, and waste cost shares
-- CSV exports for process summaries, streams, mass and energy balances, costs, equations, and parameters
+- CSV and SVG exports for process summaries, input/output streams, mass and energy balances, TEA-ready cost models, LCA inventories, LCA impact summaries, costs, equations, parameters, plant architecture, LCA flow maps, LCA impact bars, and TEA cost-stack graphics
 
 The backend has no runtime dependencies beyond Node.js.
