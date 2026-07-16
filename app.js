@@ -3629,24 +3629,65 @@ function streamDirection(item) {
   return "Internal";
 }
 
+function classifyInventoryStream(item, from, to) {
+  const text = `${item.id} ${item.composition} ${item.phase} ${from?.name || ""} ${to?.name || ""}`.toLowerCase();
+  const direction = streamDirection(item);
+  if (text.includes("wfi") || text.includes("water") || text.includes("rinse")) {
+    return { flowType: "Water input", compartment: "technosphere", teaDisposition: "utility", factor: 0.00035, sourceBasis: "Screening water factor; replace with site WFI/process-water factor" };
+  }
+  if (text.includes("media") || text.includes("feed") || text.includes("glucose") || text.includes("nutrient")) {
+    return { flowType: "Biochemical input", compartment: "technosphere", teaDisposition: "raw material", factor: 1.8, sourceBasis: "Screening media/raw-material factor; replace with supplier LCI" };
+  }
+  if (text.includes("buffer") || text.includes("salt") || text.includes("caustic") || text.includes("acid")) {
+    return { flowType: "Chemical input", compartment: "technosphere", teaDisposition: "raw material", factor: 1.2, sourceBasis: "Screening chemical factor; replace with material-specific LCI" };
+  }
+  if (text.includes("ethanol") || text.includes("solvent") || text.includes("methanol") || text.includes("isopropanol")) {
+    return { flowType: "Solvent input", compartment: "technosphere", teaDisposition: "recover or dispose", factor: 2.1, sourceBasis: "Screening solvent factor; replace with solvent-specific LCI and recovery rate" };
+  }
+  if (text.includes("resin") || text.includes("membrane") || text.includes("filter") || text.includes("consumable")) {
+    return { flowType: "Consumable input", compartment: "technosphere", teaDisposition: "consumable", factor: 12, sourceBasis: "Screening single-use/resin factor; replace with supplier EPD" };
+  }
+  if (text.includes("wastewater") || text.includes("spent") || text.includes("cip drain") || text.includes("wash waste")) {
+    return { flowType: "Wastewater output", compartment: "treatment", teaDisposition: "waste treatment", factor: 0.0011, sourceBasis: "Screening wastewater treatment factor; replace with site treatment model" };
+  }
+  if (text.includes("waste") || text.includes("biomass") || text.includes("reject") || text.includes("sludge")) {
+    return { flowType: "Solid or biological waste", compartment: "treatment", teaDisposition: "waste treatment", factor: 0.25, sourceBasis: "Screening solid/biological waste factor; replace with disposal route" };
+  }
+  if (text.includes("co2") || text.includes("offgas") || text.includes("vent") || item.phase === "Gas") {
+    return { flowType: "Air emission", compartment: "air", teaDisposition: "emission", factor: 1, sourceBasis: "Direct CO2e placeholder for gas streams; speciate off-gas for full LCA" };
+  }
+  if (direction === "Output") {
+    return { flowType: "Product or co-product", compartment: "technosphere", teaDisposition: "product", factor: 0, sourceBasis: "Product output; burden allocated by selected TEA/LCA method" };
+  }
+  return { flowType: "Intermediate process stream", compartment: "internal", teaDisposition: "internal transfer", factor: 0, sourceBasis: "Internal stream; no direct inventory burden unless allocated by upstream inputs" };
+}
+
 function streamRows() {
   const solved = solveMassBalance();
+  const annualKg = Math.max(1, metrics().annualKg);
   return state.streams.map((item) => {
     const from = state.units.find((candidate) => candidate.id === item.from);
     const to = state.units.find((candidate) => candidate.id === item.to);
     const kind = streamKind(item, from, to);
     const solvedStream = solved.streamMap[item.id];
+    const massFlowKgBatch = solvedStream?.massFlow || streamNumericFlow(item);
+    const annualMassKg = solvedStream?.annualMass || massFlowKgBatch * state.batchCount;
+    const classification = classifyInventoryStream(item, from, to);
     return {
       id: item.id,
       direction: streamDirection(item),
       role: streamLabel(kind),
+      lcaFlowType: classification.flowType,
+      lcaCompartment: classification.compartment,
+      teaDisposition: classification.teaDisposition,
       from: item.from,
       fromName: from?.name || "",
       to: item.to,
       toName: to?.name || "",
       flow: streamFlow(item),
-      massFlowKgBatch: solvedStream?.massFlow || streamNumericFlow(item),
-      annualMassKg: solvedStream?.annualMass || streamNumericFlow(item) * state.batchCount,
+      massFlowKgBatch,
+      annualMassKg,
+      perKgProductKg: annualMassKg / annualKg,
       components: solvedStream?.componentText || item.composition,
       nominalDescription: item.composition,
       phase: item.phase,
@@ -3654,6 +3695,9 @@ function streamRows() {
       densityKgM3: solvedStream?.components ? vectorDensity(solvedStream.components) : "",
       viscosityCp: solvedStream?.components ? vectorViscosity(solvedStream.components) : "",
       osmoticIndex: solvedStream?.components ? vectorOsmoticPressure(solvedStream.components) : "",
+      screeningEmissionFactorKgCo2eKg: classification.factor,
+      screeningCo2eKgAnnual: annualMassKg * classification.factor,
+      sourceBasis: classification.sourceBasis,
     };
   });
 }
@@ -5584,6 +5628,7 @@ function streamNumericFlow(item) {
 }
 
 function balanceRows() {
+  const annualKg = Math.max(1, metrics().annualKg);
   return solveMassBalance().units.map((item) => ({
     tag: item.tag,
     operation: item.operation,
@@ -5595,10 +5640,17 @@ function balanceRows() {
     lossKgBatch: item.loss,
     massOutKgBatch: item.massOut,
     massGapKgBatch: item.massGap,
+    annualMassInKg: item.massIn * state.batchCount,
+    annualMassOutKg: item.massOut * state.batchCount,
+    massInPerKgProduct: item.massIn * state.batchCount / annualKg,
+    massOutPerKgProduct: item.massOut * state.batchCount / annualKg,
     closurePct: item.closurePct,
     netHeatDutyKwhBatch: item.heatDuty,
     grossHeatDutyKwhBatch: item.grossHeatDuty,
     recoveredHeatKwhBatch: item.recoveredHeat,
+    annualNetHeatKwh: item.heatDuty * state.batchCount,
+    annualGrossHeatKwh: item.grossHeatDuty * state.batchCount,
+    netHeatPerKgProductKwhKg: item.heatDuty * state.batchCount / annualKg,
     targetTemperatureC: item.targetTemperature,
     densityKgM3: item.densityKgM3,
     viscosityCp: item.viscosityCp,
@@ -5614,17 +5666,339 @@ function balanceRows() {
 
 function costRows() {
   const data = metrics();
-  return [
-    { item: "Installed CAPEX", value: data.scale.installedCapital, unit: "USD", note: "Scaled installed capital estimate" },
-    { item: "Annualized CAPEX", value: data.scale.annualizedCapital, unit: "USD/yr", note: "Annualized capital charge" },
-    { item: "Fixed facility burden", value: data.scale.fixedBurden, unit: "USD/yr", note: "High at lab scale; decreases non-linearly with scale" },
-    { item: "Materials", value: data.scale.materialIntensity, unit: "USD/yr", note: "Media, buffers, raw materials, consumables" },
-    { item: "Labor", value: data.scale.laborCost, unit: "USD/yr", note: "Automation-adjusted labor estimate" },
-    { item: "QA/QC validation", value: data.scale.qaCost, unit: "USD/yr", note: "GMP release, validation, and quality burden" },
-    { item: "Utilities", value: data.scale.utilityCost, unit: "USD/yr", note: "Power, WFI, steam, cooling, compressed gases" },
-    { item: "Waste", value: data.scale.wasteCost, unit: "USD/yr", note: "Wastewater, biomass, emissions, rejects" },
-    { item: "Direct cost", value: data.directCost, unit: "USD/kg", note: "Annual cost divided by annual product" },
+  const annualKg = Math.max(1, data.annualKg);
+  const baseRows = [
+    { item: "Installed CAPEX", value: data.scale.installedCapital, unit: "USD", note: "Scaled installed capital estimate", category: "CAPEX", costType: "capital", lifetimeYears: 10, allocationBasis: "facility installed cost", confidence: "screening" },
+    { item: "Annualized CAPEX", value: data.scale.annualizedCapital, unit: "USD/yr", note: "Annualized capital charge", category: "CAPEX", costType: "annualized capital", lifetimeYears: 10, allocationBasis: "capital recovery charge", confidence: "screening" },
+    { item: "Fixed facility burden", value: data.scale.fixedBurden, unit: "USD/yr", note: "High at lab scale; decreases non-linearly with scale", category: "Facility", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "scale profile", confidence: "screening" },
+    { item: "Materials", value: data.scale.materialIntensity, unit: "USD/yr", note: "Media, buffers, raw materials, consumables", category: "Materials", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "batch volume and titer", confidence: "screening" },
+    { item: "Labor", value: data.scale.laborCost, unit: "USD/yr", note: "Automation-adjusted labor estimate", category: "Labor", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "operation count and automation", confidence: "screening" },
+    { item: "QA/QC validation", value: data.scale.qaCost, unit: "USD/yr", note: "GMP release, validation, and quality burden", category: "Quality", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "unit count and validation factor", confidence: "screening" },
+    { item: "Utilities", value: data.scale.utilityCost, unit: "USD/yr", note: "Power, WFI, steam, cooling, compressed gases", category: "Utilities", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "annual utility demand", confidence: "screening" },
+    { item: "Waste", value: data.scale.wasteCost, unit: "USD/yr", note: "Wastewater, biomass, emissions, rejects", category: "Waste", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "yield loss and waste assets", confidence: "screening" },
+    { item: "Direct cost", value: data.directCost, unit: "USD/kg", note: "Annual cost divided by annual product", category: "Result", costType: "unit cost", lifetimeYears: "", allocationBasis: "annual product mass", confidence: "screening" },
   ];
+  return baseRows.map((row) => {
+    const annualValueUsd = row.unit === "USD/yr" ? row.value : row.unit === "USD/kg" ? row.value * annualKg : "";
+    const perKgProductUsd = row.unit === "USD/kg" ? row.value : row.unit === "USD/yr" ? row.value / annualKg : row.unit === "USD" ? row.value / annualKg : "";
+    const low = typeof annualValueUsd === "number" ? annualValueUsd * 0.72 : "";
+    const high = typeof annualValueUsd === "number" ? annualValueUsd * 1.38 : "";
+    return {
+      ...row,
+      annualProductKg: data.annualKg,
+      productPerBatchKg: data.productPerBatchKg,
+      annualBatches: state.batchCount,
+      batchVolumeL: state.batchSize,
+      annualValueUsd,
+      perKgProductUsd,
+      lowEstimateUsdPerYr: low,
+      highEstimateUsdPerYr: high,
+      uncertaintyRange: typeof annualValueUsd === "number" ? "-28% / +38%" : "",
+      capitalScaleExponent: state.params.capitalScaleExponent,
+      plantUtilizationPct: data.utilization,
+      sourceBasis: "Axion screening TEA model; replace with vendor quotes, site labor rates, depreciation, tax, and region factors",
+    };
+  });
+}
+
+function teaRows() {
+  const data = metrics();
+  const utilityKwhYr = data.utilities * 1000;
+  const annualKg = Math.max(1, data.annualKg);
+  const rows = costRows().map((row) => ({
+    table: "TEA cost model",
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    product: activeTemplate().product,
+    item: row.item,
+    category: row.category,
+    costType: row.costType,
+    baseValue: row.value,
+    baseUnit: row.unit,
+    annualValueUsd: row.annualValueUsd,
+    perKgProductUsd: row.perKgProductUsd,
+    lowEstimateUsdPerYr: row.lowEstimateUsdPerYr,
+    highEstimateUsdPerYr: row.highEstimateUsdPerYr,
+    annualProductKg: data.annualKg,
+    productPerBatchKg: data.productPerBatchKg,
+    annualBatches: state.batchCount,
+    batchVolumeL: state.batchSize,
+    titerGL: state.titer,
+    recoveryPct: state.recovery,
+    processYieldPct: data.processYield * 100,
+    effectiveTiterGL: data.effectiveTiter,
+    plantUtilizationPct: data.utilization,
+    allocationBasis: row.allocationBasis,
+    lifetimeYears: row.lifetimeYears,
+    capitalScaleExponent: row.capitalScaleExponent,
+    confidence: row.confidence,
+    sourceBasis: row.sourceBasis,
+    note: row.note,
+  }));
+  rows.push({
+    table: "TEA utility driver",
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    product: activeTemplate().product,
+    item: "Total utility demand",
+    category: "Utilities",
+    costType: "physical driver",
+    baseValue: utilityKwhYr,
+    baseUnit: "kWh/yr",
+    annualValueUsd: "",
+    perKgProductUsd: "",
+    lowEstimateUsdPerYr: "",
+    highEstimateUsdPerYr: "",
+    annualProductKg: data.annualKg,
+    productPerBatchKg: data.productPerBatchKg,
+    annualBatches: state.batchCount,
+    batchVolumeL: state.batchSize,
+    titerGL: state.titer,
+    recoveryPct: state.recovery,
+    processYieldPct: data.processYield * 100,
+    effectiveTiterGL: data.effectiveTiter,
+    plantUtilizationPct: data.utilization,
+    allocationBasis: "equipment power and campaign duration",
+    lifetimeYears: "",
+    capitalScaleExponent: state.params.capitalScaleExponent,
+    confidence: "screening",
+    sourceBasis: "Use this as TEA utility driver before replacing with metered/site tariff data",
+    note: `${formatNumber(utilityKwhYr / annualKg, 2)} kWh/kg product`,
+  });
+  return rows;
+}
+
+function lcaUtilityAssumptions() {
+  const totalKwhYr = metrics().utilities * 1000;
+  return [
+    { flow: "Electricity", direction: "input", activityType: "energy", unit: "kWh", annualQuantity: totalKwhYr * 0.46, factorKgCo2eUnit: 0.42, sourceBasis: "Screening grid electricity factor; replace with market/location factor" },
+    { flow: "Clean steam / process heat", direction: "input", activityType: "energy", unit: "kWh", annualQuantity: totalKwhYr * 0.32, factorKgCo2eUnit: 0.24, sourceBasis: "Screening natural-gas steam factor; replace with boiler and fuel data" },
+    { flow: "Chilled water / cooling", direction: "input", activityType: "energy", unit: "kWh", annualQuantity: totalKwhYr * 0.16, factorKgCo2eUnit: 0.08, sourceBasis: "Screening chilled-water factor; replace with plant cooling model" },
+    { flow: "Compressed air / process gases", direction: "input", activityType: "energy", unit: "kWh", annualQuantity: totalKwhYr * 0.06, factorKgCo2eUnit: 0.18, sourceBasis: "Screening compressed utility factor; replace with compressor and gas supply model" },
+  ];
+}
+
+function lcaInventoryRows() {
+  const annualKg = Math.max(1, metrics().annualKg);
+  const streamInventory = streamRows().map((row) => ({
+    table: "LCA process inventory",
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    product: activeTemplate().product,
+    flowId: row.id,
+    flowName: row.components,
+    activityType: row.lcaFlowType,
+    direction: row.direction.toLowerCase(),
+    compartment: row.lcaCompartment,
+    unit: "kg",
+    quantityPerBatch: row.massFlowKgBatch,
+    annualQuantity: row.annualMassKg,
+    quantityPerKgProduct: row.perKgProductKg,
+    emissionFactorKgCo2eUnit: row.screeningEmissionFactorKgCo2eKg,
+    climateKgCo2eAnnual: row.screeningCo2eKgAnnual,
+    climateKgCo2ePerKgProduct: row.screeningCo2eKgAnnual / annualKg,
+    waterKgAnnual: row.lcaFlowType.includes("Water") ? row.annualMassKg : "",
+    wasteKgAnnual: row.lcaFlowType.includes("Waste") || row.lcaFlowType.includes("Solid") ? row.annualMassKg : "",
+    fromUnit: row.from,
+    fromName: row.fromName,
+    toUnit: row.to,
+    toName: row.toName,
+    phase: row.phase,
+    teaDisposition: row.teaDisposition,
+    densityKgM3: row.densityKgM3,
+    viscosityCp: row.viscosityCp,
+    osmoticIndex: row.osmoticIndex,
+    sourceBasis: row.sourceBasis,
+    dataQuality: row.solverStatus,
+  }));
+  const utilityInventory = lcaUtilityAssumptions().map((row, index) => ({
+    table: "LCA utility inventory",
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    product: activeTemplate().product,
+    flowId: `U-${String(index + 1).padStart(3, "0")}`,
+    flowName: row.flow,
+    activityType: row.activityType,
+    direction: row.direction,
+    compartment: "technosphere",
+    unit: row.unit,
+    quantityPerBatch: row.annualQuantity / Math.max(1, state.batchCount),
+    annualQuantity: row.annualQuantity,
+    quantityPerKgProduct: row.annualQuantity / annualKg,
+    emissionFactorKgCo2eUnit: row.factorKgCo2eUnit,
+    climateKgCo2eAnnual: row.annualQuantity * row.factorKgCo2eUnit,
+    climateKgCo2ePerKgProduct: row.annualQuantity * row.factorKgCo2eUnit / annualKg,
+    waterKgAnnual: "",
+    wasteKgAnnual: "",
+    fromUnit: "site utility",
+    fromName: row.flow,
+    toUnit: "process",
+    toName: activeTemplate().label,
+    phase: "Utility",
+    teaDisposition: "utility",
+    densityKgM3: "",
+    viscosityCp: "",
+    osmoticIndex: "",
+    sourceBasis: row.sourceBasis,
+    dataQuality: "Screening",
+  }));
+  return [...streamInventory, ...utilityInventory];
+}
+
+function lcaImpactRows() {
+  const data = metrics();
+  const annualKg = Math.max(1, data.annualKg);
+  const inventory = lcaInventoryRows();
+  const sum = (predicate, field = "annualQuantity") => inventory
+    .filter(predicate)
+    .reduce((acc, row) => acc + (Number(row[field]) || 0), 0);
+  const climate = sum(() => true, "climateKgCo2eAnnual");
+  const electricity = sum((row) => row.flowName === "Electricity");
+  const processHeat = sum((row) => row.flowName === "Clean steam / process heat");
+  const cooling = sum((row) => row.flowName === "Chilled water / cooling");
+  const water = sum((row) => row.activityType === "Water input");
+  const wastewater = sum((row) => row.activityType === "Wastewater output");
+  const waste = sum((row) => row.activityType === "Solid or biological waste");
+  const solvent = sum((row) => row.activityType === "Solvent input");
+  const materials = sum((row) => ["Biochemical input", "Chemical input", "Consumable input"].includes(row.activityType));
+  const recoveredHeatCredit = balanceRows().reduce((acc, row) => acc + (Number(row.recoveredHeatKwhBatch) || 0), 0) * state.batchCount * 0.24;
+  return [
+    { indicator: "Climate screening total", annualValue: climate, perKgProduct: climate / annualKg, unit: "kg CO2e", method: "Screening sum of material, utility, waste, and emission factors", dataQuality: "screening" },
+    { indicator: "Electricity demand", annualValue: electricity, perKgProduct: electricity / annualKg, unit: "kWh", method: "Allocated share of total utility model", dataQuality: "screening" },
+    { indicator: "Process heat demand", annualValue: processHeat, perKgProduct: processHeat / annualKg, unit: "kWh", method: "Allocated share of total utility model", dataQuality: "screening" },
+    { indicator: "Cooling demand", annualValue: cooling, perKgProduct: cooling / annualKg, unit: "kWh", method: "Allocated share of total utility model", dataQuality: "screening" },
+    { indicator: "Process water input", annualValue: water, perKgProduct: water / annualKg, unit: "kg", method: "Classified stream inventory", dataQuality: "estimated/solved" },
+    { indicator: "Wastewater output", annualValue: wastewater, perKgProduct: wastewater / annualKg, unit: "kg", method: "Classified stream inventory", dataQuality: "estimated/solved" },
+    { indicator: "Solid or biological waste", annualValue: waste, perKgProduct: waste / annualKg, unit: "kg", method: "Classified stream inventory", dataQuality: "estimated/solved" },
+    { indicator: "Solvent throughput", annualValue: solvent, perKgProduct: solvent / annualKg, unit: "kg", method: "Classified stream inventory", dataQuality: "estimated/solved" },
+    { indicator: "Raw material and consumable throughput", annualValue: materials, perKgProduct: materials / annualKg, unit: "kg", method: "Classified stream inventory", dataQuality: "estimated/solved" },
+    { indicator: "Recovered heat credit", annualValue: -recoveredHeatCredit, perKgProduct: -recoveredHeatCredit / annualKg, unit: "kg CO2e credit", method: "Recovered heat multiplied by screening heat factor", dataQuality: "screening" },
+  ].map((row) => ({
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    product: activeTemplate().product,
+    annualProductKg: data.annualKg,
+    functionalUnit: "1 kg product at plant gate",
+    ...row,
+    sourceBasis: "Screening LCA export for OpenLCA/SimaPro preparation; replace factors with ecoinvent/GaBi/supplier/site data",
+  }));
+}
+
+function svgEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;");
+}
+
+function barChartSvg(title, subtitle, rows, options = {}) {
+  const width = options.width || 1180;
+  const height = options.height || 760;
+  const max = Math.max(1, ...rows.map((row) => Math.abs(Number(row.value) || 0)));
+  const barHeight = Math.min(48, Math.max(26, (height - 210) / Math.max(1, rows.length) - 12));
+  const colors = ["#69d2c4", "#b7a4ff", "#f5bc5f", "#f27d72", "#88a6ff", "#75d18d", "#d4d9e4", "#ff9f7a"];
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#071326"/>
+  <rect x="34" y="34" width="${width - 68}" height="${height - 68}" rx="28" fill="#0c1c34" stroke="#28435f"/>
+  <text x="72" y="92" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="760">${svgEscape(title)}</text>
+  <text x="72" y="128" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">${svgEscape(subtitle)}</text>
+  ${rows.map((row, index) => {
+    const y = 180 + index * (barHeight + 22);
+    const length = Math.max(8, Math.abs(row.value) / max * (width - 430));
+    const color = colors[index % colors.length];
+    return `
+      <text x="78" y="${y + barHeight * 0.68}" fill="#dce6f3" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="650">${svgEscape(row.label)}</text>
+      <rect x="360" y="${y}" width="${width - 460}" height="${barHeight}" rx="12" fill="#132844"/>
+      <rect x="360" y="${y}" width="${length}" height="${barHeight}" rx="12" fill="${color}"/>
+      <text x="${width - 82}" y="${y + barHeight * 0.68}" text-anchor="end" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="720">${svgEscape(row.display)}</text>
+    `;
+  }).join("")}
+  <text x="72" y="${height - 66}" fill="#75869f" font-family="Inter, Arial, sans-serif" font-size="13">Generated by Axion Process OS - screening model; replace assumptions with site and supplier data for regulated decisions.</text>
+</svg>`.trim();
+}
+
+function teaCostSvg() {
+  const rows = costRows()
+    .filter((row) => row.unit === "USD/yr")
+    .map((row) => ({
+      label: row.item,
+      value: Number(row.annualValueUsd) || 0,
+      display: `$${formatNumber((Number(row.annualValueUsd) || 0) / 1000000, 2)}M/yr`,
+    }));
+  return barChartSvg("TEA cost stack", `${activeTemplate().label} - ${formatNumber(metrics().annualKg, 0)} kg product/year`, rows);
+}
+
+function lcaImpactSvg() {
+  const rows = lcaImpactRows().slice(0, 8).map((row) => ({
+    label: row.indicator,
+    value: Math.abs(Number(row.perKgProduct) || 0),
+    display: `${formatNumber(row.perKgProduct, 2)} ${row.unit}/kg`,
+  }));
+  return barChartSvg("LCA screening indicators", `${activeTemplate().label} - functional unit 1 kg product`, rows);
+}
+
+function lcaFlowSvg() {
+  const inventory = lcaInventoryRows();
+  const annualKg = Math.max(1, metrics().annualKg);
+  const groups = [
+    { label: "Materials", key: (row) => ["Biochemical input", "Chemical input", "Consumable input", "Solvent input"].includes(row.activityType), color: "#69d2c4" },
+    { label: "Utilities", key: (row) => row.activityType === "energy", color: "#b7a4ff" },
+    { label: "Water", key: (row) => row.activityType === "Water input", color: "#88a6ff" },
+    { label: "Waste", key: (row) => row.activityType.includes("Waste") || row.activityType.includes("Solid"), color: "#f27d72" },
+    { label: "Emissions", key: (row) => row.compartment === "air", color: "#f5bc5f" },
+  ].map((group) => {
+    const annualQuantity = inventory.filter(group.key).reduce((sum, row) => sum + (Number(row.annualQuantity) || 0), 0);
+    return { ...group, annualQuantity, perKg: annualQuantity / annualKg };
+  });
+  const max = Math.max(1, ...groups.map((row) => row.annualQuantity));
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720">
+  <rect width="1180" height="720" fill="#071326"/>
+  <text x="72" y="86" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="760">Plant-gate LCA flow map</text>
+  <text x="72" y="122" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">${svgEscape(activeTemplate().label)} - annual inventory grouped for LCA handoff</text>
+  <rect x="438" y="260" width="304" height="156" rx="26" fill="#10223d" stroke="#69d2c4" stroke-width="2"/>
+  <text x="590" y="326" text-anchor="middle" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="760">Axion process model</text>
+  <text x="590" y="362" text-anchor="middle" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="15">${svgEscape(formatNumber(metrics().annualKg, 0))} kg product/year</text>
+  ${groups.map((row, index) => {
+    const y = 180 + index * 92;
+    const stroke = Math.max(5, row.annualQuantity / max * 28);
+    const left = index < 3;
+    const x1 = left ? 110 : 742;
+    const x2 = left ? 438 : 1070;
+    const labelX = left ? 112 : 920;
+    return `
+      <path d="M${x1} ${y} C${left ? 230 : 870} ${y}, ${left ? 318 : 950} 338, ${x2} 338" fill="none" stroke="${row.color}" stroke-width="${stroke}" stroke-linecap="round" opacity="0.86"/>
+      <circle cx="${x1}" cy="${y}" r="12" fill="${row.color}"/>
+      <text x="${labelX}" y="${y - 20}" ${left ? "" : "text-anchor=\"end\""} fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="720">${svgEscape(row.label)}</text>
+      <text x="${labelX}" y="${y + 28}" ${left ? "" : "text-anchor=\"end\""} fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="14">${svgEscape(formatNumber(row.perKg, 2))} unit/kg product</text>
+    `;
+  }).join("")}
+  <text x="72" y="664" fill="#75869f" font-family="Inter, Arial, sans-serif" font-size="13">Width is proportional to annual grouped inventory mass or energy. Use CSV exports for exact LCA/TEA data.</text>
+</svg>`.trim();
+}
+
+function processOverviewSvg() {
+  const stats = plantAreaStats();
+  const max = Math.max(1, ...stats.map((row) => row.count));
+  const width = 1180;
+  const height = 720;
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#071326"/>
+  <text x="72" y="86" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="760">Production plant architecture</text>
+  <text x="72" y="122" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">${svgEscape(activeTemplate().label)} - main process, support, cleaning, recycle, heat, waste, and quality layers</text>
+  ${stats.map((row, index) => {
+    const x = 78 + index * 154;
+    const h = Math.max(36, row.count / max * 310);
+    const y = 520 - h;
+    return `
+      <rect x="${x}" y="${y}" width="108" height="${h}" rx="18" fill="#10223d" stroke="#28435f"/>
+      <rect x="${x}" y="${y}" width="108" height="${h}" rx="18" fill="#69d2c4" opacity="${0.2 + row.count / max * 0.55}"/>
+      <text x="${x + 54}" y="${y - 18}" text-anchor="middle" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="780">${row.count}</text>
+      <text x="${x + 54}" y="560" text-anchor="middle" fill="#dce6f3" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="720">${svgEscape(row.label)}</text>
+      <text x="${x + 54}" y="586" text-anchor="middle" fill="#8999af" font-family="Inter, Arial, sans-serif" font-size="12">${svgEscape(row.examples)}</text>
+    `;
+  }).join("")}
+  <path d="M118 238 C260 170, 370 170, 512 238 S792 306, 964 238" fill="none" stroke="#b7a4ff" stroke-width="6" stroke-linecap="round" stroke-dasharray="16 16"/>
+  <text x="72" y="664" fill="#75869f" font-family="Inter, Arial, sans-serif" font-size="13">Layer count view exported from the editable process model. Use the process builder for unit-level editing.</text>
+</svg>`.trim();
 }
 
 function downloadCsv(filename, rows) {
@@ -5634,6 +6008,10 @@ function downloadCsv(filename, rows) {
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
   ].join("\n");
   downloadText(filename, "text/csv", csv);
+}
+
+function downloadSvg(filename, svg) {
+  downloadText(filename, "image/svg+xml", svg);
 }
 
 function comprehensiveReport() {
@@ -5662,6 +6040,9 @@ function comprehensiveReport() {
     streams: streamRows(),
     balances: balanceRows(),
     costs: costRows(),
+    tea: teaRows(),
+    lcaInventory: lcaInventoryRows(),
+    lcaImpacts: lcaImpactRows(),
     equations,
     unitEquations: state.units.map((item) => ({ tag: item.id, name: item.name, equations: unitReactions(item) })),
     cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ oxygen: cell.oxygen, nutrient: cell.nutrient, shear: cell.shear, risk: cell.risk })) })),
@@ -5679,14 +6060,17 @@ function renderReportsBoard() {
     <section class="reports-hero">
       <div>
         <p>Download center</p>
-        <h3>Balances, costs, equations, streams, and parameters</h3>
-        <span>Export spreadsheet-ready CSV files for Excel, thesis appendices, process reviews, and external modelling. CFD now runs visibly inside the workbench.</span>
+        <h3>Balances, LCA, TEA, equations, streams, and visualizations</h3>
+        <span>Export spreadsheet-ready CSV files and crisp SVG graphics for Excel, LCA/TEA handoff, thesis appendices, process reviews, and external modelling.</span>
       </div>
       <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
     <section class="reports-grid">
       <article><span>Mass + energy balances</span><strong>${formatNumber(report.solver.totals.closurePct, 2)}%</strong><p>${report.balances.length} unit balances with component inputs/outputs, generation, loss, closure, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
       <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, materials, labor, QA/QC, utilities, waste, and direct cost.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
+      <article><span>TEA-ready export</span><strong>${report.tea.length}</strong><p>Cost model with annual value, per-kg product values, scenario basis, uncertainty range, scale exponent, utilization, and physical utility drivers.</p><button data-download-report="tea-csv" type="button">Download CSV</button><button data-download-report="tea-cost-svg" type="button">Cost SVG</button></article>
+      <article><span>LCA inventory</span><strong>${report.lcaInventory.length}</strong><p>OpenLCA/SimaPro-ready screening inventory with activity type, compartment, per-batch, annual, per-kg, factors, CO2e, water, waste, and data-quality notes.</p><button data-download-report="lca-inventory-csv" type="button">Inventory CSV</button><button data-download-report="lca-impact-csv" type="button">Impact CSV</button></article>
+      <article><span>Downloadable visualizations</span><strong>SVG</strong><p>High-resolution process architecture, LCA flow map, LCA impact bars, and TEA cost-stack graphics for slides, thesis appendices, and reviews.</p><button data-download-report="process-svg" type="button">Plant SVG</button><button data-download-report="lca-flow-svg" type="button">LCA flow SVG</button><button data-download-report="lca-impact-svg" type="button">LCA impact SVG</button></article>
       <article><span>Chemical equations</span><strong>${equations.length}</strong><p>Stoichiometry, kinetics, mass balances, energy balances, separations, emissions, and economics.</p><button data-download-report="equations-csv" type="button">Download CSV</button></article>
       <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
@@ -6103,7 +6487,7 @@ function downloadSummaryCsv() {
 
 function downloadStreamsCsv() {
   const rows = streamRows();
-  const headers = ["id", "direction", "role", "from", "fromName", "to", "toName", "flow", "massFlowKgBatch", "annualMassKg", "components", "nominalDescription", "phase", "solverStatus", "densityKgM3", "viscosityCp", "osmoticIndex"];
+  const headers = ["id", "direction", "role", "lcaFlowType", "lcaCompartment", "teaDisposition", "from", "fromName", "to", "toName", "flow", "massFlowKgBatch", "annualMassKg", "perKgProductKg", "components", "nominalDescription", "phase", "solverStatus", "densityKgM3", "viscosityCp", "osmoticIndex", "screeningEmissionFactorKgCo2eKg", "screeningCo2eKgAnnual", "sourceBasis"];
   const csv = [
     headers.map(csvEscape).join(","),
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
@@ -6117,6 +6501,20 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
   } else if (type === "costs-csv") {
     downloadCsv(`${state.template}-cost-model.csv`, costRows());
+  } else if (type === "tea-csv") {
+    downloadCsv(`${state.template}-tea-ready-cost-model.csv`, teaRows());
+  } else if (type === "lca-inventory-csv") {
+    downloadCsv(`${state.template}-lca-inventory.csv`, lcaInventoryRows());
+  } else if (type === "lca-impact-csv") {
+    downloadCsv(`${state.template}-lca-impact-summary.csv`, lcaImpactRows());
+  } else if (type === "tea-cost-svg") {
+    downloadSvg(`${state.template}-tea-cost-stack.svg`, teaCostSvg());
+  } else if (type === "lca-flow-svg") {
+    downloadSvg(`${state.template}-lca-flow-map.svg`, lcaFlowSvg());
+  } else if (type === "lca-impact-svg") {
+    downloadSvg(`${state.template}-lca-impact-bars.svg`, lcaImpactSvg());
+  } else if (type === "process-svg") {
+    downloadSvg(`${state.template}-process-architecture.svg`, processOverviewSvg());
   } else if (type === "equations-csv") {
     downloadCsv(`${state.template}-chemical-equations.csv`, equations);
   } else if (type === "streams-csv") {

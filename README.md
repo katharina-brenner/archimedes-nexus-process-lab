@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=projects-collab-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=20260716-lca-tea-v1`.
 
 ## Online static access
 
@@ -25,6 +25,7 @@ The front of the application now works like a company-grade product entry flow:
 - Optional data files can be attached to the product brief
 - Axion automatically maps the brief to the closest process model
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
+- The download center exports detailed LCA inventory CSVs, LCA impact summaries, TEA-ready cost tables, and downloadable SVG visualizations for plant architecture, LCA flows, and cost stacks
 - A persistent help field lets users describe a problem in words and receive direct tool steps
 
 ## Private workspace backend
