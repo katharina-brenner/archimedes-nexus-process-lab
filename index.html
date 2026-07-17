@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260717-hero-connectors-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-command-canvas-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -836,24 +836,6 @@
               <div id="profilePanel" class="profile-panel" hidden></div>
             </div>
           </div>
-          <nav class="view-tabs" aria-label="Workspace views">
-            <button class="tab active" data-view="start">Start</button>
-            <button class="tab" data-view="projects">Projects</button>
-            <button class="tab" data-view="overview">Overview</button>
-            <button class="tab" data-view="flowsheet">Builder</button>
-            <button class="tab" data-view="equipment">Equipment</button>
-            <button class="tab" data-view="streams">Streams</button>
-            <button class="tab" data-view="equations">Equations</button>
-            <button class="tab" data-view="simulation">Simulation</button>
-            <button class="tab" data-view="cfd">CFD</button>
-            <button class="tab" data-view="ai">Boundaries</button>
-            <button class="tab" data-view="standards">Standards</button>
-            <button class="tab" data-view="sources">Sources + Data</button>
-            <button class="tab" data-view="recommendations">Recommendations</button>
-            <button class="tab" data-view="twin">Twin OS</button>
-            <button class="tab" data-view="economics">Economics</button>
-            <button class="tab" data-view="reports">Downloads</button>
-          </nav>
           <div class="actions">
             <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Auto Layout</span></button>
             <button id="fitCanvas" class="action-button primary" title="Fit the whole flowsheet into view" aria-label="Fit full process"><span>Fit Process</span></button>
@@ -1050,18 +1032,18 @@
 
     <aside id="detailDrawer" class="detail-drawer" aria-label="Selected item details" aria-live="polite"></aside>
 
-    <aside id="helpDock" class="help-dock" aria-label="Tool help">
-      <button id="helpToggle" class="help-toggle" type="button">Help</button>
+    <aside id="helpDock" class="help-dock open" aria-label="Axion command field">
+      <button id="helpToggle" class="help-toggle" type="button">Describe · Build · Refine</button>
       <div class="help-panel">
-        <strong>Ask Axion</strong>
-        <p>Describe the problem and get direct steps inside the tool.</p>
-        <textarea id="helpPrompt" rows="3" placeholder="Example: oxygen is too low in my 20,000 L bioreactor"></textarea>
-        <button id="askHelp" type="button">Get guidance</button>
+        <strong>System Composer</strong>
+        <p>Describe a change. Axion applies clear model edits immediately and shows what changed.</p>
+        <textarea id="helpPrompt" rows="3" placeholder="Example: show full PFD, add CIP, improve oxygen transfer, fit canvas"></textarea>
+        <button id="askHelp" type="button">Apply to model</button>
         <div id="helpResult" class="help-result" aria-live="polite"></div>
       </div>
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260717-hero-connectors-v1"></script>
+    <script type="module" src="./app.js?v=20260717-command-canvas-v1"></script>
   </body>
 </html>

@@ -8736,14 +8736,233 @@ function fallbackHelp(prompt) {
   };
 }
 
+function commandTemplateMatch(lower) {
+  const candidates = [
+    ["penicillin", "penicilin", "penicillium", "antibiotic"],
+    ["antibody", "mab", "monoclonal", "cho"],
+    ["culturedMeat", "cultured meat", "cellular agriculture", "meat"],
+    ["fermentation", "industrial fermentation", "precision fermentation"],
+    ["vaccine", "vaccin"],
+    ["plasmid", "pdna", "gene therapy"],
+    ["cellTherapy", "cell therapy", "car-t", "cart"],
+    ["water", "water purification", "wfi"],
+    ["wastewater", "waste water"],
+    ["biohydrogen", "hydrogen"],
+    ["insulin", "peptide"],
+    ["smallMolecule", "small molecule", "api synthesis"],
+    ["starch", "starch"],
+    ["airPollution", "air pollution", "emissions"],
+  ];
+  const match = candidates.find(([key, ...terms]) => templates[key] && terms.some((term) => lower.includes(term)));
+  return match?.[0] || null;
+}
+
+function commandScaleMatch(lower) {
+  if (lower.includes("commercial") || lower.includes("industrial") || lower.includes("large scale")) return "commercial";
+  if (lower.includes("demo") || lower.includes("demonstration")) return "demo";
+  if (lower.includes("pilot")) return "pilot";
+  if (lower.includes("lab") || lower.includes("bench")) return "lab";
+  return null;
+}
+
+function commandEquipmentMatch(lower) {
+  const aliases = [
+    ["bioreactor", ["bioreactor", "reactor", "fermenter"]],
+    ["cip", ["cip", "cleaning skid", "cleaning"]],
+    ["sip-panel", ["sip", "sterilization panel"]],
+    ["valve", ["manual valve", "valve"]],
+    ["control-valve", ["control valve"]],
+    ["pump", ["pump"]],
+    ["heat-exchanger", ["heat exchanger", "heat reuse", "heater", "cooler"]],
+    ["chromatography", ["chromatography", "column", "protein a"]],
+    ["sterile-filter", ["sterile filter", "grade filter"]],
+    ["depth-filter", ["depth filter"]],
+    ["centrifuge", ["centrifuge"]],
+    ["ufdf", ["ufdf", "uf/df", "tff", "ultrafiltration"]],
+    ["hold-tank", ["hold tank", "surge tank", "buffer hold"]],
+    ["sampling", ["sample", "sampling"]],
+    ["pat", ["pat", "sensor", "soft sensor"]],
+    ["waste-hold", ["waste hold", "waste tank"]],
+  ];
+  return aliases.find(([type, terms]) => palette.some((item) => item.type === type) && terms.some((term) => lower.includes(`add ${term}`) || lower.includes(`insert ${term}`) || lower.includes(`place ${term}`)))?.[0] || null;
+}
+
+function applySystemCommand(prompt) {
+  const lower = prompt.toLowerCase();
+  const applied = [];
+  const steps = [];
+  let targetView = null;
+  let needsRender = false;
+  let needsFit = false;
+
+  const templateKey = commandTemplateMatch(lower);
+  if (templateKey && state.template !== templateKey) {
+    loadTemplate(templateKey, lower.includes("keep scale"));
+    applied.push(`Loaded ${templates[templateKey].label} as the active product model.`);
+    steps.push("The workspace now uses the selected product model, so labels, streams, equipment and reports follow that process instead of the previous template.");
+    targetView = "overview";
+  }
+
+  const scaleKey = commandScaleMatch(lower);
+  if (scaleKey && scalePresets[scaleKey] && state.scale !== scaleKey) {
+    applyScale(scaleKey);
+    applied.push(`Changed scale to ${scalePresets[scaleKey].label}.`);
+    steps.push("Scale-dependent costs, batch size, annual batches and equipment sizing were recalculated.");
+    needsRender = true;
+  }
+
+  if (lower.includes("full pfd") || lower.includes("all streams") || lower.includes("show flows") || lower.includes("show streams") || lower.includes("more flow")) {
+    state.flowDetail = "full";
+    state.canvasFocus = "all";
+    applied.push("Switched the canvas to Full PFD with all flow labels visible.");
+    steps.push("The canvas now shows equipment data, stream labels, utilities, waste, QC/data and supporting flows.");
+    targetView = "flowsheet";
+    needsRender = true;
+    needsFit = true;
+  }
+
+  if (lower.includes("core process")) {
+    state.canvasFocus = "main";
+    applied.push("Focused the canvas on the core production train.");
+    targetView = "flowsheet";
+    needsRender = true;
+  }
+
+  if (lower.includes("utilities") || lower.includes("support systems")) {
+    state.canvasFocus = "utilities";
+    applied.push("Focused the canvas on utilities, support systems, cleaning and sterilization.");
+    targetView = "flowsheet";
+    needsRender = true;
+  }
+
+  if (lower.includes("recycle") || lower.includes("heat reuse") || lower.includes("heat recovery")) {
+    state.params.heatRecovery = Math.min(85, Math.max(state.params.heatRecovery || 0, 45));
+    if (!state.units.some((item) => item.name.toLowerCase().includes("heat recovery"))) addSectionPreset("recycle");
+    state.canvasFocus = "recycle";
+    applied.push("Added or emphasized recycle and heat-reuse logic, with heat recovery raised to at least 45%.");
+    targetView = "flowsheet";
+    needsRender = true;
+  }
+
+  if (lower.includes("cip") || lower.includes("sip") || lower.includes("cleaning") || lower.includes("sterilization")) {
+    if (!state.units.some((item) => item.type === "cip")) addSectionPreset("cip");
+    state.canvasFocus = "utilities";
+    state.params.cipTime = Math.max(state.params.cipTime || 0, 2.5);
+    state.params.sipHold = Math.max(state.params.sipHold || 0, 30);
+    applied.push("Added or emphasized CIP/SIP support and cleaning-cycle parameters.");
+    targetView = "flowsheet";
+    needsRender = true;
+  }
+
+  if (lower.includes("oxygen") || lower.includes("kla") || lower.includes("do ") || lower.includes("mixing")) {
+    state.params.kla = Math.min(260, Math.max(state.params.kla || 0, Math.round((state.params.kla || 65) * 1.18)));
+    state.params.aeration = Math.min(2.5, Math.max(state.params.aeration || 0.01, Number(((state.params.aeration || 0.35) + 0.08).toFixed(2))));
+    state.params.doSetpoint = Math.max(state.params.doSetpoint || 0, 45);
+    applied.push("Improved oxygen-transfer assumptions: kLa, aeration and DO setpoint were raised conservatively.");
+    steps.push("Open CFD to inspect oxygen, nutrient and shear gradients before accepting the scale-up.");
+    targetView = "cfd";
+    needsRender = true;
+  }
+
+  if (lower.includes("ammon") || lower.includes("lactate") || lower.includes("ph boundary")) {
+    state.params.glutamine = Math.max(0, Number(((state.params.glutamine || 3) * 0.82).toFixed(1)));
+    state.params.feedRate = Math.min(80, Math.max(state.params.feedRate || 0, 22));
+    applied.push("Adjusted conservative cell-culture boundary assumptions for ammonium/lactate risk review.");
+    targetView = "ai";
+    needsRender = true;
+  }
+
+  if (lower.includes("material") || lower.includes("media cost") || lower.includes("medium cost")) {
+    state.params.mediaCostPerL = Math.max(state.params.mediaCostPerL || 0, 60);
+    state.params.feedSupplementCostPerL = Math.max(state.params.feedSupplementCostPerL || 0, 220);
+    state.params.materialLossFactor = Math.max(state.params.materialLossFactor || 0, 22);
+    applied.push("Raised media, feed supplement and material-loss assumptions so materials carry more weight in economics.");
+    targetView = "economics";
+    needsRender = true;
+  }
+
+  const equipmentType = commandEquipmentMatch(lower);
+  if (equipmentType) {
+    addUnitFromButton(equipmentType);
+    applied.push(`Added ${palette.find((item) => item.type === equipmentType)?.label || "equipment"} near the current selection.`);
+    targetView = "flowsheet";
+    needsRender = true;
+  }
+
+  if (lower.includes("layout") || lower.includes("arrange") || lower.includes("clean up") || lower.includes("make it clear")) {
+    autoLayout();
+    state.flowDetail = "full";
+    applied.push("Re-arranged the process canvas and enabled full PFD visibility.");
+    targetView = "flowsheet";
+    needsRender = true;
+    needsFit = true;
+  }
+
+  if (lower.includes("fit") || lower.includes("zoom") || lower.includes("entire process") || lower.includes("whole process")) {
+    applied.push("Fitted the whole process canvas into view.");
+    targetView = "flowsheet";
+    needsFit = true;
+  }
+
+  if (lower.includes("schedule")) {
+    applied.push("Opened the scheduling and simulation layer.");
+    steps.push("Use the schedule board to inspect equipment occupancy, cleaning windows, batch release and repeated equipment use.");
+    targetView = "simulation";
+  }
+
+  if (lower.includes("download") || lower.includes("export") || lower.includes("csv") || lower.includes("lca") || lower.includes("tea")) {
+    applied.push("Opened the Downloads area for LCA, TEA, streams, balances, visuals and schedules.");
+    targetView = "reports";
+  }
+
+  if (lower.includes("source") || lower.includes("paper") || lower.includes("reference") || lower.includes("public data")) {
+    applied.push("Opened scientific data and source governance.");
+    steps.push("Axion uses public or licensed references only, keeps provenance attached, and does not copy proprietary simulator files.");
+    targetView = "sources";
+  }
+
+  if (targetView) setView(targetView);
+  if (needsRender) {
+    syncInputs();
+    renderAll();
+  }
+  if (needsFit) window.requestAnimationFrame(() => fitCanvas(true));
+
+  const fallback = fallbackHelp(prompt);
+  if (!applied.length) {
+    steps.push(...fallback.steps);
+    if (fallback.targetView) targetView = fallback.targetView;
+  }
+
+  return {
+    title: applied.length ? "Applied to the model" : "Suggested next steps",
+    applied,
+    steps: steps.length ? steps : fallback.steps,
+    targetView: targetView || fallback.targetView,
+    assumptions: [
+      `Active model: ${activeTemplate().label}`,
+      `Current scale: ${scalePresets[state.scale].label}`,
+      `Selected item: ${state.selectedId || "none"}`,
+    ],
+    commands: [
+      "show full PFD and fit canvas",
+      "add CIP and cleaning loop",
+      "improve oxygen transfer",
+      "open LCA and TEA downloads",
+    ],
+  };
+}
+
 function renderHelpResult(payload) {
   if (!els.helpResult) return;
   const guide = payload.guide || payload;
   els.helpResult.innerHTML = `
     <strong>${guide.title || "Recommended next steps"}</strong>
+    ${(guide.applied || []).length ? `<div>${guide.applied.map((item) => `<span class="applied-change">${escapeHtml(item)}</span>`).join("")}</div>` : ""}
     <ol>${(guide.steps || []).map((step) => `<li>${step}</li>`).join("")}</ol>
     <div>${(guide.assumptions || []).map((item) => `<span>${item}</span>`).join("")}</div>
     ${guide.targetView ? `<button data-help-jump="${guide.targetView}" type="button">Open ${pageTitle(guide.targetView)}</button>` : ""}
+    ${(guide.commands || []).length ? `<div>${guide.commands.map((command) => `<button data-help-command="${escapeAttr(command)}" type="button">${escapeHtml(command)}</button>`).join("")}</div>` : ""}
   `;
 }
 
@@ -9045,29 +9264,17 @@ async function restoreProjectVersion(versionId) {
 async function askToolHelp() {
   const prompt = els.helpPrompt?.value.trim() || "";
   if (prompt.length < 5) {
-    renderHelpResult({ title: "Describe the issue first", steps: ["Tell Axion what is confusing or failing, for example oxygen transfer, ammonium, cost, stream download, or equipment placement."], assumptions: [] });
+    renderHelpResult({
+      title: "Describe the change first",
+      steps: ["Type a concrete model instruction, for example: show full PFD, add CIP, improve oxygen transfer, fit canvas, open downloads, or switch to penicillin."],
+      assumptions: [],
+      commands: ["show full PFD and fit canvas", "add CIP and cleaning loop", "improve oxygen transfer", "open LCA and TEA downloads"],
+    });
     return;
   }
-  if (els.helpResult) els.helpResult.innerHTML = "<p>Preparing guidance...</p>";
-  const localGuide = fallbackHelp(prompt);
-  try {
-    const payload = await apiRequest("/api/help", {
-      method: "POST",
-      body: JSON.stringify({
-        prompt,
-        context: {
-          template: state.template,
-          scale: state.scale,
-          selectedId: state.selectedId,
-          unitCount: state.units.length,
-          streamCount: state.streams.length,
-        },
-      }),
-    });
-    renderHelpResult({ guide: { ...localGuide, ...(payload.guide || {}) } });
-  } catch {
-    renderHelpResult(localGuide);
-  }
+  if (els.helpResult) els.helpResult.innerHTML = "<p>Applying changes...</p>";
+  const guide = applySystemCommand(prompt);
+  renderHelpResult(guide);
 }
 
 async function loadProductConfig() {
@@ -9263,10 +9470,15 @@ function bindAuth() {
   });
 
   els.helpResult?.addEventListener("click", (event) => {
+    const command = event.target.closest("[data-help-command]");
+    if (command) {
+      if (els.helpPrompt) els.helpPrompt.value = command.dataset.helpCommand;
+      renderHelpResult(applySystemCommand(command.dataset.helpCommand || ""));
+      return;
+    }
     const button = event.target.closest("[data-help-jump]");
     if (button) {
       setView(button.dataset.helpJump);
-      els.helpDock?.classList.remove("open");
     }
   });
 }
