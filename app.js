@@ -6,7 +6,7 @@ const palette = [
   { type: "hold-tank", label: "Hold Vessel", isoName: "Sterile hold vessel", cls: "Hold", icon: "HV", color: "#5a7d7c", residence: 4, power: 0.5, standards: ["ISO 10628", "EU GMP Annex 1", "ASME BPE"] },
   { type: "buffer-prep", label: "Buffer Preparation", isoName: "Buffer preparation vessel", cls: "Preparation", icon: "BP", color: "#277da1", residence: 2.5, power: 0.7, standards: ["ASME BPE", "EU GMP Part I", "ICH Q7"] },
   { type: "resin-prep", label: "Resin Slurry Prep", isoName: "Chromatography resin slurry preparation vessel", cls: "Purification", icon: "RP", color: "#6d597a", residence: 2, power: 0.4, standards: ["ASME BPE", "ICH Q11", "EU GMP Part I"] },
-  { type: "heat-exchanger", label: "Heat Exchanger", isoName: "Shell-and-tube or plate heat exchanger", cls: "Thermal", icon: "HX", color: "#bc6c25", residence: 0.5, power: 1.5, standards: ["ISO 10628", "ASME BPE"] },
+  { type: "heat-exchanger", label: "Heat Exchanger", isoName: "Shell-and-tube or plate heat exchanger", cls: "Thermal", icon: "HX", color: "#596a64", residence: 0.5, power: 1.5, standards: ["ISO 10628", "ASME BPE"] },
   { type: "autoclave", label: "Autoclave", isoName: "Moist-heat sterilizer", cls: "Sterilization", icon: "AC", color: "#b74d45", residence: 3, power: 9.5, standards: ["EU GMP Annex 1", "ISO 17665", "ISO 13408-1"] },
   { type: "sip", label: "SIP Cycle", isoName: "Steam-in-place sterilization", cls: "Sterilization", icon: "SIP", color: "#b74d45", residence: 2, power: 4.5, standards: ["EU GMP Annex 1", "ISO 13408-1", "ASME BPE"] },
   { type: "sterile-filter", label: "Sterilizing Grade Filter", isoName: "0.22 micron sterilizing-grade membrane filter", cls: "Filtration", icon: "SF", color: "#43aa8b", residence: 0.5, power: 0.2, standards: ["EU GMP Annex 1", "PDA TR26", "ISO 13408-2"] },
@@ -27,11 +27,11 @@ const palette = [
   { type: "nanofilter", label: "Nanofiltration", isoName: "Nanofiltration membrane skid", cls: "Separation", icon: "NF", color: "#43aa8b", residence: 2.5, power: 1.6, standards: ["ICH Q7", "EU GMP Part I", "ASME BPE"] },
   { type: "extractor", label: "Liquid-Liquid Extractor", isoName: "Liquid-liquid extraction mixer-settler", cls: "Separation", icon: "EX", color: "#4895ef", residence: 2.5, power: 1.2, standards: ["ISO 10628", "ICH Q7"] },
   { type: "phase-separator", label: "Phase Separator", isoName: "Gravity phase separator or decanter", cls: "Separation", icon: "PS", color: "#4895ef", residence: 1.5, power: 0.3, standards: ["ISO 10628", "ICH Q7"] },
-  { type: "distillation", label: "Distillation Column", isoName: "Distillation column with condenser and reboiler", cls: "Thermal", icon: "DC", color: "#bc6c25", residence: 8, power: 18, standards: ["ISO 10628", "ICH Q7", "ATEX/DSEAR"] },
+  { type: "distillation", label: "Distillation Column", isoName: "Distillation column with condenser and reboiler", cls: "Thermal", icon: "DC", color: "#596a64", residence: 8, power: 18, standards: ["ISO 10628", "ICH Q7", "ATEX/DSEAR"] },
   { type: "crystallizer", label: "Crystallizer", isoName: "Batch crystallization vessel", cls: "Recovery", icon: "CR", color: "#b56576", residence: 8, power: 1.4, standards: ["ISO 10628", "ICH Q7"] },
   { type: "filter-dryer", label: "Filter Dryer", isoName: "Agitated nutsche filter dryer", cls: "Recovery", icon: "FD", color: "#b56576", residence: 10, power: 5.8, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
   { type: "washer", label: "Wash Vessel", isoName: "Product wash vessel", cls: "Downstream", icon: "WV", color: "#4895ef", residence: 2, power: 0.7, standards: ["ISO 10628", "EU GMP Part I"] },
-  { type: "dryer", label: "Vacuum Dryer", isoName: "Vacuum tray or conical dryer", cls: "Finishing", icon: "DR", color: "#bc6c25", residence: 6, power: 8.8, standards: ["ICH Q7", "EU GMP Part II"] },
+  { type: "dryer", label: "Vacuum Dryer", isoName: "Vacuum tray or conical dryer", cls: "Finishing", icon: "DR", color: "#596a64", residence: 6, power: 8.8, standards: ["ICH Q7", "EU GMP Part II"] },
   { type: "formulation", label: "Formulation Vessel", isoName: "Final formulation vessel", cls: "Finishing", icon: "FV", color: "#5a7d7c", residence: 2, power: 0.9, standards: ["EU GMP Annex 1", "ICH Q8", "ICH Q9"] },
   { type: "sterile-fill", label: "Aseptic Filling Line", isoName: "Aseptic filling and stoppering line", cls: "Packaging", icon: "AF", color: "#3f6173", residence: 1.5, power: 2.4, standards: ["EU GMP Annex 1", "ISO 13408-1", "ISO 14644"] },
   { type: "lyophilizer", label: "Lyophilizer", isoName: "Freeze dryer", cls: "Finishing", icon: "LY", color: "#3f6173", residence: 28, power: 10.2, standards: ["EU GMP Annex 1", "ASME BPE", "ISO 14644"] },
@@ -62,15 +62,15 @@ const palette = [
   { type: "inspection", label: "Visual Inspection", isoName: "Automated visual inspection station", cls: "Quality", icon: "VIQ", color: "#8a6f3d", residence: 1, power: 1.8, standards: ["EU GMP Annex 1", "USP <790>", "21 CFR 211"] },
   { type: "cold-storage", label: "Cold Storage", isoName: "Qualified cold room or freezer storage", cls: "Hold", icon: "CSG", color: "#4895ef", residence: 24, power: 4.5, standards: ["ICH Q5C", "EU GMP Annex 15", "GMP GDP"] },
   { type: "waste-hold", label: "Waste Hold Tank", isoName: "GMP liquid waste hold tank", cls: "Utilities", icon: "WH", color: "#b74d45", residence: 6, power: 0.5, standards: ["ISO 14001", "EU GMP Part I"] },
-  { type: "solvent-tank", label: "Solvent Tank Farm", isoName: "GMP solvent storage and transfer system", cls: "Hold", icon: "ST", color: "#bc6c25", residence: 8, power: 0.7, standards: ["ATEX/DSEAR", "ICH Q7", "ISO 10628"] },
-  { type: "dryer-mill", label: "Mill and Sieve", isoName: "Cone mill and vibratory sieve", cls: "Finishing", icon: "MS", color: "#bc6c25", residence: 1.5, power: 2.2, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
+  { type: "solvent-tank", label: "Solvent Tank Farm", isoName: "GMP solvent storage and transfer system", cls: "Hold", icon: "ST", color: "#596a64", residence: 8, power: 0.7, standards: ["ATEX/DSEAR", "ICH Q7", "ISO 10628"] },
+  { type: "dryer-mill", label: "Mill and Sieve", isoName: "Cone mill and vibratory sieve", cls: "Finishing", icon: "MS", color: "#596a64", residence: 1.5, power: 2.2, standards: ["ICH Q7", "EU GMP Part II", "ISO 10628"] },
   { type: "weigh-fill", label: "Weigh Fill", isoName: "Bulk weigh fill station", cls: "Packaging", icon: "WF", color: "#3f6173", residence: 1, power: 0.8, standards: ["EU GMP Annex 16", "21 CFR 211"] },
   { type: "pump", label: "Transfer Pump", isoName: "Hygienic transfer pump", cls: "Piping", icon: "P", color: "#4b5563", residence: 0.1, power: 1.6, standards: ["ASME BPE", "ISO 10628", "EU GMP Annex 15"] },
   { type: "valve", label: "Manual Valve", isoName: "Hygienic diaphragm valve", cls: "Piping", icon: "V", color: "#4f6f8f", residence: 0.05, power: 0.02, standards: ["ASME BPE", "ISO 10628"] },
   { type: "control-valve", label: "Control Valve", isoName: "Automated flow control valve", cls: "Piping", icon: "CV", color: "#4b5563", residence: 0.05, power: 0.08, standards: ["ASME BPE", "ISA-88", "21 CFR Part 11"] },
   { type: "flowmeter", label: "Flowmeter", isoName: "Coriolis or magnetic flowmeter", cls: "Instrumentation", icon: "FM", color: "#00a88f", residence: 0.05, power: 0.05, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
   { type: "sensor", label: "PAT Sensor", isoName: "Inline pH DO conductivity or UV sensor", cls: "Instrumentation", icon: "S", color: "#8a6f3d", residence: 0.05, power: 0.08, standards: ["ICH Q8", "GAMP 5", "21 CFR Part 11"] },
-  { type: "pressure-relief", label: "Pressure Relief", isoName: "Relief valve or rupture disc assembly", cls: "Piping", icon: "PR", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ASME BPE", "PED", "ISO 10628"] },
+  { type: "pressure-relief", label: "Pressure Relief", isoName: "Relief valve or rupture disc assembly", cls: "Piping", icon: "PR", color: "#275f6b", residence: 0.05, power: 0.02, standards: ["ASME BPE", "PED", "ISO 10628"] },
   { type: "manifold", label: "Manifold", isoName: "Hygienic transfer manifold", cls: "Piping", icon: "MF", color: "#4f6f8f", residence: 0.1, power: 0.05, standards: ["ASME BPE", "EU GMP Annex 1", "ISO 10628"] },
   { type: "storage", label: "Raw Material Storage", isoName: "Bulk raw material storage bin or tank", cls: "Preparation", icon: "STO", color: "#51606f", residence: 12, power: 0.2, standards: ["ISO 10628", "EU GMP Part I Ch. 5"] },
   { type: "grinder", label: "Grinder", isoName: "Feedstock grinder or mill", cls: "Preparation", icon: "GR", color: "#51606f", residence: 0.8, power: 7.5, standards: ["ISO 10628", "EU GMP Part I"] },
@@ -80,10 +80,10 @@ const palette = [
   { type: "dark-fermenter", label: "Dark Fermenter", isoName: "Thermophilic continuous stirred-tank dark fermenter", cls: "Bioreactor", icon: "DF", color: "#0f766e", residence: 12, power: 8.2, standards: ["ISO 10628", "ISA-88", "ASME BPE"] },
   { type: "anaerobic-digester", label: "Anaerobic Digester", isoName: "Anaerobic digestion reactor", cls: "Bioreactor", icon: "AD", color: "#4d908e", residence: 72, power: 5.6, standards: ["ISO 10628", "ISA-88"] },
   { type: "absorber", label: "Absorption Column", isoName: "Packed or tray absorption column", cls: "Separation", icon: "ABS", color: "#4895ef", residence: 2.2, power: 6.4, standards: ["ISO 10628", "ATEX/DSEAR"] },
-  { type: "desorber", label: "Desorption Column", isoName: "Solvent regeneration desorption column", cls: "Thermal", icon: "DES", color: "#bc6c25", residence: 2.8, power: 12.5, standards: ["ISO 10628", "ATEX/DSEAR"] },
+  { type: "desorber", label: "Desorption Column", isoName: "Solvent regeneration desorption column", cls: "Thermal", icon: "DES", color: "#596a64", residence: 2.8, power: 12.5, standards: ["ISO 10628", "ATEX/DSEAR"] },
   { type: "splitter", label: "Recycle Splitter", isoName: "Recycle purge splitter", cls: "Piping", icon: "SPL", color: "#4b5563", residence: 0.05, power: 0.05, standards: ["ISO 10628", "ISA-88"] },
   { type: "regulator", label: "Feedback Regulator", isoName: "Feedback regulatory control block", cls: "Instrumentation", icon: "REG", color: "#8a6f3d", residence: 0.05, power: 0.2, standards: ["ISA-88", "GAMP 5", "21 CFR Part 11"] },
-  { type: "tear-stream", label: "Tear Stream Marker", isoName: "Recycle loop tear stream convergence marker", cls: "Instrumentation", icon: "TS", color: "#c04f47", residence: 0.05, power: 0.02, standards: ["ISA-88", "GAMP 5"] },
+  { type: "tear-stream", label: "Tear Stream Marker", isoName: "Recycle loop tear stream convergence marker", cls: "Instrumentation", icon: "TS", color: "#275f6b", residence: 0.05, power: 0.02, standards: ["ISA-88", "GAMP 5"] },
   { type: "equalization", label: "Equalization Tank", isoName: "Wastewater equalization basin", cls: "Environmental", icon: "EQ", color: "#277da1", residence: 8, power: 1.2, standards: ["ISO 14001", "ISO 10628"] },
   { type: "neutralization", label: "Neutralization Tank", isoName: "pH neutralization reactor", cls: "Environmental", icon: "NT", color: "#577590", residence: 2, power: 0.8, standards: ["ISO 14001", "ISO 10628"] },
   { type: "primary-clarifier", label: "Primary Clarifier", isoName: "Gravity primary clarifier", cls: "Environmental", icon: "PC", color: "#4895ef", residence: 3, power: 0.9, standards: ["ISO 14001", "ISO 10628"] },
@@ -98,13 +98,13 @@ const palette = [
   { type: "baghouse", label: "Baghouse Filter", isoName: "Fabric baghouse dust collector", cls: "Air pollution", icon: "BH", color: "#90be6d", residence: 0.5, power: 4.8, standards: ["EPA-MACT", "ISO 14001"] },
   { type: "cyclone", label: "Cyclone Separator", isoName: "Cyclone particulate separator", cls: "Air pollution", icon: "CY", color: "#f8961e", residence: 0.2, power: 2.4, standards: ["EPA-MACT", "ISO 10628"] },
   { type: "carbon-bed", label: "Activated Carbon Bed", isoName: "Activated carbon adsorption bed", cls: "Air pollution", icon: "ACB", color: "#6d597a", residence: 1.5, power: 1.6, standards: ["EPA-MACT", "ISO 14001"] },
-  { type: "thermal-oxidizer", label: "Thermal Oxidizer", isoName: "Regenerative thermal oxidizer", cls: "Air pollution", icon: "TO", color: "#bc6c25", residence: 0.3, power: 20, standards: ["EPA-MACT", "ISO 14001"] },
+  { type: "thermal-oxidizer", label: "Thermal Oxidizer", isoName: "Regenerative thermal oxidizer", cls: "Air pollution", icon: "TO", color: "#596a64", residence: 0.3, power: 20, standards: ["EPA-MACT", "ISO 14001"] },
   { type: "cartoner", label: "Cartoner", isoName: "Cartoning packaging machine", cls: "Packaging", icon: "CT", color: "#3f6173", residence: 0.8, power: 2.8, standards: ["ISO 15378", "21 CFR 211"] },
   { type: "case-packer", label: "Case Packer", isoName: "Case packing machine", cls: "Packaging", icon: "CP", color: "#3f6173", residence: 0.6, power: 2.1, standards: ["ISO 15378"] },
   { type: "palletizer", label: "Palletizer", isoName: "Palletizing station", cls: "Packaging", icon: "PL", color: "#3f6173", residence: 0.5, power: 3.2, standards: ["ISO 15378"] },
   { type: "vacuum-pump", label: "Vacuum Pump", isoName: "Auxiliary vacuum pump package", cls: "Auxiliary", icon: "VP", color: "#3f6173", residence: 0.2, power: 4.6, standards: ["ISO 10628", "EU GMP Part I"] },
-  { type: "heat-agent", label: "Heat Agent Loop", isoName: "Heat transfer agent supply and return loop", cls: "Utilities", icon: "HTA", color: "#bc6c25", residence: 0.3, power: 2.4, standards: ["ISO 10628", "ISPE Baseline"] },
-  { type: "power-meter", label: "Power Meter", isoName: "Electrical demand and generation meter", cls: "Instrumentation", icon: "kW", color: "#d7a229", residence: 0.05, power: 0.05, standards: ["GAMP 5", "21 CFR Part 11"] },
+  { type: "heat-agent", label: "Heat Agent Loop", isoName: "Heat transfer agent supply and return loop", cls: "Utilities", icon: "HTA", color: "#596a64", residence: 0.3, power: 2.4, standards: ["ISO 10628", "ISPE Baseline"] },
+  { type: "power-meter", label: "Power Meter", isoName: "Electrical demand and generation meter", cls: "Instrumentation", icon: "kW", color: "#7b8a84", residence: 0.05, power: 0.05, standards: ["GAMP 5", "21 CFR Part 11"] },
   { type: "labor-crew", label: "Labor Crew", isoName: "Labor type demand and allocation record", cls: "Resources", icon: "LC", color: "#8a6f3d", residence: 0.1, power: 0.02, standards: ["ISA-95", "EU GMP Part I"] },
   { type: "material-inventory", label: "Material Inventory", isoName: "Material storage inventory and timing record", cls: "Resources", icon: "MI", color: "#51606f", residence: 2, power: 0.1, standards: ["EU GMP Part I Ch. 5", "ICH Q7"] },
   { type: "stream-summary", label: "Stream Summary", isoName: "Stream summary table and Excel-link node", cls: "Reports", icon: "SR", color: "#00a88f", residence: 0.1, power: 0.02, standards: ["21 CFR Part 11", "GAMP 5"] },
@@ -117,8 +117,8 @@ const palette = [
   { type: "caustic-hold", label: "Caustic Hold", isoName: "Caustic cleaning solution hold tank", cls: "Utilities", icon: "NaOH", color: "#b74d45", residence: 1, power: 0.5, standards: ["ASME BPE", "EU GMP Annex 15"] },
   { type: "acid-hold", label: "Acid Hold", isoName: "Acid cleaning solution hold tank", cls: "Utilities", icon: "ACD", color: "#b74d45", residence: 1, power: 0.5, standards: ["ASME BPE", "EU GMP Annex 15"] },
   { type: "cip-return", label: "CIP Return", isoName: "CIP return, neutralization, and spent-rinse collection", cls: "Utilities", icon: "CIPR", color: "#9b4d4d", residence: 1.5, power: 0.8, standards: ["EU GMP Annex 15", "ISO 14001"] },
-  { type: "heat-recovery", label: "Heat Recovery Loop", isoName: "Process heat recovery exchanger and reuse loop", cls: "Thermal", icon: "HR", color: "#bc6c25", residence: 0.6, power: 1.1, standards: ["ISO 10628", "ISPE Baseline"] },
-  { type: "condensate-return", label: "Condensate Return", isoName: "Clean steam condensate recovery and credit node", cls: "Utilities", icon: "CRN", color: "#bc6c25", residence: 0.4, power: 0.7, standards: ["ASME BPE", "ISPE Baseline"] },
+  { type: "heat-recovery", label: "Heat Recovery Loop", isoName: "Process heat recovery exchanger and reuse loop", cls: "Thermal", icon: "HR", color: "#596a64", residence: 0.6, power: 1.1, standards: ["ISO 10628", "ISPE Baseline"] },
+  { type: "condensate-return", label: "Condensate Return", isoName: "Clean steam condensate recovery and credit node", cls: "Utilities", icon: "CRN", color: "#596a64", residence: 0.4, power: 0.7, standards: ["ASME BPE", "ISPE Baseline"] },
   { type: "solvent-recycle", label: "Solvent Recycle", isoName: "Recovered solvent recycle and purge control", cls: "Recovery", icon: "SRC", color: "#6d597a", residence: 1.1, power: 1.8, standards: ["ISO 10628", "ICH Q7"] },
   { type: "water-reuse", label: "Water Reuse", isoName: "Process water reuse and reject-routing node", cls: "Environmental", icon: "WR", color: "#277da1", residence: 1.4, power: 1.2, standards: ["USP <1231>", "ISO 14001"] },
   { type: "weigh-scale", label: "Weigh Scale", isoName: "Process weigh scale or load cell station", cls: "Instrumentation", icon: "WS", color: "#8a6f3d", residence: 0.05, power: 0.05, standards: ["21 CFR Part 11", "GAMP 5"] },
@@ -5167,26 +5167,26 @@ function renderSimulationBoard() {
           <div><span>Product formation</span><h4>${formatMass(profileRows.at(-1)?.productKg || 0)}</h4></div>
           <svg viewBox="0 0 420 112" role="img" aria-label="Product and substrate profile">
             <path d="${sparklinePath(profileRows, "productKg")}" fill="none" stroke="#00a88f" stroke-width="4" />
-            <path d="${sparklinePath(profileRows, "substrateGL")}" fill="none" stroke="#c04f47" stroke-width="3" opacity="0.8" />
+            <path d="${sparklinePath(profileRows, "substrateGL")}" fill="none" stroke="#275f6b" stroke-width="3" opacity="0.8" />
           </svg>
-          <p>Green: product. Red: substrate. Use this to see whether the selected titer, feed, and batch time are physically plausible.</p>
+          <p>Green: product. Blue-grey: substrate. Use this to see whether the selected titer, feed, and batch time are physically plausible.</p>
         </article>
         <article class="simulation-card">
           <div><span>Cell culture stress</span><h4>${formatNumber(dynamic.minDoPct, 1)}% minimum DO</h4></div>
           <svg viewBox="0 0 420 112" role="img" aria-label="DO ammonia lactate profile">
             <path d="${sparklinePath(profileRows, "dissolvedOxygenPct")}" fill="none" stroke="#4f7cff" stroke-width="4" />
-            <path d="${sparklinePath(profileRows, "ammoniaMm")}" fill="none" stroke="#b98900" stroke-width="3" opacity="0.9" />
-            <path d="${sparklinePath(profileRows, "lactateGL")}" fill="none" stroke="#c04f47" stroke-width="3" opacity="0.75" />
+            <path d="${sparklinePath(profileRows, "ammoniaMm")}" fill="none" stroke="#7b8a84" stroke-width="3" opacity="0.9" />
+            <path d="${sparklinePath(profileRows, "lactateGL")}" fill="none" stroke="#275f6b" stroke-width="3" opacity="0.75" />
           </svg>
-          <p>Blue: DO. Gold: ammonium. Red: lactate. Boundary cards still decide whether these values are acceptable.</p>
+          <p>Blue: DO. Slate: ammonium. Deep cyan: lactate. Boundary cards still decide whether these values are acceptable.</p>
         </article>
         <article class="simulation-card">
           <div><span>Thermal profile</span><h4>${formatNumber(dynamic.peakHeatKw, 1)} kW peak</h4></div>
           <svg viewBox="0 0 420 112" role="img" aria-label="Heat load and cumulative energy profile">
-            <path d="${sparklinePath(profileRows, "heatLoadKw")}" fill="none" stroke="#bc6c25" stroke-width="4" />
+            <path d="${sparklinePath(profileRows, "heatLoadKw")}" fill="none" stroke="#596a64" stroke-width="4" />
             <path d="${sparklinePath(profileRows, "cumulativeEnergyKwh")}" fill="none" stroke="#51606f" stroke-width="3" opacity="0.8" />
           </svg>
-          <p>Orange: instantaneous heat load. Grey: cumulative net energy after heat-recovery credit.</p>
+          <p>Graphite-green: instantaneous heat load. Grey: cumulative net energy after heat-recovery credit.</p>
         </article>
       </div>
     </section>
@@ -7164,10 +7164,10 @@ function scheduleGanttSvg() {
   const axisW = width - axisX - 95;
   const maxH = Math.max(1, ...rows.map((row) => row.finishH), schedule.makespanH);
   const phaseColor = {
-    Setup: "#c08a2d",
-    Process: "#a72b22",
+    Setup: "#596a64",
+    Process: "#173f37",
     Transfer: "#64748b",
-    "Cleaning/Release": "#476b58",
+    "Cleaning/Release": "#275f6b",
   };
   const tickCount = 8;
   return `
@@ -7197,10 +7197,10 @@ function scheduleGanttSvg() {
     `;
   }).join("")}
   <g font-family="Inter, Arial, sans-serif" font-size="12" fill="#aebbd0">
-    <rect x="72" y="${height - 106}" width="18" height="10" rx="5" fill="#c08a2d"/><text x="98" y="${height - 97}">Setup</text>
-    <rect x="164" y="${height - 106}" width="18" height="10" rx="5" fill="#a72b22"/><text x="190" y="${height - 97}">Process</text>
+    <rect x="72" y="${height - 106}" width="18" height="10" rx="5" fill="#596a64"/><text x="98" y="${height - 97}">Setup</text>
+    <rect x="164" y="${height - 106}" width="18" height="10" rx="5" fill="#173f37"/><text x="190" y="${height - 97}">Process</text>
     <rect x="268" y="${height - 106}" width="18" height="10" rx="5" fill="#64748b"/><text x="294" y="${height - 97}">Transfer</text>
-    <rect x="380" y="${height - 106}" width="18" height="10" rx="5" fill="#476b58"/><text x="406" y="${height - 97}">Cleaning / release</text>
+    <rect x="380" y="${height - 106}" width="18" height="10" rx="5" fill="#275f6b"/><text x="406" y="${height - 97}">Cleaning / release</text>
   </g>
 </svg>`.trim();
 }
@@ -7614,9 +7614,9 @@ function renderEconomics() {
   const materialRows = data.scale.materialBreakdown?.rows || [];
   const costItems = [
     { label: "Annualized CAPEX", value: data.scale.annualizedCapital, color: "#123a56" },
-    { label: "Fixed facility burden", value: data.scale.fixedBurden, color: "#c04f47" },
+    { label: "Fixed facility burden", value: data.scale.fixedBurden, color: "#275f6b" },
     { label: "Materials + media", value: data.scale.materialIntensity, color: "#0f8f83" },
-    { label: "Labor", value: data.scale.laborCost, color: "#d7a229" },
+    { label: "Labor", value: data.scale.laborCost, color: "#7b8a84" },
     { label: "QA/QC validation", value: data.scale.qaCost, color: "#8a6f3d" },
     { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#257c88" },
   ];

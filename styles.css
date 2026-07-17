@@ -5,37 +5,37 @@
   --ink: #15181d;
   --muted: #5e6775;
   --quiet: #8c95a1;
-  --line: #d4d8df;
-  --line-strong: #aeb5c1;
-  --panel: #f6f5f1;
-  --surface: #ebeae5;
-  --surface-2: #deded7;
+  --line: #c9d2d8;
+  --line-strong: #9dacb4;
+  --panel: #f4f7f6;
+  --surface: #e8eeec;
+  --surface-2: #d8e2df;
   --shell: #0b1828;
   --shell-2: #122234;
   --steel: #26313f;
   --navy: #0b1828;
   --navy-2: #142638;
   --navy-3: #24384a;
-  --teal: #9f241c;
-  --teal-soft: #ead5cf;
-  --green: #476b58;
-  --cyan: #8f3328;
-  --amber: #a66a18;
-  --gold: #c08a2d;
-  --red: #a72b22;
-  --red-deep: #681a16;
-  --red-soft: #f0ded9;
+  --teal: #0f5a52;
+  --teal-soft: #d8e8e4;
+  --green: #214c43;
+  --cyan: #275f6b;
+  --amber: #596a64;
+  --gold: #7b8a84;
+  --red: #173f37;
+  --red-deep: #092923;
+  --red-soft: #dfe9e6;
   --shadow: 0 18px 44px rgba(18, 34, 52, 0.11);
   --glass: rgba(247, 247, 244, 0.92);
   --glass-strong: rgba(250, 250, 247, 0.98);
   --deep-panel: #102033;
   --deep-panel-2: #182b40;
-  --enterprise-blue: #9f241c;
-  --radius-xs: 10px;
-  --radius-sm: 14px;
-  --radius-md: 18px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
+  --enterprise-blue: #173f37;
+  --radius-xs: 14px;
+  --radius-sm: 18px;
+  --radius-md: 24px;
+  --radius-lg: 32px;
+  --radius-xl: 42px;
   --ui-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --display-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-family: var(--ui-font);
@@ -3023,19 +3023,157 @@ body[data-active-view="flowsheet"] .actions {
   display: flex;
 }
 
-/* Premium rounded visual system: soft DeepTech surfaces with red/amber accents. */
+/* Final Axion CI pass: no warm red/orange UI, only deep navy, graphite, slate, and dark green. */
+:root {
+  --line: #c9d2d8;
+  --line-strong: #9dacb4;
+  --panel: #f4f7f6;
+  --surface: #e8eeec;
+  --surface-2: #d8e2df;
+  --teal: #0f5a52;
+  --teal-soft: #d8e8e4;
+  --green: #214c43;
+  --cyan: #275f6b;
+  --amber: #596a64;
+  --gold: #7b8a84;
+  --red: #173f37;
+  --red-deep: #092923;
+  --red-soft: #dfe9e6;
+  --enterprise-blue: #173f37;
+}
+
+.public-site,
+.login-gate {
+  background:
+    linear-gradient(rgba(218, 231, 235, 0.036) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(218, 231, 235, 0.036) 1px, transparent 1px),
+    radial-gradient(circle at 18% 10%, rgba(30, 82, 78, 0.22), transparent 34%),
+    radial-gradient(circle at 86% 16%, rgba(52, 69, 82, 0.22), transparent 30%),
+    linear-gradient(152deg, #061625 0%, #0b2032 48%, #102d38 74%, #173f37 100%);
+}
+
+:where(
+  .access-card,
+  .checkout-card,
+  .login-card,
+  .bento-card,
+  .public-detail-panel,
+  .case-study-map button,
+  .public-example-grid article,
+  .migration-grid article,
+  .platform-grid article,
+  .workflow-rail article,
+  .ecosystem-grid article,
+  .review-grid article,
+  .faq-grid article,
+  .pricing-grid article,
+  .control-group,
+  .canvas-frame,
+  .data-view,
+  .equations-view,
+  .simulation-view,
+  .standards-view,
+  .economics-view,
+  .schedule-panel,
+  .advanced-schedule-board,
+  .reports-grid article,
+  .profile-card,
+  .project-card,
+  .integration-card,
+  .invite-card,
+  .unit
+) {
+  border-radius: 26px;
+}
+
+:where(.tab, .tool, .action-button, .text-button, .danger-button, .icon-button, .login-button, .public-primary, .public-secondary, .schedule-export-actions button) {
+  border-radius: 999px;
+}
+
+:where(.template-button.active, .segmented button.active, .tab.active, .tool.active, .palette-groups button.active, .focus-toggle button.active, .suite-link.active),
+.action-button.primary,
+.login-button,
+.checkout-button,
+.custom-parameter-box button {
+  border-color: rgba(36, 92, 82, 0.62);
+  color: #fff;
+  background: linear-gradient(135deg, #245c52, #092923);
+  box-shadow: 0 16px 36px rgba(9, 41, 35, 0.22);
+}
+
+:where(.profile-actions [data-profile-logout], .danger-button) {
+  border-color: rgba(39, 95, 107, 0.48);
+  background: #173f37;
+}
+
+:where(.project-card.active, .integration-card.selected, .template-button.active) {
+  border-color: rgba(36, 92, 82, 0.42);
+  background: linear-gradient(180deg, rgba(216, 232, 228, 0.68), rgba(255, 255, 255, 0.96));
+}
+
+.schedule-row > i {
+  background:
+    linear-gradient(90deg,
+      transparent var(--start),
+      rgba(23, 63, 55, 0.94) var(--start),
+      rgba(23, 63, 55, 0.94) var(--process-end),
+      rgba(77, 96, 119, 0.85) var(--process-end),
+      rgba(77, 96, 119, 0.85) var(--transfer-end),
+      rgba(39, 95, 107, 0.84) var(--transfer-end),
+      rgba(39, 95, 107, 0.84) var(--bar-end),
+      transparent var(--bar-end)),
+    repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.055) 0 1px, transparent 1px 12.5%);
+}
+
+.legend-process {
+  background: #173f37;
+}
+
+.legend-transfer {
+  background: #4d606f;
+}
+
+.legend-clean {
+  background: #275f6b;
+}
+
+.schedule-export-actions button,
+.advanced-schedule-board header strong,
+.connector-payload-chips span,
+.release-strip span {
+  border-color: rgba(36, 92, 82, 0.22);
+  color: #123b35;
+  background: rgba(216, 232, 228, 0.68);
+}
+
+.advanced-schedule-row.critical {
+  border-color: rgba(39, 95, 107, 0.32);
+  box-shadow: inset 5px 0 0 rgba(23, 63, 55, 0.72);
+}
+
+.score-bar {
+  background:
+    linear-gradient(90deg, #173f37 var(--score), rgba(7, 17, 31, 0.09) var(--score)),
+    #eef0ed;
+}
+
+.unit {
+  border-left-color: #0f5a52;
+}
+
+/* Premium rounded visual system: deep blue, graphite, and dark green accents. */
 .public-site {
   background:
-    linear-gradient(rgba(232, 221, 214, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(232, 221, 214, 0.035) 1px, transparent 1px),
-    linear-gradient(152deg, #071a31 0%, #0c2139 44%, #132f4b 72%, #1b3b56 100%);
+    linear-gradient(rgba(218, 231, 235, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(218, 231, 235, 0.035) 1px, transparent 1px),
+    linear-gradient(152deg, #061625 0%, #0b2032 46%, #102d38 74%, #173f37 100%);
 }
 
 .login-gate {
   background:
-    radial-gradient(circle at 18% 12%, rgba(167, 43, 34, 0.22), transparent 34%),
-    radial-gradient(circle at 82% 20%, rgba(192, 138, 45, 0.13), transparent 30%),
-    linear-gradient(135deg, rgba(7, 26, 49, 0.98), rgba(13, 35, 60, 0.98));
+    radial-gradient(circle at 18% 12%, rgba(30, 82, 78, 0.28), transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(63, 82, 94, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(6, 22, 37, 0.985), rgba(12, 34, 49, 0.985));
 }
 
 :where(
@@ -3145,28 +3283,28 @@ body[data-active-view="flowsheet"] .actions {
 }
 
 :where(.template-button.active, .segmented button.active, .tab.active, .tool.active, .palette-groups button.active, .focus-toggle button.active, .suite-link.active) {
-  border-color: rgba(167, 43, 34, 0.55);
+  border-color: rgba(36, 92, 82, 0.58);
   color: #fff;
   background:
-    linear-gradient(135deg, rgba(167, 43, 34, 0.98), rgba(104, 26, 22, 0.98));
-  box-shadow: 0 10px 24px rgba(104, 26, 22, 0.2);
+    linear-gradient(135deg, rgba(36, 92, 82, 0.98), rgba(9, 41, 35, 0.98));
+  box-shadow: 0 12px 28px rgba(9, 41, 35, 0.2);
 }
 
 .action-button.primary,
 .login-button,
 .checkout-button,
 .custom-parameter-box button {
-  border-color: rgba(167, 43, 34, 0.65);
+  border-color: rgba(36, 92, 82, 0.68);
   color: #fff;
   background:
-    linear-gradient(135deg, #b73529, #681a16);
-  box-shadow: 0 14px 30px rgba(104, 26, 22, 0.18);
+    linear-gradient(135deg, #245c52, #092923);
+  box-shadow: 0 16px 34px rgba(9, 41, 35, 0.2);
 }
 
 .danger-button,
 .profile-actions [data-profile-logout] {
-  border-color: rgba(167, 43, 34, 0.55);
-  background: #8f241d;
+  border-color: rgba(23, 63, 55, 0.55);
+  background: #173f37;
 }
 
 .public-primary,
@@ -3179,8 +3317,8 @@ body[data-active-view="flowsheet"] .actions {
 .public-secondary:hover,
 .public-primary:hover,
 .public-nav nav button:hover {
-  border-color: rgba(192, 138, 45, 0.32);
-  background: rgba(192, 138, 45, 0.1);
+  border-color: rgba(93, 112, 119, 0.36);
+  background: rgba(36, 92, 82, 0.12);
 }
 
 .library-intro p,
@@ -3202,18 +3340,18 @@ input[type="range"] {
   background:
     linear-gradient(90deg,
       transparent var(--start),
-      rgba(167, 43, 34, 0.92) var(--start),
-      rgba(167, 43, 34, 0.92) var(--process-end),
+      rgba(23, 63, 55, 0.94) var(--start),
+      rgba(23, 63, 55, 0.94) var(--process-end),
       rgba(87, 96, 111, 0.82) var(--process-end),
       rgba(87, 96, 111, 0.82) var(--transfer-end),
-      rgba(192, 138, 45, 0.84) var(--transfer-end),
-      rgba(192, 138, 45, 0.84) var(--bar-end),
+      rgba(39, 95, 107, 0.84) var(--transfer-end),
+      rgba(39, 95, 107, 0.84) var(--bar-end),
       transparent var(--bar-end)),
     repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.055) 0 1px, transparent 1px 12.5%);
 }
 
 .legend-process {
-  background: rgba(167, 43, 34, 0.92);
+  background: rgba(23, 63, 55, 0.94);
 }
 
 .legend-transfer {
@@ -3221,7 +3359,7 @@ input[type="range"] {
 }
 
 .legend-clean {
-  background: rgba(192, 138, 45, 0.84);
+  background: rgba(39, 95, 107, 0.84);
 }
 
 .score-bar {
@@ -3264,7 +3402,7 @@ input[type="range"] {
 }
 
 .danger-button {
-  border-color: rgba(183, 77, 69, 0.35);
+  border-color: rgba(39, 95, 107, 0.35);
   color: #fff;
   background: var(--red);
 }
@@ -3823,7 +3961,7 @@ input[type="range"] {
 }
 
 .legend-waste::before {
-  background: linear-gradient(90deg, #c04f47, #d7a229);
+  background: linear-gradient(90deg, #275f6b, #7b8a84);
 }
 
 .legend-qc::before {
@@ -3856,7 +3994,7 @@ input[type="range"] {
 }
 
 .role-heat::before {
-  background: #bc6c25;
+  background: #596a64;
 }
 
 .equation-spotlight {
@@ -3993,7 +4131,7 @@ input[type="range"] {
 }
 
 .lane-cleaning {
-  background: linear-gradient(90deg, rgba(183, 77, 69, 0.1), rgba(188, 108, 37, 0.08));
+  background: linear-gradient(90deg, rgba(39, 95, 107, 0.10), rgba(83, 102, 111, 0.08));
 }
 
 .lane-quality {
@@ -4114,7 +4252,7 @@ input[type="range"] {
 }
 
 .unit-layer-cleaning {
-  border-color: rgba(183, 77, 69, 0.42);
+  border-color: rgba(39, 95, 107, 0.42);
   background: linear-gradient(180deg, rgba(255, 249, 248, 0.96), rgba(240, 229, 229, 0.92));
 }
 
@@ -4124,7 +4262,7 @@ input[type="range"] {
 }
 
 .unit-layer-heat {
-  border-color: rgba(188, 108, 37, 0.42);
+  border-color: rgba(83, 102, 111, 0.42);
   background: linear-gradient(180deg, rgba(255, 249, 240, 0.96), rgba(240, 230, 216, 0.92));
 }
 
@@ -4258,7 +4396,7 @@ input[type="range"] {
 
 .unit-thermal,
 .unit-recovery {
-  border-top: 3px solid #bc6c25;
+  border-top: 3px solid #596a64;
 }
 
 .unit-quality,
@@ -4276,7 +4414,7 @@ input[type="range"] {
 }
 
 .unit-air-pollution {
-  border-top: 3px solid #bc6c25;
+  border-top: 3px solid #596a64;
 }
 
 .unit h3,
@@ -4339,8 +4477,8 @@ input[type="range"] {
 
 .unit-layer-cleaning .unit-role {
   color: #8f2f2a;
-  border-color: rgba(183, 77, 69, 0.28);
-  background: rgba(183, 77, 69, 0.1);
+  border-color: rgba(39, 95, 107, 0.28);
+  background: rgba(39, 95, 107, 0.10);
 }
 
 .unit-layer-recycle .unit-role {
@@ -4351,8 +4489,8 @@ input[type="range"] {
 
 .unit-layer-heat .unit-role {
   color: #7a4619;
-  border-color: rgba(188, 108, 37, 0.3);
-  background: rgba(188, 108, 37, 0.12);
+  border-color: rgba(83, 102, 111, 0.30);
+  background: rgba(83, 102, 111, 0.12);
 }
 
 .unit p,
@@ -4475,7 +4613,7 @@ input[type="range"] {
   background:
     radial-gradient(circle, rgba(255, 255, 255, 0.85) 0 2px, transparent 3px),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.65) 0 9px, transparent 9px 22px),
-    linear-gradient(90deg, #c04f47, #d7a229);
+    linear-gradient(90deg, #275f6b, #7b8a84);
 }
 
 .stream-qc {
@@ -4504,7 +4642,7 @@ input[type="range"] {
 }
 
 .stream-waste::after {
-  border-left-color: #d7a229;
+  border-left-color: #7b8a84;
 }
 
 .stream-qc::after {
@@ -4984,11 +5122,11 @@ dd {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(167, 43, 34, 0.18);
+  border: 1px solid rgba(36, 92, 82, 0.18);
   border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 245, 241, 0.92)),
-    radial-gradient(circle at 86% 0%, rgba(192, 138, 45, 0.12), transparent 38%);
+    radial-gradient(circle at 86% 0%, rgba(39, 95, 107, 0.12), transparent 38%);
 }
 
 .connector-workbench-head {
@@ -5029,7 +5167,7 @@ dd {
 .connector-payload-chips span {
   min-height: 26px;
   padding: 6px 9px;
-  border: 1px solid rgba(167, 43, 34, 0.14);
+  border: 1px solid rgba(36, 92, 82, 0.14);
   border-radius: 999px;
   color: #5d302b;
   background: rgba(240, 222, 217, 0.46);
@@ -5088,7 +5226,7 @@ dd {
 
 .connector-check.warn,
 .connector-check.hold {
-  border-color: rgba(192, 138, 45, 0.28);
+  border-color: rgba(83, 102, 111, 0.28);
   background: rgba(255, 249, 235, 0.82);
 }
 
@@ -5498,8 +5636,8 @@ dd {
 .plant-area-main b { background: #0f8f83; }
 .plant-area-cleaning b { background: #2f7b69; }
 .plant-area-recycle b { background: #00a88f; }
-.plant-area-heat b { background: #d7a229; }
-.plant-area-waste b { background: #c04f47; }
+.plant-area-heat b { background: #7b8a84; }
+.plant-area-waste b { background: #275f6b; }
 .plant-area-quality b { background: #8a6f3d; }
 
 .plant-area span,
@@ -7198,7 +7336,7 @@ th {
 }
 
 .boundary-caution {
-  border-left-color: #d7a229;
+  border-left-color: #7b8a84;
   background: linear-gradient(180deg, #fff, #fffaf0);
 }
 
@@ -7207,7 +7345,7 @@ th {
 }
 
 .boundary-critical {
-  border-left-color: #c04f47;
+  border-left-color: #275f6b;
   background: linear-gradient(180deg, #fff, #fff7f6);
 }
 
@@ -7296,7 +7434,7 @@ th {
   height: 10px;
   max-width: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #0f8f83, #d7a229);
+  background: linear-gradient(90deg, #0f8f83, #7b8a84);
 }
 
 .viz-row em {
@@ -7513,8 +7651,8 @@ th {
       rgba(0, 168, 143, 0.9) var(--process-end),
       rgba(77, 96, 119, 0.85) var(--process-end),
       rgba(77, 96, 119, 0.85) var(--transfer-end),
-      rgba(183, 77, 69, 0.82) var(--transfer-end),
-      rgba(183, 77, 69, 0.82) var(--bar-end),
+      rgba(39, 95, 107, 0.82) var(--transfer-end),
+      rgba(39, 95, 107, 0.82) var(--bar-end),
       transparent var(--bar-end)),
     repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.06) 0 1px, transparent 1px 12.5%);
 }
@@ -7522,7 +7660,7 @@ th {
 .schedule-row[data-schedule-status="hold violation"] > i,
 .schedule-row[data-schedule-status="line wait"] > i,
 .schedule-row[data-schedule-status="CIP wait"] > i {
-  box-shadow: 0 0 0 2px rgba(183, 77, 69, 0.22);
+  box-shadow: 0 0 0 2px rgba(39, 95, 107, 0.22);
 }
 
 .schedule-legend {
@@ -7555,7 +7693,7 @@ th {
 }
 
 .legend-clean {
-  background: rgba(183, 77, 69, 0.82);
+  background: rgba(39, 95, 107, 0.82);
 }
 
 .schedule-export-actions {
@@ -7567,11 +7705,11 @@ th {
 
 .schedule-export-actions button {
   min-height: 34px;
-  border: 1px solid rgba(167, 43, 34, 0.22);
+  border: 1px solid rgba(36, 92, 82, 0.24);
   border-radius: 999px;
   padding: 0 12px;
-  color: #681a16;
-  background: rgba(240, 222, 217, 0.42);
+  color: #123b35;
+  background: rgba(216, 232, 228, 0.58);
   font-size: 11px;
   font-weight: 900;
 }
@@ -7584,8 +7722,8 @@ th {
   border: 1px solid rgba(31, 42, 58, 0.14);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 246, 242, 0.94)),
-    radial-gradient(circle at 92% 0%, rgba(192, 138, 45, 0.1), transparent 40%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(244, 247, 246, 0.94)),
+    radial-gradient(circle at 92% 0%, rgba(39, 95, 107, 0.1), transparent 40%);
   box-shadow: 0 12px 30px rgba(7, 17, 31, 0.08);
 }
 
@@ -7614,8 +7752,8 @@ th {
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 7px 10px;
-  color: #5d302b;
-  background: rgba(240, 222, 217, 0.58);
+  color: #123b35;
+  background: rgba(216, 232, 228, 0.72);
   font-size: 11px;
 }
 
@@ -7663,13 +7801,13 @@ th {
 }
 
 .advanced-schedule-row:hover {
-  border-color: rgba(167, 43, 34, 0.28);
+  border-color: rgba(36, 92, 82, 0.28);
   background: rgba(240, 222, 217, 0.18);
 }
 
 .advanced-schedule-row.critical {
-  border-color: rgba(167, 43, 34, 0.32);
-  box-shadow: inset 4px 0 0 rgba(167, 43, 34, 0.72);
+  border-color: rgba(36, 92, 82, 0.32);
+  box-shadow: inset 4px 0 0 rgba(23, 63, 55, 0.72);
 }
 
 .advanced-schedule-row span {
@@ -7703,7 +7841,7 @@ th {
 }
 
 .release-strip span.review {
-  border-color: rgba(192, 138, 45, 0.3);
+  border-color: rgba(83, 102, 111, 0.30);
   background: rgba(255, 249, 235, 0.82);
 }
 
