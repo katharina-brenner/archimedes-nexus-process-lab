@@ -54,7 +54,7 @@ The paywall is backend-enforced. Do not use a static GitHub Pages deployment for
 
 1. Copy `.env.example` to `.env`.
 2. Set `SESSION_SECRET` to a long private random string.
-3. Set `AXION_PRICE_CENTS=72500` and `AXION_CURRENCY=EUR`.
+3. Set `AXION_PRICE_CENTS=240000` and `AXION_CURRENCY=EUR` for the Professional Individual annual licence.
 4. Create a Stripe product/price for the annual Axion license, or let the backend create a one-off checkout price from `AXION_PRICE_CENTS`.
 5. Set `STRIPE_SECRET_KEY`.
 6. Optional but recommended: set `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET`.
@@ -85,10 +85,14 @@ The response contains the activated license key. The user can then log in with t
 
 `KBrenner/kbrenner` and `MAhmed/mahmed` are seeded as payment-exempt internal users and do not need payment.
 
+## Market intelligence notes
+
+The public site includes legacy-simulator migration positioning, target-account segments, buying-center roles, and licence-benchmark caveats. Treat those as market intelligence: public client lists are partial, individual customer contract values are not public, and private contact details should not be used. The recommended wedge is a representative migration pilot: reconstruct or import one existing process from legitimate customer-owned exports, validate mass balance and economics, then demonstrate collaboration, versioning, LCA/TEA exports, API handoffs, and scenario review in the browser.
+
 ## Backend API
 
 - `GET /api/product` lists product and backend configuration
-- `POST /api/checkout` creates a Stripe Checkout session for the 725 EUR license
+- `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR Professional Individual annual licence
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
 - `POST /api/stripe/webhook` receives Stripe checkout payment events and activates paid orders
 - `POST /api/auth/login` logs in the owner workspace
@@ -113,7 +117,7 @@ The response contains the activated license key. The user can then log in with t
 - Process templates for cultured meat, penicillin, monoclonal antibody, industrial fermentation, recombinant insulin, viral vaccine, plasmid DNA, autologous cell therapy, small-molecule API, biohydrogen dark-fermentation, industrial wastewater, water purification, and air pollution control
 - Natural-language product brief that chooses the process model automatically, so users do not have to manually choose between template families
 - Project workspace with multi-user backend accounts, per-user projects, active model files, archived old model versions, project restore, and invite-by-email/username collaboration records
-- API connector registry for SuperPro Designer, Aspen, COMSOL, STAR-CCM+, OPC UA/SCADA, AVEVA PI/OSIsoft PI, Benchling, and generic LIMS/ELN handoff targets
+- API connector registry for legacy process-simulator exports, Aspen, COMSOL, STAR-CCM+, OPC UA/SCADA, AVEVA PI/OSIsoft PI, Benchling, and generic LIMS/ELN handoff targets
 - Data upload capture for project briefs, including file metadata and short previews for CSV, text, JSON, and other attached data
 - Persistent help dock for natural-language troubleshooting inside the tool
 - Twin OS workspace for clickable factory-to-cell-model navigation, live-data connector mapping, process-version comparison, SOP/literature attachment, and AI-assisted process variants
@@ -127,7 +131,7 @@ The response contains the activated license key. The user can then log in with t
 - Interactive CFD workbench with a more technical bioreactor vessel section, liquid level, shaft, motor, baffles, DO/pH probes, dual impellers, axial/radial circulation loops, gas plume, sparger ring, feed zone, 12x12 oxygen/nutrient/shear screening map, hotspot counts, mixing time, tip speed, gas hold-up, OTR margin, dead-zone proxy, live telemetry, and suggested engineering edits
 - gPROMS-style advanced modelling scaffold for equation-oriented plant models, parameter estimation, dynamic optimization, uncertainty/design-space analysis, soft sensors, online digital twins, utility optimization, and sustainability optimization
 - Finite-capacity campaign scheduler with editable active/skip flags, route branches, visual branch/merge topology, automatic route optimizer, predecessor dependencies, recipe timing, setup/process/CIP windows, parallel equipment pools, shared CIP/SIP skid constraints, equipment occupancy, hold-time warnings, QC release queue, bottleneck resources, route comparison, and downloadable recipe/schedule/resource/route/topology/optimizer CSV files
-- SuperPro-style simulation functions from the referenced thesis and v12 manual: chemical/component register, stock mixtures, bulk/discrete streams, stream drawing and classification, procedures/operations, batch-vs-continuous mode, resource tracking, scheduling/Gantt concepts, feedback regulation, recycle loops, tear-stream convergence, breakpoints, throughput scale-up, debottlenecking, emissions, reports, databanks, and economic evaluation
+- Professional process-simulation functions from the referenced thesis and process-modelling requirements: chemical/component register, stock mixtures, bulk/discrete streams, stream drawing and classification, procedures/operations, batch-vs-continuous mode, resource tracking, scheduling/Gantt concepts, feedback regulation, recycle loops, tear-stream convergence, breakpoints, throughput scale-up, debottlenecking, emissions, reports, databanks, and economic evaluation
 - Major remaining manual areas represented as model modules: cleaning-agent stream classification, CIP/SIP auxiliary occupancy, material inventory/storage charts, heat-transfer-agent tracking, heat reuse, condensate return, solvent and water recycle with purge, power demand/generation, labor requirement tables, process explorer/overview navigator, stream summary tables, physical-state and density toolboxes, pre-simulation checks, partition/sequencing/back-propagation, error/status output, visual annotation objects, Excel/OLE exchange concepts, report sets, database import/export/access control, currency/consumable/material/site databanks, process-library search, and emission limit checks
 - Biohydrogen-specific functions including potato-peel pre-treatment, enzymatic liquefaction/saccharification, rotary vacuum filtration, dark fermentation, anaerobic digestion, CO2 absorption/desorption, solvent recycle, osmotic inhibition, H2 inhibition, and CSTR washout checks
 - Live batch volume, annual batch, titer, recovery, production, utilization, utility, and non-linear direct-cost estimates

@@ -481,6 +481,14 @@ const processParameters = [
   { key: "learningRate", label: "Learning rate", unit: "%", min: 0, max: 45, step: 1, value: 18 },
   { key: "automationLevel", label: "Automation level", unit: "%", min: 0, max: 95, step: 1, value: 62 },
   { key: "facilityPremium", label: "Facility premium", unit: "%", min: 0, max: 120, step: 1, value: 35 },
+  { key: "mediaCostPerL", label: "Media cost", unit: "$/L", min: 0.1, max: 500, step: 0.1, value: 42 },
+  { key: "feedSupplementCostPerL", label: "Feed/supplement cost", unit: "$/L", min: 0, max: 1200, step: 1, value: 160 },
+  { key: "bufferCostPerL", label: "Buffer cost", unit: "$/L", min: 0.05, max: 80, step: 0.05, value: 3.2 },
+  { key: "resinCostPerL", label: "Resin cost", unit: "$/L resin", min: 50, max: 25000, step: 50, value: 9500 },
+  { key: "singleUseCostPerL", label: "Single-use cost", unit: "$/L batch", min: 0, max: 120, step: 0.1, value: 7.5 },
+  { key: "qcConsumableCost", label: "QC consumables", unit: "$/batch", min: 0, max: 250000, step: 100, value: 28000 },
+  { key: "materialLossFactor", label: "Material loss factor", unit: "%", min: 0, max: 120, step: 1, value: 18 },
+  { key: "coldChainMaterialFactor", label: "Cold-chain material", unit: "%", min: 0, max: 80, step: 1, value: 12 },
   { key: "annualOperatingTime", label: "AOT available", unit: "h/yr", min: 2000, max: 8760, step: 10, value: 7920 },
   { key: "setupTime", label: "Setup time", unit: "h/batch", min: 0, max: 48, step: 0.5, value: 4 },
   { key: "turnaroundTime", label: "Turnaround time", unit: "h/batch", min: 0, max: 72, step: 0.5, value: 8 },
@@ -1561,6 +1569,11 @@ const equations = [
   eq("Line occupancy", "economics", "occupancy = required_hours / available_hours", "Facility or line capacity utilization."),
   eq("Campaign output", "economics", "M_campaign = M_batch * batches_per_campaign * success_rate", "Expected campaign output including success probability."),
   eq("Raw material cost", "economics", "C_raw = sum(m_i * price_i / purity_i)", "Raw material cost corrected for purity."),
+  eq("Media cost", "economics", "C_media = V_media * price_media * purchasing_factor * loss_factor", "Cell-culture or fermentation medium cost from annual media volume, media unit price, purchasing power, and material loss."),
+  eq("Feed and supplement cost", "economics", "C_feed = V_broth * feed_rate * price_feed * supplement_factor", "Feeds, growth factors, amino acids, cytokines, glucose, antifoam, and other supplements can dominate bioprocess OPEX."),
+  eq("Consumables cost", "economics", "C_consumables = V_batch * N_batches * price_single_use + C_filters + C_membranes", "Single-use bags, tubing, sterile connectors, filters, membranes, and assemblies scale with batch volume and unit count."),
+  eq("Resin amortization", "economics", "C_resin,yr = V_resin * price_resin * cycles_used / resin_lifetime_cycles", "Chromatography resin annual burden from resin volume, resin price, and reuse lifetime."),
+  eq("Material inventory burden", "economics", "C_inventory = C_materials * inventory_days / 365 * carrying_rate", "Inventory, cold-chain, expiry, supplier qualification, and safety stock burden for high-value materials."),
   eq("Utility cost", "economics", "C_util = steam*price_steam + chilled_water*price_cw + electricity*price_kWh", "Combined utility operating cost."),
   eq("Waste treatment cost", "economics", "C_waste = V_liquid*price_liquid + m_solid*price_solid + biohazard_factor", "Waste cost estimate including hazardous or bioactive factor."),
   eq("Labor cost", "economics", "C_labor = operators * hours * loaded_rate", "Direct labor cost for a batch or campaign."),
@@ -1571,7 +1584,7 @@ const equations = [
   eq("E-factor", "economics", "E_factor = mass_waste / mass_product", "Waste intensity metric."),
   eq("Water intensity", "economics", "WI = water_used / kg_product", "Water use per product mass."),
   eq("Carbon intensity", "economics", "CI = sum(activity_i * emission_factor_i) / kg_product", "Scope-relevant process carbon intensity estimate."),
-  eq("SPD kinetic productivity", "kinetics", "q_C = (alpha*mu_max*S1*S2*S3 + beta) * X", "SuperPro-style volumetric productivity for kinetic fermentation with up to three multiplicative growth or inhibition terms."),
+  eq("Kinetic productivity", "kinetics", "q_C = (alpha*mu_max*S1*S2*S3 + beta) * X", "Volumetric productivity for kinetic fermentation with up to three multiplicative growth or inhibition terms."),
   eq("Luedeking-Piret product", "kinetics", "q_P = alpha*dX/dt + beta*X", "Growth-associated and non-growth-associated product formation used to represent product rather than biomass formation."),
   eq("Critical osmolarity inhibition", "kinetics", "I_osm = 1 - (OSM / OSM_crit)^n_osm", "Dark-fermentation osmotic inhibition from acetate, lactate, glucose, and other dissolved species."),
   eq("Hydrogen inhibition", "kinetics", "I_H2 = 1 - (H2_aq / H2_aq,crit)^n_H2", "Dissolved hydrogen inhibition term for C. saccharolyticus dark fermentation."),
@@ -1580,7 +1593,7 @@ const equations = [
   eq("First order formation", "kinetics", "r_P = k * C_reference", "Simplified product formation used when full product or by-product inhibition cannot be modeled."),
   eq("Zeroth order formation", "kinetics", "r_P = k", "Constant product formation independent of concentration."),
   eq("CSTR dilution", "mass", "D = F / V", "Continuous stirred-tank dilution rate from volumetric feed and reactor volume."),
-  eq("CSTR washout check", "mass", "washout risk if D >= mu", "Continuous fermentation wash-out condition highlighted as a SuperPro limitation in the thesis."),
+  eq("CSTR washout check", "mass", "washout risk if D >= mu", "Continuous fermentation wash-out condition for dilution-rate and growth-rate screening."),
   eq("Tear stream convergence", "mass", "epsilon = abs(F_n - F_(n-1)) / F_n", "Recycle-loop convergence error checked over successive tear-stream iterations."),
   eq("Recycle purge", "mass", "F_purge = F_recycle * (1 - recycle_fraction)", "Purge needed to avoid accumulation in a continuous recycle loop."),
   eq("Regulated dilution stream", "mass", "F_water = F_syrup * (C_syrup/C_target - 1)", "Feedback-regulated water addition to achieve a target substrate concentration."),
@@ -1589,7 +1602,7 @@ const equations = [
   eq("Absorption removal", "separation", "CO2_out = CO2_in * (1 - eta_abs)", "Simplified CO2 absorption removal model for DEA gas upgrading."),
   eq("Solvent regeneration", "energy", "Q_regen = m_solvent * Cp * DeltaT + m_CO2 * DeltaH_des", "Desorption/regeneration duty estimate for a CO2-rich solvent stream."),
   eq("Adjusted absorption cost", "economics", "OC_adjusted = OC_fermentation * (1 + absorption_factor)", "Thesis-style adjustment when absorption cannot be modeled accurately in the simulator."),
-  eq("Process throughput scale-up", "economics", "scale_factor = target_MP_rate / current_MP_rate", "SuperPro Adjust Process Throughput analogue for scaling flows and parallel unit counts."),
+  eq("Process throughput scale-up", "economics", "scale_factor = target_MP_rate / current_MP_rate", "Throughput target scaling for flows, equipment capacity, and parallel unit counts."),
   eq("Parallel unit count", "economics", "N_parallel = ceil(required_capacity / unit_capacity)", "Automatic invisible parallel-unit sizing behavior described for bottleneck equipment."),
   eq("Gross margin", "economics", "gross_margin = (revenue - operating_cost) / revenue", "Economic Evaluation report profitability metric."),
   eq("Unit production cost", "economics", "UPC = annual_operating_cost / annual_main_product", "Cost basis used in the thesis economic evaluation reports."),
@@ -1684,7 +1697,7 @@ const spdFunctions = [
   { group: "Batch", name: "PULL OUT", status: "Implemented", inputs: "Downstream demand or operation criterion", output: "Demand-driven outlet transfer", note: "Represents downstream-listening transfer behavior described in Appendix VII." },
   { group: "Batch", name: "STORE / GRIND / HEAT / HEAT EXCHANGE / FILTER / CIP", status: "Implemented", inputs: "Duration, energy source, split coefficients, labor, scheduling", output: "Unit operation sequence and cost/schedule impact", note: "Included as batch-operation cards and equipment units such as grinder, heat exchanger, rotary vacuum filter, and CIP." },
   { group: "Fermentation", name: "Stoichiometric reaction", status: "Implemented", inputs: "Balanced mass or molar coefficients, reaction time", output: "Linear conversion across residence time", note: "The PDF recommends mass balancing where biomass is treated as an approximate pseudo-component." },
-  { group: "Fermentation", name: "Kinetic fermentation", status: "Implemented", inputs: "mu max, alpha, beta, biomass, S1/S2/S3 terms", output: "Volumetric productivity", note: "Adds the SuperPro kinetic productivity equation and Luedeking-Piret product formation." },
+  { group: "Fermentation", name: "Kinetic fermentation", status: "Implemented", inputs: "mu max, alpha, beta, biomass, S1/S2/S3 terms", output: "Volumetric productivity", note: "Adds kinetic productivity and Luedeking-Piret product formation." },
   { group: "Fermentation", name: "Dark fermentation inhibition", status: "Implemented", inputs: "Glucose, osmolarity, dissolved H2, critical inhibition terms", output: "DF growth/productivity warning model", note: "Adds osmolarity and hydrogen inhibition from the thesis, plus CSTR washout checking." },
   { group: "Continuous", name: "Feedback regulatory system", status: "Implemented", inputs: "Target concentration, water feed, syrup feed", output: "Adjusted dilution stream", note: "Modeled as the feedback regulator unit and dilution equation for syrup-water concentration control." },
   { group: "Continuous", name: "Recycle loop and tear stream", status: "Implemented", inputs: "Recycle fraction, purge, max iterations, tolerance", output: "Convergence status and tear-stream marker", note: "Includes splitter, tear-stream marker, convergence equation, and purge balance." },
@@ -1692,7 +1705,7 @@ const spdFunctions = [
   { group: "Troubleshooting", name: "Unit-operation equation lookup", status: "Implemented", inputs: "Selected unit or stream", output: "Relevant equation spotlight", note: "The canvas equation spotlight changes with selected equipment or stream and links into the full equation library." },
   { group: "Scale-up", name: "Process throughput target", status: "Implemented", inputs: "Target main-product rate", output: "Scale factor and parallel unit count", note: "Implements the Adjust Process Throughput idea from the PDF and shows parallel unit sizing equations." },
   { group: "Economics", name: "Economic evaluation report", status: "Implemented", inputs: "Capital, operating cost, revenues, waste handling, absorption adjustment", output: "COGS, gross margin, ROI-like indicators", note: "Adds thesis-style operating-cost adjustment, unit production cost, gross margin, and revenue/cost stream classification." },
-  { group: "Gas upgrading", name: "Absorption and desorption", status: "Implemented", inputs: "CO2 removal, DEA solvent recycle, regeneration duty", output: "Product gas and solvent loop estimate", note: "Adds absorber/desorber equipment and simplified CO2 absorption/regeneration functions because the thesis noted SPD limitations for reactive absorption." },
+  { group: "Gas upgrading", name: "Absorption and desorption", status: "Implemented", inputs: "CO2 removal, DEA solvent recycle, regeneration duty", output: "Product gas and solvent loop estimate", note: "Adds absorber/desorber equipment and simplified CO2 absorption/regeneration functions for reactive absorption screening." },
   { group: "Reporting", name: "Batch sheet / dynamic profiles", status: "Implemented", inputs: "Operation sequence, time profile, temperature/concentration records", output: "Checklist-style batch record and time-series assumptions", note: "Represented by operation-sequence cards and profile-related equations; exported in JSON with scenario data." },
   { group: "Components", name: "Pure component databank", status: "Implemented", inputs: "Name, formula, MW, density, vapor pressure, heat capacity, economics", output: "Registered component property set", note: "Manual chapter 3 coverage: component registration, missing-property flags, DIPPR/PPDS-style property sources, and economics fields." },
   { group: "Components", name: "Stock mixture databank", status: "Implemented", inputs: "Mixture composition, dry mass options, pollutant categories", output: "Reusable material or feedstock mixture", note: "Supports foods, plant materials, wastewater feeds, raw substrates, and undefined process mixtures." },
@@ -1736,7 +1749,7 @@ const spdFunctions = [
   { group: "Simulation", name: "Error output and status indicators", status: "Implemented", inputs: "Filtering threshold, breakpoint visibility, status indicators, simulation speed", output: "Troubleshooting signal set", note: "Manual chapter 8 coverage for error output windows, filtering, breakpoints, and procedure status indicators." },
   { group: "Economics", name: "Cash-flow and financing analysis", status: "Implemented", inputs: "Working capital, depreciation, tax, discount rate, debt/loan, royalties, credits", output: "NPV, ROI, IRR, payback, taxable income, and cash-flow assumptions", note: "Extends economics to the manual's cash-flow report and profitability-analysis concepts." },
   { group: "Economics", name: "Currency and cost-reporting options", status: "Implemented", inputs: "Currency, exchange rate, reporting basis, unit reference flow", output: "Currency-aware economic reporting assumptions", note: "Manual chapter 9 coverage for currency and reporting of economic figures." },
-  { group: "Reports", name: "Full SuperPro report set", status: "Implemented", inputs: "SR, EER, CFR, ICR, THR, EIR, EMS, EPA, EQR, AUX, IDR, CSR, custom Excel", output: "Report-set checklist and export payload", note: "Adds remaining report names from manual chapter 12 including equipment, auxiliary, input data, cash flow, itemized cost, and CIP/SIP reports." },
+  { group: "Reports", name: "Full process-simulation report set", status: "Implemented", inputs: "SR, EER, CFR, ICR, THR, EIR, EMS, EPA, EQR, AUX, IDR, CSR, custom Excel", output: "Report-set checklist and export payload", note: "Adds report coverage including equipment, auxiliary, input data, cash flow, itemized cost, and CIP/SIP reports." },
   { group: "Visual Objects", name: "Flowsheet annotation objects", status: "Implemented", inputs: "Text, line, rectangle, ellipse, polyline, polygon, style defaults", output: "Documentation and mark-up layer", note: "Manual chapter 13 coverage for visual objects and their command/style concepts." },
   { group: "Exchange", name: "Excel hot-link and OLE model", status: "Implemented", inputs: "Tables, charts, flowsheet drawing, resource data, scheduling data, OLE server hooks", output: "External-data exchange model", note: "Manual chapter 14 coverage for exporting drawings/data, hot-linked Excel charts, OLE objects, and automation-server concepts." },
   { group: "Databanks", name: "Database import/export and access control", status: "Implemented", inputs: "User DB, system DB, password, import, export, upgrade, sync", output: "Databank governance model", note: "Adds manual chapter 15 coverage for database registration, import/export, older DB access, and password-protected access." },
@@ -1748,6 +1761,26 @@ const spdFunctions = [
   { group: "Energy", name: "Heat reuse and condensate return", status: "Implemented", inputs: "Hot stream, cold stream, heat transfer agent, condensate return, recovery efficiency", output: "Recovered duty and utility credit", note: "Adds heat-transfer-agent charts, heat recovery, reuse, and condensate return concepts." },
   { group: "Recycle", name: "Solvent and water recycle with purge", status: "Implemented", inputs: "Recycle split, purge split, solvent recovery, water reuse, tear stream", output: "Recycle loop, purge, and convergence model", note: "Covers recycle-loop convergence, preferred tear streams, solvent reuse, and water reuse/reject routing." },
   { group: "Resources", name: "Main vs support process role model", status: "Implemented", inputs: "Unit class, stream class, utilities, cleaning, recycle, heat, QC, waste", output: "Visible unit role badges and support infrastructure layer", note: "Makes the core process visually distinct from utilities, cleaning, resource, heat-reuse, recycle, waste, and QC/data elements." },
+  { group: "Cloud", name: "Browser-first workspace", status: "Implemented", inputs: "Browser session, project workspace, backend token, saved model", output: "No-install process modelling environment", note: "Positions Axion against desktop-only workflows: projects, models, downloads, auth, and collaboration are available from the hosted workspace." },
+  { group: "Collaboration", name: "Shared projects and invitations", status: "Implemented", inputs: "Username/email invite, role, project id", output: "Collaborator access record and in-app invite", note: "Supports project-specific collaboration through backend or local invite records." },
+  { group: "Collaboration", name: "Git-style model versions", status: "Implemented", inputs: "Saved project state, archived version, active model", output: "Versioned model history", note: "Old model versions are stored in project archives and can be restored for later editing." },
+  { group: "Collaboration", name: "Audit and review trail", status: "Implemented", inputs: "Login, checkout, project save, invite, restore", output: "Backend audit events and reviewable project metadata", note: "Provides the foundation for enterprise audit trails, approval states, and model-change review." },
+  { group: "API-first", name: "REST API and JSON process model", status: "Implemented", inputs: "Project, model, stream, equipment, report payloads", output: "Portable JSON model and API handoff", note: "Moves the architecture toward REST/JSON instead of desktop COM automation." },
+  { group: "API-first", name: "Python SDK and notebooks", status: "Planned connector", inputs: "Token, model id, parameter set, run id", output: "Notebook-driven sweeps, calibration, and report export", note: "The connector registry exposes a Python SDK target for future automation and scientific workflows." },
+  { group: "API-first", name: "Webhooks and event model", status: "Planned connector", inputs: "Project events, run events, license events", output: "External system notifications", note: "Prepared for project.created, model.versioned, run.completed, report.ready, invite.created, and license.activated webhooks." },
+  { group: "Compute", name: "Cloud batch runs", status: "Planned connector", inputs: "Run queue, scenario set, parameter grid", output: "Scenario-run package", note: "Prepared for running parameter sweeps and Monte Carlo cases without Excel add-ins or desktop scripts." },
+  { group: "Uncertainty", name: "Native sensitivity analysis", status: "Implemented", inputs: "Titer, recovery, media cost, utilities, CAPEX exponent, yield", output: "Dominant parameter and scenario-risk guidance", note: "Supports browser-native sensitivity reasoning for LCA/TEA and process-readiness decisions." },
+  { group: "Uncertainty", name: "Sobol-style global sensitivity roadmap", status: "Planned connector", inputs: "Parameter distributions, sampled model runs", output: "Global sensitivity ranking", note: "Prepared for rigorous uncertainty analysis and probabilistic model comparison." },
+  { group: "Uncertainty", name: "Probabilistic cost ranges", status: "Implemented", inputs: "Material prices, CAPEX exponent, facility burden, uncertainty assumptions", output: "Screening-level cost ranges and driver explanation", note: "Economics now exposes itemized materials and major COGS drivers for scenario-range discussion." },
+  { group: "Digital Twin", name: "Dynamic cell growth and metabolite profile", status: "Implemented", inputs: "Batch time, biomass, substrate, DO, lactate, ammonium, heat load", output: "Time-resolved dynamic profile", note: "Provides the first dynamic layer beyond static batch balances." },
+  { group: "Digital Twin", name: "Live data and historian mapping", status: "Planned connector", inputs: "OPC UA, PI tags, SCADA tags, batch records", output: "Model variable calibration and live envelope comparison", note: "The connector registry maps DO, pH, temperature, airflow, agitation, feeds, pressure, and batch state to model variables." },
+  { group: "Digital Twin", name: "Soft sensors and anomaly checks", status: "Planned connector", inputs: "PAT, Raman, capacitance, process tags, model prediction", output: "Online prediction and deviation warning", note: "Prepared for model-based soft sensors, anomaly detection, and eventually model predictive control." },
+  { group: "Vertical models", name: "Cultivated meat template", status: "Implemented", inputs: "Media prep, seed train, perfusion/cell retention, harvest, wash, formulation, packaging", output: "Food-biotech scale-up model", note: "Captures media cost, oxygen transfer, ammonium/lactate, water reuse, wastewater, heat recovery, and food-grade operations." },
+  { group: "Vertical models", name: "Precision fermentation and enzymes", status: "Implemented", inputs: "Sterile media, aerobic fermentation, recovery, concentration, drying, utilities", output: "Industrial biotech and ingredient route", note: "Covers fermentation, downstream recovery, utilities, waste, route scheduling, and TEA/LCA outputs." },
+  { group: "Vertical models", name: "mAbs, vaccines, viral vectors, CGT", status: "Implemented", inputs: "Seed train, production, capture, viral safety, polishing, UF/DF, fill, QC release", output: "Biopharma platform route", note: "Targets high-demand biopharma platform processes plus advanced therapy variants." },
+  { group: "Economics", name: "Vendor quotes and regional cost indices", status: "Planned connector", inputs: "Supplier quote, region, inflation, equipment family, material BOM", output: "Updated CAPEX/OPEX basis", note: "Prepared for ERP/procurement links, regional cost indices, and quote-backed capital and material costs." },
+  { group: "Economics", name: "NPV, IRR, payback and break-even roadmap", status: "Planned module", inputs: "Revenue, COGS, CAPEX, depreciation, tax, ramp-up, utilization", output: "Investment-decision model", note: "Pricing research highlights transparent economics as a key differentiator; the current tool exposes COGS drivers and is ready for full cash-flow metrics." },
+  { group: "Migration", name: "Representative process reconstruction", status: "Implemented workflow", inputs: "Existing report, stream table, equipment list, assumptions", output: "Editable Axion model for side-by-side review", note: "The recommended migration offer is not to replace everything instantly, but to reconstruct one representative model and compare speed, collaboration, and transparency." },
 ];
 
 const twinWorkspace = {
@@ -1763,11 +1796,16 @@ const twinWorkspace = {
   modules: [
     { name: "Live collaboration", status: "Tool module", detail: "Shared process workspace with comments, assignments, presence, review states, and approval gates.", action: "Open overview", view: "overview" },
     { name: "Git-style process versions", status: "Tool module", detail: "Branches for alternative process variants, diff of equipment/streams/parameters, and merge-ready decisions.", action: "Export model", view: "reports" },
+    { name: "Browser-first workspace", status: "Core architecture", detail: "No desktop installation, no license-server thinking, and no local-only model file as the primary workflow.", action: "Open projects", view: "projects" },
+    { name: "REST API + Python SDK", status: "API-first layer", detail: "JSON model handoff, REST endpoints, Python automation, webhooks, cloud runs, parameter sweeps, and Monte Carlo scenario packages.", action: "Open projects", view: "projects" },
     { name: "Live data connectors", status: "Connector map", detail: "SCADA, OSIsoft PI, Historian, OPC UA, CSV uploads, sensor streams, and batch records.", action: "Open streams", view: "streams" },
+    { name: "Dynamic digital twin", status: "Model layer", detail: "Time-dependent cell growth, metabolites, oxygen, heat, calibration against experiment data, soft sensors, anomaly detection, and online prediction roadmap.", action: "Open simulation", view: "simulation" },
+    { name: "Uncertainty engine", status: "Decision layer", detail: "Native sensitivity analysis, probabilistic cost ranges, Sobol-style ranking roadmap, parameter fitting, and scenario comparison in the browser.", action: "Open economics", view: "economics" },
     { name: "Literature layer", status: "Tool module", detail: "Recommended papers, typical OUR, typical kLa, best practices, and source-backed unit assumptions.", action: "Open sources", view: "sources" },
     { name: "SOP and knowledge base", status: "Tool module", detail: "Attach SOPs, deviations, assumptions, validation notes, and experiment learnings to units and streams.", action: "Open recommendations", view: "recommendations" },
     { name: "AI Engineer", status: "Tool module", detail: "Natural-language prompts propose process variants such as media-cost reduction, oxygen-transfer fixes, or yield improvements.", action: "Ask help", view: "ai" },
     { name: "Equipment cost model", status: "Tool module", detail: "Equipment sizing, purchase curves, region, inflation, uncertainty, and validation burden as editable cost inputs.", action: "Open economics", view: "economics" },
+    { name: "Vertical industry templates", status: "Template layer", detail: "Cultivated meat, precision fermentation, mAbs, cell and gene therapy, viral vectors, enzymes, alternative proteins, media prep, utilities, and wastewater.", action: "Open start", view: "start" },
     { name: "Sustainability model", status: "Tool module", detail: "CO2, energy, water, waste, solvent recovery, heat reuse, and LCA-style indicators integrated with process flows.", action: "Open boundaries", view: "ai" },
   ],
   aiPrompts: [
@@ -1775,7 +1813,47 @@ const twinWorkspace = {
     "Find the highest-risk scale-up boundary in this bioreactor train.",
     "Create a lower-water-use version with CIP rinse recovery and heat reuse.",
     "Compare a stainless-steel 20,000 L train against parallel single-use 2,000 L trains.",
+    "Run a scenario comparison for titer, recovery, resin lifetime, media price, and plant utilization.",
+    "Prepare a legacy-simulator migration checklist for this process and highlight missing validation data.",
   ],
+};
+
+const marketIntelligence = {
+  caveats: [
+    "Public client lists are partial and do not prove current seat count, usage intensity, or exact contract value.",
+    "Named companies should not be linked to exact licence prices unless they publish that specific contract.",
+    "Use public business channels only: official websites, contact forms, conferences, and LinkedIn.",
+  ],
+  licenseBenchmarks: [
+    { label: "Desktop fixed licence", value: "about 7,000 USD/year", note: "Public benchmark from the provided research context; per computer, not an enterprise contract." },
+    { label: "Simulator + scheduling fixed", value: "about 11,000 USD/year", note: "Public benchmark from the provided research context; support and upgrades during licence term." },
+    { label: "Floating / site / corporate", value: "not public", note: "May involve discounts, multi-user terms, multi-year terms, site or corporate agreements." },
+    { label: "Axion professional individual", value: "2,400 EUR/year", note: "Positioned as entry to a browser workspace, not as a low-cost desktop clone." },
+  ],
+  targetWaves: [
+    { wave: "Wave 1", title: "Highest conversion probability", accounts: "Mosa Meat, Perfect Day, Remilk, UNIVERCELLS, Northway Biotech, PROCESSIUM, Pixon Engineering, MMR Consulting, Nexus PMG, VTU Engineering, smaller CDMOs, European precision-fermentation startups.", reason: "Shorter decision paths, visible scale-up and COGS pain, and strong need for facility modelling." },
+    { wave: "Wave 2", title: "Engineering multipliers", accounts: "NNE, PM Group, CRB, Pharmaplan/TTP/Triplan, Jacobs, Technip Energies, Wood, Tetra Pak.", reason: "One won engineering partner can apply the platform across many client processes." },
+    { wave: "Wave 3", title: "Enterprise after validation", accounts: "WuXi Biologics, Lonza, Thermo Fisher Scientific, Novo Nordisk, Roche, Pfizer, Sanofi, Novartis, Takeda, GSK.", reason: "Requires references, security documentation, enterprise access control, audit trails, and validation evidence." },
+  ],
+  buyerRoles: [
+    "Head/Director of Process Engineering",
+    "Director of Bioprocess Development",
+    "Head of MSAT",
+    "Director of Process Modeling and Simulation",
+    "Head of Techno-Economic Analysis",
+    "Digital Engineering Lead",
+    "Capital Projects / Conceptual Design Lead",
+    "Capacity Planning Lead",
+    "Cost of Goods Modeling Lead",
+    "Principal Process Engineer",
+    "Director of Manufacturing Strategy",
+    "Head of Process Systems Engineering",
+  ],
+  migrationOffer: {
+    title: "Representative process migration pilot",
+    detail: "Keep existing legitimate simulator work. Import or reconstruct one representative process from customer-owned exports, validate mass balance and economics, and show collaborative scenario evaluation in the browser.",
+    includes: ["Report/CSV/Excel import or reconstruction", "Mass-balance and economics validation", "Editable model with versions and comments", "LCA/TEA-ready exports and readiness-gap report"],
+  },
 };
 
 const routeOptions = [
@@ -1996,6 +2074,63 @@ function scaleProfile() {
   return { key: "commercial", label: "Commercial", fixedBurden: 1, qaMultiplier: 1, laborMultiplier: 1, purchasingPower: 0.86, automationCredit: 0.68 };
 }
 
+function templateMaterialProfile() {
+  const key = state.template;
+  if (key === "culturedMeat") return { media: 1.25, feed: 0.42, buffer: 0.7, resin: 0.05, singleUse: 1.25, gas: 1.2, qc: 0.9, note: "Cultured meat media and growth supplements dominate screening OPEX." };
+  if (key === "antibody") return { media: 1.05, feed: 0.34, buffer: 3.8, resin: 1.8, singleUse: 1.05, gas: 1.05, qc: 1.35, note: "mAb economics are strongly driven by cell-culture media, feeds, buffers, Protein A resin, filters, and QC release consumables." };
+  if (key === "penicillin") return { media: 0.46, feed: 0.18, buffer: 1.1, resin: 0.08, singleUse: 0.22, gas: 1.45, qc: 0.65, note: "Fermentation economics are driven by substrate, aeration, extraction chemicals, solvents, waste, and downstream recovery losses." };
+  if (key === "industrialFermentation") return { media: 0.42, feed: 0.14, buffer: 0.8, resin: 0.05, singleUse: 0.18, gas: 1.35, qc: 0.5, note: "Bulk fermentation has lower media unit prices but high throughput, utilities, and waste loads." };
+  if (key === "cellTherapy") return { media: 1.45, feed: 0.55, buffer: 2.6, resin: 0.2, singleUse: 3.8, gas: 0.9, qc: 4.5, note: "Cell therapy material cost is dominated by closed kits, cytokines, viral/vector-related consumables, QC, and release testing." };
+  return { media: 0.82, feed: 0.24, buffer: 1.6, resin: 0.45, singleUse: 0.72, gas: 1, qc: 1, note: "Material profile is a screening default; replace with a process-specific bill of materials." };
+}
+
+function materialCostBreakdown(data, profile, learningCredit) {
+  const p = state.params;
+  const materialProfile = templateMaterialProfile();
+  const batchVolumeL = Math.max(1, state.batchSize);
+  const batches = Math.max(1, state.batchCount);
+  const annualBrothL = batchVolumeL * batches;
+  const productKg = Math.max(0.001, data.annualKg);
+  const bioreactors = state.units.filter((item) => item.cls === "Bioreactor").length || 1;
+  const chromatographyUnits = state.units.filter((item) => ["Purification", "Viral safety"].includes(item.cls)).length;
+  const filtrationUnits = state.units.filter((item) => ["Filtration", "Concentration", "Solid-liquid"].includes(item.cls)).length;
+  const cleaningUnits = state.units.filter((item) => ["Sterilization", "Utilities"].includes(item.cls)).length;
+  const lossFactor = 1 + (p.materialLossFactor || 0) / 100 + (1 - data.processYield) * 0.65;
+  const coldChainFactor = 1 + (p.coldChainMaterialFactor || 0) / 100;
+  const purchasing = profile.purchasingPower * learningCredit;
+  const mediaVolumeL = annualBrothL * materialProfile.media * (1 + (p.perfusionRate || 0) * 0.16);
+  const feedVolumeL = annualBrothL * ((p.feedRate || 0) / 100) * materialProfile.feed;
+  const bufferVolumeL = annualBrothL * materialProfile.buffer * (1 + chromatographyUnits * 0.28 + filtrationUnits * 0.08);
+  const wfiCleaningL = annualBrothL * (0.85 + cleaningUnits * 0.18 + filtrationUnits * 0.06);
+  const mediaCost = mediaVolumeL * (p.mediaCostPerL || 42) * purchasing * lossFactor * coldChainFactor;
+  const feedCost = feedVolumeL * (p.feedSupplementCostPerL || 160) * purchasing * lossFactor * coldChainFactor;
+  const bufferCost = bufferVolumeL * (p.bufferCostPerL || 3.2) * purchasing * (1 + (p.materialLossFactor || 0) / 220);
+  const resinLiters = Math.max(0, chromatographyUnits) * Math.max(1, batchVolumeL * Math.max(0.02, state.titer / 1800) * materialProfile.resin);
+  const resinCyclesPerYear = Math.max(1, Math.min(120, batches / Math.max(1, chromatographyUnits || 1)));
+  const resinCost = resinLiters * (p.resinCostPerL || 9500) * Math.max(0.18, Math.min(1, resinCyclesPerYear / 60)) * purchasing;
+  const singleUseCost = annualBrothL * (p.singleUseCostPerL || 7.5) * materialProfile.singleUse * (1 + filtrationUnits * 0.12) * purchasing * lossFactor;
+  const wfiCipChemicals = wfiCleaningL * (0.32 + (p.bufferCostPerL || 3.2) * 0.18) * (1 + cleaningUnits * 0.06) * purchasing;
+  const gasAndAdditives = annualBrothL * (0.55 + (p.aeration || 0.35) * 2.8 + (p.agitation || 0.9) * 0.12) * materialProfile.gas * purchasing;
+  const qcConsumables = batches * (p.qcConsumableCost || 28000) * materialProfile.qc * profile.qaMultiplier;
+  const inventoryAndColdChain = (mediaCost + feedCost + bufferCost + resinCost + singleUseCost) * ((p.materialInventoryDays || 0) / 365 * 0.18 + (p.coldChainMaterialFactor || 0) / 100 * 0.08);
+  const yieldLossProxyUsdPerKg = 180 + (p.mediaCostPerL || 42) * materialProfile.media * 4 + (p.feedSupplementCostPerL || 160) * materialProfile.feed * 0.8;
+  const wasteLinkedMaterials = productKg * yieldLossProxyUsdPerKg * Math.max(0, 1 - data.processYield) * 0.18;
+  const rows = [
+    { item: "Cell-culture media / fermentation medium", value: mediaCost, unit: "USD/yr", note: `${formatNumber(mediaVolumeL, 0)} L/yr media basis`, category: "Materials", costType: "media and basal medium", allocationBasis: "annual broth volume x media price" },
+    { item: "Feeds and supplements", value: feedCost, unit: "USD/yr", note: `${formatNumber(feedVolumeL, 0)} L/yr feed/supplement basis`, category: "Materials", costType: "feeds and supplements", allocationBasis: "feed rate x annual broth volume" },
+    { item: "Buffers, salts, acids and bases", value: bufferCost, unit: "USD/yr", note: `${formatNumber(bufferVolumeL, 0)} L/yr buffer basis`, category: "Materials", costType: "buffers and chemicals", allocationBasis: "downstream and cleaning buffer demand" },
+    { item: "Chromatography resin amortization", value: resinCost, unit: "USD/yr", note: `${formatNumber(resinLiters, 1)} L resin screening basis`, category: "Materials", costType: "resin amortization", allocationBasis: "chromatography units, titer, resin price and cycles" },
+    { item: "Single-use, filters and membranes", value: singleUseCost, unit: "USD/yr", note: "Bags, assemblies, filters, membranes, tubing and sterile connectors", category: "Materials", costType: "single-use consumables", allocationBasis: "batch volume, filtration count and loss factor" },
+    { item: "WFI, CIP/SIP chemicals and cleaning consumables", value: wfiCipChemicals, unit: "USD/yr", note: `${formatNumber(wfiCleaningL, 0)} L/yr WFI/cleaning basis`, category: "Materials", costType: "cleaning materials", allocationBasis: "cleaning and utility equipment count" },
+    { item: "Gases, antifoam and process additives", value: gasAndAdditives, unit: "USD/yr", note: "O2/air/CO2, antifoam and small additives", category: "Materials", costType: "gases and additives", allocationBasis: "aeration, agitation and annual broth volume" },
+    { item: "QC/release consumables", value: qcConsumables, unit: "USD/yr", note: "Release assays, sterility, potency, identity and consumable kits", category: "Materials", costType: "QC consumables", allocationBasis: "batches, QC burden and process profile" },
+    { item: "Material inventory, cold-chain and expiry burden", value: inventoryAndColdChain, unit: "USD/yr", note: "Inventory holding, cold storage, expiry and supplier qualification burden", category: "Materials", costType: "inventory burden", allocationBasis: "material inventory days and cold-chain factor" },
+    { item: "Yield-loss replacement materials", value: wasteLinkedMaterials, unit: "USD/yr", note: "Extra material burden associated with non-ideal process yield", category: "Materials", costType: "yield-loss materials", allocationBasis: "process yield and annual product" },
+  ];
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  return { rows, total, materialProfile };
+}
+
 function scaleEconomics(data) {
   const p = state.params;
   const profile = scaleProfile();
@@ -2008,7 +2143,8 @@ function scaleEconomics(data) {
   const fixedBurden = profile.fixedBurden * (620000 + state.units.length * 18500);
   const automationCredit = 1 - (p.automationLevel / 100) * profile.automationCredit;
   const learningCredit = Math.max(0.45, 1 - (p.learningRate / 100) * Math.log2(Math.max(1, campaignRatio)));
-  const materialIntensity = (state.batchSize * state.batchCount * (0.45 + state.titer / 120)) * profile.purchasingPower * learningCredit;
+  const materialBreakdown = materialCostBreakdown(data, profile, learningCredit);
+  const materialIntensity = materialBreakdown.total;
   const laborCost = (520000 + state.units.length * 42000) * profile.laborMultiplier * automationCredit / Math.sqrt(Math.max(0.35, campaignRatio));
   const qaCost = (380000 + state.units.length * 26000) * profile.qaMultiplier * (1 + p.validationFactor / 100);
   const utilityCost = data.utilities * 145 * (0.92 + profile.fixedBurden * 0.03);
@@ -2018,7 +2154,7 @@ function scaleEconomics(data) {
   const directCost = annualCost / kg;
   const scaleEfficiency = Math.max(0.08, Math.min(1, 1 / profile.fixedBurden));
 
-  return { profile, installedCapital, annualizedCapital, fixedBurden, materialIntensity, laborCost, qaCost, utilityCost, wasteCost, annualCost, directCost, parallelUnits, scaleEfficiency };
+  return { profile, installedCapital, annualizedCapital, fixedBurden, materialIntensity, materialBreakdown, laborCost, qaCost, utilityCost, wasteCost, annualCost, directCost, parallelUnits, scaleEfficiency };
 }
 
 function isMinorUnit(item) {
@@ -3921,7 +4057,7 @@ function parameterGroup(item) {
   if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density", "heatRecovery"].includes(item.key)) return "Transfer + rheology";
   if (["perfusionRate", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
   if (["cipTime", "sipHold", "sterilityAssurance", "bioburden", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit", "qcReleaseTime", "operatorShiftHours"].includes(item.key)) return "GMP + cleaning";
-  if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction"].includes(item.key)) return "Scale-up + economics";
+  if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction", "mediaCostPerL", "feedSupplementCostPerL", "bufferCostPerL", "resinCostPerL", "singleUseCostPerL", "qcConsumableCost", "materialLossFactor", "coldChainMaterialFactor", "materialInventoryDays"].includes(item.key)) return "Scale-up + economics";
   return "Environmental + utilities";
 }
 
@@ -4117,7 +4253,7 @@ function renderPalette() {
     <button class="palette-item" draggable="true" data-type="${item.type}" title="Add ${item.label}" data-tooltip="${escapeAttr(`${item.label}: ${item.isoName}. Class: ${item.cls}. Standards: ${(item.standards || []).slice(0, 3).join(", ")}. Drag to the canvas or click to add.`)}">
       <span style="background:${item.color}">${item.icon}</span>
       <strong>${item.label}</strong>
-      <small><b>${unitLayerLabel(unitLayer(item))}</b>${item.cls}</small>
+      <small><b>${unitLayerLabel(unitLayer(item))}</b><em>${item.cls}</em></small>
     </button>
   `).join("") : `
     <div class="palette-empty">
@@ -5432,7 +5568,7 @@ function connectorStatusTone(status = "") {
 
 function connectorPayloads(item) {
   const byKey = {
-    superpro: ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
+    "legacy-simulator": ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
     aspen: ["component list", "stream vectors", "property package assumptions", "unit operation duty table"],
     comsol: ["bioreactor geometry", "boundary conditions", "sparger and impeller metadata", "DO/nutrient target fields"],
     starccm: ["CFD case matrix", "mesh basis", "gas-liquid assumptions", "shear and oxygen transfer targets"],
@@ -6062,7 +6198,7 @@ function renderCfdBoard() {
       <div>
         <p>Interactive bioreactor CFD workbench</p>
         <h3>${selected.id} · ${selected.name}</h3>
-        <span>Screen oxygen transfer, nutrient distribution, shear, dead zones, and feed-point risk directly in the tool. This is a fast engineering model for prioritising rigorous CFD and scale-down experiments.</span>
+        <span>Screen oxygen transfer, nutrient distribution, shear, dead zones, and feed-point risk directly in the tool. The vessel is shown as a vertical stirred-tank bioreactor with horizontal impeller planes, central downflow, wall upflow, sparging, and feed-zone gradients.</span>
       </div>
       <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
     </section>
@@ -6084,6 +6220,11 @@ function renderCfdBoard() {
           <div class="cfd-motor"></div>
           <div class="cfd-impeller impeller-top"><i></i><i></i><i></i><i></i></div>
           <div class="cfd-impeller impeller-bottom"><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-horizontal-plane plane-top"><span>horizontal impeller plane</span></div>
+          <div class="cfd-horizontal-plane plane-bottom"></div>
+          <div class="cfd-center-downflow"></div>
+          <div class="cfd-wall-upflow wall-left"></div>
+          <div class="cfd-wall-upflow wall-right"></div>
           <div class="cfd-axial-flow axial-up"></div>
           <div class="cfd-axial-flow axial-down"></div>
           <div class="cfd-circulation circulation-a"></div>
@@ -6195,16 +6336,18 @@ function balanceRows() {
 function costRows() {
   const data = metrics();
   const annualKg = Math.max(1, data.annualKg);
+  const materialRows = data.scale.materialBreakdown?.rows || [];
   const baseRows = [
-    { item: "Installed CAPEX", value: data.scale.installedCapital, unit: "USD", note: "Scaled installed capital estimate", category: "CAPEX", costType: "capital", lifetimeYears: 10, allocationBasis: "facility installed cost", confidence: "screening" },
-    { item: "Annualized CAPEX", value: data.scale.annualizedCapital, unit: "USD/yr", note: "Annualized capital charge", category: "CAPEX", costType: "annualized capital", lifetimeYears: 10, allocationBasis: "capital recovery charge", confidence: "screening" },
-    { item: "Fixed facility burden", value: data.scale.fixedBurden, unit: "USD/yr", note: "High at lab scale; decreases non-linearly with scale", category: "Facility", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "scale profile", confidence: "screening" },
-    { item: "Materials", value: data.scale.materialIntensity, unit: "USD/yr", note: "Media, buffers, raw materials, consumables", category: "Materials", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "batch volume and titer", confidence: "screening" },
-    { item: "Labor", value: data.scale.laborCost, unit: "USD/yr", note: "Automation-adjusted labor estimate", category: "Labor", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "operation count and automation", confidence: "screening" },
-    { item: "QA/QC validation", value: data.scale.qaCost, unit: "USD/yr", note: "GMP release, validation, and quality burden", category: "Quality", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "unit count and validation factor", confidence: "screening" },
-    { item: "Utilities", value: data.scale.utilityCost, unit: "USD/yr", note: "Power, WFI, steam, cooling, compressed gases", category: "Utilities", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "annual utility demand", confidence: "screening" },
-    { item: "Waste", value: data.scale.wasteCost, unit: "USD/yr", note: "Wastewater, biomass, emissions, rejects", category: "Waste", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "yield loss and waste assets", confidence: "screening" },
-    { item: "Direct cost", value: data.directCost, unit: "USD/kg", note: "Annual cost divided by annual product", category: "Result", costType: "unit cost", lifetimeYears: "", allocationBasis: "annual product mass", confidence: "screening" },
+    { item: "Installed CAPEX", value: data.scale.installedCapital, unit: "USD", note: "Scaled installed capital estimate", category: "CAPEX", costType: "capital", lifetimeYears: 10, allocationBasis: "facility installed cost", confidence: "screening", aggregationRole: "capital basis" },
+    { item: "Annualized CAPEX", value: data.scale.annualizedCapital, unit: "USD/yr", note: "Annualized capital charge", category: "CAPEX", costType: "annualized capital", lifetimeYears: 10, allocationBasis: "capital recovery charge", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "Fixed facility burden", value: data.scale.fixedBurden, unit: "USD/yr", note: "High at lab scale; decreases non-linearly with scale", category: "Facility", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "scale profile", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "Materials total", value: data.scale.materialIntensity, unit: "USD/yr", note: data.scale.materialBreakdown?.materialProfile?.note || "Media, buffers, raw materials, consumables, resin, single-use and QC consumables", category: "Materials", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "itemized material cost model", confidence: "screening", aggregationRole: "rollup; do not sum with material components" },
+    ...materialRows.map((row) => ({ ...row, lifetimeYears: "", confidence: "screening", aggregationRole: "material component; sum to Materials total" })),
+    { item: "Labor", value: data.scale.laborCost, unit: "USD/yr", note: "Automation-adjusted labor estimate", category: "Labor", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "operation count and automation", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "QA/QC validation", value: data.scale.qaCost, unit: "USD/yr", note: "GMP release, validation, and quality burden", category: "Quality", costType: "fixed OPEX", lifetimeYears: "", allocationBasis: "unit count and validation factor", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "Utilities", value: data.scale.utilityCost, unit: "USD/yr", note: "Power, WFI, steam, cooling, compressed gases", category: "Utilities", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "annual utility demand", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "Waste", value: data.scale.wasteCost, unit: "USD/yr", note: "Wastewater, biomass, emissions, rejects", category: "Waste", costType: "variable OPEX", lifetimeYears: "", allocationBasis: "yield loss and waste assets", confidence: "screening", aggregationRole: "summable cost line" },
+    { item: "Direct cost", value: data.directCost, unit: "USD/kg", note: "Annual cost divided by annual product", category: "Result", costType: "unit cost", lifetimeYears: "", allocationBasis: "annual product mass", confidence: "screening", aggregationRole: "result; do not sum" },
   ];
   return baseRows.map((row) => {
     const annualValueUsd = row.unit === "USD/yr" ? row.value : row.unit === "USD/kg" ? row.value * annualKg : "";
@@ -6256,6 +6399,7 @@ function teaRows() {
     effectiveTiterGL: data.effectiveTiter,
     plantUtilizationPct: data.utilization,
     allocationBasis: row.allocationBasis,
+    aggregationRole: row.aggregationRole,
     lifetimeYears: row.lifetimeYears,
     capitalScaleExponent: row.capitalScaleExponent,
     confidence: row.confidence,
@@ -6444,7 +6588,7 @@ function barChartSvg(title, subtitle, rows, options = {}) {
 
 function teaCostSvg() {
   const rows = costRows()
-    .filter((row) => row.unit === "USD/yr")
+    .filter((row) => row.unit === "USD/yr" && !String(row.aggregationRole || "").startsWith("material component"))
     .map((row) => ({
       label: row.item,
       value: Number(row.annualValueUsd) || 0,
@@ -6579,6 +6723,7 @@ function comprehensiveReport() {
     sources: scientificSources,
     recommendations: simulationReadinessItems(),
     twinWorkspace,
+    marketIntelligence,
   };
 }
 
@@ -6812,6 +6957,45 @@ function renderRecommendations() {
       </div>
       <strong>${fullCount} mapped equipment objects</strong>
     </section>
+    <section class="market-intel-board">
+      <div>
+        <p>Market and adoption intelligence</p>
+        <h3>${marketIntelligence.migrationOffer.title}</h3>
+        <span>${marketIntelligence.migrationOffer.detail}</span>
+      </div>
+      <div class="market-caveat-list">
+        ${marketIntelligence.caveats.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+    </section>
+    <section class="market-wave-grid">
+      ${marketIntelligence.targetWaves.map((item) => `
+        <article>
+          <span>${escapeHtml(item.wave)}</span>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>${escapeHtml(item.accounts)}</p>
+          <small>${escapeHtml(item.reason)}</small>
+        </article>
+      `).join("")}
+    </section>
+    <section class="license-benchmark-board">
+      ${marketIntelligence.licenseBenchmarks.map((item) => `
+        <article>
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+          <p>${escapeHtml(item.note)}</p>
+        </article>
+      `).join("")}
+    </section>
+    <section class="buyer-role-board">
+      <div>
+        <span>Buying centers</span>
+        <h3>Start with the technical champion, not central procurement.</h3>
+        <p>Use these roles to frame demos and pilots around the problem owner who feels the modelling, collaboration, and scenario-review pain directly.</p>
+      </div>
+      <div>
+        ${marketIntelligence.buyerRoles.map((role) => `<span>${escapeHtml(role)}</span>`).join("")}
+      </div>
+    </section>
     <section class="ics-coverage-grid">
       ${coverage.map((item) => `
         <article>
@@ -6885,24 +7069,43 @@ function renderTwinWorkspace() {
 
 function renderEconomics() {
   const data = metrics();
+  const materialRows = data.scale.materialBreakdown?.rows || [];
   const costItems = [
     { label: "Annualized CAPEX", value: data.scale.annualizedCapital, color: "#123a56" },
     { label: "Fixed facility burden", value: data.scale.fixedBurden, color: "#c04f47" },
-    { label: "Materials", value: data.scale.materialIntensity, color: "#00a88f" },
+    { label: "Materials + media", value: data.scale.materialIntensity, color: "#0f8f83" },
     { label: "Labor", value: data.scale.laborCost, color: "#d7a229" },
     { label: "QA/QC validation", value: data.scale.qaCost, color: "#8a6f3d" },
-    { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#0f8f83" },
+    { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#257c88" },
   ];
   const totalCost = costItems.reduce((sum, item) => sum + item.value, 0) || 1;
-  els.costStack.innerHTML = costItems.map((item) => `
+  const materialTotal = Math.max(1, data.scale.materialIntensity);
+  els.costStack.innerHTML = `
+    ${costItems.map((item) => `
     <div class="cost-bar">
       <span>${item.label}</span>
       <span class="cost-track"><span class="cost-fill" style="width:${Math.max(2, item.value / totalCost * 100)}%; background:${item.color}"></span></span>
       <strong>${formatNumber(item.value / totalCost * 100, 0)}%</strong>
     </div>
-  `).join("");
+    `).join("")}
+    <div class="cost-bar cost-bar-section">
+      <span>Material breakdown</span>
+      <span>media, feeds, buffers, resin, single-use, QC, cleaning</span>
+      <strong>$${formatNumber(data.scale.materialIntensity / Math.max(1, data.annualKg), 0)}/kg</strong>
+    </div>
+    ${materialRows
+      .slice()
+      .sort((a, b) => b.value - a.value)
+      .map((item) => `
+        <div class="cost-bar material-cost-bar">
+          <span>${item.item}</span>
+          <span class="cost-track"><span class="cost-fill" style="width:${Math.max(2, item.value / materialTotal * 100)}%; background:#0f8f83"></span></span>
+          <strong>${formatNumber(item.value / materialTotal * 100, 0)}%</strong>
+        </div>
+      `).join("")}
+  `;
 
-  els.costNarrative.textContent = `${activeTemplate().label} at ${formatNumber(state.batchSize)} L is treated as ${data.scale.profile.label} scale. The cost model is non-linear: lab scale carries high fixed facility, labor, QA/QC, and validation burden per kg, while larger plants benefit from a ${formatNumber(state.params.capitalScaleExponent, 2)} CAPEX scaling exponent, purchasing power, automation, campaign learning, and higher utilization. Estimated direct cost is $${formatNumber(data.directCost, 0)}/kg.`;
+  els.costNarrative.textContent = `${activeTemplate().label} at ${formatNumber(state.batchSize)} L is treated as ${data.scale.profile.label} scale. Materials are now modeled as a major bioprocess cost driver: media, feeds/supplements, buffers, resin, filters, membranes, single-use assemblies, WFI/CIP chemicals, gases, QC consumables, cold-chain, inventory and yield-loss replacement materials are itemized. Larger plants still benefit from purchasing power and learning, but high-value media and consumables remain a dominant OPEX driver. Estimated direct cost is $${formatNumber(data.directCost, 0)}/kg.`;
   els.economicDetails.innerHTML = `
     <dt>Product</dt><dd>${activeTemplate().product}</dd>
     <dt>Product per batch</dt><dd>${formatMass(data.productPerBatchKg)}</dd>
@@ -6913,6 +7116,8 @@ function renderEconomics() {
     <dt>Scale profile</dt><dd>${data.scale.profile.label}</dd>
     <dt>Installed CAPEX</dt><dd>$${formatNumber(data.scale.installedCapital / 1000000, 2)}M</dd>
     <dt>Annual cost</dt><dd>$${formatNumber(data.scale.annualCost / 1000000, 2)}M/yr</dd>
+    <dt>Materials total</dt><dd>$${formatNumber(data.scale.materialIntensity / 1000000, 2)}M/yr</dd>
+    <dt>Materials per kg</dt><dd>$${formatNumber(data.scale.materialIntensity / Math.max(1, data.annualKg), 0)}/kg</dd>
     <dt>Parallel units</dt><dd>${data.scale.parallelUnits}</dd>
     <dt>Scale efficiency</dt><dd>${formatNumber(data.scale.scaleEfficiency * 100, 0)}%</dd>
   `;
@@ -7146,7 +7351,7 @@ function lockApp() {
   window.setTimeout(() => els.loginGate?.scrollTo({ top: 0, behavior: "auto" }), 0);
 }
 
-const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth", "superpro-auth"];
+const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth"];
 const staticAuth = {
   token: "axion-static-session-v1",
   users: [
@@ -7180,7 +7385,7 @@ function staticAccountForUser(user = "") {
     billing: {
       plan: candidate.role === "admin" ? "Owner workspace" : "Internal private workspace",
       paymentStatus: "password access, payment exempt",
-      amountFormatted: "725,00 EUR",
+      amountFormatted: "2.400,00 EUR",
       customerId: candidate.user,
       billingEmail: `${candidate.user}@local.axion`,
     },
@@ -7280,7 +7485,7 @@ function renderProfileMenu() {
   const config = state.productConfig || {};
   const billing = account.billing || {};
   const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
-  const amount = billing.amountFormatted || config.amountFormatted || "725,00 EUR";
+  const amount = billing.amountFormatted || config.amountFormatted || "2.400,00 EUR";
   const paymentStatus = billing.paymentStatus || (account.licenseKey ? "active license" : account.role === "static" ? "static access" : "workspace access");
   const plan = billing.plan || (account.role === "admin" ? "Owner workspace" : account.role === "customer" ? "Professional license" : "Private workspace");
   const principal = account.username || account.email || account.principal || accountName();
@@ -7334,7 +7539,7 @@ function renderStaticAccessMode() {
   }
   if (els.googleLoginFallback) els.googleLoginFallback.disabled = true;
   if (els.googleLoginStatus) {
-    els.googleLoginStatus.textContent = "Google login requires the backend; password login is available for this hosted static version.";
+    els.googleLoginStatus.textContent = "Password login is available now. Google SSO can be enabled by the workspace administrator.";
   }
   renderProfileMenu();
 }
@@ -7453,19 +7658,29 @@ const publicPageTargets = {
   loginPanel: "login",
 };
 
+const mabWalkthroughSteps = [
+  ["mab-overview", "Overview"],
+  ["mab-upstream", "Upstream"],
+  ["mab-downstream", "Downstream"],
+  ["mab-cfd", "CFD + boundaries"],
+  ["mab-reports", "Reports"],
+];
+
 const publicDetailStories = {
   "mab-overview": {
-    eyebrow: "Guided example",
-    title: "10,000 L CHO monoclonal antibody platform process",
-    body: "A high-demand biopharma model because it forces the whole software to work: upstream cell culture, harvest, capture chromatography, viral safety, polishing, UF/DF, fill, QC release, utilities, cleaning, economics, LCA, and scale-up physics.",
+    eyebrow: "Canonical biopharma walkthrough",
+    title: "Therapeutic monoclonal antibody production",
+    body: "Axion uses an original CHO monoclonal-antibody platform process as the front-page guided demo because it forces the full software stack to work: upstream cell culture, harvest, capture chromatography, viral safety, polishing, UF/DF, fill, QC release, utilities, cleaning, scheduling, economics, LCA, and scale-up physics.",
     points: [
-      "Starts from a product brief rather than a blank canvas.",
-      "Creates a full process path with main units and supporting systems.",
-      "Keeps assumptions, equations, boundaries, reports, and references connected.",
+      "Starts from a therapeutic mAb product brief rather than a blank canvas.",
+      "Creates a full process path with main units, support systems, cleaning, utilities, and QC release.",
+      "Uses an original, non-proprietary reference architecture based on common mAb manufacturing practice.",
+      "Keeps assumptions, equations, boundaries, reports, and references connected so the page sells the actual tool workflow.",
     ],
     visual: [
-      ["Model", "CHO fed-batch mAb process"],
-      ["Scale", "10,000 L production STR example"],
+      ["Reference basis", "Common CHO/mAb platform-process architecture"],
+      ["Model", "CHO mAb platform process"],
+      ["Scale", "Fed-batch or continuous/perfusion variants"],
       ["Core", "Seed train -> production -> Protein A -> VI -> polishing -> UF/DF -> fill"],
       ["Outputs", "Streams, balances, equations, LCA/TEA datasets, SVG visuals"],
     ],
@@ -7631,32 +7846,131 @@ const publicDetailStories = {
     visual: [["Screening", "Fast editable process model"], ["Gaps", "Data, validation, vendor, site-specific values"], ["Next", "Rigorous simulation or investment review"]],
     actions: [["mab-reports", "See report gaps"], ["mab-cfd", "See physics gaps"], ["login", "Try it"]],
   },
+  "legacy-migration": {
+    eyebrow: "Migration layer",
+    title: "Modernize existing simulator work instead of throwing it away",
+    body: "The strongest offer is not a cheap clone. Axion can import or reconstruct one representative process from legitimate customer-owned exports, validate mass balance and economics against the current workflow, then show browser-based collaboration, versioning, and transparent scenario review.",
+    points: ["Use existing customer-owned reports, stream tables, equipment lists, schedules, and economic outputs as migration inputs.", "Rebuild the process into an editable Axion model with visible assumptions and downloadable review data.", "Compare speed, clarity, collaboration, and model transparency before asking teams to change their workflow."],
+    visual: [["Input", "Reports, CSV, Excel, stream table"], ["Axion", "Editable model, branches, comments"], ["Output", "Validated balance, TEA/LCA, scenario review"]],
+    actions: [["api-first", "See API layer"], ["collaboration-versioning", "See collaboration"], ["login", "Open workspace"]],
+  },
+  "collaboration-versioning": {
+    eyebrow: "Collaboration layer",
+    title: "Shared process models with version history",
+    body: "Teams need more than local model files. Axion exposes projects, collaborators, invitations, model archives, restoreable versions, and the product structure for future branches, diffs, comments, and approval gates.",
+    points: ["Multiple users can be attached to project workspaces by username or email.", "Old models are saved in an archive so teams can continue later or restore a previous version.", "The architecture is ready for Git-style branches, model comparison, audit trails, and enterprise review states."],
+    visual: [["Project", "Owner + collaborators"], ["Version", "Saved state + archive"], ["Review", "Diff, branch, approval roadmap"]],
+    actions: [["legacy-migration", "See migration"], ["reports", "See exports"], ["login", "Try it"]],
+  },
+  "api-first": {
+    eyebrow: "API-first layer",
+    title: "REST, Python, webhooks, and cloud runs",
+    body: "Legacy process-simulator automation is often desktop- and file-centric. Axion is structured around JSON process models, REST endpoints, Python automation targets, webhook events, and browser-native scenario runs.",
+    points: ["Connector registry now includes REST API, Python SDK, webhooks, cloud batch runs, legacy simulator handoff, Aspen, gPROMS, CFD tools, LIMS, historian, ERP, and dashboards.", "The model exports equipment, streams, balances, parameters, economics, and report payloads as machine-readable data.", "Cloud-run and Monte-Carlo execution are represented as first-class product modules rather than spreadsheet add-ons."],
+    visual: [["REST", "Projects, models, runs, reports"], ["Python", "Sweeps, fitting, Monte Carlo"], ["Webhooks", "Run complete, report ready, invite created"]],
+    actions: [["connectors", "See connectors"], ["uncertainty", "See uncertainty"], ["login", "Open workspace"]],
+  },
+  "dynamic-twin": {
+    eyebrow: "Digital twin layer",
+    title: "Dynamic bioprocess model beyond a static flowsheet",
+    body: "Axion now makes the dynamic roadmap explicit: time-dependent growth, metabolites, oxygen transfer, heat load, live plant tags, calibration, soft sensors, anomaly checks, and online prediction.",
+    points: ["Simulation exports dynamic profiles for biomass, substrate, product, DO, lactate, ammonium, heat, and energy.", "Connector targets map SCADA, OPC UA, AVEVA PI, and batch-record data to model variables.", "High-fidelity handoff is prepared for equation-oriented modelling, parameter estimation, optimization, and eventually MPC."],
+    visual: [["Dynamic", "Cell growth + metabolites"], ["Live data", "PI / SCADA / OPC UA"], ["Prediction", "Soft sensors + anomaly checks"]],
+    actions: [["mab-cfd", "See CFD"], ["connectors", "See data layer"], ["login", "Try it"]],
+  },
+  uncertainty: {
+    eyebrow: "Uncertainty layer",
+    title: "Native sensitivity, scenarios, and probabilistic economics",
+    body: "Instead of pushing uncertainty into separate Excel add-ins, Axion surfaces sensitivity and risk as part of the browser workflow.",
+    points: ["Scenario reports expose titer, recovery, media cost, resin lifetime, utilities, yield, and CAPEX exponent as major drivers.", "The connector registry includes cloud runs for parameter sweeps and Monte Carlo cases.", "The roadmap includes Sobol-style global sensitivity, uncertainty bands, and automatic parameter fitting."],
+    visual: [["Inputs", "Ranges and distributions"], ["Runs", "Sweeps and Monte Carlo"], ["Output", "Driver ranking and uncertainty bands"]],
+    actions: [["economics-upgrade", "See economics"], ["reports", "See downloads"], ["login", "Open workspace"]],
+  },
+  "economics-upgrade": {
+    eyebrow: "Economics layer",
+    title: "Transparent economics for process decisions",
+    body: "The economics layer now treats materials, media, feeds, resin, single-use, QC, cleaning, utilities, waste, CAPEX, validation, and facility burden as explicit drivers rather than one hidden number.",
+    points: ["Pricing and product positioning are not based on being cheaper; they are based on clearer collaboration, APIs, vertical templates, and decision-ready TEA.", "Economics is prepared for vendor quotes, regional indices, inflation, scenario ranges, NPV, IRR, payback, break-even, and cash runway.", "Material cost is intentionally high and itemized for bioprocesses where media and consumables dominate."],
+    visual: [["COGS", "Materials, labor, QA, utilities"], ["CAPEX", "Equipment, install, validation"], ["Finance", "NPV, IRR, payback roadmap"]],
+    actions: [["uncertainty", "See uncertainty"], ["pricing", "See pricing"], ["login", "Try it"]],
+  },
+  "target-engineering": {
+    eyebrow: "Target segment",
+    title: "Engineering and process-design organizations",
+    body: "Engineering partners are attractive because one team can apply the platform across many client projects: conceptual design, sizing, utilities, CAPEX/OPEX, scheduling, and debottlenecking.",
+    points: ["Best fit: process engineering, digital engineering, life-science facility design, conceptual design, and simulation leads.", "Axion supports fast feasibility studies alongside existing simulator workflows instead of forcing immediate replacement.", "The workspace helps compare alternatives and explain assumptions to clients, suppliers, and internal reviewers."],
+    visual: [["Use cases", "Facility design, capacity, CAPEX"], ["Teams", "Process, digital, simulation"], ["Offer", "Migration pilot + team workspace"]],
+    actions: [["legacy-migration", "See migration"], ["pricing", "See pricing"], ["login", "Open workspace"]],
+  },
+  "target-biopharma": {
+    eyebrow: "Target segment",
+    title: "Biopharma, CDMO, and MSAT teams",
+    body: "Biopharma teams need site-standardized, reviewable models for mAbs, vaccines, advanced therapies, tech transfer, COGS, capacity, and customer-specific CDMO scenarios.",
+    points: ["Model families include mAbs, continuous/perfusion variants, vaccines, viral vectors, cell and gene therapy, insulin/API, and downstream purification trains.", "CDMOs can use the workflow for rapid customer modelling, capacity planning, and quote-ready TEA exports.", "Enterprise readiness depends on security, validation, audit trails, access control, and source-backed model assumptions."],
+    visual: [["Products", "mAbs, vaccines, CGT, viral vectors"], ["Outputs", "COGS, capacity, tech transfer"], ["Controls", "GMP, audit, QA, validation"]],
+    actions: [["mab-overview", "See mAb example"], ["recommendations", "See readiness"], ["login", "Try it"]],
+  },
+  "target-food": {
+    eyebrow: "Target segment",
+    title: "Food, fermentation, and alternative-protein teams",
+    body: "This is a strong wedge because food biotech and precision fermentation need rapid scale-up, media-cost realism, downstream recovery, utilities, sustainability, and investor-readable TEA/LCA outputs.",
+    points: ["Model cultivated meat, precision fermentation, enzyme production, alternative proteins, food processing, media preparation, utilities, wastewater, and heat reuse.", "Make media, feeds, water, cleaning, aeration, fermentation, recovery, drying, waste, and LCA drivers visible.", "Use the same product-brief workflow for founders, university teams, CDMOs, ingredient companies, and engineering partners."],
+    visual: [["Core", "Fermentation, media, recovery"], ["Economics", "Media, utilities, waste"], ["Exports", "LCA / TEA / visuals"]],
+    actions: [["cultured-meat", "See cultured meat"], ["penicillin", "See fermentation"], ["login", "Open workspace"]],
+  },
 };
 
 function renderPublicDetail(key = "mab-overview") {
   const story = publicDetailStories[key] || publicDetailStories["mab-overview"];
   const panel = document.querySelector("#publicDetailPanel");
   if (!panel) return;
+  const currentIndex = mabWalkthroughSteps.findIndex(([stepKey]) => stepKey === key);
+  const nextStep = currentIndex >= 0 ? mabWalkthroughSteps[Math.min(currentIndex + 1, mabWalkthroughSteps.length - 1)] : null;
+  const isMabStory = currentIndex >= 0;
   panel.innerHTML = `
     <div class="public-detail-copy">
       <span>${escapeHtml(story.eyebrow)}</span>
       <h3>${escapeHtml(story.title)}</h3>
       <p>${escapeHtml(story.body)}</p>
+      ${isMabStory ? `
+        <div class="public-detail-stepper" aria-label="mAb example walkthrough">
+          ${mabWalkthroughSteps.map(([stepKey, label], index) => `
+            <button type="button" class="${stepKey === key ? "active" : ""}" data-public-detail-next="${escapeAttr(stepKey)}">
+              <b>${String(index + 1).padStart(2, "0")}</b><span>${escapeHtml(label)}</span>
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
       <ul class="public-detail-list">
         ${story.points.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}
       </ul>
       <div class="public-detail-actions">
         ${story.actions.map(([target, label]) => `<button type="button" data-public-detail-next="${escapeAttr(target)}">${escapeHtml(label)}</button>`).join("")}
+        ${nextStep && nextStep[0] !== key ? `<button type="button" class="public-next-primary" data-public-detail-next="${escapeAttr(nextStep[0])}">Next: ${escapeHtml(nextStep[1])}</button>` : ""}
       </div>
     </div>
     <div class="public-detail-visual">
       ${story.visual.map(([label, value]) => `<div><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></div>`).join("")}
+      ${isMabStory ? `
+        <div class="public-source-card">
+          <b>Why this example?</b>
+          <span>mAb manufacturing is one of the clearest biopharma platform examples because it combines upstream cell culture, downstream purification, GMP controls, economics, LCA, and scale-up physics in one story.</span>
+        </div>
+      ` : ""}
     </div>
   `;
   document.querySelectorAll("[data-public-detail]").forEach((button) => {
     button.classList.toggle("active", button.dataset.publicDetail === key);
   });
-  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openPublicDetail(key = "mab-overview", { scroll = true } = {}) {
+  showPublicPage("platform", { scroll: false });
+  window.setTimeout(() => {
+    renderPublicDetail(key);
+    if (scroll) document.querySelector("#publicDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 80);
 }
 
 function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {}) {
@@ -7747,7 +8061,7 @@ async function setupGoogleLogin() {
     const config = await apiRequest("/api/auth/google-config");
     if (!config.enabled || !config.clientId) {
       els.googleLoginFallback.disabled = true;
-      els.googleLoginStatus.textContent = "Google login is waiting for GOOGLE_CLIENT_ID in the backend .env. Password and paid-license login are available now.";
+      els.googleLoginStatus.textContent = "Password login is available now. Google SSO can be enabled by the workspace administrator.";
       return;
     }
     els.googleLoginStatus.textContent = "Google login ready.";
@@ -7767,7 +8081,7 @@ async function setupGoogleLogin() {
     });
   } catch (error) {
     els.googleLoginFallback.disabled = true;
-    els.googleLoginStatus.textContent = `Google login unavailable: ${error.message}`;
+    els.googleLoginStatus.textContent = "Password login is available now. Google SSO is not active for this workspace yet.";
   }
 }
 
@@ -7857,14 +8171,21 @@ function normalizeLocalProjectOwnership(store) {
 
 function localIntegrations() {
   return [
-    { key: "superpro", name: "SuperPro Designer", category: "Process simulation", status: "import-export scaffold", direction: "Import reports / export Axion model", auth: "file", description: "CSV, equipment, stream, balance, and economic report handoff for existing SuperPro workflows." },
+    { key: "legacy-simulator", name: "Legacy process simulator", category: "Process simulation", status: "import-export scaffold", direction: "Import reports / export Axion model", auth: "file", description: "CSV, equipment, stream, balance, and economic report handoff for legitimate customer-owned simulator workflows." },
+    { key: "rest-api", name: "Axion REST API", category: "API-first modelling", status: "schema scaffold", direction: "Read/write JSON process models", auth: "token", description: "Prepared for project, version, equipment, stream, parameter, simulation-run, and report endpoints." },
+    { key: "python-sdk", name: "Python SDK", category: "Automation", status: "SDK planned", direction: "Run sweeps, fit parameters, export reports", auth: "token", description: "Prepared for notebooks, parameter sweeps, Monte Carlo, Sobol-style sensitivity analysis, and calibration scripts." },
+    { key: "webhooks", name: "Webhooks", category: "Automation", status: "event scaffold", direction: "Notify external systems", auth: "signing secret", description: "Prepared for project.created, model.versioned, run.completed, report.ready, invite.created, and license.activated events." },
+    { key: "cloud-runs", name: "Cloud batch runs", category: "Scenario compute", status: "run queue planned", direction: "Execute parameter sweeps and Monte Carlo cases", auth: "workspace token", description: "Prepared for browser-native scenario runs without Excel add-ins or desktop automation." },
     { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "connector planned", direction: "Export streams, property package, and economics basis", auth: "enterprise API or file", description: "Prepared for stream vectors, component properties, and unit-operation duty transfer." },
     { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "connector planned", direction: "Export reactor geometry and boundary conditions", auth: "file/API", description: "Prepared for rigorous bioreactor CFD geometry, sparger, impeller, and boundary-condition setup." },
     { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "connector planned", direction: "Export CFD screening cases", auth: "file/API", description: "Prepared for oxygen, nutrient, shear, gas-liquid, and agitation case handoff." },
+    { key: "gproms", name: "gPROMS / equation-oriented modelling", category: "High-fidelity modelling", status: "handoff planned", direction: "Export equations, parameters, units, and estimation cases", auth: "file/API", description: "Prepared for rigorous dynamic models, parameter estimation, optimization, soft sensors, and model predictive control roadmaps." },
     { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "connector planned", direction: "Read historian tags", auth: "server credentials", description: "Maps live pH, DO, temperature, pressure, flow, and batch-state tags to model parameters." },
     { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "connector planned", direction: "Read batch historian", auth: "enterprise connector", description: "Prepared for batch-profile calibration, deviations, soft sensors, and continued process verification." },
     { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "connector planned", direction: "Read experiments and assays", auth: "API key/OAuth", description: "Prepared for titer, viability, media, assay, strain, and cell-line metadata transfer." },
     { key: "limsid", name: "LIMS / ELN generic", category: "Quality data", status: "connector planned", direction: "Read/write assay metadata", auth: "API key", description: "Generic release-test, sterility, HCP, DNA, endotoxin, and bioburden handoff shell." },
+    { key: "erp", name: "ERP / procurement", category: "Economics", status: "connector planned", direction: "Read material prices, inventory, and vendor quote records", auth: "enterprise connector", description: "Prepared for regional costs, supplier quotes, media BOMs, consumables, resin, packaging, and working-capital assumptions." },
+    { key: "powerbi", name: "Power BI / data warehouse", category: "Analytics", status: "export scaffold", direction: "Publish TEA/LCA and portfolio metrics", auth: "workspace token", description: "Prepared for dashboards across projects, scenarios, facilities, emissions, COGS, and readiness gaps." },
   ];
 }
 
@@ -8147,32 +8468,37 @@ function bindAuth() {
   });
 
   document.querySelectorAll("[data-public-target]").forEach((button) => {
-    button.addEventListener("click", () => {
-      scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel");
+    button.addEventListener("click", (event) => {
       if (button.dataset.publicDetail) {
-        window.setTimeout(() => renderPublicDetail(button.dataset.publicDetail), 120);
+        event.preventDefault();
+        event.stopPropagation();
+        openPublicDetail(button.dataset.publicDetail);
+        return;
       }
+      scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel");
     });
   });
 
   document.querySelector(".public-scroll")?.addEventListener("click", (event) => {
     const nextButton = event.target.closest("[data-public-detail-next]");
     if (nextButton) {
+      event.preventDefault();
+      event.stopPropagation();
       const target = nextButton.dataset.publicDetailNext;
       if (target === "login") {
         scrollPublicTarget("loginPanel", true);
       } else if (target === "pricing") {
         scrollPublicTarget("publicPricing");
       } else {
-        scrollPublicTarget("publicPlatform");
-        window.setTimeout(() => renderPublicDetail(target), 120);
+        openPublicDetail(target);
       }
       return;
     }
     const detailButton = event.target.closest("[data-public-detail]");
     if (!detailButton) return;
-    if (detailButton.dataset.publicTarget) return;
-    renderPublicDetail(detailButton.dataset.publicDetail);
+    event.preventDefault();
+    event.stopPropagation();
+    openPublicDetail(detailButton.dataset.publicDetail);
   });
 
   els.loginForm?.addEventListener("submit", async (event) => {

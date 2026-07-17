@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260716-clickable-details-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260717-deeptech-nav-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -190,11 +190,49 @@
                 <button type="button" data-public-detail="penicillin">Open example</button>
               </article>
             </div>
+            <div class="migration-grid" aria-label="Modern process modelling capabilities">
+              <article data-public-detail="legacy-migration">
+                <span>Migration</span>
+                <h3>Keep existing simulator work</h3>
+                <p>Import or reconstruct one representative process, validate mass balance and economics, then evaluate scenarios collaboratively in the browser.</p>
+                <button type="button" data-public-detail="legacy-migration">Open migration layer</button>
+              </article>
+              <article data-public-detail="collaboration-versioning">
+                <span>Collaboration</span>
+                <h3>Versions, branches, comments</h3>
+                <p>Shared projects, roles, invitations, audit history, model versions, process alternatives, and comparison-ready decision records.</p>
+                <button type="button" data-public-detail="collaboration-versioning">Open collaboration layer</button>
+              </article>
+              <article data-public-detail="api-first">
+                <span>API-first</span>
+                <h3>REST, Python, webhooks</h3>
+                <p>JSON process model, API handoffs, cloud batch runs, parameter sweeps, Monte Carlo cases, and LIMS/historian/ERP connectors.</p>
+                <button type="button" data-public-detail="api-first">Open API layer</button>
+              </article>
+              <article data-public-detail="dynamic-twin">
+                <span>Digital Twin</span>
+                <h3>Dynamic plant intelligence</h3>
+                <p>Time-dependent cell growth, metabolites, live plant data, calibration, soft sensors, anomaly checks, and online prediction roadmap.</p>
+                <button type="button" data-public-detail="dynamic-twin">Open twin layer</button>
+              </article>
+              <article data-public-detail="uncertainty">
+                <span>Uncertainty</span>
+                <h3>Native risk analysis</h3>
+                <p>Sensitivity, Sobol-style ranking, probabilistic costs, uncertainty bands, parameter fitting, and scenario comparison without spreadsheet add-ins.</p>
+                <button type="button" data-public-detail="uncertainty">Open uncertainty layer</button>
+              </article>
+              <article data-public-detail="economics-upgrade">
+                <span>Economics</span>
+                <h3>Transparent COGS + CAPEX</h3>
+                <p>Regional cost indices, vendor quotes, CAPEX ranges, media and consumables, NPV/IRR/break-even, cash runway, and key cost drivers.</p>
+                <button type="button" data-public-detail="economics-upgrade">Open economics layer</button>
+              </article>
+            </div>
             <div class="public-case-study" id="publicCaseStudy" aria-label="Interactive monoclonal antibody case study">
               <div class="case-study-copy">
-                <p>Most requested SuperPro-style example</p>
-                <h3>Monoclonal antibody production, built as a guided product demo.</h3>
-                <span>SuperPro Designer’s own example library and training materials prominently feature monoclonal antibody manufacturing. Axion uses that high-demand biopharma pattern as the front-page walkthrough because it touches the full problem: upstream cell culture, downstream purification, viral safety, scheduling, economics, LCA, quality, and scale-up physics.</span>
+                <p>High-demand biopharma example</p>
+                <h3>Therapeutic monoclonal antibody production, built as a guided product demo.</h3>
+                <span>Axion uses an original CHO monoclonal-antibody platform process as the front-page walkthrough because it touches the full problem: upstream cell culture, downstream purification, viral safety, scheduling, economics, LCA, quality, and scale-up physics.</span>
                 <div class="case-study-actions">
                   <button type="button" data-public-detail="mab-overview">Overview</button>
                   <button type="button" data-public-detail="mab-upstream">Upstream</button>
@@ -217,8 +255,7 @@
               <div id="publicDetailPanel" class="public-detail-panel" aria-live="polite"></div>
               <div class="case-source-note">
                 <span>Example basis</span>
-                <p>Based on publicly listed SuperPro Designer monoclonal-antibody examples and common CHO/mAb platform process structure. Axion is not copying proprietary files; it demonstrates an editable modern workflow around this process type.</p>
-                <p class="source-links"><a href="https://www.intelligen.com/products/superpro-examples/" target="_blank" rel="noreferrer">Intelligen example library</a><a href="https://www.intelligen.com/static/SPDDownloadCenter/Latest/Example_Process_Files.htm" target="_blank" rel="noreferrer">SuperPro example process files</a><a href="https://www.researchgate.net/publication/340742077_Monoclonal_Antibody_Production_-_Comparison_of_Stainless-Steel_Equipment_vs_Disposable_Single-Use_Equipment_-_Process_Modeling_and_Techno-Economic_Assessment_TEA_with_SuperPro_Designer" target="_blank" rel="noreferrer">mAb TEA example</a></p>
+                <p>Based on common CHO/mAb platform process structure and general bioprocess-engineering practice. Axion is not copying proprietary simulator files; it demonstrates an original, editable workflow around this process type.</p>
               </div>
             </div>
           </section>
@@ -310,16 +347,31 @@
               <h2>Built for the stakeholders around a bioprocess project.</h2>
             </div>
             <div class="partner-strip" aria-label="Partner-ready ecosystem categories">
-              <span>Universities</span>
-              <span>Biotech startups</span>
-              <span>CDMOs</span>
+              <span>Engineering partners</span>
+              <span>Biopharma + CDMO</span>
+              <span>Food + fermentation</span>
               <span>Equipment OEMs</span>
-              <span>GMP consultants</span>
-              <span>Supplier data</span>
+              <span>MSAT + process design</span>
+              <span>Supplier quotes</span>
               <span>SCADA / Historian</span>
-              <span>Regulatory review</span>
+              <span>Regulatory + QA review</span>
             </div>
             <div class="ecosystem-grid">
+              <article data-public-detail="target-engineering">
+                <h3>Engineering and process-design teams</h3>
+                <p>For conceptual design, CAPEX/OPEX, facility fit, utilities, scheduling, debottlenecking, and client scenario review across many projects.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="target-engineering">Open detail</button>
+              </article>
+              <article data-public-detail="target-biopharma">
+                <h3>Biopharma, CDMO, and MSAT</h3>
+                <p>For mAbs, vaccines, cell and gene therapy, viral vectors, biologics, tech transfer, COGS, capacity planning, and site-standardized models.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="target-biopharma">Open detail</button>
+              </article>
+              <article data-public-detail="target-food">
+                <h3>Food, fermentation, and alternative proteins</h3>
+                <p>For cultivated meat, precision fermentation, enzymes, ingredients, food processing, media cost, downstream recovery, utilities, and sustainability.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="target-food">Open detail</button>
+              </article>
               <article data-public-detail="sources">
                 <h3>Scientific reference layer</h3>
                 <p>Attach papers, supplier data, standards, assumptions, and SOP notes directly to units, streams, parameters, and scale-up decisions.</p>
@@ -355,6 +407,83 @@
                 <p>Use Axion’s model cards to decide where equation-oriented modelling, parameter estimation, optimization, soft sensors, web apps and utility optimization should be connected next.</p>
                 <button type="button" data-public-target="publicPlatform" data-public-detail="recommendations">See readiness path</button>
               </article>
+            </div>
+          </section>
+
+          <section class="public-section public-market-intel public-page" data-public-page="ecosystem" aria-label="Process simulator market intelligence and target accounts">
+            <div class="section-heading">
+              <p>Market Intelligence</p>
+              <h2>Who needs a modern browser layer around process models.</h2>
+            </div>
+            <div class="market-alert">
+              <strong>Important qualification</strong>
+              <p>Public client lists and licence benchmarks do not reveal individual customer contracts, exact seat counts, current usage intensity, private contacts, or negotiated enterprise terms. Axion should use this as market intelligence, not as a claim that any named organization pays a specific amount today.</p>
+            </div>
+            <div class="market-matrix" aria-label="Priority target waves">
+              <article>
+                <span>Wave 1</span>
+                <h3>Highest conversion probability</h3>
+                <p>Mosa Meat, Perfect Day, Remilk, UNIVERCELLS, Northway Biotech, PROCESSIUM, Pixon Engineering, MMR Consulting, Nexus PMG, VTU Engineering, smaller CDMOs, and European precision-fermentation startups.</p>
+                <small>Best wedge: fast feasibility study, scale-up, media cost, COGS, facility fit, and investor/supplier review.</small>
+              </article>
+              <article>
+                <span>Wave 2</span>
+                <h3>Engineering multipliers</h3>
+                <p>NNE, PM Group, CRB, Pharmaplan/TTP/Triplan, Jacobs, Technip Energies, Wood, and Tetra Pak.</p>
+                <small>Best wedge: one parallel feasibility study comparing speed, collaboration, versioning, and model transparency with the existing workflow.</small>
+              </article>
+              <article>
+                <span>Wave 3</span>
+                <h3>Enterprise after validation</h3>
+                <p>WuXi Biologics, Lonza, Thermo Fisher Scientific, Novo Nordisk, Roche, Pfizer, Sanofi, Novartis, Takeda, and GSK.</p>
+                <small>Prerequisites: references, security documentation, enterprise access control, audit trails, validation evidence, and procurement readiness.</small>
+              </article>
+            </div>
+            <div class="target-segment-grid" aria-label="Detailed target account segments">
+              <article>
+                <h3>Engineering and consulting</h3>
+                <p>NNE, PM Group, CRB, TTP Group, Pharmaplan, Triplan, VTU Engineering, PROCESSIUM, PROCESSCONSULT, Pixon Engineering, MMR Consulting, Nexus PMG, Scitech Engineering, Technip Energies, Wood, Jacobs, Fluor, SNC-Lavalin, Samsung Engineering, Shanghai Biying Engineering, Sino Pharmengin.</p>
+                <dl>
+                  <dt>Use cases</dt><dd>Facility design, equipment sizing, utilities, CAPEX/OPEX, scheduling, debottlenecking, client scenario review.</dd>
+                  <dt>Buying center</dt><dd>Head of process engineering, digital engineering lead, process simulation lead, conceptual design lead.</dd>
+                </dl>
+              </article>
+              <article>
+                <h3>Biopharma and CDMO</h3>
+                <p>Pfizer, Roche, Genentech, Novo Nordisk, Novartis, Sanofi, Takeda, WuXi Biologics, Lonza, Thermo Fisher Scientific, Samsung Biologics, UCB Pharma, Octapharma, Bristol Myers Squibb, Eli Lilly, Merck, GSK, Biogen, Regeneron, Genmab, Nitto Denko Avecia, Olon, Syngene International, Northway Biotech, UNIVERCELLS Vaccines, Spark Therapeutics, uniQure, Sutro Biopharma, PTC Therapeutics, Xellia Pharmaceuticals.</p>
+                <dl>
+                  <dt>Use cases</dt><dd>Biologics, vaccines, mAbs, CGT, viral vectors, plasma, CDMO quotations, COGS, tech transfer, site capacity.</dd>
+                  <dt>Buying center</dt><dd>MSAT, bioprocess development, manufacturing strategy, capacity planning, COGS modelling, digital engineering.</dd>
+                </dl>
+              </article>
+              <article>
+                <h3>Food, fermentation, and industrial biotech</h3>
+                <p>Mosa Meat, Perfect Day, Remilk, Noblegen, PiP International, Novozymes/Novonesis, Roquette, PepsiCo, Unilever, Tetra Pak, Tereos, ADM, Bio-Springer, Procter & Gamble, Colgate-Palmolive, Bayer, Dow, DuPont, Petrobras, TotalEnergies, Zymergen, CJ Corporation, FMC BioPolymer, Hitachi Plant, Sartorius Korea, VIRBAC, Natura Cosméticos.</p>
+                <dl>
+                  <dt>Use cases</dt><dd>Cultivated meat, precision fermentation, enzymes, ingredients, food processing, utilities, sustainability, media cost, recovery, drying.</dd>
+                  <dt>Buying center</dt><dd>CTO, VP process development, head of scale-up, VP manufacturing, CSO, TEA lead, sustainability engineering.</dd>
+                </dl>
+              </article>
+              <article>
+                <h3>Research and public organizations</h3>
+                <p>National Research Council Canada, RISE Sweden, A*STAR/SIFBI Singapore, UFZ Germany, USDA, U.S. Department of Defense, U.S. Army, U.S. EPA, and historical DOE/Sandia-style research users.</p>
+                <dl>
+                  <dt>Use cases</dt><dd>Reference models, validation, public pilot projects, methodology studies, education, technology assessment.</dd>
+                  <dt>Buying center</dt><dd>Principal investigators, research engineers, platform leads, program managers, public grant consortia.</dd>
+                </dl>
+              </article>
+            </div>
+            <div class="market-offer">
+              <div>
+                <span>Migration offer</span>
+                <h3>Keep your existing models. Prove the browser workflow on one representative process.</h3>
+                <p>Import or reconstruct one process, validate mass balance and economics, then show how a team can evaluate scenarios, branches, assumptions, sources, LCA/TEA outputs, and readiness gaps in the browser.</p>
+              </div>
+              <ul>
+                <li>Use public business channels only: company sites, contact forms, conferences, and LinkedIn.</li>
+                <li>Do not claim exact individual licence prices or private contract values for named companies.</li>
+                <li>Start with visible startups or engineering boutiques before approaching the largest pharma accounts.</li>
+              </ul>
             </div>
           </section>
 
@@ -442,37 +571,60 @@
           <section id="publicPricing" class="public-section public-pricing public-page" data-public-page="pricing">
             <div class="section-heading">
               <p>Pricing</p>
-              <h2>Clear pricing for the private beta and larger teams.</h2>
+              <h2>Professional pricing for serious process-engineering teams.</h2>
             </div>
             <div class="pricing-intro">
-              <p>Indicative annual pricing for Axion Process OS. Prices are shown in EUR, exclude VAT where applicable, and can be adjusted for academic pilots, limited beta access, or enterprise procurement requirements.</p>
+              <p>Indicative annual pricing for Axion Process OS. Prices are shown in EUR, exclude VAT where applicable, and are positioned as a modern cloud workspace around process models, not as a low-cost desktop clone. Public desktop-simulator benchmarks cited in the attached research are roughly 7,000 USD/year for a fixed licence and 11,000 USD/year for a simulator-plus-scheduling bundle, while floating, site, and corporate agreements vary.</p>
+            </div>
+            <div class="license-benchmark-grid" aria-label="Public process-simulator licence benchmark caveats">
+              <article>
+                <span>Public benchmark</span>
+                <h3>Desktop fixed licence</h3>
+                <p>Comparable desktop process-simulator fixed licences are publicly cited around 7,000 USD per computer and year in the provided research context.</p>
+              </article>
+              <article>
+                <span>Public benchmark</span>
+                <h3>Simulator + scheduling</h3>
+                <p>A combined simulator-plus-scheduling fixed licence benchmark is cited around 11,000 USD per computer and year.</p>
+              </article>
+              <article>
+                <span>Unknown contracts</span>
+                <h3>Floating / site / corporate</h3>
+                <p>Floating, multi-user, multi-year, site, and corporate agreements can differ materially and should not be reverse-engineered for named companies.</p>
+              </article>
+              <article>
+                <span>Positioning rule</span>
+                <h3>Do not compete only on price</h3>
+                <p>The stronger offer is browser collaboration, versioning, APIs, vertical templates, transparent economics, and a migration pilot around existing models.</p>
+              </article>
             </div>
             <div class="pricing-grid" aria-label="Axion pricing plans">
               <article>
-                <span>Student</span>
-                <h3>€50</h3>
-                <p>per year</p>
+                <span>Academic Individual</span>
+                <h3>€180</h3>
+                <p>per user / year</p>
                 <ul>
                   <li>Learning workspace</li>
                   <li>Core process builder</li>
                   <li>Example models and downloads</li>
-                  <li>Academic-use positioning</li>
+                  <li>Academic-use license</li>
                 </ul>
               </article>
               <article class="pricing-featured">
-                <span>Private Beta</span>
-                <h3>€725</h3>
+                <span>Professional Individual</span>
+                <h3>€2,400</h3>
                 <p>per user / year</p>
                 <ul>
                   <li>Full private workspace access</li>
                   <li>Bioprocess flowsheets and equipment library</li>
-                  <li>Mass and energy balances, CFD workbench, AI help</li>
+                  <li>Balances, CFD screening, AI help, uncertainty tools</li>
+                  <li>Entry simulation credits for scenario runs</li>
                   <li>Downloadable stream, LCA, TEA, SVG, cost, and equation reports</li>
                 </ul>
               </article>
               <article>
-                <span>University</span>
-                <h3>€500-2,000</h3>
+                <span>Academic Department</span>
+                <h3>€1,800-3,500</h3>
                 <p>per lab / year</p>
                 <ul>
                   <li>Teaching and lab licences</li>
@@ -482,104 +634,105 @@
                 </ul>
               </article>
               <article>
-                <span>Startup</span>
-                <h3>€3,000-8,000</h3>
+                <span>Startup / Small Team</span>
+                <h3>€4,800-12,000</h3>
                 <p>per company / year</p>
                 <ul>
                   <li>Multiple users and project workspaces</li>
                   <li>Investor and supplier review exports</li>
                   <li>Scale-up and readiness modules</li>
-                  <li>Priority onboarding</li>
+                  <li>Vertical modules for cultivated meat, fermentation, mAbs, utilities, wastewater</li>
+                  <li>Paid pilot and onboarding workflow</li>
                 </ul>
               </article>
               <article>
-                <span>Industry</span>
-                <h3>€10,000-50,000</h3>
-                <p>per site / year</p>
+                <span>Engineering Partner</span>
+                <h3>€30,000-75,000</h3>
+                <p>per team / year</p>
                 <ul>
                   <li>Team process engineering workspace</li>
-                  <li>GMP, utilities, cleaning, and standards layers</li>
-                  <li>Data import and structured review workflows</li>
-                  <li>Advanced support package</li>
+                  <li>Client project libraries and model reuse</li>
+                  <li>Version comparison, audit trail, API handoffs</li>
+                  <li>Premium support, simulation credits, and migration pilot</li>
                 </ul>
               </article>
               <article>
-                <span>Enterprise</span>
-                <h3>from €100,000</h3>
+                <span>Enterprise Site</span>
+                <h3>from €75,000</h3>
                 <p>per year</p>
                 <ul>
-                  <li>Multi-site deployment</li>
+                  <li>Site deployment and governance</li>
                   <li>Custom integrations and governance</li>
                   <li>Supplier, historian, and model-data workflows</li>
-                  <li>Dedicated technical success</li>
+                  <li>Private model libraries, private cloud or on-prem options</li>
+                  <li>Global enterprise options from €150,000+</li>
                 </ul>
               </article>
             </div>
             <div class="pricing-note">
               <strong>What is included?</strong>
-              <p>All plans are positioned around the same core idea: process modelling, visual plant logic, equipment, streams, equations, LCA/TEA handoff exports, downloadable visuals, and explainable technical recommendations. Higher tiers add collaboration, governance, integrations, support, and enterprise deployment depth.</p>
+              <p>All paid plans include the core process workspace: visual plant logic, equipment, streams, equations, LCA/TEA handoff exports, downloadable visuals, uncertainty-ready reports, and explainable technical recommendations. Higher tiers add collaboration, governance, integrations, model libraries, support, migration pilots, cloud runs, private deployment, and enterprise access control.</p>
               <button class="public-primary" type="button" data-public-target="loginPanel">Open private workspace</button>
             </div>
           </section>
 
           <section id="loginPanel" class="public-section public-login public-page" data-public-page="login">
-            <div class="section-heading">
+            <div class="section-heading access-heading">
               <p>Private workspace</p>
-              <h2>Log in and continue modelling.</h2>
+              <h2>One clean entry point for modelling and access.</h2>
             </div>
-            <form id="loginForm" class="login-card access-card">
-              <div class="login-brand">
-                <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>
-                <div>
-                  <p>Process Intelligence</p>
-                  <h1>Axion Process OS</h1>
+            <div class="access-panel">
+              <form id="loginForm" class="login-card access-card access-primary-card">
+                <div class="login-brand">
+                  <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>
+                  <div>
+                    <p>Process Intelligence</p>
+                    <h1>Sign in to Axion</h1>
+                  </div>
                 </div>
-              </div>
-              <p class="access-copy">A precise biochemical process modelling suite for building, editing, simulating, and improving production systems.</p>
-              <label>
-                <span>User</span>
-                <input id="loginUser" autocomplete="username" placeholder="Enter user" />
-              </label>
-              <label>
-                <span>Password</span>
-                <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password" />
-              </label>
-              <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
-              <button class="login-button" type="submit">Enter Axion</button>
-              <div class="login-divider"><span>or</span></div>
-              <div id="googleLoginBox" class="google-login-box" aria-label="Google login">
-                <button id="googleLoginFallback" class="google-login-fallback" type="button">Continue with Google</button>
-                <div id="googleButtonMount" class="google-button-mount"></div>
-                <small id="googleLoginStatus">Checking Google login configuration.</small>
-              </div>
-              <p id="loginError" class="login-error" role="alert"></p>
-              <small>Backend login keeps the workspace private while you build and simulate process models.</small>
-            </form>
-            <form id="checkoutForm" class="login-card access-card checkout-card">
-              <div class="login-brand">
-                <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>
-                <div>
-                  <p>Secure subscription</p>
-                  <h1>Start Axion Pro</h1>
+                <p class="access-copy">Use your assigned workspace credentials to continue modelling, simulating, and improving biochemical production systems.</p>
+                <label>
+                  <span>User</span>
+                  <input id="loginUser" autocomplete="username" placeholder="Username" />
+                </label>
+                <label>
+                  <span>Password</span>
+                  <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+                </label>
+                <p class="login-origin" id="loginOrigin">Backend status is being checked.</p>
+                <button class="login-button" type="submit">Enter workspace</button>
+                <div class="login-divider"><span>or</span></div>
+                <div id="googleLoginBox" class="google-login-box" aria-label="Google login">
+                  <button id="googleLoginFallback" class="google-login-fallback" type="button">Continue with Google SSO</button>
+                  <div id="googleButtonMount" class="google-button-mount"></div>
+                  <small id="googleLoginStatus">Checking sign-in options.</small>
                 </div>
-              </div>
-              <p class="access-copy">Start a secure hosted checkout. Access is activated automatically after successful payment; KBrenner and MAhmed keep internal access without payment.</p>
-              <label>
-                <span>Name</span>
-                <input id="checkoutName" autocomplete="name" placeholder="Customer name" />
-              </label>
-              <label>
-                <span>Email</span>
-                <input id="checkoutEmail" type="email" autocomplete="email" placeholder="billing@company.com" />
-              </label>
-              <label>
-                <span>Company</span>
-                <input id="checkoutCompany" autocomplete="organization" placeholder="Company or university" />
-              </label>
-              <button class="login-button" type="submit">Continue to secure checkout</button>
-              <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
-              <small>Payments are handled by Stripe Checkout. After payment, Axion issues the license and unlocks the workspace automatically.</small>
-            </form>
+                <p id="loginError" class="login-error" role="alert"></p>
+                <small>Private workspaces, projects, saved models, billing state, and collaboration permissions are handled by the backend.</small>
+              </form>
+              <form id="checkoutForm" class="access-card checkout-card">
+                <div class="checkout-header">
+                  <p>Need access?</p>
+                  <h3>Activate Axion Pro</h3>
+                </div>
+                <p class="access-copy">New users can activate a secure license through hosted checkout. After successful payment, the workspace unlocks automatically.</p>
+                <div class="checkout-summary">
+                  <strong>Axion Pro · Professional Individual</strong>
+                  <span>€2,400/year via secure checkout. Team, engineering partner, and enterprise plans are handled as managed onboarding.</span>
+                </div>
+                <label>
+                  <span>Email</span>
+                  <input id="checkoutEmail" type="email" autocomplete="email" placeholder="billing@company.com" />
+                </label>
+                <label>
+                  <span>Company</span>
+                  <input id="checkoutCompany" autocomplete="organization" placeholder="Company or university" />
+                </label>
+                <button class="login-button checkout-button" type="submit">Activate access</button>
+                <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
+                <small>Payments are handled by Stripe Checkout when backend payment credentials are configured.</small>
+              </form>
+            </div>
           </section>
         </main>
       </div>
