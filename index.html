@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260716-realtime-cfd-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260716-clickable-details-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -56,7 +56,7 @@
                 <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and CFD screening.</p>
                 <div class="composer-actions">
                   <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
-                  <button class="public-secondary" type="button" data-public-target="publicPlatform">See modules</button>
+                  <button class="public-secondary" type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">See the mAb example</button>
                 </div>
               </div>
               <div class="hero-outcome-panel" aria-label="Generated workspace preview">
@@ -80,7 +80,7 @@
               <div class="prompt-suggestions" aria-label="Example process prompts">
                 <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
                 <button type="button" data-public-target="loginPanel">Penicillin fermentation</button>
-                <button type="button" data-public-target="loginPanel">Antibody GMP facility</button>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">Antibody GMP facility</button>
                 <button type="button" data-public-target="loginPanel">Wastewater + heat reuse</button>
               </div>
               <div class="hero-trust-strip" aria-label="Axion workspace highlights">
@@ -145,43 +145,81 @@
               <h2>From product brief to editable plant model.</h2>
             </div>
             <div class="platform-grid">
-              <article>
+              <article data-public-detail="brief">
                 <span>01</span>
                 <h3>Natural-language process brief</h3>
                 <p>Start with penicillin, cultured meat, antibodies, fermentation, vaccines, plasmids, cell therapy, water, or emissions. Axion maps the brief to a process architecture.</p>
+                <button type="button" data-public-detail="brief">Open brief layer</button>
               </article>
-              <article>
+              <article data-public-detail="builder">
                 <span>02</span>
                 <h3>Flowsheet + equipment builder</h3>
                 <p>Drag equipment, connect animated streams, add CIP/SIP, recycle, heat reuse, utilities, valves, sensors, QC nodes, and support infrastructure.</p>
+                <button type="button" data-public-detail="builder">Open builder layer</button>
               </article>
-              <article>
+              <article data-public-detail="reports">
                 <span>03</span>
                 <h3>Models, equations, and downloads</h3>
                 <p>Work with mass and energy balances, chemical equations, stream tables, parameters, economics, standards, LCA inventories, TEA cost drivers, and downloadable CSV/SVG datasets.</p>
+                <button type="button" data-public-detail="reports">Open report layer</button>
               </article>
-              <article>
+              <article data-public-detail="ai">
                 <span>04</span>
                 <h3>AI-assisted engineering</h3>
                 <p>Ask what blocks oxygen transfer, ammonium control, media cost, scale-up, cleaning, heat recovery, or facility readiness, then jump to the right tool module.</p>
+                <button type="button" data-public-detail="ai">Open AI layer</button>
               </article>
             </div>
             <div class="public-example-grid" aria-label="Concrete platform examples">
-              <article>
+              <article data-public-detail="mab-overview">
                 <span>Example in Axion</span>
                 <h3>10,000 L mAb fed-batch model</h3>
                 <p>Generates seed train, production STR, harvest, depth filtration, Protein A, low-pH viral inactivation, polishing, UF/DF, fill, QC release, CIP/SIP, mass balance, LCA inventory, and TEA cost stack.</p>
+                <button type="button" data-public-detail="mab-overview">Explore antibody model</button>
               </article>
-              <article>
+              <article data-public-detail="cultured-meat">
                 <span>Example in Axion</span>
                 <h3>Cultured meat perfusion plant</h3>
                 <p>Shows media preparation, seed expansion, perfusion bioreactor, cell-retention, harvest wash, formulation, packaging, ammonia and lactate boundaries, heat reuse, wastewater, and water-reuse loops.</p>
+                <button type="button" data-public-detail="cultured-meat">Open example</button>
               </article>
-              <article>
+              <article data-public-detail="penicillin">
                 <span>Example in Axion</span>
                 <h3>Penicillin fermentation route</h3>
                 <p>Builds sterile media, aerobic fermentation, cell removal, extraction, solvent recycle, crystallization, drying, emissions, hazardous solvent checks, route scheduling, and downstream yield sensitivity.</p>
+                <button type="button" data-public-detail="penicillin">Open example</button>
               </article>
+            </div>
+            <div class="public-case-study" id="publicCaseStudy" aria-label="Interactive monoclonal antibody case study">
+              <div class="case-study-copy">
+                <p>Most requested SuperPro-style example</p>
+                <h3>Monoclonal antibody production, built as a guided product demo.</h3>
+                <span>SuperPro Designer’s own example library and training materials prominently feature monoclonal antibody manufacturing. Axion uses that high-demand biopharma pattern as the front-page walkthrough because it touches the full problem: upstream cell culture, downstream purification, viral safety, scheduling, economics, LCA, quality, and scale-up physics.</span>
+                <div class="case-study-actions">
+                  <button type="button" data-public-detail="mab-overview">Overview</button>
+                  <button type="button" data-public-detail="mab-upstream">Upstream</button>
+                  <button type="button" data-public-detail="mab-downstream">Downstream</button>
+                  <button type="button" data-public-detail="mab-cfd">CFD + boundaries</button>
+                  <button type="button" data-public-detail="mab-reports">Reports</button>
+                </div>
+              </div>
+              <div class="case-study-map" aria-label="mAb process path">
+                <button type="button" data-public-detail="mab-upstream"><b>01</b><span>Media + seed train</span></button>
+                <i></i>
+                <button type="button" data-public-detail="mab-upstream"><b>02</b><span>CHO production STR</span></button>
+                <i></i>
+                <button type="button" data-public-detail="mab-downstream"><b>03</b><span>Harvest + Protein A</span></button>
+                <i></i>
+                <button type="button" data-public-detail="mab-downstream"><b>04</b><span>VI + polishing</span></button>
+                <i></i>
+                <button type="button" data-public-detail="mab-reports"><b>05</b><span>UF/DF + fill + release</span></button>
+              </div>
+              <div id="publicDetailPanel" class="public-detail-panel" aria-live="polite"></div>
+              <div class="case-source-note">
+                <span>Example basis</span>
+                <p>Based on publicly listed SuperPro Designer monoclonal-antibody examples and common CHO/mAb platform process structure. Axion is not copying proprietary files; it demonstrates an editable modern workflow around this process type.</p>
+                <p class="source-links"><a href="https://www.intelligen.com/products/superpro-examples/" target="_blank" rel="noreferrer">Intelligen example library</a><a href="https://www.intelligen.com/static/SPDDownloadCenter/Latest/Example_Process_Files.htm" target="_blank" rel="noreferrer">SuperPro example process files</a><a href="https://www.researchgate.net/publication/340742077_Monoclonal_Antibody_Production_-_Comparison_of_Stainless-Steel_Equipment_vs_Disposable_Single-Use_Equipment_-_Process_Modeling_and_Techno-Economic_Assessment_TEA_with_SuperPro_Designer" target="_blank" rel="noreferrer">mAb TEA example</a></p>
+              </div>
             </div>
           </section>
 
@@ -191,26 +229,29 @@
               <h2>A technical operating layer for process design.</h2>
             </div>
             <div class="workflow-rail">
-              <article><b>Product</b><span>Define product, organism, scale, titer, recovery, quality constraints, and uploaded data.</span></article>
-              <article><b>Process</b><span>Generate and edit the flowsheet, unit procedures, streams, utilities, cleaning loops, and recycle paths.</span></article>
-              <article><b>Physics</b><span>Check kLa, OUR, pH, DO, heat load, mixing time, cell boundaries, and CFD-style distribution risks.</span></article>
-              <article><b>Decision</b><span>Export streams, equations, parameters, balances, LCA inventory, LCA impacts, TEA-ready cost model, SVG visuals, and readiness recommendations.</span></article>
+              <article data-public-detail="brief"><b>Product</b><span>Define product, organism, scale, titer, recovery, quality constraints, and uploaded data.</span><button type="button" data-public-target="publicPlatform" data-public-detail="brief">Open detail</button></article>
+              <article data-public-detail="builder"><b>Process</b><span>Generate and edit the flowsheet, unit procedures, streams, utilities, cleaning loops, and recycle paths.</span><button type="button" data-public-target="publicPlatform" data-public-detail="builder">Open detail</button></article>
+              <article data-public-detail="mab-cfd"><b>Physics</b><span>Check kLa, OUR, pH, DO, heat load, mixing time, cell boundaries, and CFD-style distribution risks.</span><button type="button" data-public-target="publicPlatform" data-public-detail="mab-cfd">Open detail</button></article>
+              <article data-public-detail="reports"><b>Decision</b><span>Export streams, equations, parameters, balances, LCA inventory, LCA impacts, TEA-ready cost model, SVG visuals, and readiness recommendations.</span><button type="button" data-public-target="publicPlatform" data-public-detail="reports">Open detail</button></article>
             </div>
             <div class="public-example-grid workflow-examples" aria-label="Concrete workflow examples">
               <article>
                 <span>Workflow example</span>
                 <h3>“Reduce media cost by 20%”</h3>
                 <p>Open parameters, lower media intensity, test titer/recovery tradeoffs, inspect ammonium/osmolality warnings, compare direct cost, then download TEA-ready CSV for the new scenario.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-reports">See optimization output</button>
               </article>
               <article>
                 <span>Workflow example</span>
                 <h3>“Can I scale this reactor?”</h3>
                 <p>Jump to CFD, check kLa/OTR margin, mixing time, gas hold-up, shear and dead zones, then return to Process Builder to split the reactor into parallel scale-out trains.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-cfd">See CFD layer</button>
               </article>
               <article>
                 <span>Workflow example</span>
                 <h3>“Prepare an LCA handoff”</h3>
                 <p>Use streams and reports to export water, WFI, media, chemicals, utilities, waste, emissions, per-batch values, annual values, per-kg values, and screening CO2e factors.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="reports">See downloads</button>
               </article>
             </div>
           </section>
@@ -279,17 +320,20 @@
               <span>Regulatory review</span>
             </div>
             <div class="ecosystem-grid">
-              <article>
+              <article data-public-detail="sources">
                 <h3>Scientific reference layer</h3>
                 <p>Attach papers, supplier data, standards, assumptions, and SOP notes directly to units, streams, parameters, and scale-up decisions.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="sources">Open detail</button>
               </article>
-              <article>
+              <article data-public-detail="connectors">
                 <h3>Integration layer</h3>
                 <p>Model CSV uploads, historian data, OPC UA, SCADA, sensor streams, batch records, and source-backed parameter updates.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="connectors">Open detail</button>
               </article>
-              <article>
+              <article data-public-detail="recommendations">
                 <h3>Review layer</h3>
                 <p>Use structured recommendations to see what still has to be added before a full production simulation is defensible.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="recommendations">Open detail</button>
               </article>
             </div>
             <div class="public-example-grid ecosystem-examples" aria-label="Concrete ecosystem examples">
@@ -297,16 +341,19 @@
                 <span>Integration example</span>
                 <h3>SCADA / historian handoff</h3>
                 <p>Map DO, pH, temperature, airflow, agitation, pressure, feed mass and conductivity tags to live digital-twin variables and compare them with the model envelope.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="connectors">See connector path</button>
               </article>
               <article>
                 <span>Partner example</span>
                 <h3>Supplier quote review</h3>
                 <p>Attach bioreactor, filter, resin, membrane, CIP skid and clean-utility assumptions to CAPEX/OPEX rows so TEA reviewers can replace screening factors with quoted values.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="sources">See source layer</button>
               </article>
               <article>
                 <span>Model example</span>
                 <h3>gPROMS-style high-fidelity path</h3>
                 <p>Use Axion’s model cards to decide where equation-oriented modelling, parameter estimation, optimization, soft sensors, web apps and utility optimization should be connected next.</p>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="recommendations">See readiness path</button>
               </article>
             </div>
           </section>
@@ -512,11 +559,11 @@
               <div class="login-brand">
                 <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>
                 <div>
-                  <p>Paid access</p>
-                  <h1>Activate Axion</h1>
+                  <p>Secure subscription</p>
+                  <h1>Start Axion Pro</h1>
                 </div>
               </div>
-              <p class="access-copy">For all users except KBrenner and MAhmed, access is activated after payment. Submit the billing contact to generate a bank-transfer reference and license order.</p>
+              <p class="access-copy">Start a secure hosted checkout. Access is activated automatically after successful payment; KBrenner and MAhmed keep internal access without payment.</p>
               <label>
                 <span>Name</span>
                 <input id="checkoutName" autocomplete="name" placeholder="Customer name" />
@@ -529,9 +576,9 @@
                 <span>Company</span>
                 <input id="checkoutCompany" autocomplete="organization" placeholder="Company or university" />
               </label>
-              <button class="login-button" type="submit">Generate payment reference</button>
+              <button class="login-button" type="submit">Continue to secure checkout</button>
               <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
-              <small>After the bank transfer is received, the admin marks the order paid and Axion issues a license key.</small>
+              <small>Payments are handled by Stripe Checkout. After payment, Axion issues the license and unlocks the workspace automatically.</small>
             </form>
           </section>
         </main>

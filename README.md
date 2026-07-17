@@ -9,7 +9,7 @@ npm install
 npm run backend
 ```
 
-Then open `http://127.0.0.1:8899/index.html?v=20260716-realtime-cfd-v1`.
+Then open `http://127.0.0.1:8899/index.html?v=saas-checkout-v1`.
 
 ## Online static access
 
@@ -29,6 +29,7 @@ The front of the application now works like a company-grade product entry flow:
 - The Process Builder can be opened directly from Twin OS and automatically fits the full process canvas
 - Platform, Workflow, and Ecosystem pages include concrete tool examples for mAb, cultured meat, penicillin, LCA/TEA handoff, SCADA/historian, supplier quotes, and gPROMS-style modelling paths
 - Real-time digital-twin telemetry cards show live DO, pH, OTR margin, mixing time, heat load, and mass-closure signals in Overview, Simulation, and CFD
+- Click-to-explore detail drawer for public cards, KPI tiles, reports, sources, standards, recommendations, simulation cards, live telemetry, canvas units, streams, and tables, with animated click feedback and contextual tool jumps
 - A persistent help field lets users describe a problem in words and receive direct tool steps
 
 ## Private workspace backend
@@ -39,6 +40,7 @@ Axion includes a small Node backend for private workspace access, product briefs
 export AXION_ADMIN_USER="owner"
 export AXION_ADMIN_PASSWORD="set-a-private-password"
 export SESSION_SECRET="set-a-long-random-secret"
+export APP_BASE_URL="http://127.0.0.1:8899"
 export GOOGLE_CLIENT_ID="your-google-oauth-client-id.apps.googleusercontent.com"
 export GOOGLE_ALLOWED_EMAILS="you@example.com"
 export GOOGLE_ALLOWED_DOMAINS=""
@@ -53,11 +55,22 @@ The paywall is backend-enforced. Do not use a static GitHub Pages deployment for
 1. Copy `.env.example` to `.env`.
 2. Set `SESSION_SECRET` to a long private random string.
 3. Set `AXION_PRICE_CENTS=72500` and `AXION_CURRENCY=EUR`.
-4. Fill `BANK_ACCOUNT_HOLDER`, `BANK_IBAN`, `BANK_BIC`, and `BANK_NAME`.
-5. Start the backend with `npm run backend`.
-6. New paying users open the login page and submit the paid-access form.
-7. The backend creates a bank-transfer order with a unique reference.
-8. After the bank transfer arrives, the admin marks the order paid:
+4. Create a Stripe product/price for the annual Axion license, or let the backend create a one-off checkout price from `AXION_PRICE_CENTS`.
+5. Set `STRIPE_SECRET_KEY`.
+6. Optional but recommended: set `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET`.
+7. Set `APP_BASE_URL` to the public backend URL, for example `https://your-domain.com`.
+8. Start the backend with `npm run backend`.
+9. New paying users open the login page and submit the paid-access form.
+10. The backend creates a Stripe Checkout session and redirects the user to secure payment.
+11. After Stripe confirms payment, the backend creates a license and the frontend logs the user in automatically.
+
+For local webhook testing with Stripe CLI:
+
+```bash
+stripe listen --forward-to http://127.0.0.1:8899/api/stripe/webhook
+```
+
+Manual admin activation is still available as a fallback:
 
 ```bash
 TOKEN=$(curl -sS -X POST http://127.0.0.1:8899/api/auth/login \
@@ -68,14 +81,16 @@ curl -sS -X POST http://127.0.0.1:8899/api/admin/orders/ORDER_REFERENCE/mark-pai
   -H "authorization: Bearer $TOKEN"
 ```
 
-9. The response contains the activated license key. The user can then log in with their email and the license key.
+The response contains the activated license key. The user can then log in with their email and the license key.
 
 `KBrenner/kbrenner` and `MAhmed/mahmed` are seeded as payment-exempt internal users and do not need payment.
 
 ## Backend API
 
 - `GET /api/product` lists product and backend configuration
-- `POST /api/checkout` creates a 725 EUR bank-transfer order and payment reference
+- `POST /api/checkout` creates a Stripe Checkout session for the 725 EUR license
+- `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
+- `POST /api/stripe/webhook` receives Stripe checkout payment events and activates paid orders
 - `POST /api/auth/login` logs in the owner workspace
 - `GET /api/auth/google-config` tells the frontend whether Google login is configured
 - `POST /api/auth/google` verifies a Google ID token and creates a server session

@@ -1819,6 +1819,7 @@ const state = {
   projectVersions: [],
   projectInvites: [],
   integrations: [],
+  selectedIntegration: "",
   projectFolders: {},
 };
 
@@ -2128,15 +2129,15 @@ function unitFocusLevel(item) {
 }
 
 function unitWidth(item) {
-  return isMinorUnit(item) ? 156 : 238;
+  return isMinorUnit(item) ? 172 : 286;
 }
 
 function unitHeight(item) {
-  return isMinorUnit(item) ? 68 : 104;
+  return isMinorUnit(item) ? 78 : 118;
 }
 
 function unitMidline(item) {
-  return item.y + (isMinorUnit(item) ? 29 : 46);
+  return item.y + (isMinorUnit(item) ? 36 : 56);
 }
 
 function snapToCanvasGrid(value, step = 16) {
@@ -2236,7 +2237,7 @@ function importModelState(modelState = {}) {
   state.streams = Array.isArray(modelState.streams) ? clone(modelState.streams) : clone(templates[template].streams);
   state.costs = Array.isArray(modelState.costs) ? clone(modelState.costs) : clone(templates[template].costs);
   state.selectedId = modelState.selectedId || state.units[0]?.id || null;
-  state.zoom = Number(modelState.zoom) || state.zoom;
+  state.zoom = Math.max(0.72, Math.min(1.35, Number(modelState.zoom) || state.zoom));
   state.nextUnit = Number(modelState.nextUnit) || 900;
   state.nextStream = Number(modelState.nextStream) || 900;
   state.batchSize = Number(modelState.batchSize) || state.batchSize;
@@ -2280,14 +2281,20 @@ function metrics() {
   const downstreamCount = state.units.filter((item) => item.cls !== "Bioreactor").length || 1;
   const bioAdjustment = Math.max(0.75, Math.min(1.6, p.doublingTime / 24 + p.perfusionRate * 0.03 - p.specificGrowth * 0.8));
   const batchDuration = state.units.reduce((sum, item) => sum + item.residence, 0) * bioAdjustment + reactorCount * 5 + downstreamCount * 0.75;
-  const utilization = Math.min(96, (state.batchCount * batchDuration / 8760) * 100);
+  const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
+  const availabilityFactor = Math.max(0.45, Math.min(0.86, (1 - (p.resourceSlack || 12) / 100) * 0.9));
+  const cycleDuration = batchDuration + (p.setupTime || 0) + (p.turnaroundTime || 0);
+  const rawUtilization = state.batchCount * cycleDuration / Math.max(1, effectiveAot) * 100;
+  const targetUtilization = Math.max(58, Math.min(82, (p.bottleneckUtil || 82) - (p.resourceSlack || 12) * 0.35));
+  const impliedParallelTrains = Math.max(1, Math.ceil(rawUtilization / Math.max(35, targetUtilization)));
+  const utilization = Math.min(targetUtilization, rawUtilization / impliedParallelTrains * availabilityFactor + targetUtilization * (1 - availabilityFactor));
   const utilities = (state.units.reduce((sum, item) => sum + item.powerFactor, 0) + p.agitation * reactorCount + p.aeration * 8 + p.kla * 0.04) * batchDuration * state.batchCount / 1000;
   const productPerBatchKg = state.batchSize * effectiveTiter * processYield / 1000;
   const preliminary = { annualKg, batchDuration, utilization, utilities, productPerBatchKg, processYield, effectiveTiter };
   const scale = scaleEconomics(preliminary);
   const directCost = scale.directCost;
 
-  return { annualKg, batchDuration, utilization, directCost, utilities, productPerBatchKg, processYield, effectiveTiter, scale };
+  return { annualKg, batchDuration, utilization, rawUtilization, impliedParallelTrains, directCost, utilities, productPerBatchKg, processYield, effectiveTiter, scale };
 }
 
 function unitSize(item) {
@@ -4279,6 +4286,7 @@ function renderCanvas() {
     line.addEventListener("click", () => {
       state.selectedId = item.id;
       renderEquationSpotlight();
+      showExploreDetails(line);
       renderCanvas();
     });
     if (state.selectedId === item.id) line.classList.add("selected");
@@ -4299,6 +4307,7 @@ function renderCanvas() {
       label.addEventListener("click", () => {
         state.selectedId = item.id;
         renderEquationSpotlight();
+        showExploreDetails(label);
         renderCanvas();
       });
       stage.appendChild(label);
@@ -4325,9 +4334,11 @@ function renderCanvas() {
         <strong>${unitSymbol(item)}</strong>
         <small>${item.icon}</small>
       </span>
-      <span>
-        <em class="unit-role">${unitLayerLabel(layer)}</em>
-        <h3>${item.id}</h3>
+      <span class="unit-body">
+        <span class="unit-header">
+          <h3>${item.id}</h3>
+          <em class="unit-role">${unitLayerLabel(layer)}</em>
+        </span>
         <p>${item.name}</p>
         <small>${unitSize(item)} · ${unitPower(item)}</small>
         ${showEquipmentMeta ? `<small class="unit-ics">${ics.code} · ${item.cls}</small>` : ""}
@@ -4357,6 +4368,7 @@ function wireUnitNode(node, item) {
     }
     state.selectedId = item.id;
     renderEquationSpotlight();
+    showExploreDetails(node);
     renderCanvas();
   });
 
@@ -5388,6 +5400,89 @@ function renderStartBoard() {
   `;
 }
 
+function inviteStatusLabel(invite) {
+  if (invite.status === "accepted") return "Added to project";
+  if (invite.delivery === "local") return "Saved locally";
+  return "Pending invite";
+}
+
+function renderInviteCard(invite) {
+  const status = inviteStatusLabel(invite);
+  const created = invite.createdAt ? new Date(invite.createdAt).toLocaleString() : "not sent yet";
+  return `
+    <article class="invite-card clickable-surface ${invite.status === "accepted" ? "accepted" : "pending"}" data-invite-card="${escapeAttr(invite.id || invite.recipient || "")}" tabindex="0" role="button" aria-label="Open invite details for ${escapeAttr(invite.recipient || "recipient")}">
+      <div>
+        <span>${escapeHtml(status)}</span>
+        <strong>${escapeHtml(invite.recipient || "unknown recipient")}</strong>
+        <p>${escapeHtml(invite.projectName || invite.projectId || "Current project")} · ${escapeHtml(invite.role || "editor")} · ${escapeHtml(invite.delivery || "recorded")}</p>
+      </div>
+      <dl>
+        <dt>Created</dt><dd>${escapeHtml(created)}</dd>
+        <dt>Delivery</dt><dd>${invite.delivery === "email" ? "Email sent" : "Stored in Axion"}</dd>
+      </dl>
+    </article>
+  `;
+}
+
+function connectorStatusTone(status = "") {
+  if (status.includes("ready") || status.includes("active")) return "ready";
+  if (status.includes("scaffold") || status.includes("import")) return "partial";
+  return "planned";
+}
+
+function connectorPayloads(item) {
+  const byKey = {
+    superpro: ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
+    aspen: ["component list", "stream vectors", "property package assumptions", "unit operation duty table"],
+    comsol: ["bioreactor geometry", "boundary conditions", "sparger and impeller metadata", "DO/nutrient target fields"],
+    starccm: ["CFD case matrix", "mesh basis", "gas-liquid assumptions", "shear and oxygen transfer targets"],
+    opcua: ["tag map", "sampling interval", "unit parameter binding", "live telemetry stream"],
+    "osisoft-pi": ["batch historian tags", "time-series calibration data", "deviation windows", "soft-sensor input"],
+    benchling: ["experiment metadata", "assay tables", "cell-line or strain records", "media and titer data"],
+    limsid: ["QC assay fields", "release test metadata", "sample chain", "batch record handoff"],
+  };
+  return byKey[item.key] || ["stream data", "equipment metadata", "parameter set", "report export"];
+}
+
+function renderIntegrationRegistry() {
+  const items = state.integrations.length ? state.integrations : localIntegrations();
+  return items.map((item) => {
+    const selected = state.selectedIntegration === item.key;
+    const tone = connectorStatusTone(item.status || "");
+    const payloads = connectorPayloads(item);
+    return `
+      <article class="integration-card clickable-surface ${selected ? "selected" : ""}" data-integration-card="${escapeAttr(item.key)}" tabindex="0" role="button" aria-label="Open connector ${escapeAttr(item.name)}">
+        <div class="integration-head">
+          <div>
+            <span>${escapeHtml(item.category || "Connector")}</span>
+            <h4>${escapeHtml(item.name)}</h4>
+          </div>
+          <b class="connector-status ${tone}">${escapeHtml(item.status || "planned")}</b>
+        </div>
+        <p>${escapeHtml(item.description || item.direction || "Connector definition for external process-model handoff.")}</p>
+        <dl>
+          <dt>Direction</dt><dd>${escapeHtml(item.direction || "model handoff")}</dd>
+          <dt>Auth</dt><dd>${escapeHtml(item.auth || "credential setup")}</dd>
+          <dt>Payload</dt><dd>${payloads.slice(0, 3).map(escapeHtml).join(", ")}</dd>
+        </dl>
+        ${selected ? `
+          <div class="integration-detail">
+            <strong>Implementation next step</strong>
+            <p>${escapeHtml(item.status?.includes("planned")
+              ? "Add customer credentials, vendor API access, schema mapping, and a validation test before enabling live sync."
+              : "Use current Axion exports as the controlled handoff package and validate imported values in the target tool.")}</p>
+          </div>
+        ` : ""}
+        <footer>
+          <button data-integration-action="configure" data-integration-key="${escapeAttr(item.key)}" type="button">Configure</button>
+          <button data-integration-action="test" data-integration-key="${escapeAttr(item.key)}" type="button">Test mapping</button>
+          <button data-integration-action="export" data-integration-key="${escapeAttr(item.key)}" type="button">Export JSON</button>
+        </footer>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderProjectsBoard() {
   if (!els.projectsBoard) return;
   const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
@@ -5427,14 +5522,14 @@ function renderProjectsBoard() {
       <div class="project-column">
         <h3>Open projects</h3>
         ${openProjects.length ? openProjects.map((project) => `
-          <article class="project-card ${project.id === state.currentProjectId ? "active" : ""}">
+          <article class="project-card clickable-surface ${project.id === state.currentProjectId ? "active" : ""}" data-project-card="${escapeAttr(project.id)}" tabindex="0" role="button" aria-label="Open project ${escapeAttr(project.name)}">
             <div>
               <span>${project.template || "model"} · ${project.scale || "scale"}</span>
               <h4>${project.name}</h4>
               <p>${project.description || `${project.versionCount || 0} saved model versions`}</p>
             </div>
             <dl>
-              <dt>Owner</dt><dd>${project.ownerName || project.owner}</dd>
+              <dt>Owner</dt><dd>${escapeHtml(projectOwnerLabel(project))}</dd>
               <dt>Updated</dt><dd>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : "n/a"}</dd>
               <dt>Versions</dt><dd>${project.versionCount || 0}</dd>
             </dl>
@@ -5448,57 +5543,49 @@ function renderProjectsBoard() {
       <div class="project-column">
         <h3>Old versions</h3>
         ${state.projectVersions.length ? state.projectVersions.slice(0, 8).map((version) => `
-          <article class="project-version-card">
+          <article class="project-version-card clickable-surface" data-version-card="${escapeAttr(version.id)}" tabindex="0" role="button" aria-label="Open saved model version ${escapeAttr(version.label || version.id)}">
             <span>${version.label || "Saved model"}</span>
             <strong>${new Date(version.createdAt).toLocaleString()}</strong>
             <p>${version.createdBy || "user"} · ${version.summary?.units || 0} units · ${version.summary?.streams || 0} streams</p>
             <button data-restore-version="${version.id}" type="button">Restore this model</button>
           </article>
         `).join("") : `<article class="project-version-card"><p>Open a project to see its old model versions.</p></article>`}
-        ${archivedProjects.length ? `<h3>Archived projects</h3>${archivedProjects.slice(0, 6).map((project) => `<article class="project-version-card"><span>${project.name}</span><p>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : ""}</p></article>`).join("")}` : ""}
+        ${archivedProjects.length ? `<h3>Archived projects</h3>${archivedProjects.slice(0, 6).map((project) => `<article class="project-version-card clickable-surface" data-project-card="${escapeAttr(project.id)}" tabindex="0" role="button"><span>${escapeHtml(project.name)}</span><p>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : ""}</p></article>`).join("")}` : ""}
       </div>
     </section>
     <section class="collaboration-panel">
       <div>
         <p>Collaboration</p>
-        <h3>Invite by email or username</h3>
-        <span>If the user already exists, Axion adds them to the project. Otherwise the invite is stored as pending until a real email provider is connected.</span>
+        <h3>${activeProject ? "Invite collaborators to this model." : "Save a project before inviting collaborators."}</h3>
+        <span>${activeProject
+          ? "Invite by email or username. Existing Axion users are added to the project; external recipients are stored as pending until email delivery is connected."
+          : "Collaboration is project-based, so Axion first needs a saved model with an owner, version history, and a project ID."}</span>
       </div>
       <label>
         <span>Email or username</span>
-        <input id="inviteRecipient" type="text" placeholder="mahmed or person@company.com" />
+        <input id="inviteRecipient" type="text" placeholder="mahmed or person@company.com" ${activeProject ? "" : "disabled"} />
       </label>
       <label>
         <span>Role</span>
-        <select id="inviteRole">
+        <select id="inviteRole" ${activeProject ? "" : "disabled"}>
           <option value="editor">Editor</option>
           <option value="viewer">Viewer</option>
           <option value="owner">Owner</option>
         </select>
       </label>
-      <button class="action-button primary" data-invite-collaborator type="button">Invite collaborator</button>
+      <button class="action-button primary" data-invite-collaborator type="button" ${activeProject ? "" : "disabled"}>${activeProject ? "Invite collaborator" : "Save project first"}</button>
     </section>
     <section class="project-grid">
       <div class="project-column">
         <h3>Invites</h3>
-        ${state.projectInvites.length ? state.projectInvites.slice(0, 10).map((invite) => `
-          <article class="project-version-card">
-            <span>${invite.status}</span>
-            <strong>${invite.recipient}</strong>
-            <p>${invite.projectName || invite.projectId} · ${invite.role} · ${invite.delivery || "recorded"}</p>
-          </article>
-        `).join("") : `<article class="project-version-card"><p>No invitations yet.</p></article>`}
+        ${state.projectInvites.length ? state.projectInvites.slice(0, 10).map(renderInviteCard).join("") : `<article class="project-version-card"><p>No invitations yet. Save a project, then invite MAhmed, KBrenner, or an external email address.</p></article>`}
       </div>
-      <div class="project-column">
-        <h3>API connector registry</h3>
-        ${state.integrations.map((item) => `
-          <article class="integration-card">
-            <span>${item.category}</span>
-            <h4>${item.name}</h4>
-            <p>${item.direction || item.description}</p>
-            <small>${item.status} · auth: ${item.auth}</small>
-          </article>
-        `).join("")}
+      <div class="project-column connector-column">
+        <div class="connector-heading">
+          <h3>API connector registry</h3>
+          <p>Prepared handoff targets for simulation, CFD, historian, ELN/LIMS, and plant-data tools. Live sync needs credentials and vendor access.</p>
+        </div>
+        ${renderIntegrationRegistry()}
       </div>
     </section>
   `;
@@ -5662,8 +5749,14 @@ function enhanceInteractiveSurfaces() {
 }
 
 function exploreTitle(item) {
-  const preferred = item.querySelector("h1, h2, h3, h4, strong, b")?.textContent?.trim()
+  const heading = item.querySelector("h1, h2, h3, h4")?.textContent?.trim();
+  const label = item.querySelector("span")?.textContent?.trim();
+  const metric = item.querySelector("strong, b")?.textContent?.trim();
+  const preferred = heading
+    || (label && metric ? `${label}: ${metric}` : label)
+    || metric
     || item.getAttribute("aria-label")
+    || item.getAttribute("title")
     || item.dataset.id
     || item.textContent?.trim().split(/\s+/).slice(0, 7).join(" ")
     || "selected item";
@@ -5708,6 +5801,21 @@ function exploreContext(item) {
 
 function showExploreDetails(item) {
   if (!els.detailDrawer) return;
+  const projectCardId = item.dataset.projectCard;
+  const versionCardId = item.dataset.versionCard;
+  const inviteCardId = item.dataset.inviteCard;
+  if (projectCardId && projectById(projectCardId)) {
+    showProjectDetails(projectById(projectCardId));
+    return;
+  }
+  if (versionCardId && versionById(versionCardId)) {
+    showVersionDetails(versionById(versionCardId));
+    return;
+  }
+  if (inviteCardId && inviteById(inviteCardId)) {
+    showInviteDetails(inviteById(inviteCardId));
+    return;
+  }
   const title = exploreTitle(item);
   const body = exploreBody(item);
   const metrics = exploreMetrics(item);
@@ -5722,6 +5830,76 @@ function showExploreDetails(item) {
       <div class="detail-next">
         <small>${escapeHtml(context.note)}</small>
         <button data-detail-jump="${context.view}" type="button">${context.label}</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
+function showProjectDetails(project) {
+  if (!els.detailDrawer || !project) return;
+  const collaborators = (project.collaborators || []).map((item) => `${item.principal} (${item.role})`).join(", ") || "No collaborators yet";
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>Project</span>
+      <h3>${escapeHtml(project.name || "Untitled project")}</h3>
+      <p>${escapeHtml(project.description || "Saved Axion process model with equipment, streams, balances, economics, CFD screening, and reports.")}</p>
+      <dl>
+        <dt>Owner</dt><dd>${escapeHtml(projectOwnerLabel(project))}</dd>
+        <dt>Project ID</dt><dd>${escapeHtml(project.id)}</dd>
+        <dt>Updated</dt><dd>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : "n/a"}</dd>
+        <dt>Versions</dt><dd>${project.versionCount || 0}</dd>
+        <dt>Collaborators</dt><dd>${escapeHtml(collaborators)}</dd>
+      </dl>
+      <div class="detail-actions">
+        <button data-detail-load-project="${escapeAttr(project.id)}" type="button">Open project</button>
+        <button data-detail-jump="projects" type="button">Stay in projects</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
+function showVersionDetails(version) {
+  if (!els.detailDrawer || !version) return;
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>Archived model version</span>
+      <h3>${escapeHtml(version.label || "Saved model")}</h3>
+      <p>Created ${version.createdAt ? new Date(version.createdAt).toLocaleString() : "at unknown time"} by ${escapeHtml(version.createdBy || "user")}.</p>
+      <dl>
+        <dt>Units</dt><dd>${version.summary?.units || 0}</dd>
+        <dt>Streams</dt><dd>${version.summary?.streams || 0}</dd>
+        <dt>Template</dt><dd>${escapeHtml(version.summary?.template || state.template)}</dd>
+        <dt>Scale</dt><dd>${escapeHtml(version.summary?.scale || state.scale)}</dd>
+      </dl>
+      <div class="detail-actions">
+        <button data-detail-restore-version="${escapeAttr(version.id)}" type="button">Restore this version</button>
+        <button data-detail-jump="reports" type="button">Open downloads</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
+function showInviteDetails(invite) {
+  if (!els.detailDrawer || !invite) return;
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>${escapeHtml(inviteStatusLabel(invite))}</span>
+      <h3>${escapeHtml(invite.recipient || "Collaborator")}</h3>
+      <p>${escapeHtml(invite.projectName || invite.projectId || state.projectName)} · ${escapeHtml(invite.role || "editor")} access · ${escapeHtml(invite.delivery || "recorded locally")}.</p>
+      <dl>
+        <dt>Status</dt><dd>${escapeHtml(invite.status || "pending")}</dd>
+        <dt>Role</dt><dd>${escapeHtml(invite.role || "editor")}</dd>
+        <dt>Created</dt><dd>${invite.createdAt ? new Date(invite.createdAt).toLocaleString() : "not sent yet"}</dd>
+        <dt>Delivery</dt><dd>${invite.delivery === "email" ? "Email sent" : "Stored in Axion"}</dd>
+      </dl>
+      <div class="detail-actions">
+        <button data-detail-jump="projects" type="button">Back to project workspace</button>
       </div>
     </div>
   `;
@@ -5786,6 +5964,11 @@ function cfdEngineeringMetrics(unit, cells) {
   const otrMargin = otrMmolLh / Math.max(0.1, p.our);
   const deadZonePct = cells.filter((cell) => cell.oxygen < 0.45 || cell.nutrient < 0.45).length / cells.length * 100;
   const shearLimit = isCellCultureTemplate() ? 1.8 : 3.5;
+  const workingVolumePct = unit.type === "seed-reactor"
+    ? 65
+    : isCellCultureTemplate()
+      ? 72
+      : 80;
   return {
     diameterM,
     impellerM,
@@ -5799,6 +5982,7 @@ function cfdEngineeringMetrics(unit, cells) {
     otrMargin,
     deadZonePct,
     shearLimit,
+    workingVolumePct,
   };
 }
 
@@ -5888,8 +6072,9 @@ function renderCfdBoard() {
           <span>${formatNumber(selected.volumeL, 0)} L</span>
           <strong>${selected.id}</strong>
         </div>
-        <div class="cfd-vessel-body">
-          <div class="cfd-liquid-level"><span>working volume</span></div>
+        <div class="cfd-vessel-body" style="--working-volume:${formatNumber(eng.workingVolumePct, 1)}%;">
+          <div class="cfd-headspace"><span>headspace</span></div>
+          <div class="cfd-liquid-level"><span>working volume ${formatNumber(eng.workingVolumePct, 0)}%</span></div>
           <div class="cfd-baffle baffle-left"></div>
           <div class="cfd-baffle baffle-right"></div>
           <div class="cfd-baffle baffle-back"></div>
@@ -5935,6 +6120,7 @@ function renderCfdBoard() {
           <article><span>Tip speed</span><strong>${formatNumber(eng.tipSpeed, 2)}</strong><small>m/s, ${formatNumber(eng.rpm, 0)} rpm</small></article>
           <article><span>OTR margin</span><strong>${formatNumber(eng.otrMargin, 2)}x</strong><small>${formatNumber(eng.otrMmolLh, 2)} mmol/L/h proxy</small></article>
           <article><span>Gas hold-up</span><strong>${formatNumber(eng.gasHoldUpPct, 1)}%</strong><small>sparger/aeration proxy</small></article>
+          <article><span>Working volume</span><strong>${formatNumber(eng.workingVolumePct, 0)}%</strong><small>of vessel volume, max 80% screen</small></article>
         </div>
         ${renderRealtimeTelemetry(true)}
         <div class="cfd-actions">
@@ -6747,12 +6933,25 @@ function setMode(mode) {
 function setView(view) {
   const target = document.querySelector(`#${view}View`);
   if (!target) return;
+  document.body.dataset.activeView = view;
+  if (view === "simulation") renderSimulationBoard();
+  if (view === "cfd") renderCfdBoard();
+  if (view === "reports") renderReportsBoard();
+  if (view === "recommendations") renderRecommendations();
   document.querySelectorAll(".view").forEach((item) => item.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   if (els.pageTitle) els.pageTitle.textContent = pageTitle(view);
   target.classList.add("active");
+  document.querySelector(".workspace")?.scrollTo({ left: 0, top: document.querySelector(".workspace")?.scrollTop || 0, behavior: "auto" });
   if (view === "flowsheet") openProcessCanvas();
+  else window.requestAnimationFrame(() => target.scrollIntoView({ block: "start", behavior: "smooth" }));
+}
+
+function jumpToView(view) {
+  if (!view) return;
+  setView(view);
+  showToast(`${pageTitle(view)} opened`);
 }
 
 function openProcessCanvas() {
@@ -6777,7 +6976,7 @@ function fitCanvas(silent = false) {
   const rect = els.canvas.getBoundingClientRect();
   const availableWidth = Math.max(240, rect.width - 48);
   const availableHeight = Math.max(220, rect.height - 48);
-  state.zoom = Math.max(0.18, Math.min(1, Math.min(availableWidth / maxX, availableHeight / maxY)));
+  state.zoom = Math.max(0.72, Math.min(1, Math.min(availableWidth / maxX, availableHeight / maxY)));
   renderCanvas();
   els.canvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
   if (!silent) showToast(`Fitted full process at ${Math.round(state.zoom * 100)}%`);
@@ -6951,8 +7150,8 @@ const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth"
 const staticAuth = {
   token: "axion-static-session-v1",
   users: [
-    { user: "kbrenner", passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9" },
-    { user: "mahmed", passwordHash: "5626696e19ac4b81318bf2bdc4af05efb210da38a29f0cc395eeda1c37d11ede" },
+    { user: "kbrenner", name: "KBrenner", role: "admin", passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9" },
+    { user: "mahmed", name: "MAhmed", role: "user", passwordHash: "5626696e19ac4b81318bf2bdc4af05efb210da38a29f0cc395eeda1c37d11ede" },
   ],
 };
 let staticAccessMode = false;
@@ -6966,13 +7165,32 @@ async function sha256Hex(value) {
 async function staticPasswordMatches(user, password) {
   const normalizedUser = user.trim().toLowerCase();
   const passwordHash = await sha256Hex(password);
-  return staticAuth.users.some((candidate) => candidate.user === normalizedUser && candidate.passwordHash === passwordHash);
+  return staticAuth.users.find((candidate) => candidate.user === normalizedUser && candidate.passwordHash === passwordHash) || null;
+}
+
+function staticAccountForUser(user = "") {
+  const normalizedUser = String(user || "").trim().toLowerCase();
+  const candidate = staticAuth.users.find((item) => item.user === normalizedUser) || staticAuth.users[0];
+  return {
+    role: candidate.role || "static",
+    name: candidate.name || candidate.user,
+    username: candidate.user,
+    principal: candidate.user,
+    productName: "Axion Process OS",
+    billing: {
+      plan: candidate.role === "admin" ? "Owner workspace" : "Internal private workspace",
+      paymentStatus: "password access, payment exempt",
+      amountFormatted: "725,00 EUR",
+      customerId: candidate.user,
+      billingEmail: `${candidate.user}@local.axion`,
+    },
+  };
 }
 
 async function apiRequest(path, options = {}) {
   const session = window.localStorage.getItem("axion-session");
   if (session === staticAuth.token && path === "/api/account") {
-    return { account: { role: "static", name: "Static workspace user", username: "static", principal: "static", productName: "Axion Process OS", billing: { plan: "Static private workspace", paymentStatus: "password access", amountFormatted: "725,00 EUR" } } };
+    return { account: staticAccountForUser(window.localStorage.getItem("axion-static-user") || "") };
   }
   if (path === "/api/auth/google-config" && session === staticAuth.token) {
     return { enabled: false, clientId: "" };
@@ -7002,14 +7220,58 @@ function storeSession(token) {
   clearLegacyAuth();
 }
 
+function prettyUsername(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "kbrenner") return "KBrenner";
+  if (normalized === "mahmed") return "MAhmed";
+  return String(value || "").trim();
+}
+
 function accountName() {
   const account = state.account || {};
-  return account.name || account.username || account.email || account.principal || "Axion user";
+  if (account.username) return prettyUsername(account.username);
+  const name = String(account.name || "").trim();
+  if (name && !["admin", "owner", "workspace owner", "static workspace user"].includes(name.toLowerCase())) return name;
+  return account.email || account.principal || "Axion user";
+}
+
+function accountAccessLabel(account = state.account || {}) {
+  if (account.role === "admin") return "Owner access";
+  if (account.role === "customer") return "Paid workspace";
+  if (account.role === "user") return "Internal user access";
+  if (account.role === "static") return "Password access";
+  return "Workspace access";
 }
 
 function accountInitials() {
   const parts = accountName().split(/[\s@._-]+/).filter(Boolean);
   return (parts[0]?.[0] || "A") + (parts[1]?.[0] || "X");
+}
+
+function accountPrincipal() {
+  const account = state.account || {};
+  return account.username || account.email || account.principal || account.name || "local-user";
+}
+
+function projectOwnerLabel(project = {}) {
+  const owner = project.owner || accountPrincipal();
+  const rawOwnerName = project.ownerName || (owner === accountPrincipal() ? accountName() : owner);
+  const ownerName = ["workspace owner", "owner", "admin", "static user", "static workspace user"].includes(String(rawOwnerName).toLowerCase())
+    ? prettyUsername(owner)
+    : rawOwnerName;
+  return ownerName && ownerName !== owner ? `${ownerName} (${owner})` : owner;
+}
+
+function projectById(projectId) {
+  return state.projects.find((project) => project.id === projectId);
+}
+
+function versionById(versionId) {
+  return state.projectVersions.find((version) => version.id === versionId);
+}
+
+function inviteById(inviteId) {
+  return state.projectInvites.find((invite) => invite.id === inviteId);
 }
 
 function renderProfileMenu() {
@@ -7021,6 +7283,7 @@ function renderProfileMenu() {
   const amount = billing.amountFormatted || config.amountFormatted || "725,00 EUR";
   const paymentStatus = billing.paymentStatus || (account.licenseKey ? "active license" : account.role === "static" ? "static access" : "workspace access");
   const plan = billing.plan || (account.role === "admin" ? "Owner workspace" : account.role === "customer" ? "Professional license" : "Private workspace");
+  const principal = account.username || account.email || account.principal || accountName();
   els.profileInitials.textContent = accountInitials().toUpperCase().slice(0, 2);
   els.profileName.textContent = accountName();
   els.profilePanel.innerHTML = `
@@ -7029,11 +7292,12 @@ function renderProfileMenu() {
         <span>${accountInitials().toUpperCase().slice(0, 2)}</span>
         <div>
           <strong>${accountName()}</strong>
-          <small>${account.email || account.username || account.principal || "local workspace"}</small>
+          <small>${escapeHtml(principal)}</small>
         </div>
       </div>
       <dl>
-        <dt>Role</dt><dd>${account.role || "static"}</dd>
+        <dt>User</dt><dd>${escapeHtml(accountName())}</dd>
+        <dt>Access</dt><dd>${escapeHtml(accountAccessLabel(account))}</dd>
         <dt>Plan</dt><dd>${plan}</dd>
         <dt>Status</dt><dd>${paymentStatus}</dd>
         <dt>Price</dt><dd>${amount}</dd>
@@ -7079,18 +7343,44 @@ function renderCheckoutResult(payload) {
   if (!els.checkoutResult) return;
   const order = payload.order || {};
   const payment = payload.payment || {};
-  const bank = payment.bank || {};
+  const checkoutUrl = payment.checkoutUrl || order.checkoutUrl || "";
+  const paid = Boolean(payload.paid || order.status === "paid_active" || payload.licenseKey);
+  const amount = payment.amount || order.amount || "";
+  const currency = payment.currency || order.currency || state.productConfig?.currency || "EUR";
+  const licenseKey = payload.licenseKey || order.licenseKey || "";
+  if (paid) {
+    els.checkoutResult.innerHTML = `
+      <strong>Access is active</strong>
+      <dl>
+        <dt>Reference</dt><dd>${escapeHtml(order.reference || payment.reference || "paid checkout")}</dd>
+        <dt>Billing email</dt><dd>${escapeHtml(payload.customerEmail || order.customerEmail || els.checkoutEmail?.value || "")}</dd>
+        <dt>License</dt><dd>${escapeHtml(licenseKey || "created")}</dd>
+      </dl>
+      <p>${escapeHtml(payload.instruction || "Payment confirmed. Axion is unlocking your workspace now.")}</p>
+    `;
+    return;
+  }
+  if (checkoutUrl) {
+    els.checkoutResult.innerHTML = `
+      <strong>Secure checkout ready</strong>
+      <dl>
+        <dt>Reference</dt><dd>${escapeHtml(order.reference || payment.reference || "")}</dd>
+        <dt>Amount</dt><dd>${escapeHtml(`${amount} ${currency}`)}</dd>
+        <dt>Activation</dt><dd>automatic after payment</dd>
+      </dl>
+      <p>${escapeHtml(payment.instruction || "Continue to Stripe Checkout. Your license activates automatically after successful payment.")}</p>
+      <a class="checkout-link" href="${escapeHtml(checkoutUrl)}">Open secure checkout</a>
+    `;
+    return;
+  }
   els.checkoutResult.innerHTML = `
-    <strong>Payment reference created</strong>
+    <strong>Checkout setup needed</strong>
     <dl>
-      <dt>Reference</dt><dd>${order.reference || payment.reference}</dd>
-      <dt>Amount</dt><dd>${payment.amount || order.amount} ${payment.currency || order.currency || "EUR"}</dd>
-      <dt>Recipient</dt><dd>${bank.accountHolder || "Configure bank account"}</dd>
-      <dt>IBAN</dt><dd>${bank.iban || "Configure BANK_IBAN"}</dd>
-      <dt>BIC</dt><dd>${bank.bic || "Configure BANK_BIC"}</dd>
-      <dt>Bank</dt><dd>${bank.bankName || "Configure BANK_NAME"}</dd>
+      <dt>Provider</dt><dd>${escapeHtml(payment.provider || state.productConfig?.payments?.provider || "setup_required")}</dd>
+      <dt>Required</dt><dd>STRIPE_SECRET_KEY</dd>
+      <dt>Optional</dt><dd>STRIPE_PRICE_ID and STRIPE_WEBHOOK_SECRET</dd>
     </dl>
-    <p>${payment.instruction || "Transfer the amount with the reference. Access is activated after manual confirmation."}</p>
+    <p>${escapeHtml(payload.error || payment.instruction || "Add Stripe credentials on the backend to enable automatic SaaS payment and license activation.")}</p>
   `;
 }
 
@@ -7099,15 +7389,57 @@ async function createCheckoutOrder() {
   const customerName = els.checkoutName?.value.trim() || "";
   const customerEmail = els.checkoutEmail?.value.trim() || "";
   const company = els.checkoutCompany?.value.trim() || "";
-  els.checkoutResult.innerHTML = "<p>Creating payment reference...</p>";
+  els.checkoutResult.innerHTML = "<p>Preparing secure checkout...</p>";
   try {
     const payload = await apiRequest("/api/checkout", {
       method: "POST",
       body: JSON.stringify({ customerName, customerEmail, company }),
     });
     renderCheckoutResult(payload);
+    const checkoutUrl = payload.payment?.checkoutUrl || payload.order?.checkoutUrl;
+    if (checkoutUrl) window.setTimeout(() => window.location.assign(checkoutUrl), 260);
   } catch (error) {
-    els.checkoutResult.innerHTML = `<p>${error.message || "Could not create payment reference."}</p>`;
+    els.checkoutResult.innerHTML = `<p>${escapeHtml(error.message || "Could not start secure checkout.")}</p>`;
+  }
+}
+
+async function handleCheckoutReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const checkoutState = params.get("checkout");
+  const sessionId = params.get("session_id");
+  if (!checkoutState) return;
+  showPublicPage("login", { scroll: false });
+  if (checkoutState === "cancelled") {
+    if (els.checkoutResult) {
+      els.checkoutResult.innerHTML = "<p>Checkout was cancelled. You can restart secure checkout whenever you are ready.</p>";
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+    return;
+  }
+  if (checkoutState !== "success" || !sessionId) return;
+  if (els.checkoutResult) {
+    els.checkoutResult.innerHTML = "<p>Confirming payment and activating access...</p>";
+  }
+  try {
+    const payload = await apiRequest(`/api/checkout/session/${encodeURIComponent(sessionId)}`);
+    renderCheckoutResult(payload);
+    if (payload.paid && payload.licenseKey) {
+      const loginPayload = await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ user: payload.customerEmail, password: payload.licenseKey, licenseKey: payload.licenseKey }),
+      });
+      storeSession(loginPayload.token);
+      state.account = loginPayload.account || null;
+      unlockApp();
+      refreshProjects();
+      showToast("Payment confirmed. Workspace unlocked.");
+    }
+  } catch (error) {
+    if (els.checkoutResult) {
+      els.checkoutResult.innerHTML = `<p>${escapeHtml(error.message || "Payment could not be confirmed yet.")}</p>`;
+    }
+  } finally {
+    window.history.replaceState(null, "", window.location.pathname);
   }
 }
 
@@ -7120,6 +7452,212 @@ const publicPageTargets = {
   publicPricing: "pricing",
   loginPanel: "login",
 };
+
+const publicDetailStories = {
+  "mab-overview": {
+    eyebrow: "Guided example",
+    title: "10,000 L CHO monoclonal antibody platform process",
+    body: "A high-demand biopharma model because it forces the whole software to work: upstream cell culture, harvest, capture chromatography, viral safety, polishing, UF/DF, fill, QC release, utilities, cleaning, economics, LCA, and scale-up physics.",
+    points: [
+      "Starts from a product brief rather than a blank canvas.",
+      "Creates a full process path with main units and supporting systems.",
+      "Keeps assumptions, equations, boundaries, reports, and references connected.",
+    ],
+    visual: [
+      ["Model", "CHO fed-batch mAb process"],
+      ["Scale", "10,000 L production STR example"],
+      ["Core", "Seed train -> production -> Protein A -> VI -> polishing -> UF/DF -> fill"],
+      ["Outputs", "Streams, balances, equations, LCA/TEA datasets, SVG visuals"],
+    ],
+    actions: [
+      ["mab-upstream", "Open upstream"],
+      ["mab-downstream", "Open downstream"],
+      ["login", "Try it in Axion"],
+    ],
+  },
+  "mab-upstream": {
+    eyebrow: "Upstream model",
+    title: "Media, seed train, and production bioreactor",
+    body: "The walkthrough begins with media preparation, sterile transfer, seed expansion, production STR, gas supply, antifoam, feed strategy, sampling, sensors, SIP/CIP, and working-volume limits.",
+    points: [
+      "Shows media and feed as explicit input streams rather than hidden assumptions.",
+      "Tracks oxygen demand, kLa, mixing time, heat load, pH, lactate, ammonium, and viable-cell boundary checks.",
+      "Separates main production units from utilities, sensors, cleaning, and QC nodes.",
+    ],
+    visual: [
+      ["Equipment", "Media tank, seed reactors, production STR, gas mixer, feed tank"],
+      ["Parameters", "Titer, VCD, doubling time, OUR, kLa, pH, feed, working volume"],
+      ["Boundaries", "DO, ammonium, lactate, heat removal, shear, 20,000 L cell-culture caution"],
+      ["Next", "Harvest and capture purification"],
+    ],
+    actions: [
+      ["mab-cfd", "Inspect CFD + boundaries"],
+      ["mab-downstream", "Continue downstream"],
+      ["login", "Build this model"],
+    ],
+  },
+  "mab-downstream": {
+    eyebrow: "Downstream model",
+    title: "Harvest, Protein A, viral safety, polishing, and formulation",
+    body: "The example then walks through clarification, depth filtration, Protein A capture, low-pH viral inactivation, ion exchange polishing, viral filtration, UF/DF, sterile filtration, filling, and release analytics.",
+    points: [
+      "Every step carries yield, residence time, buffer, waste, equipment, and cleaning assumptions.",
+      "Chromatography and filtration connect to resin/membrane costs, cycle count, buffer volumes, and hold-time risk.",
+      "Outputs are prepared for QA review, TEA, LCA, and supplier conversations.",
+    ],
+    visual: [
+      ["Capture", "Protein A with load, wash, elute, regeneration, storage"],
+      ["Safety", "Low-pH viral inactivation and viral filtration"],
+      ["Polish", "CEX/AEX, UF/DF, formulation, sterile filtration"],
+      ["Release", "QC assays, batch record, fill-finish handoff"],
+    ],
+    actions: [
+      ["mab-reports", "Open report outputs"],
+      ["mab-cfd", "Review scale-up physics"],
+      ["login", "Try private workspace"],
+    ],
+  },
+  "mab-cfd": {
+    eyebrow: "Scale-up physics",
+    title: "CFD-style reactor screening and biochemical boundaries",
+    body: "The frontend demo shows why the tool is more than a static flowsheet: reactor working volume, headspace, oxygen transfer, nutrient distribution, shear, mixing, ammonium, lactate, heat, and scale-up warnings become visible early.",
+    points: [
+      "Working volume is kept below the visual 80% screen limit with visible headspace.",
+      "Oxygen and nutrient limitations are shown as distribution risks, not only as one average number.",
+      "The tool recommends whether to adjust kLa, split into parallel trains, reduce working volume, or commission rigorous CFD.",
+    ],
+    visual: [
+      ["kLa / OTR", "Oxygen-transfer margin and OUR screening"],
+      ["Mixing", "Horizontal/tangential flow, dead-zone watch, feed-zone risk"],
+      ["Cells", "Ammonium, lactate, pH, osmolality, shear limits"],
+      ["Decision", "Scale-up, scale-out, or refine process parameters"],
+    ],
+    actions: [
+      ["mab-reports", "See downloadable outputs"],
+      ["builder", "See editable builder"],
+      ["login", "Open workspace"],
+    ],
+  },
+  "mab-reports": {
+    eyebrow: "Decision outputs",
+    title: "Downloadable outputs that make the model useful",
+    body: "The end of the walkthrough shows what a user gets out of the software: not just a picture, but process data that can be reviewed, exported, challenged, and improved.",
+    points: [
+      "CSV exports for streams, input/output flows, mass balances, energy balances, parameters, costs, LCA inventory, LCA impacts, and dynamic profiles.",
+      "SVG exports for plant architecture, LCA flow maps, impact charts, and TEA cost-stack graphics.",
+      "Readiness recommendations list what is still missing for full production simulation.",
+    ],
+    visual: [
+      ["Engineering", "Equipment register, streams, equations, balances"],
+      ["Economics", "CAPEX/OPEX drivers, scale exponent, utilization, facility burden"],
+      ["Sustainability", "Water, waste, utilities, CO2e screening, LCA handoff"],
+      ["Review", "Sources, standards, assumptions, gaps, recommendations"],
+    ],
+    actions: [
+      ["pricing", "See pricing"],
+      ["login", "Open private workspace"],
+      ["mab-overview", "Restart walkthrough"],
+    ],
+  },
+  brief: {
+    eyebrow: "Platform layer",
+    title: "The product brief becomes the model seed",
+    body: "Axion starts from a plain-language product description and converts it into a likely process architecture, default scale, equipment family, parameters, and next assumptions to inspect.",
+    points: ["Product, organism, scale, titer, recovery, sterility and constraints are captured together.", "Uploaded data can become project context.", "The model opens in the workspace instead of ending as a static recommendation."],
+    visual: [["Input", "Text brief + optional uploaded data"], ["Output", "Chosen process family"], ["Next", "Editable plant workspace"]],
+    actions: [["builder", "Open builder layer"], ["mab-overview", "See example"], ["login", "Try it"]],
+  },
+  builder: {
+    eyebrow: "Platform layer",
+    title: "Editable flowsheet with equipment and streams",
+    body: "The builder is the bridge between a generated concept and real engineering work: drag units, connect streams, separate main/support systems, and inspect assumptions.",
+    points: ["Main process, CIP/SIP, utilities, heat reuse, waste, QC, recycle and sensors are visually separated.", "Equipment and stream clicks reveal equations and data.", "The user can reshape the process rather than accept a black-box result."],
+    visual: [["Canvas", "PFD-like unit and stream editor"], ["Library", "Reactors, filters, tanks, chromatography, valves, sensors"], ["Motion", "Animated stream direction and roles"]],
+    actions: [["mab-upstream", "Use mAb model"], ["reports", "See reports"], ["login", "Open workspace"]],
+  },
+  reports: {
+    eyebrow: "Platform layer",
+    title: "Download center for engineering review",
+    body: "The reporting layer turns the model into reviewable artifacts for LCA, TEA, slides, suppliers, thesis work, and process meetings.",
+    points: ["Streams and balances include annual, per-batch, and per-kg product values.", "Costs expose fixed, variable, facility, material, labor, utility, validation and waste drivers.", "Visual downloads help explain the plant without screenshots."],
+    visual: [["CSV", "Streams, balances, LCA, TEA, costs"], ["SVG", "Plant, LCA, TEA visualizations"], ["JSON", "Full model scenario"]],
+    actions: [["mab-reports", "See mAb outputs"], ["pricing", "See pricing"], ["login", "Try it"]],
+  },
+  ai: {
+    eyebrow: "Platform layer",
+    title: "AI help tied to the actual model",
+    body: "The AI layer is useful only when it knows the process context. Axion connects help prompts to selected units, streams, parameters, boundaries, and reports.",
+    points: ["Ask how to lower media cost, improve oxygen transfer, reduce water use, or fix ammonium warnings.", "The answer points to the right module instead of staying generic.", "Recommendations keep a list of missing work before full simulation."],
+    visual: [["Prompt", "Natural-language engineering question"], ["Context", "Active model + selected unit"], ["Action", "Jump to parameter, CFD, report, or builder module"]],
+    actions: [["mab-cfd", "See boundary example"], ["mab-reports", "See outputs"], ["login", "Open workspace"]],
+  },
+  "cultured-meat": {
+    eyebrow: "Example",
+    title: "Cultured meat perfusion plant",
+    body: "A food-biotech scenario with media cost pressure, oxygen transfer, ammonia/lactate limits, water reuse, cleaning, heat recovery, harvest wash, formulation, and packaging.",
+    points: ["Good for media-cost optimization.", "Shows perfusion and cell-retention logic.", "Highlights food-grade scale-up and utility burden."],
+    visual: [["Core", "Media -> seed -> perfusion STR -> harvest"], ["Risk", "Ammonium, lactate, oxygen, water demand"], ["Outputs", "LCA/TEA and process visuals"]],
+    actions: [["mab-overview", "Compare with mAb"], ["login", "Build this model"]],
+  },
+  penicillin: {
+    eyebrow: "Example",
+    title: "Penicillin fermentation route",
+    body: "A classic fermentation and recovery example with sterile media, aerobic fermentation, clarification, extraction, crystallization, drying, solvent recycle, emissions, and hazardous-material checks.",
+    points: ["Good for fermentation and solvent recovery.", "Makes extraction, crystallization and drying visible.", "Useful for emissions, waste and route-scheduling discussion."],
+    visual: [["Core", "Media -> fermenter -> separation -> extraction"], ["Recovery", "Crystallization and drying"], ["Support", "Solvent recycle and emissions"]],
+    actions: [["mab-overview", "Compare with mAb"], ["login", "Build this model"]],
+  },
+  sources: {
+    eyebrow: "Ecosystem layer",
+    title: "Scientific sources and supplier assumptions attached to the model",
+    body: "The reference layer is where the product becomes credible: papers, supplier values, SOP notes, standards, parameter assumptions, and internal decisions sit next to the equipment or stream they influence.",
+    points: ["Click a bioreactor to see typical OUR, kLa, working-volume and scale-up assumptions.", "Replace screening values with supplier quotes or site data.", "Keep uncertainty visible for technical reviews."],
+    visual: [["Attached to", "Units, streams, parameters, standards"], ["Use", "Audit assumptions and justify values"], ["Next", "Export model and source notes"]],
+    actions: [["mab-overview", "See mAb model"], ["reports", "See exports"], ["login", "Open workspace"]],
+  },
+  connectors: {
+    eyebrow: "Ecosystem layer",
+    title: "Connector path for SCADA, historian, CFD and simulator handoff",
+    body: "The public demo now explains how Axion should connect outward: not as a vague API promise, but as concrete handoff payloads for streams, equipment, historian tags, CFD cases, and property assumptions.",
+    points: ["Map PI/SCADA tags to model variables.", "Export reactor geometry and boundary-condition packages for rigorous CFD.", "Move stream/equipment tables into external simulation and review tools."],
+    visual: [["Historian", "DO, pH, airflow, agitation, pressure, feeds"], ["CFD", "Geometry, sparger, impeller, boundary conditions"], ["Simulators", "Streams, properties, equipment, balances"]],
+    actions: [["mab-cfd", "See CFD layer"], ["mab-reports", "See handoff outputs"], ["login", "Open workspace"]],
+  },
+  recommendations: {
+    eyebrow: "Ecosystem layer",
+    title: "Readiness recommendations before a full production simulation",
+    body: "Instead of pretending the screening model is final, Axion lists what is still missing for a defensible simulation: measured kinetics, site utilities, validated CFD, supplier quotes, impurity data, control logic and batch records.",
+    points: ["Makes missing assumptions visible.", "Turns gaps into concrete engineering tasks.", "Helps users decide what to refine next before spending on detailed modelling."],
+    visual: [["Screening", "Fast editable process model"], ["Gaps", "Data, validation, vendor, site-specific values"], ["Next", "Rigorous simulation or investment review"]],
+    actions: [["mab-reports", "See report gaps"], ["mab-cfd", "See physics gaps"], ["login", "Try it"]],
+  },
+};
+
+function renderPublicDetail(key = "mab-overview") {
+  const story = publicDetailStories[key] || publicDetailStories["mab-overview"];
+  const panel = document.querySelector("#publicDetailPanel");
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="public-detail-copy">
+      <span>${escapeHtml(story.eyebrow)}</span>
+      <h3>${escapeHtml(story.title)}</h3>
+      <p>${escapeHtml(story.body)}</p>
+      <ul class="public-detail-list">
+        ${story.points.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}
+      </ul>
+      <div class="public-detail-actions">
+        ${story.actions.map(([target, label]) => `<button type="button" data-public-detail-next="${escapeAttr(target)}">${escapeHtml(label)}</button>`).join("")}
+      </div>
+    </div>
+    <div class="public-detail-visual">
+      ${story.visual.map(([label, value]) => `<div><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></div>`).join("")}
+    </div>
+  `;
+  document.querySelectorAll("[data-public-detail]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.publicDetail === key);
+  });
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
 
 function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {}) {
   const targetPage = page || "home";
@@ -7138,6 +7676,7 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {
     els.loginUser?.focus({ preventScroll: true });
     window.setTimeout(() => els.loginUser?.focus(), 260);
   }
+  if (targetPage === "platform") window.setTimeout(() => renderPublicDetail("mab-overview"), 80);
 }
 
 function scrollPublicTarget(targetId, focusLogin = false) {
@@ -7192,7 +7731,7 @@ async function handleGoogleCredential(response) {
     });
     storeSession(payload.token);
     unlockApp();
-    showToast(`Logged in with Google as ${payload.account.email || payload.account.role}`);
+      showToast(`Logged in as ${accountName()}`);
   } catch (error) {
     els.loginError.textContent = error.message;
   }
@@ -7208,7 +7747,7 @@ async function setupGoogleLogin() {
     const config = await apiRequest("/api/auth/google-config");
     if (!config.enabled || !config.clientId) {
       els.googleLoginFallback.disabled = true;
-      els.googleLoginStatus.textContent = "Google login is not configured. Set GOOGLE_CLIENT_ID on the backend.";
+      els.googleLoginStatus.textContent = "Google login is waiting for GOOGLE_CLIENT_ID in the backend .env. Password and paid-license login are available now.";
       return;
     }
     els.googleLoginStatus.textContent = "Google login ready.";
@@ -7291,16 +7830,90 @@ function saveLocalProjectStore(store) {
   window.localStorage.setItem("axion-local-projects", JSON.stringify(store));
 }
 
+function normalizeLocalProjectOwnership(store) {
+  const principal = accountPrincipal();
+  const name = accountName();
+  let changed = false;
+  (store.projects || []).forEach((project) => {
+    if (!project.owner || ["static", "static-user", "local-user"].includes(String(project.owner).toLowerCase())) {
+      project.owner = principal;
+      project.ownerName = name;
+      changed = true;
+    }
+    if (!project.ownerName || ["static user", "static workspace user"].includes(String(project.ownerName).toLowerCase())) {
+      project.ownerName = name;
+      changed = true;
+    }
+  });
+  (store.versions || []).forEach((version) => {
+    if (!version.createdBy || ["static", "static-user", "local-user"].includes(String(version.createdBy).toLowerCase())) {
+      version.createdBy = principal;
+      changed = true;
+    }
+  });
+  if (changed) saveLocalProjectStore(store);
+  return store;
+}
+
 function localIntegrations() {
   return [
-    { key: "superpro", name: "SuperPro Designer", category: "Process simulation", status: "import-export scaffold", direction: "CSV/report exchange", auth: "file" },
-    { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "connector planned", direction: "stream/property export", auth: "enterprise API" },
-    { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "connector planned", direction: "reactor geometry export", auth: "file/API" },
-    { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "connector planned", direction: "CFD case export", auth: "file/API" },
-    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "connector planned", direction: "historian tags", auth: "server credentials" },
-    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "connector planned", direction: "batch profile import", auth: "enterprise connector" },
-    { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "connector planned", direction: "experiments and assays", auth: "API key/OAuth" },
+    { key: "superpro", name: "SuperPro Designer", category: "Process simulation", status: "import-export scaffold", direction: "Import reports / export Axion model", auth: "file", description: "CSV, equipment, stream, balance, and economic report handoff for existing SuperPro workflows." },
+    { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "connector planned", direction: "Export streams, property package, and economics basis", auth: "enterprise API or file", description: "Prepared for stream vectors, component properties, and unit-operation duty transfer." },
+    { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "connector planned", direction: "Export reactor geometry and boundary conditions", auth: "file/API", description: "Prepared for rigorous bioreactor CFD geometry, sparger, impeller, and boundary-condition setup." },
+    { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "connector planned", direction: "Export CFD screening cases", auth: "file/API", description: "Prepared for oxygen, nutrient, shear, gas-liquid, and agitation case handoff." },
+    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "connector planned", direction: "Read historian tags", auth: "server credentials", description: "Maps live pH, DO, temperature, pressure, flow, and batch-state tags to model parameters." },
+    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "connector planned", direction: "Read batch historian", auth: "enterprise connector", description: "Prepared for batch-profile calibration, deviations, soft sensors, and continued process verification." },
+    { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "connector planned", direction: "Read experiments and assays", auth: "API key/OAuth", description: "Prepared for titer, viability, media, assay, strain, and cell-line metadata transfer." },
+    { key: "limsid", name: "LIMS / ELN generic", category: "Quality data", status: "connector planned", direction: "Read/write assay metadata", auth: "API key", description: "Generic release-test, sterility, HCP, DNA, endotoxin, and bioburden handoff shell." },
   ];
+}
+
+function connectorHandoffPayload(item) {
+  return {
+    product: "Axion Process OS",
+    generatedAt: new Date().toISOString(),
+    project: {
+      id: state.currentProjectId || "unsaved-local-model",
+      name: state.projectName,
+      template: state.template,
+      scale: state.scale,
+    },
+    connector: {
+      key: item.key,
+      name: item.name,
+      category: item.category,
+      status: item.status,
+      direction: item.direction,
+      auth: item.auth,
+    },
+    payloads: connectorPayloads(item),
+    modelSummary: currentModelSummary(),
+    streamsPreview: streamRows().slice(0, 12),
+    equipmentPreview: state.units.slice(0, 12).map((unit) => ({
+      id: unit.id,
+      name: unit.name,
+      type: unit.type,
+      role: unit.role,
+      size: unit.size,
+      power: unit.power,
+    })),
+    note: "This is a connector handoff package. Live third-party sync requires customer credentials, vendor API access, schema mapping, and validation.",
+  };
+}
+
+function handleIntegrationAction(action, key) {
+  const item = (state.integrations.length ? state.integrations : localIntegrations()).find((candidate) => candidate.key === key);
+  if (!item) return;
+  state.selectedIntegration = key;
+  if (action === "export") {
+    downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(connectorHandoffPayload(item), null, 2));
+    showToast(`${item.name} handoff JSON downloaded`);
+  } else if (action === "test") {
+    showToast(`${item.name}: mapping check prepared (${connectorPayloads(item).length} payload groups)`);
+  } else {
+    showToast(`${item.name} connector details opened`);
+  }
+  renderProjectsBoard();
 }
 
 async function refreshProjects() {
@@ -7311,11 +7924,16 @@ async function refreshProjects() {
     state.integrations = payload.integrations || [];
     state.projectFolders = payload.folders || {};
   } catch {
-    const store = localProjectStore();
+    const store = normalizeLocalProjectOwnership(localProjectStore());
     state.projects = store.projects || [];
     state.projectInvites = store.invites || [];
     state.integrations = localIntegrations();
     state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
+  }
+  if (!state.currentProjectId && state.projects.length) {
+    const latestOpenProject = state.projects.find((project) => !project.archived) || state.projects[0];
+    state.currentProjectId = latestOpenProject.id;
+    state.projectName = latestOpenProject.name || state.projectName;
   }
   renderProjectsBoard();
   renderProfileMenu();
@@ -7343,17 +7961,19 @@ async function saveCurrentProject() {
     await refreshProjects();
     showToast("Project saved");
   } catch {
-    const store = localProjectStore();
+    const store = normalizeLocalProjectOwnership(localProjectStore());
     const now = new Date().toISOString();
     let project = store.projects.find((item) => item.id === state.currentProjectId);
     if (!project) {
-      project = { id: `local-${Date.now()}`, name, description: state.productBrief, owner: "static-user", ownerName: "Static user", createdAt: now, collaborators: [], versionCount: 0 };
+      project = { id: `local-${Date.now()}`, name, description: state.productBrief, owner: accountPrincipal(), ownerName: accountName(), createdAt: now, collaborators: [], versionCount: 0 };
       store.projects.unshift(project);
       state.currentProjectId = project.id;
     }
     if (project.modelState) {
-      store.versions.unshift({ id: `v-${Date.now()}`, projectId: project.id, createdAt: now, createdBy: "static-user", label: "Archived local model", modelState: project.modelState, summary: project.summary });
+      store.versions.unshift({ id: `v-${Date.now()}`, projectId: project.id, createdAt: now, createdBy: accountPrincipal(), label: "Archived local model", modelState: project.modelState, summary: project.summary });
     }
+    project.owner = project.owner || accountPrincipal();
+    project.ownerName = project.ownerName || accountName();
     project.name = name;
     project.updatedAt = now;
     project.template = state.template;
@@ -7378,7 +7998,7 @@ async function loadProject(projectId) {
     setView("overview");
     showToast(`${payload.project.name} loaded`);
   } catch {
-    const store = localProjectStore();
+    const store = normalizeLocalProjectOwnership(localProjectStore());
     const project = store.projects.find((item) => item.id === projectId);
     if (!project) return showToast("Project not found");
     state.currentProjectId = project.id;
@@ -7396,7 +8016,7 @@ async function archiveProject(projectId) {
     await refreshProjects();
     showToast("Project archived");
   } catch {
-    const store = localProjectStore();
+    const store = normalizeLocalProjectOwnership(localProjectStore());
     const project = store.projects.find((item) => item.id === projectId);
     if (project) project.archived = true;
     saveLocalProjectStore(store);
@@ -7417,16 +8037,22 @@ async function inviteToProject() {
     return;
   }
   try {
-    await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/invites`, {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/invites`, {
       method: "POST",
       body: JSON.stringify({ recipient, role }),
     });
+    if (payload.invite) state.projectInvites = [payload.invite, ...state.projectInvites.filter((invite) => invite.id !== payload.invite.id)];
+    const input = document.querySelector("#inviteRecipient");
+    if (input) input.value = "";
     await refreshProjects();
     showToast("Invite recorded");
   } catch {
-    const store = localProjectStore();
-    store.invites.unshift({ id: `invite-${Date.now()}`, projectId: state.currentProjectId, recipient, role, status: "pending", createdAt: new Date().toISOString(), delivery: "local" });
+    const store = normalizeLocalProjectOwnership(localProjectStore());
+    const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
+    store.invites.unshift({ id: `invite-${Date.now()}`, projectId: state.currentProjectId, projectName: activeProject?.name || state.projectName, recipient, role, status: "pending", createdAt: new Date().toISOString(), delivery: "local" });
     saveLocalProjectStore(store);
+    const input = document.querySelector("#inviteRecipient");
+    if (input) input.value = "";
     await refreshProjects();
     showToast("Invite saved locally");
   }
@@ -7442,7 +8068,7 @@ async function restoreProjectVersion(versionId) {
     importModelState(payload.model?.modelState || {});
     showToast("Archived model restored");
   } catch {
-    const store = localProjectStore();
+    const store = normalizeLocalProjectOwnership(localProjectStore());
     const version = store.versions.find((item) => item.id === versionId && item.projectId === state.currentProjectId);
     if (version) {
       importModelState(version.modelState || {});
@@ -7521,7 +8147,32 @@ function bindAuth() {
   });
 
   document.querySelectorAll("[data-public-target]").forEach((button) => {
-    button.addEventListener("click", () => scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel"));
+    button.addEventListener("click", () => {
+      scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel");
+      if (button.dataset.publicDetail) {
+        window.setTimeout(() => renderPublicDetail(button.dataset.publicDetail), 120);
+      }
+    });
+  });
+
+  document.querySelector(".public-scroll")?.addEventListener("click", (event) => {
+    const nextButton = event.target.closest("[data-public-detail-next]");
+    if (nextButton) {
+      const target = nextButton.dataset.publicDetailNext;
+      if (target === "login") {
+        scrollPublicTarget("loginPanel", true);
+      } else if (target === "pricing") {
+        scrollPublicTarget("publicPricing");
+      } else {
+        scrollPublicTarget("publicPlatform");
+        window.setTimeout(() => renderPublicDetail(target), 120);
+      }
+      return;
+    }
+    const detailButton = event.target.closest("[data-public-detail]");
+    if (!detailButton) return;
+    if (detailButton.dataset.publicTarget) return;
+    renderPublicDetail(detailButton.dataset.publicDetail);
   });
 
   els.loginForm?.addEventListener("submit", async (event) => {
@@ -7530,13 +8181,15 @@ function bindAuth() {
     const password = els.loginPassword.value.trim();
     els.loginError.textContent = "";
     if (staticAccessMode) {
-      if (await staticPasswordMatches(user, password)) {
+      const staticUser = await staticPasswordMatches(user, password);
+      if (staticUser) {
         storeSession(staticAuth.token);
-        state.account = { role: "static", username: user.toLowerCase(), principal: user.toLowerCase() };
+        window.localStorage.setItem("axion-static-user", staticUser.user);
+        state.account = staticAccountForUser(staticUser.user);
         els.loginPassword.value = "";
         unlockApp();
         refreshProjects();
-        showToast("Workspace unlocked");
+        showToast(`Workspace unlocked for ${state.account.name}`);
       } else {
         els.loginError.textContent = "Access denied. Use the workspace password.";
       }
@@ -7552,15 +8205,17 @@ function bindAuth() {
       els.loginPassword.value = "";
       unlockApp();
       refreshProjects();
-      showToast(`Logged in as ${payload.account.role}`);
+      showToast(`Logged in as ${accountName()}`);
     } catch (error) {
-      if (await staticPasswordMatches(user, password)) {
+      const staticUser = await staticPasswordMatches(user, password);
+      if (staticUser) {
         storeSession(staticAuth.token);
-        state.account = { role: "static", username: user.toLowerCase(), principal: user.toLowerCase() };
+        window.localStorage.setItem("axion-static-user", staticUser.user);
+        state.account = staticAccountForUser(staticUser.user);
         els.loginPassword.value = "";
         unlockApp();
         refreshProjects();
-        showToast("Workspace unlocked");
+        showToast(`Workspace unlocked for ${state.account.name}`);
       } else {
         els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
       }
@@ -7590,6 +8245,7 @@ function bindAuth() {
     const logoutButton = event.target.closest("[data-profile-logout]");
     if (logoutButton) {
       window.localStorage.removeItem("axion-session");
+      window.localStorage.removeItem("axion-static-user");
       clearLegacyAuth();
       state.account = null;
       els.profilePanel.hidden = true;
@@ -7661,7 +8317,8 @@ function renderAll() {
 function bindEvents() {
   document.addEventListener("pointerdown", (event) => {
     const surface = event.target.closest(".clickable-surface, .unit, .stream-line, .stream-label");
-    if (!surface || surface.closest(".detail-drawer") || event.target.closest("button, a, input, textarea, select")) return;
+    const control = event.target.closest("button, a, input, textarea, select");
+    if (!surface || surface.closest(".detail-drawer") || (control && !surface.matches(".unit, .stream-line, .stream-label"))) return;
     animateSurfaceClick(surface, event);
   });
 
@@ -7675,6 +8332,12 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
+    const globalJumpButton = event.target.closest("[data-jump-view]");
+    if (globalJumpButton) {
+      event.preventDefault();
+      jumpToView(globalJumpButton.dataset.jumpView);
+      return;
+    }
     const closeButton = event.target.closest("[data-close-detail]");
     if (closeButton) {
       els.detailDrawer?.classList.remove("open");
@@ -7682,12 +8345,25 @@ function bindEvents() {
     }
     const jumpButton = event.target.closest("[data-detail-jump]");
     if (jumpButton) {
-      setView(jumpButton.dataset.detailJump);
+      jumpToView(jumpButton.dataset.detailJump);
       els.detailDrawer?.classList.remove("open");
       return;
     }
-    const surface = event.target.closest(".clickable-surface");
-    if (!surface || surface.closest(".detail-drawer") || event.target.closest("button, a, input, textarea, select")) return;
+    const detailLoadProject = event.target.closest("[data-detail-load-project]");
+    if (detailLoadProject) {
+      loadProject(detailLoadProject.dataset.detailLoadProject);
+      els.detailDrawer?.classList.remove("open");
+      return;
+    }
+    const detailRestoreVersion = event.target.closest("[data-detail-restore-version]");
+    if (detailRestoreVersion) {
+      restoreProjectVersion(detailRestoreVersion.dataset.detailRestoreVersion);
+      els.detailDrawer?.classList.remove("open");
+      return;
+    }
+    const surface = event.target.closest(".clickable-surface, .unit, .stream-line, .stream-label");
+    const control = event.target.closest("button, a, input, textarea, select");
+    if (!surface || surface.closest(".detail-drawer") || (control && !surface.matches(".unit, .stream-line, .stream-label"))) return;
     showExploreDetails(surface);
   });
 
@@ -7730,31 +8406,71 @@ function bindEvents() {
     const saveButton = event.target.closest("[data-save-project]");
     if (saveButton) {
       saveCurrentProject();
+      event.stopPropagation();
       return;
     }
     const refreshButton = event.target.closest("[data-refresh-projects]");
     if (refreshButton) {
       refreshProjects();
       showToast("Projects refreshed");
+      event.stopPropagation();
       return;
     }
     const loadButton = event.target.closest("[data-load-project]");
     if (loadButton) {
       loadProject(loadButton.dataset.loadProject);
+      event.stopPropagation();
       return;
     }
     const archiveButton = event.target.closest("[data-archive-project]");
     if (archiveButton) {
       archiveProject(archiveButton.dataset.archiveProject);
+      event.stopPropagation();
       return;
     }
     const restoreButton = event.target.closest("[data-restore-version]");
     if (restoreButton) {
       restoreProjectVersion(restoreButton.dataset.restoreVersion);
+      event.stopPropagation();
       return;
     }
     const inviteButton = event.target.closest("[data-invite-collaborator]");
-    if (inviteButton) inviteToProject();
+    if (inviteButton) {
+      inviteToProject();
+      event.stopPropagation();
+      return;
+    }
+    const integrationButton = event.target.closest("[data-integration-action]");
+    if (integrationButton) {
+      handleIntegrationAction(integrationButton.dataset.integrationAction, integrationButton.dataset.integrationKey);
+      event.stopPropagation();
+      return;
+    }
+    const integrationCard = event.target.closest("[data-integration-card]");
+    if (integrationCard) {
+      handleIntegrationAction("configure", integrationCard.dataset.integrationCard);
+      event.stopPropagation();
+      return;
+    }
+    const versionCard = event.target.closest("[data-version-card]");
+    if (versionCard) {
+      showVersionDetails(versionById(versionCard.dataset.versionCard));
+      event.stopPropagation();
+      return;
+    }
+    const inviteCard = event.target.closest("[data-invite-card]");
+    if (inviteCard) {
+      showInviteDetails(inviteById(inviteCard.dataset.inviteCard));
+      event.stopPropagation();
+      return;
+    }
+    const projectCard = event.target.closest("[data-project-card]");
+    if (projectCard) {
+      const project = projectById(projectCard.dataset.projectCard);
+      if (project?.archived) showProjectDetails(project);
+      else loadProject(projectCard.dataset.projectCard);
+      event.stopPropagation();
+    }
   });
 
   els.scaleList.addEventListener("click", (event) => {
@@ -8055,7 +8771,7 @@ function bindEvents() {
 
 bindAuth();
 bindEvents();
-checkStoredAuth();
 loadTemplate("culturedMeat");
 startRealtimeTelemetry();
 setView("start");
+checkStoredAuth().finally(() => handleCheckoutReturn());

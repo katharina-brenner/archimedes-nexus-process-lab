@@ -46,12 +46,10 @@ const config = {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
-  bank: {
-    accountHolder: process.env.BANK_ACCOUNT_HOLDER || "",
-    iban: process.env.BANK_IBAN || "",
-    bic: process.env.BANK_BIC || "",
-    bankName: process.env.BANK_NAME || "",
-  },
+  appBaseUrl: process.env.APP_BASE_URL || `http://${process.env.HOST || "127.0.0.1"}:${process.env.PORT || 8899}`,
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+  stripePriceId: process.env.STRIPE_PRICE_ID || "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
 };
 
 const staticTypes = new Map([
@@ -80,9 +78,10 @@ const defaultDb = {
 function backendFeatures() {
   return [
     "725 EUR professional license checkout",
-    "Bank-transfer order references",
-    "Manual paid-status activation after incoming transfer",
-    "License-key generation",
+    "Stripe Checkout hosted payment flow",
+    "Automatic license-key generation after successful payment",
+    "Stripe webhook activation",
+    "Checkout-session verification fallback",
     "Server-side login tokens",
     "Google OAuth login with backend token verification",
     "Multi-user project workspaces",
@@ -91,7 +90,7 @@ function backendFeatures() {
     "External integration registry for modelling and data tools",
     "Admin order and license listing",
     "Static app hosting from the same backend",
-    "Bank account configuration via environment variables",
+    "Google OAuth configuration via environment variables",
   ];
 }
 
@@ -109,16 +108,14 @@ function publicConfig() {
     amount,
     amountFormatted: new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency }).format(amount),
     currency: config.currency,
-    bankConfigured: Boolean(config.bank.accountHolder && config.bank.iban),
-    bank: {
-      accountHolder: config.bank.accountHolder || "Configure BANK_ACCOUNT_HOLDER",
-      iban: config.bank.iban || "Configure BANK_IBAN",
-      bic: config.bank.bic || "Configure BANK_BIC",
-      bankName: config.bank.bankName || "Configure BANK_NAME",
-    },
     features: backendFeatures(),
     auth: {
       googleEnabled: Boolean(config.googleClientId),
+    },
+    payments: {
+      provider: config.stripeSecretKey ? "stripe" : "setup_required",
+      stripeEnabled: Boolean(config.stripeSecretKey),
+      automaticActivation: Boolean(config.stripeSecretKey),
     },
   };
 }
@@ -175,6 +172,65 @@ function parseBody(req) {
   });
 }
 
+function readRawBody(req) {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks = [];
+    let length = 0;
+    req.on("data", (chunk) => {
+      chunks.push(chunk);
+      length += chunk.length;
+      if (length > 2_000_000) {
+        rejectBody(new Error("Payload too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolveBody(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", rejectBody);
+  });
+}
+
+function formBody(params) {
+  const encoded = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") encoded.append(key, String(value));
+  });
+  return encoded;
+}
+
+async function stripeRequest(pathname, params = {}, method = "POST") {
+  if (!config.stripeSecretKey) {
+    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY and optionally STRIPE_PRICE_ID on the backend.");
+  }
+  const response = await fetch(`https://api.stripe.com${pathname}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${config.stripeSecretKey}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: method === "GET" ? undefined : formBody(params),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error?.message || `Stripe request failed with status ${response.status}`);
+  }
+  return payload;
+}
+
+function verifyStripeSignature(rawBody, signatureHeader) {
+  if (!config.stripeWebhookSecret) return false;
+  const parts = Object.fromEntries(String(signatureHeader || "").split(",").map((part) => {
+    const [key, ...valueParts] = part.split("=");
+    return [key, valueParts.join("=")];
+  }));
+  const timestamp = parts.t;
+  const signature = parts.v1;
+  if (!timestamp || !signature) return false;
+  const expected = createHmac("sha256", config.stripeWebhookSecret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest("hex");
+  return safeCompare(expected, signature);
+}
+
 function signSession(payload) {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = createHmac("sha256", config.sessionSecret).update(encoded).digest("base64url");
@@ -214,8 +270,8 @@ function normalizePrincipal(value) {
 
 function seedUsers(db) {
   const seeds = [
-    { username: "kbrenner", email: "kbrenner@local.axion", name: "Workspace Owner", password: "0105", role: "admin", paymentExempt: true },
-    { username: "mahmed", email: "mahmed@local.axion", name: "M. Ahmed", password: "1402", role: "user", paymentExempt: true },
+    { username: "kbrenner", email: "kbrenner@local.axion", name: "KBrenner", password: "0105", role: "admin", paymentExempt: true },
+    { username: "mahmed", email: "mahmed@local.axion", name: "MAhmed", password: "1402", role: "user", paymentExempt: true },
   ];
   seeds.forEach((seed) => {
     const existing = db.users.find((user) => user.username === seed.username || user.email === seed.email);
@@ -361,9 +417,30 @@ function billingProfileForSession(session) {
     customerId: session.licenseKey || sessionPrincipal(session),
     licenseKey: session.licenseKey || "",
     paymentExempt: isExempt || isAdmin,
-    bankConfigured: publicConfig().bankConfigured,
-    renewal: "manual annual review",
+    checkoutConfigured: Boolean(config.stripeSecretKey),
+    renewal: "annual SaaS access",
   };
+}
+
+function activatePaidOrder(db, order, { paymentProvider = "stripe", paymentId = "", paidAt = new Date().toISOString() } = {}) {
+  if (!order.licenseKey) {
+    order.licenseKey = makeLicenseKey();
+    db.licenses.unshift({
+      key: order.licenseKey,
+      customerEmail: order.customerEmail,
+      customerName: order.customerName,
+      company: order.company,
+      orderId: order.id,
+      createdAt: paidAt,
+      status: "active",
+    });
+  }
+  order.status = "paid_active";
+  order.paidAt = paidAt;
+  order.paymentProvider = paymentProvider;
+  if (paymentId) order.paymentId = paymentId;
+  db.audit.unshift({ at: paidAt, type: "order.paid", orderId: order.id, reference: order.reference, licenseKey: order.licenseKey, paymentProvider, paymentId });
+  return order.licenseKey;
 }
 
 async function createCheckout(req, res) {
@@ -375,12 +452,23 @@ async function createCheckout(req, res) {
     json(res, 400, { error: "Please enter a customer name and valid email address." });
     return;
   }
+  if (!config.stripeSecretKey) {
+    json(res, 503, {
+      error: "Automatic checkout is not configured yet. Set STRIPE_SECRET_KEY on the backend to enable SaaS-style payment.",
+      setup: {
+        provider: "Stripe Checkout",
+        requiredEnv: ["STRIPE_SECRET_KEY"],
+        recommendedEnv: ["STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"],
+      },
+    });
+    return;
+  }
 
   const db = ensureDbShape(await loadDb());
   const order = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
-    status: "pending_bank_transfer",
+    status: "pending_stripe_checkout",
     reference: makeReference(),
     productName: config.productName,
     amount: config.priceCents / 100,
@@ -390,19 +478,45 @@ async function createCheckout(req, res) {
     company,
   };
   db.orders.unshift(order);
-  db.audit.unshift({ at: order.createdAt, type: "checkout.created", orderId: order.id, reference: order.reference });
+  db.audit.unshift({ at: order.createdAt, type: "checkout.created", orderId: order.id, reference: order.reference, provider: "stripe" });
+  await saveDb(db);
+
+  const sessionParams = {
+    mode: "payment",
+    success_url: `${config.appBaseUrl}/index.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${config.appBaseUrl}/index.html?checkout=cancelled`,
+    customer_email: customerEmail,
+    client_reference_id: order.id,
+    "metadata[orderId]": order.id,
+    "metadata[reference]": order.reference,
+    "metadata[customerEmail]": customerEmail,
+    "automatic_payment_methods[enabled]": "true",
+    "line_items[0][quantity]": 1,
+  };
+  if (config.stripePriceId) {
+    sessionParams["line_items[0][price]"] = config.stripePriceId;
+  } else {
+    sessionParams["line_items[0][price_data][currency]"] = config.currency.toLowerCase();
+    sessionParams["line_items[0][price_data][unit_amount]"] = config.priceCents;
+    sessionParams["line_items[0][price_data][product_data][name]"] = `${config.productName} annual access`;
+  }
+  const session = await stripeRequest("/v1/checkout/sessions", sessionParams);
+  order.stripeSessionId = session.id;
+  order.checkoutUrl = session.url;
   await saveDb(db);
 
   json(res, 201, {
     order: sanitizeOrder(order),
     payment: {
-      method: "SEPA bank transfer",
+      provider: "stripe",
+      method: "Stripe Checkout",
       reference: order.reference,
       amount: order.amount,
       currency: order.currency,
-      bank: publicConfig().bank,
-      bankConfigured: publicConfig().bankConfigured,
-      instruction: `Transfer ${order.amount.toFixed(2)} ${order.currency} with reference ${order.reference}. Access is activated after the incoming payment is verified.`,
+      checkoutUrl: session.url,
+      sessionId: session.id,
+      automaticActivation: true,
+      instruction: "Continue to secure checkout. Your Axion license activates automatically after successful payment.",
     },
   });
 }
@@ -591,8 +705,9 @@ async function listProjects(req, res) {
     .filter((project) => canAccessProject(session, project))
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
     .map(sanitizeProject);
+  const accessibleProjectIds = new Set(projects.map((project) => project.id));
   const invites = db.invites
-    .filter((invite) => normalizePrincipal(invite.recipient) === sessionPrincipal(session) || session.role === "admin")
+    .filter((invite) => accessibleProjectIds.has(invite.projectId) || normalizePrincipal(invite.recipient) === sessionPrincipal(session) || session.role === "admin")
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   json(res, 200, {
     projects,
@@ -938,8 +1053,10 @@ async function login(req, res) {
       json(res, 503, { error: "Admin password is not configured on the backend." });
       return;
     }
-    const token = signSession({ sub: "admin", role: "admin", name: "Owner", paymentExempt: true, exp: Date.now() + 1000 * 60 * 60 * 12 });
-    json(res, 200, { token, account: { role: "admin", name: "Owner", productName: config.productName, billing: billingProfileForSession({ role: "admin", name: "Owner", paymentExempt: true }) } });
+    const adminUsername = user || config.adminUser || "owner";
+    const adminName = adminUsername === "owner" ? "Owner" : adminUsername;
+    const token = signSession({ sub: "admin", role: "admin", username: adminUsername, name: adminName, paymentExempt: true, exp: Date.now() + 1000 * 60 * 60 * 12 });
+    json(res, 200, { token, account: { role: "admin", username: adminUsername, name: adminName, productName: config.productName, billing: billingProfileForSession({ role: "admin", username: adminUsername, name: adminName, paymentExempt: true }) } });
     return;
   }
 
@@ -1021,23 +1138,65 @@ async function markPaid(req, res, orderId) {
     json(res, 404, { error: "Order not found" });
     return;
   }
-  if (!order.licenseKey) {
-    order.licenseKey = makeLicenseKey();
-    db.licenses.unshift({
-      key: order.licenseKey,
-      customerEmail: order.customerEmail,
-      customerName: order.customerName,
-      company: order.company,
-      orderId: order.id,
-      createdAt: new Date().toISOString(),
-      status: "active",
-    });
-  }
-  order.status = "paid_active";
-  order.paidAt = new Date().toISOString();
-  db.audit.unshift({ at: order.paidAt, type: "order.paid", orderId: order.id, reference: order.reference, licenseKey: order.licenseKey });
+  activatePaidOrder(db, order, { paymentProvider: order.paymentProvider || "admin" });
   await saveDb(db);
   json(res, 200, { order: sanitizeOrder(order), licenseKey: order.licenseKey });
+}
+
+async function checkoutSessionStatus(req, res, sessionId) {
+  if (!config.stripeSecretKey) {
+    json(res, 503, { error: "Stripe is not configured on the backend." });
+    return;
+  }
+  const session = await stripeRequest(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {}, "GET");
+  const db = ensureDbShape(await loadDb());
+  const orderId = session.metadata?.orderId || session.client_reference_id;
+  const order = db.orders.find((item) => item.id === orderId || item.stripeSessionId === session.id);
+  if (!order) {
+    json(res, 404, { error: "Checkout order not found." });
+    return;
+  }
+  if (session.payment_status === "paid") {
+    activatePaidOrder(db, order, { paymentProvider: "stripe", paymentId: session.payment_intent || session.id });
+    await saveDb(db);
+  }
+  json(res, 200, {
+    order: sanitizeOrder(order),
+    paid: order.status === "paid_active",
+    licenseKey: order.licenseKey || "",
+    customerEmail: order.customerEmail,
+    instruction: order.status === "paid_active"
+      ? "Payment confirmed. Use your email and license key to log in."
+      : "Checkout has not completed yet.",
+  });
+}
+
+async function stripeWebhook(req, res) {
+  const rawBody = await readRawBody(req);
+  if (!verifyStripeSignature(rawBody, req.headers["stripe-signature"])) {
+    json(res, 400, { error: "Invalid Stripe signature." });
+    return;
+  }
+  const event = JSON.parse(rawBody);
+  const session = event.data?.object || {};
+  const db = ensureDbShape(await loadDb());
+  if ((event.type === "checkout.session.completed" && session.payment_status === "paid") || event.type === "checkout.session.async_payment_succeeded") {
+    const orderId = session.metadata?.orderId || session.client_reference_id;
+    const order = db.orders.find((item) => item.id === orderId || item.stripeSessionId === session.id);
+    if (order) {
+      activatePaidOrder(db, order, { paymentProvider: "stripe", paymentId: session.payment_intent || session.id });
+      await saveDb(db);
+    }
+  }
+  if (event.type === "checkout.session.async_payment_failed") {
+    const order = db.orders.find((item) => item.id === session.metadata?.orderId || item.stripeSessionId === session.id);
+    if (order) {
+      order.status = "payment_failed";
+      db.audit.unshift({ at: new Date().toISOString(), type: "order.payment_failed", orderId: order.id, reference: order.reference });
+      await saveDb(db);
+    }
+  }
+  json(res, 200, { received: true });
 }
 
 async function routeApi(req, res, pathname) {
@@ -1045,8 +1204,17 @@ async function routeApi(req, res, pathname) {
     json(res, 200, publicConfig());
     return;
   }
+  const checkoutSessionMatch = pathname.match(/^\/api\/checkout\/session\/([^/]+)$/);
+  if (req.method === "GET" && checkoutSessionMatch) {
+    await checkoutSessionStatus(req, res, decodeURIComponent(checkoutSessionMatch[1]));
+    return;
+  }
   if (req.method === "POST" && pathname === "/api/checkout") {
     await createCheckout(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/stripe/webhook") {
+    await stripeWebhook(req, res);
     return;
   }
   if (req.method === "POST" && pathname === "/api/auth/login") {
@@ -1159,7 +1327,10 @@ const server = createServer(async (req, res) => {
 server.listen(config.port, config.host, () => {
   console.log(`${config.productName} backend running at http://${config.host}:${config.port}`);
   console.log(`Price gate: ${(config.priceCents / 100).toFixed(2)} ${config.currency}`);
-  if (!publicConfig().bankConfigured) {
-    console.log("Bank account is not configured yet. Set BANK_ACCOUNT_HOLDER, BANK_IBAN, BANK_BIC, and BANK_NAME.");
+  if (!config.stripeSecretKey) {
+    console.log("Stripe Checkout is not configured yet. Set STRIPE_SECRET_KEY to enable automatic SaaS payment.");
+  }
+  if (!config.googleClientId) {
+    console.log("Google login is not configured yet. Set GOOGLE_CLIENT_ID to enable Google Identity login.");
   }
 });
