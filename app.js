@@ -1898,6 +1898,7 @@ const state = {
   projectInvites: [],
   integrations: [],
   selectedIntegration: "",
+  connectorResults: {},
   projectFolders: {},
 };
 
@@ -5767,6 +5768,94 @@ function connectorPayloads(item) {
   return byKey[item.key] || ["stream data", "equipment metadata", "parameter set", "report export"];
 }
 
+function connectorConfigurationRows(item) {
+  const authLabel = item.auth || "credential setup";
+  return [
+    ["Connector mode", item.status?.includes("planned") ? "Prepared handoff shell" : "Configured handoff scaffold"],
+    ["Authentication", authLabel],
+    ["Model source", `${state.projectName || "Current model"} · ${activeTemplate().label}`],
+    ["Data contract", connectorPayloads(item).join(" + ")],
+  ];
+}
+
+function connectorMappingChecks(item) {
+  const streams = streamRows();
+  const scheduleRows = scheduleStreamRows();
+  const equationCount = equations.length;
+  const payloadCount = connectorPayloads(item).length;
+  const needsCredentials = /planned|connector|SDK|queue|handoff/i.test(item.status || "");
+  return [
+    {
+      label: "Equipment register",
+      value: `${state.units.length} units mapped`,
+      status: state.units.length >= 12 ? "pass" : "warn",
+    },
+    {
+      label: "Stream table",
+      value: `${streams.length} process and utility streams`,
+      status: streams.length >= 10 ? "pass" : "warn",
+    },
+    {
+      label: "Equation layer",
+      value: `${equationCount} equations available`,
+      status: equationCount >= 40 ? "pass" : "warn",
+    },
+    {
+      label: "Scheduling handoff",
+      value: `${scheduleRows.length} stream transfer slots`,
+      status: scheduleRows.length ? "pass" : "warn",
+    },
+    {
+      label: "Payload groups",
+      value: `${payloadCount} payload groups defined`,
+      status: payloadCount >= 3 ? "pass" : "warn",
+    },
+    {
+      label: "Live sync",
+      value: needsCredentials ? "Needs customer credentials before activation" : "Ready for controlled export",
+      status: needsCredentials ? "hold" : "pass",
+    },
+  ];
+}
+
+function renderConnectorWorkbench(item, payloads) {
+  const result = state.connectorResults?.[item.key] || {
+    mode: "configure",
+    title: "Configuration workspace",
+    message: "Choose Configure, Test mapping, or Export JSON. The result stays visible here so the registry feels like a real working panel.",
+    rows: connectorConfigurationRows(item),
+    checks: connectorMappingChecks(item),
+  };
+  const rows = result.rows || connectorConfigurationRows(item);
+  const checks = result.checks || connectorMappingChecks(item);
+  return `
+    <div class="connector-workbench" aria-label="${escapeAttr(item.name)} connector workspace">
+      <div class="connector-workbench-head">
+        <div>
+          <span>${escapeHtml(result.mode || "connector")}</span>
+          <strong>${escapeHtml(result.title || "Connector workspace")}</strong>
+        </div>
+        <b>${escapeHtml(item.key)}</b>
+      </div>
+      <p>${escapeHtml(result.message || "Connector details are ready for review.")}</p>
+      <div class="connector-payload-chips" aria-label="Payload groups">
+        ${payloads.map((payload) => `<span>${escapeHtml(payload)}</span>`).join("")}
+      </div>
+      <dl class="connector-config-list">
+        ${rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}
+      </dl>
+      <div class="connector-checks" aria-label="Mapping check results">
+        ${checks.map((check) => `
+          <span class="connector-check ${escapeAttr(check.status)}">
+            <b>${escapeHtml(check.label)}</b>
+            <small>${escapeHtml(check.value)}</small>
+          </span>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderIntegrationRegistry() {
   const items = state.integrations.length ? state.integrations : localIntegrations();
   return items.map((item) => {
@@ -5788,14 +5877,7 @@ function renderIntegrationRegistry() {
           <dt>Auth</dt><dd>${escapeHtml(item.auth || "credential setup")}</dd>
           <dt>Payload</dt><dd>${payloads.slice(0, 3).map(escapeHtml).join(", ")}</dd>
         </dl>
-        ${selected ? `
-          <div class="integration-detail">
-            <strong>Implementation next step</strong>
-            <p>${escapeHtml(item.status?.includes("planned")
-              ? "Add customer credentials, vendor API access, schema mapping, and a validation test before enabling live sync."
-              : "Use current Axion exports as the controlled handoff package and validate imported values in the target tool.")}</p>
-          </div>
-        ` : ""}
+        ${selected ? renderConnectorWorkbench(item, payloads) : ""}
         <footer>
           <button data-integration-action="configure" data-integration-key="${escapeAttr(item.key)}" type="button">Configure</button>
           <button data-integration-action="test" data-integration-key="${escapeAttr(item.key)}" type="button">Test mapping</button>
@@ -8401,6 +8483,8 @@ function connectorHandoffPayload(item) {
     payloads: connectorPayloads(item),
     modelSummary: currentModelSummary(),
     streamsPreview: streamRows().slice(0, 12),
+    streamSchedulePreview: scheduleStreamRows().slice(0, 12),
+    equipmentReusePreview: scheduleCycleRows().slice(0, 12),
     equipmentPreview: state.units.slice(0, 12).map((unit) => ({
       id: unit.id,
       name: unit.name,
@@ -8417,12 +8501,40 @@ function handleIntegrationAction(action, key) {
   const item = (state.integrations.length ? state.integrations : localIntegrations()).find((candidate) => candidate.key === key);
   if (!item) return;
   state.selectedIntegration = key;
+  state.connectorResults = state.connectorResults || {};
+  const checks = connectorMappingChecks(item);
+  const passCount = checks.filter((check) => check.status === "pass").length;
+  const rows = connectorConfigurationRows(item);
   if (action === "export") {
-    downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(connectorHandoffPayload(item), null, 2));
+    const payload = connectorHandoffPayload(item);
+    downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(payload, null, 2));
+    state.connectorResults[key] = {
+      mode: "Export",
+      title: "Connector handoff downloaded",
+      message: `${payload.payloads.length} payload groups were packaged with equipment, stream, schedule, economics, and model-summary previews.`,
+      rows: [...rows, ["Export timestamp", payload.generatedAt]],
+      checks,
+    };
     showToast(`${item.name} handoff JSON downloaded`);
   } else if (action === "test") {
-    showToast(`${item.name}: mapping check prepared (${connectorPayloads(item).length} payload groups)`);
+    state.connectorResults[key] = {
+      mode: "Mapping test",
+      title: `${passCount}/${checks.length} checks passed`,
+      message: passCount === checks.length
+        ? "The current model is ready for a controlled connector export."
+        : "The current model can be exported, but live sync still needs credentials, schema validation, or more complete model data.",
+      rows,
+      checks,
+    };
+    showToast(`${item.name}: ${passCount}/${checks.length} mapping checks passed`);
   } else {
+    state.connectorResults[key] = {
+      mode: "Configure",
+      title: "Connector configuration opened",
+      message: "Review the data contract, authentication method, payload groups, and mapping readiness before enabling a real integration.",
+      rows,
+      checks,
+    };
     showToast(`${item.name} connector details opened`);
   }
   renderProjectsBoard();
@@ -8668,6 +8780,25 @@ function bindAuth() {
       }
       scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel");
     });
+  });
+
+  els.loginGate?.addEventListener("click", (event) => {
+    const publicButton = event.target.closest("[data-public-target]");
+    if (publicButton) {
+      event.preventDefault();
+      const target = publicButton.dataset.publicTarget;
+      if (publicButton.dataset.publicDetail) {
+        openPublicDetail(publicButton.dataset.publicDetail);
+      } else {
+        scrollPublicTarget(target, target === "loginPanel");
+      }
+      return;
+    }
+    const logoButton = event.target.closest("#publicLogo");
+    if (logoButton) {
+      event.preventDefault();
+      scrollPublicTarget("publicHome");
+    }
   });
 
   document.querySelector(".public-scroll")?.addEventListener("click", (event) => {
