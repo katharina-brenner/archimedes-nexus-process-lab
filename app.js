@@ -2289,7 +2289,9 @@ function relevantEquations() {
 
 function loadTemplate(key, preserveScale = false) {
   const template = templates[key];
+  if (!template) return;
   state.template = key;
+  state.inferredTemplate = key;
   state.units = clone(template.units);
   state.streams = clone(template.streams);
   state.costs = clone(template.costs);
@@ -3421,11 +3423,52 @@ function scheduleSetupDuration(unitItem) {
   return recipeNumber(unitItem, "setupH", defaultScheduleSetupDuration(unitItem), 0, 1000);
 }
 
+function scheduleReusePolicy(unitItem) {
+  const text = `${unitItem.id} ${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  if (text.includes("single-use") || text.includes("bag") || text.includes("filter") || text.includes("membrane")) {
+    return { mode: "replace assembly", detail: "Disposable path: short changeover, integrity check, and new sterile assembly before reuse." };
+  }
+  if (unitItem.cls === "Bioreactor" || text.includes("reactor") || text.includes("fermenter")) {
+    return { mode: "CIP/SIP then reusable", detail: "Production ends, product is transferred, vessel is cleaned/sterilized, then released for the next batch." };
+  }
+  if (["Preparation", "Hold", "Purification", "Concentration", "Solid-liquid", "Separation", "Recovery", "Finishing"].includes(unitItem.cls)) {
+    return { mode: "CIP/rinse then reusable", detail: "Equipment is reusable after product transfer, cleaning/rinse, and release check." };
+  }
+  if (unitLayer(unitItem) === "cleaning") {
+    return { mode: "shared cleaning resource", detail: "CIP/SIP resource is shared across equipment and can only clean one train at a time in this screening model." };
+  }
+  if (unitItem.cls === "Quality" || unitItem.cls === "Instrumentation") {
+    return { mode: "queue/resource slot", detail: "Analytical or data resource is scheduled as a queue, then released." };
+  }
+  return { mode: "reusable support", detail: "Support item returns to available state after its scheduled service window." };
+}
+
+function streamTransferDuration(streamItem, from, to, data) {
+  const massKg = Math.max(0.01, streamNumericFlow(streamItem));
+  const kind = streamKind(streamItem, from, to);
+  const phase = String(streamItem.phase || "").toLowerCase();
+  if (kind === "qc") return 0.08;
+  if (kind === "utility") return Math.max(0.04, Math.min(1.2, massKg / 20000));
+  if (phase.includes("gas")) return Math.max(0.03, Math.min(0.8, massKg / 30000));
+  if (phase.includes("solid")) return Math.max(0.12, Math.min(3, massKg / 3500));
+  if (phase.includes("slurry") || phase.includes("broth")) return Math.max(0.25, Math.min(5.5, massKg / Math.max(4000, state.batchSize * 0.8)));
+  return Math.max(0.12, Math.min(3.5, massKg / Math.max(6000, state.batchSize)));
+}
+
+function streamFlushDuration(streamItem, kind) {
+  const text = `${streamItem.id} ${streamItem.composition} ${streamItem.phase}`.toLowerCase();
+  if (kind === "qc") return 0.02;
+  if (kind === "utility" || text.includes("cip") || text.includes("steam") || text.includes("gas")) return 0.04;
+  if (text.includes("broth") || text.includes("slurry") || text.includes("harvest") || text.includes("solvent")) return 0.18;
+  return 0.08;
+}
+
 function campaignSchedule(routeKey = state.activeRoute) {
   const p = state.params;
   const data = metrics();
   const orderedUnits = orderedScheduleUnits();
   const activeUnits = orderedUnits.filter((item) => recipeActive(item) && recipeRouteEnabled(item, routeKey));
+  const activeUnitIds = new Set(activeUnits.map((item) => item.id));
   const simulatedBatches = Math.min(12, Math.max(2, state.batchCount || 2));
   const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
   const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
@@ -3434,12 +3477,15 @@ function campaignSchedule(routeKey = state.activeRoute) {
   const equipmentPools = {};
   const equipmentBusy = {};
   const equipmentCapacity = {};
+  const streamAvailable = {};
+  const streamBusy = {};
   const groupBusy = {};
   const shiftHours = Math.max(1, p.operatorShiftHours || 8);
   const resourceBusy = { "CIP/SIP skid": 0, "QC release queue": 0, "Operator shifts": 0 };
   let cipSkidAvailable = 0;
   let qcQueueAvailable = 0;
   const operations = [];
+  const streamOperations = [];
   const violations = [];
   const dependencyWarnings = [];
   const batchReleases = [];
@@ -3455,6 +3501,7 @@ function campaignSchedule(routeKey = state.activeRoute) {
       const setupH = scheduleSetupDuration(unitItem);
       const processH = scheduleOperationDuration(unitItem, data);
       const cleanH = scheduleCleaningDuration(unitItem);
+      const reuse = scheduleReusePolicy(unitItem);
       const parallelUnits = recipeParallelUnits(unitItem);
       equipmentCapacity[unitItem.id] = parallelUnits;
       if (!equipmentPools[unitItem.id] || equipmentPools[unitItem.id].length !== parallelUnits) {
@@ -3473,11 +3520,50 @@ function campaignSchedule(routeKey = state.activeRoute) {
       const startH = Math.max(readyTime, equipmentReady);
       const waitingH = Math.max(0, startH - readyTime);
       const processEndH = startH + setupH + processH;
-      const cleanStartH = cleanH > 0 ? Math.max(processEndH, cipSkidAvailable) : processEndH;
+      const outgoingStreams = state.streams.filter((streamItem) => streamItem.from === unitItem.id && activeUnitIds.has(streamItem.to));
+      let transferEndH = processEndH;
+      let lineWaitH = 0;
+      outgoingStreams.forEach((streamItem, streamIndex) => {
+        const from = state.units.find((candidate) => candidate.id === streamItem.from);
+        const to = state.units.find((candidate) => candidate.id === streamItem.to);
+        const kind = streamKind(streamItem, from, to);
+        const transferH = streamTransferDuration(streamItem, from, to, data);
+        const flushH = streamFlushDuration(streamItem, kind);
+        const lineReadyH = streamAvailable[streamItem.id] || 0;
+        const transferStartH = Math.max(processEndH + streamIndex * 0.03, lineReadyH);
+        const transferFinishH = transferStartH + transferH;
+        const flushStartH = transferFinishH;
+        const availableH = flushStartH + flushH;
+        lineWaitH += Math.max(0, transferStartH - processEndH);
+        transferEndH = Math.max(transferEndH, transferFinishH);
+        streamAvailable[streamItem.id] = availableH + transferSlack * 0.25;
+        streamBusy[streamItem.id] = (streamBusy[streamItem.id] || 0) + transferH + flushH;
+        streamOperations.push({
+          batchId,
+          streamId: streamItem.id,
+          from: streamItem.from,
+          to: streamItem.to,
+          composition: streamItem.composition,
+          phase: streamItem.phase,
+          role: streamLabel(kind),
+          kind,
+          sourceUnit: unitItem.id,
+          transferStartH,
+          transferH,
+          transferFinishH,
+          flushStartH,
+          flushH,
+          availableH,
+          lineWaitH: Math.max(0, transferStartH - processEndH),
+          status: transferStartH - processEndH > Math.max(0.5, p.holdupTime || 12) ? "line wait review" : "scheduled",
+        });
+      });
+      const cleanStartH = cleanH > 0 ? Math.max(transferEndH, cipSkidAvailable) : transferEndH;
       const cleanEndH = cleanStartH + cleanH;
-      const finishH = cleanH > 0 ? cleanEndH : processEndH;
+      const finishH = cleanH > 0 ? cleanEndH : transferEndH;
+      const availableH = cleanH > 0 ? cleanEndH : transferEndH;
       const holdLimit = Math.max(0.5, p.holdupTime || 12);
-      const status = waitingH > holdLimit ? "hold violation" : cleanH && cleanStartH > processEndH + holdLimit ? "CIP wait" : "scheduled";
+      const status = waitingH > holdLimit ? "hold violation" : lineWaitH > holdLimit ? "line wait" : cleanH && cleanStartH > transferEndH + holdLimit ? "CIP wait" : "scheduled";
       const row = {
         batchId,
         operationNo: operationIndex + 1,
@@ -3491,14 +3577,19 @@ function campaignSchedule(routeKey = state.activeRoute) {
         activeRoute: routeKey,
         assignedEquipment: `${unitItem.id}${parallelUnits > 1 ? `-${selectedSlot + 1}/${parallelUnits}` : ""}`,
         parallelUnits,
+        reuseMode: reuse.mode,
+        reuseDetail: reuse.detail,
         startH,
         setupH,
         processH,
         processEndH,
+        transferEndH,
         cleanStartH,
         cleanH,
         finishH,
+        availableH,
         waitingH,
+        lineWaitH,
         status,
       };
       operations.push(row);
@@ -3518,7 +3609,7 @@ function campaignSchedule(routeKey = state.activeRoute) {
       if (dependencyStatus !== "linked") {
         dependencyWarnings.push(`${batchId} ${unitItem.id}: ${dependencyStatus} ${predecessor}`);
       }
-      dependencyDone[unitItem.id] = processEndH;
+      dependencyDone[unitItem.id] = transferEndH;
     });
     const finalProcessEnd = Math.max(...Object.entries(dependencyDone).filter(([key]) => key !== "__batch_start").map(([, value]) => value), batchStartH);
     const qcStart = Math.max(finalProcessEnd, qcQueueAvailable);
@@ -3569,6 +3660,14 @@ function campaignSchedule(routeKey = state.activeRoute) {
       occupancyPct: busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) * 100,
       status: busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) > 0.92 ? "bottleneck" : busyH / (resource === "Operator shifts" ? makespanH / shiftHours : makespanH) > 0.75 ? "review" : "ok",
     })),
+    ...Object.entries(streamBusy).map(([resource, busyH]) => ({
+      resource,
+      type: "Process stream / transfer line",
+      busyH,
+      availableH: makespanH,
+      occupancyPct: busyH / makespanH * 100,
+      status: busyH / makespanH > 0.92 ? "bottleneck" : busyH / makespanH > 0.75 ? "review" : "ok",
+    })),
   ];
 
   return {
@@ -3585,11 +3684,13 @@ function campaignSchedule(routeKey = state.activeRoute) {
     violations,
     dependencyWarnings,
     operations,
+    streamOperations,
     batchReleases,
     resourceRows,
     warnings: [
       feasibleAnnualBatches < state.batchCount ? `Schedule capacity supports ${feasibleAnnualBatches} of ${state.batchCount} target annual batches under the current AOT and uptime.` : "",
       violations.length ? `${violations.length} hold-time or waiting violations need recipe/suite review.` : "",
+      streamOperations.some((item) => item.status !== "scheduled") ? `${streamOperations.filter((item) => item.status !== "scheduled").length} stream transfer slots need line availability review.` : "",
       dependencyWarnings.length ? `${dependencyWarnings.length} dependency warnings need recipe review.` : "",
       bottleneck.occupancyPct > 92 ? `${bottleneck.tag} is above 92% occupancy in the simulated campaign.` : "",
     ].filter(Boolean),
@@ -3614,10 +3715,56 @@ function scheduleOperationRows() {
     setupH: item.setupH,
     processH: item.processH,
     processEndH: item.processEndH,
+    transferEndH: item.transferEndH,
     cleanStartH: item.cleanStartH,
     cleanH: item.cleanH,
     finishH: item.finishH,
+    availableH: item.availableH,
     waitingH: item.waitingH,
+    lineWaitH: item.lineWaitH,
+    reuseMode: item.reuseMode,
+    reuseDetail: item.reuseDetail,
+    status: item.status,
+  }));
+}
+
+function scheduleStreamRows() {
+  return campaignSchedule().streamOperations.map((item) => ({
+    batchId: item.batchId,
+    streamId: item.streamId,
+    from: item.from,
+    to: item.to,
+    composition: item.composition,
+    phase: item.phase,
+    role: item.role,
+    kind: item.kind,
+    sourceUnit: item.sourceUnit,
+    transferStartH: item.transferStartH,
+    transferH: item.transferH,
+    transferFinishH: item.transferFinishH,
+    flushStartH: item.flushStartH,
+    flushH: item.flushH,
+    availableH: item.availableH,
+    lineWaitH: item.lineWaitH,
+    status: item.status,
+  }));
+}
+
+function scheduleCycleRows() {
+  return campaignSchedule().operations.map((item) => ({
+    batchId: item.batchId,
+    tag: item.tag,
+    operation: item.operation,
+    class: item.class,
+    assignedEquipment: item.assignedEquipment,
+    reuseMode: item.reuseMode,
+    setupStartH: item.startH,
+    processStartH: item.startH + item.setupH,
+    processEndH: item.processEndH,
+    transferEndH: item.transferEndH,
+    cleaningStartH: item.cleanStartH,
+    cleaningEndH: item.cleanStartH + item.cleanH,
+    availableForNextBatchH: item.availableH,
     status: item.status,
   }));
 }
@@ -4736,6 +4883,8 @@ function renderSimulationBoard() {
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
   const schedule = campaignSchedule();
+  const cycleRows = scheduleCycleRows();
+  const streamScheduleRows = scheduleStreamRows();
   const recipeRows = recipeEditorRows();
   const routeRows = routeComparisonRows();
   const topologyRows = routeTopologyRows();
@@ -4775,6 +4924,7 @@ function renderSimulationBoard() {
       <article><span>Feasible annual batches</span><strong class="${schedule.feasibleAnnualBatches < state.batchCount ? "risk" : "ok"}">${schedule.feasibleAnnualBatches}/${state.batchCount}</strong></article>
       <article><span>Release pitch</span><strong>${formatNumber(schedule.releasePitchH, 1)} h</strong></article>
       <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
+      <article><span>Stream slots</span><strong>${streamScheduleRows.length}</strong></article>
       <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
     </section>
     <section class="simulation-summary">
@@ -5020,21 +5170,58 @@ function renderSimulationBoard() {
         <div class="schedule-panel-copy">
           <span>${schedule.basis}</span>
           <h4>${formatNumber(schedule.makespanH, 1)} h simulated campaign · ${formatNumber(schedule.effectiveAotH, 0)} h/yr effective AOT</h4>
-          <p>${schedule.warnings.length ? schedule.warnings.join(" ") : "The selected annual batch target is inside the current finite-capacity screening schedule."}</p>
+          <p>${schedule.warnings.length ? schedule.warnings.join(" ") : "The selected annual batch target is inside the current finite-capacity screening schedule."} Each reusable unit follows setup → production → transfer → cleaning/release → available for the next batch.</p>
         </div>
         <div class="schedule-timeline" aria-label="First batch operation timeline">
           ${schedule.operations.filter((item) => item.batchId === "B01").slice(0, 18).map((item) => {
             const left = Math.max(0, item.startH / Math.max(1, schedule.makespanH) * 100);
             const width = Math.max(2.2, (item.finishH - item.startH) / Math.max(1, schedule.makespanH) * 100);
+            const processWidth = Math.max(1, (item.processEndH - item.startH) / Math.max(1, item.finishH - item.startH) * 100);
+            const transferWidth = Math.max(0, (item.transferEndH - item.processEndH) / Math.max(1, item.finishH - item.startH) * 100);
+            const processEnd = Math.min(100, left + width * processWidth / 100);
+            const transferEnd = Math.min(100, processEnd + width * transferWidth / 100);
+            const barEnd = Math.min(100, left + width);
             return `
-              <div class="schedule-row">
+              <div class="schedule-row" data-schedule-status="${escapeAttr(item.status)}">
                 <span>${item.tag}</span>
-                <i style="--start:${left}%; --width:${Math.min(100 - left, width)}%;" title="${escapeAttr(`${item.batchId} ${item.operation}: start ${formatNumber(item.startH, 1)} h, finish ${formatNumber(item.finishH, 1)} h, clean ${formatNumber(item.cleanH, 1)} h`)}"></i>
-                <b>${formatNumber(item.finishH - item.startH, 1)} h</b>
+                <i style="--start:${left}%; --process-end:${processEnd}%; --transfer-end:${transferEnd}%; --bar-end:${barEnd}%;" title="${escapeAttr(`${item.batchId} ${item.operation}: setup/process ${formatNumber(item.startH, 1)}-${formatNumber(item.processEndH, 1)} h, transfer until ${formatNumber(item.transferEndH, 1)} h, clean ${formatNumber(item.cleanH, 1)} h, available ${formatNumber(item.availableH, 1)} h. ${item.reuseDetail}`)}"></i>
+                <b>${formatNumber(item.availableH, 1)} h</b>
               </div>
             `;
           }).join("")}
+          <div class="schedule-legend">
+            <span><b class="legend-process"></b>setup + process</span>
+            <span><b class="legend-transfer"></b>stream transfer</span>
+            <span><b class="legend-clean"></b>clean/release</span>
+          </div>
         </div>
+      </div>
+      <div class="schedule-cycles-grid">
+        ${cycleRows.filter((item) => item.batchId === "B01").slice(0, 8).map((item) => `
+          <article>
+            <span>${escapeHtml(item.reuseMode)}</span>
+            <h4>${escapeHtml(item.tag)} · ${escapeHtml(item.operation)}</h4>
+            <dl>
+              <dt>Production end</dt><dd>${formatNumber(item.processEndH, 1)} h</dd>
+              <dt>Transfer end</dt><dd>${formatNumber(item.transferEndH, 1)} h</dd>
+              <dt>Back available</dt><dd>${formatNumber(item.availableForNextBatchH, 1)} h</dd>
+            </dl>
+          </article>
+        `).join("")}
+      </div>
+      <div class="schedule-stream-grid">
+        ${streamScheduleRows.filter((item) => item.batchId === "B01").slice(0, 10).map((item) => `
+          <article>
+            <span>${escapeHtml(item.role)}</span>
+            <h4>${escapeHtml(item.streamId)} · ${escapeHtml(item.from)} → ${escapeHtml(item.to)}</h4>
+            <p>${escapeHtml(item.composition)}</p>
+            <dl>
+              <dt>Transfer</dt><dd>${formatNumber(item.transferStartH, 1)}-${formatNumber(item.transferFinishH, 1)} h</dd>
+              <dt>Flush/release</dt><dd>${formatNumber(item.flushH, 2)} h</dd>
+              <dt>Available</dt><dd>${formatNumber(item.availableH, 1)} h</dd>
+            </dl>
+          </article>
+        `).join("")}
       </div>
       <div class="simulation-cards">
         ${schedule.resourceRows.slice(0, 6).map((item) => `
@@ -5474,8 +5661,8 @@ async function buildFromProductBrief() {
 }
 
 function renderStartBoard() {
-  const selected = templates[state.inferredTemplate] || activeTemplate();
-  const assumptions = briefAssumptions(state.inferredTemplate, state.productFiles.length);
+  const selected = activeTemplate();
+  const assumptions = briefAssumptions(state.template, state.productFiles.length);
   els.startBoard.innerHTML = `
     <section class="start-hero">
       <div>
@@ -6750,7 +6937,7 @@ function renderReportsBoard() {
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
-      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with setup, process, CIP/SIP, QC release, equipment occupancy, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Download CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
+      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, short cleaning/release, equipment reuse, QC release, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
@@ -6915,7 +7102,7 @@ function simulationReadinessItems() {
       group: "Scheduling",
       status: "Partially covered",
       title: "Finite-capacity batch scheduler",
-      detail: `A finite-capacity v1 scheduler now simulates ${schedule.simulatedBatches} batches with equipment occupancy, editable active/skip flags, route branches, visual branch/merge topology, automatic route optimization, predecessor dependencies, setup/process/CIP recipe timing, parallel equipment pools, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current ${state.activeRoute} route supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs operator calendars, suite-level cleanroom constraints, campaign changeovers, validated site calendars, and a mathematical optimizer with hard constraints.`,
+      detail: `A finite-capacity scheduler now simulates ${schedule.simulatedBatches} repeated batches with equipment occupancy, editable active/skip flags, route branches, visual branch/merge topology, automatic route optimization, predecessor dependencies, setup/process/transfer/CIP timing, reusable equipment pools, scheduled process-stream transfer slots, short cleaning or assembly-changeover windows, a shared CIP/SIP skid, QC release queue, hold-time checks, and bottleneck resources. Current ${state.activeRoute} route supports ${schedule.feasibleAnnualBatches} of ${state.batchCount} target annual batches. Full simulation still needs operator calendars, suite-level cleanroom constraints, campaign changeovers, validated site calendars, and a mathematical optimizer with hard constraints.`,
     },
     {
       group: "GMP validation",
@@ -7300,6 +7487,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
   } else if (type === "schedule-csv") {
     downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows());
+  } else if (type === "schedule-streams-csv") {
+    downloadCsv(`${state.template}-stream-transfer-schedule.csv`, scheduleStreamRows());
+  } else if (type === "schedule-cycles-csv") {
+    downloadCsv(`${state.template}-equipment-reuse-cycles.csv`, scheduleCycleRows());
   } else if (type === "schedule-resources-csv") {
     downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows());
   } else if (type === "recipe-csv") {

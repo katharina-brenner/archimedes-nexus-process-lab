@@ -7132,8 +7132,113 @@ th {
   height: 14px;
   border-radius: 7px;
   background:
-    linear-gradient(90deg, transparent var(--start), rgba(0, 168, 143, 0.88) var(--start), rgba(0, 168, 143, 0.88) calc(var(--start) + var(--width)), transparent calc(var(--start) + var(--width))),
+    linear-gradient(90deg,
+      transparent var(--start),
+      rgba(0, 168, 143, 0.9) var(--start),
+      rgba(0, 168, 143, 0.9) var(--process-end),
+      rgba(77, 96, 119, 0.85) var(--process-end),
+      rgba(77, 96, 119, 0.85) var(--transfer-end),
+      rgba(183, 77, 69, 0.82) var(--transfer-end),
+      rgba(183, 77, 69, 0.82) var(--bar-end),
+      transparent var(--bar-end)),
     repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.06) 0 1px, transparent 1px 12.5%);
+}
+
+.schedule-row[data-schedule-status="hold violation"] > i,
+.schedule-row[data-schedule-status="line wait"] > i,
+.schedule-row[data-schedule-status="CIP wait"] > i {
+  box-shadow: 0 0 0 2px rgba(183, 77, 69, 0.22);
+}
+
+.schedule-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.schedule-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-legend b {
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.legend-process {
+  background: rgba(0, 168, 143, 0.9);
+}
+
+.legend-transfer {
+  background: rgba(77, 96, 119, 0.85);
+}
+
+.legend-clean {
+  background: rgba(183, 77, 69, 0.82);
+}
+
+.schedule-cycles-grid,
+.schedule-stream-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.schedule-cycles-grid article,
+.schedule-stream-grid article {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(7, 17, 31, 0.05);
+}
+
+.schedule-cycles-grid span,
+.schedule-stream-grid span {
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schedule-cycles-grid h4,
+.schedule-stream-grid h4,
+.schedule-stream-grid p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.schedule-cycles-grid h4,
+.schedule-stream-grid h4 {
+  color: #07111f;
+  font-size: 13px;
+}
+
+.schedule-stream-grid p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.schedule-cycles-grid dl,
+.schedule-stream-grid dl {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .recipe-editor-panel {
