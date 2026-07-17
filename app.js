@@ -6068,8 +6068,39 @@ function renderConnectorWorkbench(item, payloads) {
   `;
 }
 
+function connectorRegistryItems() {
+  return state.integrations.length ? state.integrations : localIntegrations();
+}
+
+function selectedConnectorItem(items = connectorRegistryItems()) {
+  return items.find((item) => item.key === state.selectedIntegration) || items[0] || null;
+}
+
+function renderConnectorRegistryPanel() {
+  const items = connectorRegistryItems();
+  const item = selectedConnectorItem(items);
+  if (!item) return "";
+  const payloads = connectorPayloads(item);
+  const result = state.connectorResults?.[item.key];
+  return `
+    <article class="connector-live-panel" aria-label="API connector registry workspace">
+      <div class="connector-live-copy">
+        <span>Connector workspace</span>
+        <h4>${escapeHtml(item.name)}</h4>
+        <p>${escapeHtml(result?.message || "Select a connector, run a mapping test, configure the data contract, or export a controlled handoff package. This panel updates immediately after every action.")}</p>
+      </div>
+      <div class="connector-live-actions">
+        <button data-integration-action="configure" data-integration-key="${escapeAttr(item.key)}" type="button">Open configuration</button>
+        <button data-integration-action="test" data-integration-key="${escapeAttr(item.key)}" type="button">Run mapping test</button>
+        <button data-integration-action="export" data-integration-key="${escapeAttr(item.key)}" type="button">Download handoff JSON</button>
+      </div>
+      ${renderConnectorWorkbench(item, payloads)}
+    </article>
+  `;
+}
+
 function renderIntegrationRegistry() {
-  const items = state.integrations.length ? state.integrations : localIntegrations();
+  const items = connectorRegistryItems();
   return items.map((item) => {
     const selected = state.selectedIntegration === item.key;
     const tone = connectorStatusTone(item.status || "");
@@ -6202,6 +6233,7 @@ function renderProjectsBoard() {
           <h3>API connector registry</h3>
           <p>Prepared handoff targets for simulation, CFD, historian, ELN/LIMS, and plant-data tools. Live sync needs credentials and vendor access.</p>
         </div>
+        ${renderConnectorRegistryPanel()}
         ${renderIntegrationRegistry()}
       </div>
     </section>
@@ -8804,7 +8836,7 @@ function connectorHandoffPayload(item) {
 }
 
 function handleIntegrationAction(action, key) {
-  const item = (state.integrations.length ? state.integrations : localIntegrations()).find((candidate) => candidate.key === key);
+  const item = connectorRegistryItems().find((candidate) => candidate.key === key);
   if (!item) return;
   state.selectedIntegration = key;
   state.connectorResults = state.connectorResults || {};
@@ -8844,6 +8876,9 @@ function handleIntegrationAction(action, key) {
     showToast(`${item.name} connector details opened`);
   }
   renderProjectsBoard();
+  window.requestAnimationFrame(() => {
+    document.querySelector(".connector-live-panel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
 }
 
 async function refreshProjects() {

@@ -217,8 +217,10 @@ body.show-public .app-shell {
 .public-hero {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 42px;
   align-items: center;
-  min-height: 790px;
+  min-height: 720px;
   padding: 88px 72px 64px;
   overflow: hidden;
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
@@ -298,10 +300,10 @@ body.show-public .app-shell {
   position: relative;
   z-index: 1;
   display: grid;
-  justify-items: center;
-  max-width: 1040px;
-  margin: 0 auto;
-  text-align: center;
+  justify-items: start;
+  max-width: 760px;
+  margin: 0;
+  text-align: left;
 }
 
 .hero-product-visual,
@@ -314,8 +316,10 @@ body.show-public .app-shell {
 }
 
 .hero-product-visual {
-  width: min(1060px, 100%);
-  margin: 36px auto 0;
+  width: min(100%, 820px);
+  margin: 0;
+  align-self: center;
+  justify-self: end;
   border: 1px solid rgba(233, 239, 246, 0.2);
   border-radius: 30px;
   background:
@@ -346,7 +350,7 @@ body.show-public .app-shell {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .hero-badge-row {
@@ -486,7 +490,7 @@ body.show-public .app-shell {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start;
   width: min(820px, 100%);
   margin-top: 12px;
 }
@@ -5046,6 +5050,69 @@ dd {
   line-height: 1.45;
 }
 
+.connector-live-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(36, 92, 82, 0.18);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 246, 0.95)),
+    radial-gradient(circle at 88% 0%, rgba(39, 95, 107, 0.12), transparent 38%);
+  box-shadow: 0 18px 42px rgba(7, 17, 31, 0.08);
+}
+
+.connector-live-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.connector-live-copy span {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.connector-live-copy h4,
+.connector-live-copy p {
+  margin: 0;
+}
+
+.connector-live-copy h4 {
+  color: #071a31;
+  font-size: 18px;
+}
+
+.connector-live-copy p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.connector-live-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.connector-live-actions button {
+  min-height: 38px;
+  border: 1px solid rgba(36, 92, 82, 0.2);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #123b35;
+  background: rgba(216, 232, 228, 0.68);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.connector-live-actions button:hover {
+  border-color: rgba(36, 92, 82, 0.36);
+  background: rgba(216, 232, 228, 0.94);
+}
+
 .integration-card {
   position: relative;
   overflow: hidden;
@@ -8804,7 +8871,22 @@ th {
   }
 
   .public-hero {
+    grid-template-columns: 1fr;
     min-height: 640px;
+  }
+
+  .public-hero-copy {
+    justify-items: center;
+    max-width: 960px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .hero-badge-row,
+  .prompt-suggestions,
+  .hero-trust-strip,
+  .hero-outcome-panel {
+    justify-content: center;
   }
 
   .public-hero-copy h1 {
@@ -8864,6 +8946,10 @@ th {
   .realtime-grid,
   .market-intel-board,
   .buyer-role-board {
+    grid-template-columns: 1fr;
+  }
+
+  .connector-live-actions {
     grid-template-columns: 1fr;
   }
 
@@ -9061,6 +9147,7 @@ th {
   }
 
   .public-hero {
+    grid-template-columns: 1fr;
     min-height: 680px;
   }
 
