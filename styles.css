@@ -7558,6 +7558,172 @@ th {
   background: rgba(183, 77, 69, 0.82);
 }
 
+.schedule-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.schedule-export-actions button {
+  min-height: 34px;
+  border: 1px solid rgba(167, 43, 34, 0.22);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #681a16;
+  background: rgba(240, 222, 217, 0.42);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.advanced-schedule-board {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(31, 42, 58, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 246, 242, 0.94)),
+    radial-gradient(circle at 92% 0%, rgba(192, 138, 45, 0.1), transparent 40%);
+  box-shadow: 0 12px 30px rgba(7, 17, 31, 0.08);
+}
+
+.advanced-schedule-board header {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.advanced-schedule-board header span {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.advanced-schedule-board h4 {
+  margin: 4px 0 0;
+  color: #07111f;
+  font-size: 16px;
+}
+
+.advanced-schedule-board header strong {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #5d302b;
+  background: rgba(240, 222, 217, 0.58);
+  font-size: 11px;
+}
+
+.advanced-schedule-table {
+  display: grid;
+  gap: 6px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.advanced-schedule-head,
+.advanced-schedule-row {
+  display: grid;
+  grid-template-columns: 72px minmax(190px, 1.1fr) minmax(140px, 0.8fr) 78px 78px 112px;
+  gap: 8px;
+  align-items: center;
+  min-width: 760px;
+}
+
+.advanced-schedule-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #5e6775;
+  background: #f6f5f1;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.advanced-schedule-row {
+  min-height: 40px;
+  border: 1px solid rgba(31, 42, 58, 0.1);
+  border-radius: 14px;
+  padding: 0 10px;
+  color: #1b2433;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.advanced-schedule-row:hover {
+  border-color: rgba(167, 43, 34, 0.28);
+  background: rgba(240, 222, 217, 0.18);
+}
+
+.advanced-schedule-row.critical {
+  border-color: rgba(167, 43, 34, 0.32);
+  box-shadow: inset 4px 0 0 rgba(167, 43, 34, 0.72);
+}
+
+.advanced-schedule-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-schedule-row b {
+  color: #07111f;
+  font-weight: 950;
+}
+
+.release-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.release-strip span {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 3px;
+  min-width: 118px;
+  padding: 9px 10px;
+  border: 1px solid rgba(71, 107, 88, 0.2);
+  border-radius: 14px;
+  background: rgba(237, 246, 239, 0.76);
+}
+
+.release-strip span.review {
+  border-color: rgba(192, 138, 45, 0.3);
+  background: rgba(255, 249, 235, 0.82);
+}
+
+.release-strip b,
+.release-strip small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.release-strip b {
+  color: #07111f;
+  font-size: 12px;
+}
+
+.release-strip small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .schedule-cycles-grid,
 .schedule-stream-grid {
   display: grid;

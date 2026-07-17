@@ -3770,6 +3770,127 @@ function scheduleCycleRows() {
   }));
 }
 
+function exportDateIso() {
+  return new Date().toISOString();
+}
+
+function addHoursIso(hours, base = new Date()) {
+  return new Date(base.getTime() + Number(hours || 0) * 3600000).toISOString();
+}
+
+function scheduleGanttRows(schedule = campaignSchedule()) {
+  const rows = [];
+  const pushSegment = (item, phase, startH, endH, resource = item.assignedEquipment, predecessor = "") => {
+    const durationH = Math.max(0, endH - startH);
+    if (durationH <= 0.001) return;
+    rows.push({
+      taskId: `${item.batchId}-${item.tag}-${phase}`.replaceAll(/\s+/g, "-"),
+      parentTaskId: `${item.batchId}-${item.tag}`,
+      batchId: item.batchId,
+      operationNo: item.operationNo,
+      taskName: `${item.tag} ${phase} - ${item.operation}`,
+      operationTag: item.tag,
+      operation: item.operation,
+      phase,
+      resource,
+      resourceType: phase === "Cleaning/Release" ? "CIP/SIP" : phase === "Transfer" ? "Transfer line" : "Equipment",
+      group: item.group,
+      route: item.route,
+      activeRoute: item.activeRoute,
+      predecessorTaskId: predecessor || (item.predecessor === "__batch_start" ? "" : `${item.batchId}-${item.predecessor}-Process`),
+      startH,
+      finishH: endH,
+      durationH,
+      startIso: addHoursIso(startH),
+      finishIso: addHoursIso(endH),
+      percentComplete: 0,
+      critical: item.status !== "scheduled" || schedule.bottleneck.tag === item.tag ? "yes" : "no",
+      status: item.status,
+      note: item.reuseDetail,
+    });
+  };
+  schedule.operations.forEach((item) => {
+    const setupEnd = item.startH + item.setupH;
+    pushSegment(item, "Setup", item.startH, setupEnd);
+    pushSegment(item, "Process", setupEnd, item.processEndH, item.assignedEquipment, item.predecessor === "__batch_start" ? "" : `${item.batchId}-${item.predecessor}-Process`);
+    pushSegment(item, "Transfer", item.processEndH, item.transferEndH, `${item.tag} transfer line`, `${item.batchId}-${item.tag}-Process`);
+    pushSegment(item, "Cleaning/Release", item.cleanStartH, item.cleanStartH + item.cleanH, "CIP/SIP skid", `${item.batchId}-${item.tag}-Transfer`);
+  });
+  return rows.sort((a, b) => a.startH - b.startH || a.operationNo - b.operationNo);
+}
+
+function scheduleBatchReleaseRows(schedule = campaignSchedule()) {
+  return schedule.batchReleases.map((item) => ({
+    batchId: item.batchId,
+    firstStartH: item.firstStartH,
+    processCompleteH: item.processCompleteH,
+    qcReleaseH: item.qcReleaseH,
+    cycleTimeH: item.cycleTimeH,
+    firstStartIso: addHoursIso(item.firstStartH),
+    processCompleteIso: addHoursIso(item.processCompleteH),
+    qcReleaseIso: addHoursIso(item.qcReleaseH),
+    releaseStatus: item.releaseStatus,
+    activeRoute: schedule.activeRoute,
+    plannedPitchH: schedule.plannedPitchH,
+  }));
+}
+
+function scheduleMsProjectRows(schedule = campaignSchedule()) {
+  return scheduleGanttRows(schedule).map((item, index) => ({
+    ID: index + 1,
+    "Task Name": item.taskName,
+    "Outline Level": item.phase === "Process" ? 2 : 3,
+    Duration: `${formatNumber(item.durationH, 2)}h`,
+    Start: item.startIso,
+    Finish: item.finishIso,
+    Predecessors: item.predecessorTaskId,
+    "Resource Names": item.resource,
+    Notes: `${item.batchId}; ${item.group}; ${item.status}; ${item.note}`,
+    "% Complete": item.percentComplete,
+    Critical: item.critical,
+  }));
+}
+
+function scheduleUtilizationMatrixRows(schedule = campaignSchedule()) {
+  const windowH = Math.max(1, schedule.makespanH);
+  const bucketH = Math.max(4, Math.ceil(windowH / 18));
+  const ganttRows = scheduleGanttRows(schedule);
+  const buckets = Array.from({ length: Math.ceil(windowH / bucketH) }, (_, index) => ({
+    bucket: index + 1,
+    startH: index * bucketH,
+    finishH: Math.min(windowH, (index + 1) * bucketH),
+  }));
+  const resources = [...new Set(ganttRows.map((item) => item.resource))].slice(0, 36);
+  return resources.flatMap((resource) => buckets.map((bucket) => {
+    const busyH = ganttRows
+      .filter((row) => row.resource === resource)
+      .reduce((sum, row) => sum + Math.max(0, Math.min(row.finishH, bucket.finishH) - Math.max(row.startH, bucket.startH)), 0);
+    return {
+      resource,
+      bucket: bucket.bucket,
+      bucketStartH: bucket.startH,
+      bucketFinishH: bucket.finishH,
+      busyH,
+      availableH: bucket.finishH - bucket.startH,
+      utilizationPct: busyH / Math.max(0.001, bucket.finishH - bucket.startH) * 100,
+      status: busyH / Math.max(0.001, bucket.finishH - bucket.startH) > 0.92 ? "conflict" : busyH > 0 ? "busy" : "idle",
+    };
+  }));
+}
+
+function templateExampleRows() {
+  return Object.entries(templates).map(([key, template]) => ({
+    exampleId: key,
+    exampleName: template.label,
+    product: template.product,
+    description: template.description,
+    unitCount: template.units.length,
+    streamCount: template.streams.length,
+    recommendedUse: key === "mab" ? "high-demand antibody platform walkthrough" : "original Axion screening example",
+    downloadBasis: "Original Axion generated model; not a copied third-party example file",
+  }));
+}
+
 function routeComparisonRows() {
   return routeOptions.map((route) => {
     const schedule = campaignSchedule(route.key);
@@ -4334,6 +4455,54 @@ function csvEscape(value) {
   return `"${String(value).replaceAll("\"", "\"\"")}"`;
 }
 
+function exportMetadata(kind = "Axion export") {
+  return {
+    exportProduct: "Axion Process OS",
+    exportLogo: "Axion pixel mark",
+    exportKind: kind,
+    exportDate: exportDateIso(),
+    scenario: `${activeTemplate().label} - ${state.scale}`,
+    template: state.template,
+    product: activeTemplate().product,
+    generatedBy: accountName(),
+    modelBasis: "Original Axion screening model; validate with site, supplier, and regulatory data before design decisions",
+  };
+}
+
+function withExportMetadata(rows, kind = "Axion export") {
+  const metadata = exportMetadata(kind);
+  const sourceRows = rows.length ? rows : [{ empty: "" }];
+  return sourceRows.map((row) => ({ ...metadata, ...row }));
+}
+
+function brandSvg(svg) {
+  const width = Number(svg.match(/<svg[^>]*width="(\d+)"/)?.[1]) || 1180;
+  const height = Number(svg.match(/<svg[^>]*height="(\d+)"/)?.[1]) || 720;
+  const stamp = `
+  <g class="axion-export-brand" font-family="Inter, Arial, sans-serif">
+    <g transform="translate(${width - 214} 48)" fill="#f4f7fb">
+      <rect x="0" y="10" width="8" height="8"/>
+      <rect x="10" y="20" width="8" height="8"/>
+      <rect x="20" y="20" width="8" height="8"/>
+      <rect x="30" y="20" width="8" height="8"/>
+      <rect x="40" y="20" width="8" height="8"/>
+      <rect x="50" y="10" width="8" height="8"/>
+      <rect x="60" y="0" width="8" height="8"/>
+      <rect x="0" y="30" width="8" height="8"/>
+      <rect x="10" y="30" width="8" height="8"/>
+      <rect x="20" y="30" width="8" height="8"/>
+      <rect x="30" y="30" width="8" height="8"/>
+      <rect x="40" y="30" width="8" height="8"/>
+      <rect x="50" y="40" width="8" height="8"/>
+      <rect x="60" y="50" width="8" height="8"/>
+      <text x="86" y="26" fill="#f4f7fb" font-size="16" font-weight="760">Axion</text>
+      <text x="86" y="46" fill="#9fb0c5" font-size="11">${svgEscape(new Date().toISOString().slice(0, 10))}</text>
+    </g>
+    <text x="72" y="${height - 34}" fill="#75869f" font-size="12">Axion Process OS · ${svgEscape(activeTemplate().label)} · ${svgEscape(state.scale)} · generated ${svgEscape(exportDateIso())}</text>
+  </g>`;
+  return svg.replace("</svg>", `${stamp}\n</svg>`);
+}
+
 function syncInputs() {
   els.batchSize.value = state.batchSize;
   els.batchCount.value = state.batchCount;
@@ -4886,6 +5055,9 @@ function renderSimulationBoard() {
   const schedule = campaignSchedule();
   const cycleRows = scheduleCycleRows();
   const streamScheduleRows = scheduleStreamRows();
+  const ganttRows = scheduleGanttRows(schedule);
+  const releaseRows = scheduleBatchReleaseRows(schedule);
+  const utilizationRows = scheduleUtilizationMatrixRows(schedule);
   const recipeRows = recipeEditorRows();
   const routeRows = routeComparisonRows();
   const topologyRows = routeTopologyRows();
@@ -5195,6 +5367,46 @@ function renderSimulationBoard() {
             <span><b class="legend-transfer"></b>stream transfer</span>
             <span><b class="legend-clean"></b>clean/release</span>
           </div>
+        </div>
+      </div>
+      <div class="schedule-export-actions" aria-label="Schedule exports">
+        <button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button>
+        <button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button>
+        <button data-download-report="schedule-releases-csv" type="button">Batch releases</button>
+        <button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button>
+        <button data-download-report="schedule-svg" type="button">Schedule SVG</button>
+        <button data-download-report="schedule-json" type="button">Schedule JSON</button>
+      </div>
+      <div class="advanced-schedule-board" aria-label="Advanced finite-capacity schedule workbench">
+        <header>
+          <div>
+            <span>Batch schedule workbench</span>
+            <h4>Unit procedures, resource occupancy, transfers, cleaning, and release</h4>
+          </div>
+          <strong>${ganttRows.length} tasks · ${releaseRows.length} releases · ${utilizationRows.filter((item) => item.status === "conflict").length} conflicts</strong>
+        </header>
+        <div class="advanced-schedule-table" role="table" aria-label="Gantt task table">
+          <div class="advanced-schedule-head" role="row">
+            <span>Batch</span><span>Task</span><span>Resource</span><span>Start</span><span>Finish</span><span>Status</span>
+          </div>
+          ${ganttRows.slice(0, 36).map((row) => `
+            <button class="advanced-schedule-row ${row.critical === "yes" ? "critical" : ""}" data-jump-unit="${escapeAttr(row.operationTag)}" type="button" role="row" title="${escapeAttr(`${row.taskName}: ${formatNumber(row.startH, 1)}-${formatNumber(row.finishH, 1)} h`) }">
+              <span>${escapeHtml(row.batchId)}</span>
+              <span><b>${escapeHtml(row.operationTag)}</b> ${escapeHtml(row.phase)}</span>
+              <span>${escapeHtml(row.resource)}</span>
+              <span>${formatNumber(row.startH, 1)} h</span>
+              <span>${formatNumber(row.finishH, 1)} h</span>
+              <span>${escapeHtml(row.status)}</span>
+            </button>
+          `).join("")}
+        </div>
+        <div class="release-strip" aria-label="Batch release sequence">
+          ${releaseRows.slice(0, 12).map((row) => `
+            <span class="${row.releaseStatus.includes("review") ? "review" : ""}">
+              <b>${escapeHtml(row.batchId)}</b>
+              <small>release ${formatNumber(row.qcReleaseH, 1)} h</small>
+            </span>
+          `).join("")}
         </div>
       </div>
       <div class="schedule-cycles-grid">
@@ -6942,17 +7154,76 @@ function processOverviewSvg() {
 </svg>`.trim();
 }
 
-function downloadCsv(filename, rows) {
-  const headers = Object.keys(rows[0] || { empty: "" });
+function scheduleGanttSvg() {
+  const schedule = campaignSchedule();
+  const rows = scheduleGanttRows(schedule).filter((row) => row.batchId === "B01").slice(0, 28);
+  const width = 1480;
+  const rowH = 34;
+  const height = Math.max(620, 190 + rows.length * rowH);
+  const axisX = 330;
+  const axisW = width - axisX - 95;
+  const maxH = Math.max(1, ...rows.map((row) => row.finishH), schedule.makespanH);
+  const phaseColor = {
+    Setup: "#c08a2d",
+    Process: "#a72b22",
+    Transfer: "#64748b",
+    "Cleaning/Release": "#476b58",
+  };
+  const tickCount = 8;
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#071326"/>
+  <rect x="34" y="34" width="${width - 68}" height="${height - 68}" rx="30" fill="#0c1c34" stroke="#28435f"/>
+  <text x="72" y="92" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="760">Finite-capacity campaign schedule</text>
+  <text x="72" y="128" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">${svgEscape(activeTemplate().label)} · ${schedule.simulatedBatches} simulated batches · bottleneck ${svgEscape(schedule.bottleneck.tag)}</text>
+  ${Array.from({ length: tickCount + 1 }, (_, index) => {
+    const x = axisX + axisW * index / tickCount;
+    const value = maxH * index / tickCount;
+    return `
+      <line x1="${x}" y1="152" x2="${x}" y2="${height - 82}" stroke="#213954" stroke-width="1"/>
+      <text x="${x}" y="176" text-anchor="middle" fill="#8fa1b8" font-family="Inter, Arial, sans-serif" font-size="12">${formatNumber(value, 0)}h</text>
+    `;
+  }).join("")}
+  ${rows.map((row, index) => {
+    const y = 204 + index * rowH;
+    const x = axisX + row.startH / maxH * axisW;
+    const w = Math.max(3, row.durationH / maxH * axisW);
+    const color = phaseColor[row.phase] || "#9fb0c5";
+    return `
+      <text x="72" y="${y + 17}" fill="#dce6f3" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="720">${svgEscape(row.operationTag)}</text>
+      <text x="150" y="${y + 17}" fill="#9fb0c5" font-family="Inter, Arial, sans-serif" font-size="12">${svgEscape(row.phase)}</text>
+      <rect x="${x}" y="${y}" width="${w}" height="22" rx="11" fill="${color}" opacity="${row.critical === "yes" ? "0.98" : "0.78"}"/>
+      <text x="${Math.min(width - 120, x + w + 8)}" y="${y + 16}" fill="#c9d5e5" font-family="Inter, Arial, sans-serif" font-size="11">${svgEscape(row.resource)}</text>
+    `;
+  }).join("")}
+  <g font-family="Inter, Arial, sans-serif" font-size="12" fill="#aebbd0">
+    <rect x="72" y="${height - 106}" width="18" height="10" rx="5" fill="#c08a2d"/><text x="98" y="${height - 97}">Setup</text>
+    <rect x="164" y="${height - 106}" width="18" height="10" rx="5" fill="#a72b22"/><text x="190" y="${height - 97}">Process</text>
+    <rect x="268" y="${height - 106}" width="18" height="10" rx="5" fill="#64748b"/><text x="294" y="${height - 97}">Transfer</text>
+    <rect x="380" y="${height - 106}" width="18" height="10" rx="5" fill="#476b58"/><text x="406" y="${height - 97}">Cleaning / release</text>
+  </g>
+</svg>`.trim();
+}
+
+function downloadCsv(filename, rows, kind = "CSV export") {
+  const enrichedRows = withExportMetadata(rows, kind);
+  const headers = Object.keys(enrichedRows[0] || { empty: "" });
   const csv = [
     headers.map(csvEscape).join(","),
-    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+    ...enrichedRows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
   ].join("\n");
   downloadText(filename, "text/csv", csv);
 }
 
 function downloadSvg(filename, svg) {
-  downloadText(filename, "image/svg+xml", svg);
+  downloadText(filename, "image/svg+xml", brandSvg(svg));
+}
+
+function downloadJson(filename, payload, kind = "JSON export") {
+  downloadText(filename, "application/json", JSON.stringify({
+    metadata: exportMetadata(kind),
+    ...payload,
+  }, null, 2));
 }
 
 function comprehensiveReport() {
@@ -7019,11 +7290,13 @@ function renderReportsBoard() {
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
-      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, short cleaning/release, equipment reuse, QC release, hold-time checks, and bottleneck resources.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button></article>
+      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
+      <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
       <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
+      <article><span>Original example library</span><strong>${templateExampleRows().length}</strong><p>Download Axion's own example model library for antibodies, penicillin, cultured meat, fermentation, vaccines, plasmids, cell therapy, utilities, and emissions without using copied third-party files.</p><button data-download-report="examples-csv" type="button">Examples CSV</button><button data-download-report="examples-json" type="button">Examples JSON</button></article>
     </section>
   `;
 }
@@ -7568,13 +7841,32 @@ function handleReportDownload(type) {
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
   } else if (type === "schedule-csv") {
-    downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows());
+    downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows(), "Campaign schedule operations");
+  } else if (type === "schedule-gantt-csv") {
+    downloadCsv(`${state.template}-schedule-gantt-tasks.csv`, scheduleGanttRows(), "Gantt task schedule");
+  } else if (type === "schedule-msproject-csv") {
+    downloadCsv(`${state.template}-ms-project-schedule.csv`, scheduleMsProjectRows(), "MS Project compatible schedule");
+  } else if (type === "schedule-releases-csv") {
+    downloadCsv(`${state.template}-batch-release-schedule.csv`, scheduleBatchReleaseRows(), "Batch release schedule");
+  } else if (type === "schedule-utilization-csv") {
+    downloadCsv(`${state.template}-schedule-utilization-matrix.csv`, scheduleUtilizationMatrixRows(), "Schedule utilization matrix");
+  } else if (type === "schedule-svg") {
+    downloadSvg(`${state.template}-finite-capacity-schedule.svg`, scheduleGanttSvg());
+  } else if (type === "schedule-json") {
+    const schedule = campaignSchedule();
+    downloadJson(`${state.template}-finite-capacity-schedule.json`, {
+      schedule,
+      ganttTasks: scheduleGanttRows(schedule),
+      msProjectTasks: scheduleMsProjectRows(schedule),
+      batchReleases: scheduleBatchReleaseRows(schedule),
+      utilizationMatrix: scheduleUtilizationMatrixRows(schedule),
+    }, "Finite-capacity schedule package");
   } else if (type === "schedule-streams-csv") {
-    downloadCsv(`${state.template}-stream-transfer-schedule.csv`, scheduleStreamRows());
+    downloadCsv(`${state.template}-stream-transfer-schedule.csv`, scheduleStreamRows(), "Stream transfer schedule");
   } else if (type === "schedule-cycles-csv") {
-    downloadCsv(`${state.template}-equipment-reuse-cycles.csv`, scheduleCycleRows());
+    downloadCsv(`${state.template}-equipment-reuse-cycles.csv`, scheduleCycleRows(), "Equipment reuse cycles");
   } else if (type === "schedule-resources-csv") {
-    downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows());
+    downloadCsv(`${state.template}-schedule-resources.csv`, scheduleResourceRows(), "Schedule resources");
   } else if (type === "recipe-csv") {
     downloadCsv(`${state.template}-editable-recipe.csv`, recipeEditorRows());
   } else if (type === "routes-csv") {
@@ -7600,6 +7892,20 @@ function handleReportDownload(type) {
     }))));
   } else if (type === "route-optimizer-csv") {
     downloadCsv(`${state.template}-route-optimizer.csv`, routeOptimizationRows());
+  } else if (type === "examples-csv") {
+    downloadCsv("axion-original-example-library.csv", templateExampleRows(), "Original example library");
+  } else if (type === "examples-json") {
+    downloadJson("axion-original-example-library.json", {
+      examples: templateExampleRows(),
+      models: Object.fromEntries(Object.entries(templates).map(([key, template]) => [key, {
+        label: template.label,
+        product: template.product,
+        description: template.description,
+        units: template.units.map((unitItem) => ({ id: unitItem.id, name: unitItem.name, type: unitItem.type, class: unitItem.cls, x: unitItem.x, y: unitItem.y })),
+        streams: template.streams.map((streamItem) => ({ id: streamItem.id, from: streamItem.from, to: streamItem.to, composition: streamItem.composition, phase: streamItem.phase })),
+      }])),
+      note: "Original Axion generated example library. This package is not copied from third-party simulator example files.",
+    }, "Original example library");
   }
   showToast("Download prepared");
 }
@@ -9330,6 +9636,15 @@ function bindEvents() {
   });
 
   els.simulationBoard.addEventListener("click", (event) => {
+    const scheduleUnitButton = event.target.closest("[data-jump-unit]");
+    if (scheduleUnitButton) {
+      state.selectedId = scheduleUnitButton.dataset.jumpUnit;
+      renderEquationSpotlight();
+      renderCanvas();
+      renderSimulationBoard();
+      showToast(`${state.selectedId} selected from schedule`);
+      return;
+    }
     const nodeButton = event.target.closest("[data-route-node]");
     if (nodeButton) {
       state.selectedId = nodeButton.dataset.routeNode;
