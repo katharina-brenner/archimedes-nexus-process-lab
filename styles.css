@@ -5,29 +5,37 @@
   --ink: #15181d;
   --muted: #5e6775;
   --quiet: #8c95a1;
-  --line: #c7cdd5;
-  --line-strong: #8f98a6;
-  --panel: #f4f4f1;
-  --surface: #e7e8e5;
-  --surface-2: #d9ddd8;
+  --line: #d4d8df;
+  --line-strong: #aeb5c1;
+  --panel: #f6f5f1;
+  --surface: #ebeae5;
+  --surface-2: #deded7;
   --shell: #0b1828;
   --shell-2: #122234;
   --steel: #26313f;
   --navy: #0b1828;
   --navy-2: #142638;
   --navy-3: #24384a;
-  --teal: #0f8f83;
-  --teal-soft: #b9ddd7;
-  --green: #3f8d62;
-  --cyan: #257c88;
-  --amber: #b47a23;
-  --red: #c03221;
-  --shadow: 0 12px 28px rgba(18, 34, 52, 0.12);
+  --teal: #9f241c;
+  --teal-soft: #ead5cf;
+  --green: #476b58;
+  --cyan: #8f3328;
+  --amber: #a66a18;
+  --gold: #c08a2d;
+  --red: #a72b22;
+  --red-deep: #681a16;
+  --red-soft: #f0ded9;
+  --shadow: 0 18px 44px rgba(18, 34, 52, 0.11);
   --glass: rgba(247, 247, 244, 0.92);
   --glass-strong: rgba(250, 250, 247, 0.98);
   --deep-panel: #102033;
   --deep-panel-2: #182b40;
-  --enterprise-blue: #0f8f83;
+  --enterprise-blue: #9f241c;
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
   --ui-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --display-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-family: var(--ui-font);
@@ -2965,6 +2973,213 @@ body:not([data-active-view="flowsheet"]) .actions {
 
 body[data-active-view="flowsheet"] .actions {
   display: flex;
+}
+
+/* Premium rounded visual system: soft DeepTech surfaces with red/amber accents. */
+.public-site {
+  background:
+    linear-gradient(rgba(232, 221, 214, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 221, 214, 0.035) 1px, transparent 1px),
+    linear-gradient(152deg, #071a31 0%, #0c2139 44%, #132f4b 72%, #1b3b56 100%);
+}
+
+.login-gate {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(167, 43, 34, 0.22), transparent 34%),
+    radial-gradient(circle at 82% 20%, rgba(192, 138, 45, 0.13), transparent 30%),
+    linear-gradient(135deg, rgba(7, 26, 49, 0.98), rgba(13, 35, 60, 0.98));
+}
+
+:where(
+  .topbar,
+  .actions,
+  .control-group,
+  .canvas-frame,
+  .data-view,
+  .equations-view,
+  .simulation-view,
+  .standards-view,
+  .economics-view,
+  .library-intro,
+  .section-builder,
+  .parameter-tools input,
+  .parameter-tools button,
+  .custom-parameter-box,
+  .parameter-empty,
+  .kpi-strip article,
+  .profile-card,
+  .profile-card dl,
+  .profile-button,
+  .profile-button span,
+  .profile-card-head > span,
+  .template-button,
+  .palette-item,
+  .palette-item span,
+  .tab,
+  .tool,
+  .action-button,
+  .text-button,
+  .danger-button,
+  .segmented button,
+  .icon-button,
+  .suite-nav,
+  .suite-link,
+  .palette-groups button,
+  .section-presets button,
+  .focus-toggle button,
+  .library-search input,
+  .parameter-number,
+  .current-product-card,
+  .access-card,
+  .checkout-card,
+  .login-card,
+  .access-card input,
+  .login-button,
+  .google-button-mount,
+  .bento-card,
+  .public-detail-panel,
+  .case-study-map button,
+  .public-example-grid article,
+  .migration-grid article,
+  .platform-grid article,
+  .workflow-rail article,
+  .ecosystem-grid article,
+  .review-grid article,
+  .faq-grid article,
+  .pricing-grid article,
+  .schedule-panel,
+  .schedule-cycles-grid article,
+  .schedule-stream-grid article,
+  .simulation-card,
+  .recipe-editor-panel,
+  .route-topology-panel,
+  .route-optimizer-grid,
+  .plant-visual,
+  .plant-stage,
+  .plant-area,
+  .reports-grid article,
+  .overview-hero,
+  .start-hero,
+  .projects-hero,
+  .cfd-hero,
+  .reports-hero,
+  .brief-composer,
+  .brief-model-card,
+  .collaboration-panel,
+  .project-save-panel,
+  .project-version-card,
+  .integration-card,
+  .invite-card
+) {
+  border-radius: var(--radius-md);
+}
+
+:where(.topbar, .canvas-frame, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid) {
+  border-color: rgba(115, 129, 148, 0.32);
+  box-shadow: 0 18px 48px rgba(8, 23, 43, 0.09);
+}
+
+:where(.template-button, .palette-item, .tab, .tool, .action-button, .text-button, .danger-button, .segmented button, .icon-button, .suite-link, .palette-groups button, .section-presets button, .focus-toggle button) {
+  border-radius: 999px;
+}
+
+:where(.template-button, .palette-item) {
+  border-radius: var(--radius-md);
+}
+
+:where(.control-group, .library-intro, .section-builder, .actions, .profile-card, .kpi-strip article) {
+  background: rgba(250, 250, 247, 0.86);
+}
+
+.sidebar :where(.control-group, .suite-nav) {
+  border-color: rgba(232, 221, 214, 0.16);
+  background: rgba(232, 221, 214, 0.055);
+}
+
+:where(.template-button.active, .segmented button.active, .tab.active, .tool.active, .palette-groups button.active, .focus-toggle button.active, .suite-link.active) {
+  border-color: rgba(167, 43, 34, 0.55);
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(167, 43, 34, 0.98), rgba(104, 26, 22, 0.98));
+  box-shadow: 0 10px 24px rgba(104, 26, 22, 0.2);
+}
+
+.action-button.primary,
+.login-button,
+.checkout-button,
+.custom-parameter-box button {
+  border-color: rgba(167, 43, 34, 0.65);
+  color: #fff;
+  background:
+    linear-gradient(135deg, #b73529, #681a16);
+  box-shadow: 0 14px 30px rgba(104, 26, 22, 0.18);
+}
+
+.danger-button,
+.profile-actions [data-profile-logout] {
+  border-color: rgba(167, 43, 34, 0.55);
+  background: #8f241d;
+}
+
+.public-primary,
+.public-nav nav button.active {
+  color: #071a31;
+  background: #f5f2ea;
+  border-color: rgba(245, 242, 234, 0.9);
+}
+
+.public-secondary:hover,
+.public-primary:hover,
+.public-nav nav button:hover {
+  border-color: rgba(192, 138, 45, 0.32);
+  background: rgba(192, 138, 45, 0.1);
+}
+
+.library-intro p,
+.schedule-panel-copy span,
+.schedule-cycles-grid span,
+.schedule-stream-grid span,
+.plant-visual-head span,
+.simulation-card span,
+.public-detail-copy > span,
+.case-study-copy > span {
+  color: var(--red);
+}
+
+input[type="range"] {
+  accent-color: var(--red);
+}
+
+.schedule-row > i {
+  background:
+    linear-gradient(90deg,
+      transparent var(--start),
+      rgba(167, 43, 34, 0.92) var(--start),
+      rgba(167, 43, 34, 0.92) var(--process-end),
+      rgba(87, 96, 111, 0.82) var(--process-end),
+      rgba(87, 96, 111, 0.82) var(--transfer-end),
+      rgba(192, 138, 45, 0.84) var(--transfer-end),
+      rgba(192, 138, 45, 0.84) var(--bar-end),
+      transparent var(--bar-end)),
+    repeating-linear-gradient(90deg, rgba(7, 17, 31, 0.055) 0 1px, transparent 1px 12.5%);
+}
+
+.legend-process {
+  background: rgba(167, 43, 34, 0.92);
+}
+
+.legend-transfer {
+  background: rgba(87, 96, 111, 0.82);
+}
+
+.legend-clean {
+  background: rgba(192, 138, 45, 0.84);
+}
+
+.score-bar {
+  background:
+    linear-gradient(90deg, var(--red) var(--score), rgba(7, 17, 31, 0.09) var(--score)),
+    #eef0ed;
 }
 
 .icon-button {
