@@ -4030,6 +4030,221 @@ function scheduleUtilizationMatrixRows(schedule = campaignSchedule()) {
   }));
 }
 
+function scheduleBucketRows(schedule = campaignSchedule(), bucketCount = 24) {
+  const ganttRows = scheduleGanttRows(schedule);
+  const resources = [...new Set(ganttRows.map((item) => item.resource))];
+  const resourceCount = Math.max(1, resources.length);
+  const bucketH = Math.max(2, schedule.makespanH / Math.max(1, bucketCount));
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const startH = index * bucketH;
+    const finishH = Math.min(schedule.makespanH, (index + 1) * bucketH);
+    const overlapping = ganttRows.filter((row) => row.startH < finishH && row.finishH > startH);
+    const occupiedResources = new Set(overlapping.map((row) => row.resource));
+    const activeBatches = new Set(overlapping.map((row) => row.batchId));
+    const processOperations = overlapping.filter((row) => row.phase === "Process").length;
+    const setupOperations = overlapping.filter((row) => row.phase === "Setup").length;
+    const transferOperations = overlapping.filter((row) => row.phase === "Transfer").length;
+    const cleaningOperations = overlapping.filter((row) => row.phase === "Cleaning/Release").length;
+    const mainOperations = overlapping.filter((row) => ["Upstream", "Downstream", "Preparation", "Recovery"].includes(row.group)).length;
+    const supportOperations = Math.max(0, overlapping.length - mainOperations);
+    const busyResourcePct = occupiedResources.size / resourceCount * 100;
+    const utilityLoadPct = Math.min(100, cleaningOperations * 18 + transferOperations * 7 + processOperations * 4);
+    return {
+      bucket: index + 1,
+      bucketLabel: `T${String(index + 1).padStart(2, "0")}`,
+      startH,
+      finishH,
+      activeOperations: overlapping.length,
+      activeBatches: activeBatches.size,
+      setupOperations,
+      processOperations,
+      transferOperations,
+      cleaningOperations,
+      mainOperations,
+      supportOperations,
+      occupiedResources: occupiedResources.size,
+      totalResources: resourceCount,
+      busyResourcePct,
+      utilityLoadPct,
+      status: busyResourcePct > 85 ? "peak load" : busyResourcePct > 58 ? "busy" : overlapping.length ? "active" : "idle",
+    };
+  });
+}
+
+function scheduleEquipmentOccupancyRows(schedule = campaignSchedule()) {
+  return schedule.resourceRows
+    .filter((item) => item.type === "Equipment")
+    .map((resourceRow) => {
+      const ops = schedule.operations.filter((operation) => operation.tag === resourceRow.resource || operation.assignedEquipment.startsWith(resourceRow.resource));
+      const setupH = ops.reduce((sum, item) => sum + item.setupH, 0);
+      const processH = ops.reduce((sum, item) => sum + item.processH, 0);
+      const transferH = ops.reduce((sum, item) => sum + Math.max(0, item.transferEndH - item.processEndH), 0);
+      const cleaningH = ops.reduce((sum, item) => sum + item.cleanH, 0);
+      const waitingH = ops.reduce((sum, item) => sum + item.waitingH + item.lineWaitH, 0);
+      const firstStartH = ops.length ? Math.min(...ops.map((item) => item.startH)) : 0;
+      const lastFinishH = ops.length ? Math.max(...ops.map((item) => item.availableH)) : 0;
+      const unit = state.units.find((item) => item.id === resourceRow.resource);
+      const occupancyPct = Number(resourceRow.occupancyPct || 0);
+      return {
+        equipmentTag: resourceRow.resource,
+        equipmentName: unit?.name || resourceRow.resource,
+        equipmentClass: unit?.cls || "Equipment",
+        processArea: ops[0]?.group || scheduleUnitGroup(unit || {}),
+        assignedBatches: new Set(ops.map((item) => item.batchId)).size,
+        parallelCapacity: ops[0]?.parallelUnits || 1,
+        firstStartH,
+        lastFinishH,
+        setupH,
+        processH,
+        transferH,
+        cleaningH,
+        waitingH,
+        busyH: Number(resourceRow.busyH || 0),
+        idleH: Math.max(0, Number(resourceRow.availableH || 0) - Number(resourceRow.busyH || 0)),
+        availableH: Number(resourceRow.availableH || 0),
+        occupancyPct,
+        status: occupancyPct > 92 ? "hard bottleneck" : occupancyPct > 78 ? "capacity review" : occupancyPct < 18 ? "underused asset" : "balanced",
+        recommendation: occupancyPct > 92
+          ? "Add parallel capacity, reduce clean/setup time, or resequence campaign starts."
+          : occupancyPct > 78
+            ? "Check maintenance windows, hold-time buffers, and second-shift coverage before accepting this plan."
+            : occupancyPct < 18
+              ? "Consider consolidating batches, moving support duties, or repurposing this unit."
+              : "Keep current reuse pattern and validate against site calendars.",
+      };
+    })
+    .sort((a, b) => b.occupancyPct - a.occupancyPct);
+}
+
+function scheduleRoomOccupancyRows(schedule = campaignSchedule()) {
+  const ganttRows = scheduleGanttRows(schedule);
+  return factoryRoomRows(schedule).map((room) => {
+    const roomTasks = ganttRows.filter((row) => row.group === room.roomName);
+    const activeH = roomTasks.reduce((sum, row) => sum + row.durationH, 0);
+    const cleaningH = roomTasks.filter((row) => row.phase === "Cleaning/Release").reduce((sum, row) => sum + row.durationH, 0);
+    const transferH = roomTasks.filter((row) => row.phase === "Transfer").reduce((sum, row) => sum + row.durationH, 0);
+    const peakConcurrentBatches = Math.max(0, ...scheduleBucketRows(schedule).map((bucket) => {
+      const overlapping = roomTasks.filter((row) => row.startH < bucket.finishH && row.finishH > bucket.startH);
+      return new Set(overlapping.map((row) => row.batchId)).size;
+    }));
+    const occupancyPct = activeH / Math.max(1, schedule.makespanH) * 100;
+    return {
+      roomId: room.roomId,
+      roomName: room.roomName,
+      roomType: room.roomType,
+      cleanroomClass: room.cleanroomClass,
+      pressureCascade: room.pressureCascade,
+      equipmentCount: room.equipmentCount,
+      activeH,
+      cleaningH,
+      transferH,
+      occupancyPct,
+      peakConcurrentBatches,
+      bottleneckSignal: occupancyPct > 90 ? "suite bottleneck" : occupancyPct > 70 ? "suite review" : "ok",
+      action: occupancyPct > 90
+        ? "Split suite use or add a second campaign room before increasing annual batches."
+        : occupancyPct > 70
+          ? "Reserve campaign buffers for cleaning, material staging, and QA holds."
+          : "Room capacity is not limiting in the current campaign screen.",
+    };
+  }).sort((a, b) => b.occupancyPct - a.occupancyPct);
+}
+
+function scheduleUtilityDemandRows(schedule = campaignSchedule()) {
+  const data = metrics();
+  return scheduleBucketRows(schedule, 24).map((bucket) => {
+    const cipWfiL = bucket.cleaningOperations * Math.max(250, state.batchSize * 0.035);
+    const cleanSteamKg = bucket.cleaningOperations * Math.max(80, state.batchSize * 0.012);
+    const coolingKw = bucket.processOperations * Math.max(4, data.utilities / Math.max(1, state.batchCount) * 0.18) + bucket.transferOperations * 1.5;
+    const compressedGasNm3H = bucket.processOperations * Math.max(8, state.batchSize / 1200) + bucket.transferOperations * 2;
+    const operatorFte = bucket.setupOperations * 0.45 + bucket.processOperations * 0.18 + bucket.transferOperations * 0.22 + bucket.cleaningOperations * 0.55;
+    return {
+      bucket: bucket.bucketLabel,
+      startH: bucket.startH,
+      finishH: bucket.finishH,
+      activeBatches: bucket.activeBatches,
+      activeOperations: bucket.activeOperations,
+      cipSipWindows: bucket.cleaningOperations,
+      transferSlots: bucket.transferOperations,
+      wfiDemandL: cipWfiL,
+      cleanSteamKg,
+      coolingDemandKw: coolingKw,
+      compressedGasNm3H,
+      operatorFte,
+      qcLoadIndex: Math.min(100, bucket.activeBatches * 12 + bucket.transferOperations * 5),
+      peakSignal: bucket.utilityLoadPct > 75 ? "utility peak" : bucket.utilityLoadPct > 45 ? "watch" : "normal",
+    };
+  });
+}
+
+function scheduleScenarioRows(schedule = campaignSchedule()) {
+  const base = Math.max(1, schedule.feasibleAnnualBatches);
+  const bottleneck = schedule.bottleneck || { tag: "none", occupancyPct: 0 };
+  const warningPenalty = schedule.warnings.length * 2;
+  const scenarioBasis = [
+    { scenario: "Current finite plan", multiplier: 1, capexSignal: "none", risk: "baseline", action: "Use as the reference schedule for comparison." },
+    { scenario: `Add parallel ${bottleneck.tag}`, multiplier: bottleneck.occupancyPct > 75 ? 1.18 : 1.06, capexSignal: "medium/high", risk: "engineering fit", action: "Model a second reusable unit or disposable parallel train for the bottleneck operation." },
+    { scenario: "Add second CIP/SIP skid", multiplier: schedule.resourceRows.some((item) => item.resource === "CIP/SIP skid" && item.occupancyPct > 65) ? 1.14 : 1.04, capexSignal: "medium", risk: "utility tie-in", action: "Run cleaning windows in parallel and check WFI, clean steam, drain, and operator peaks." },
+    { scenario: "Reduce changeover 15%", multiplier: 1.09, capexSignal: "low/medium", risk: "validation", action: "Standardize recipes, pre-stage parts, and validate shortened cleaning and line clearance." },
+    { scenario: "Add QC release shift", multiplier: schedule.resourceRows.some((item) => item.resource === "QC release queue" && item.occupancyPct > 55) ? 1.1 : 1.03, capexSignal: "low", risk: "staffing", action: "Increase release testing coverage and reduce batch waiting after process completion." },
+    { scenario: "Finite material lot lock", multiplier: 0.93, capexSignal: "none", risk: "supply chain", action: "Include raw material lot release, media expiry, warehouse staging, and hold-time limits." },
+  ];
+  return scenarioBasis.map((item, index) => {
+    const feasibleAnnualBatches = Math.max(1, Math.floor(base * item.multiplier - (index ? warningPenalty : 0)));
+    const utilizationPct = Math.min(94, Math.max(28, dataUtilizationFromSchedule(schedule) / item.multiplier));
+    return {
+      scenarioId: `SCH-${String(index + 1).padStart(2, "0")}`,
+      scenario: item.scenario,
+      feasibleAnnualBatches,
+      deltaBatchesPerYear: feasibleAnnualBatches - schedule.feasibleAnnualBatches,
+      modeledPlantUtilizationPct: utilizationPct,
+      bottleneck: bottleneck.tag,
+      bottleneckOccupancyPct: bottleneck.occupancyPct,
+      capexSignal: item.capexSignal,
+      implementationRisk: item.risk,
+      planningAction: item.action,
+      decision: feasibleAnnualBatches >= state.batchCount ? "capacity target feasible" : "still below target",
+    };
+  });
+}
+
+function dataUtilizationFromSchedule(schedule = campaignSchedule()) {
+  const equipmentRows = schedule.resourceRows.filter((item) => item.type === "Equipment");
+  if (!equipmentRows.length) return 0;
+  return equipmentRows.reduce((sum, item) => sum + Number(item.occupancyPct || 0), 0) / equipmentRows.length;
+}
+
+function scheduleBottleneckRows(schedule = campaignSchedule()) {
+  const operationRows = schedule.operations;
+  return schedule.resourceRows
+    .map((resourceRow) => {
+      const matchingOps = operationRows.filter((operation) => operation.tag === resourceRow.resource || operation.assignedEquipment.startsWith(resourceRow.resource) || operation.group === resourceRow.resource);
+      const waitingH = matchingOps.reduce((sum, item) => sum + item.waitingH + item.lineWaitH, 0);
+      const cleaningH = matchingOps.reduce((sum, item) => sum + item.cleanH, 0);
+      const lostBatches = Math.max(0, Math.round((Number(resourceRow.occupancyPct || 0) - 78) / 8));
+      return {
+        resource: resourceRow.resource,
+        resourceType: resourceRow.type,
+        occupancyPct: resourceRow.occupancyPct,
+        busyH: resourceRow.busyH,
+        availableH: resourceRow.availableH,
+        waitingH,
+        cleaningH,
+        bottleneckType: resourceRow.status === "bottleneck" ? "hard capacity" : waitingH > 0.5 ? "queue/hold-time" : cleaningH > resourceRow.busyH * 0.35 ? "cleaning dominated" : "monitor",
+        annualBatchImpact: lostBatches,
+        suggestedAction: resourceRow.status === "bottleneck"
+          ? "Add parallel capacity or change campaign sequence before accepting higher demand."
+          : waitingH > 0.5
+            ? "Move predecessor, release transfer line earlier, or add hold capacity."
+            : cleaningH > resourceRow.busyH * 0.35
+              ? "Optimize CIP/SIP recipe, shared skid calendar, and validation window."
+              : "No immediate bottleneck action required.",
+      };
+    })
+    .sort((a, b) => b.occupancyPct - a.occupancyPct)
+    .slice(0, 14);
+}
+
 function advancedPlanningSuite(schedule = campaignSchedule()) {
   const data = metrics();
   const annualKg = Math.max(1, data.annualKg);
@@ -6548,6 +6763,14 @@ function renderSimulationBoard() {
   const timelineRows = factoryTimelineRows(schedule);
   const dispatchRows = factoryDispatchRecommendations(schedule, state.factoryTimeH);
   const aps = advancedPlanningSuite(schedule);
+  const scheduleBuckets = scheduleBucketRows(schedule);
+  const equipmentOccupancy = scheduleEquipmentOccupancyRows(schedule);
+  const roomOccupancy = scheduleRoomOccupancyRows(schedule);
+  const utilityDemand = scheduleUtilityDemandRows(schedule);
+  const scheduleScenarios = scheduleScenarioRows(schedule);
+  const bottleneckRows = scheduleBottleneckRows(schedule);
+  const plantOccupancyPct = dataUtilizationFromSchedule(schedule);
+  const peakBucket = [...scheduleBuckets].sort((a, b) => b.busyResourcePct - a.busyResourcePct)[0] || scheduleBuckets[0];
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -6571,6 +6794,99 @@ function renderSimulationBoard() {
       <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
       <article><span>Stream slots</span><strong>${streamScheduleRows.length}</strong></article>
       <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
+    </section>
+    <section class="simulation-group schedule-command-center">
+      <div class="simulation-group-heading">
+        <div>
+          <span>Plant utilization scheduler</span>
+          <h3>Finite-capacity model for equipment, rooms, streams, cleaning, staffing, and utilities</h3>
+        </div>
+        <strong>${formatNumber(plantOccupancyPct, 0)}% average equipment occupancy</strong>
+      </div>
+      <div class="schedule-command-kpis">
+        <article><span>Peak bucket</span><strong>${escapeHtml(peakBucket?.bucketLabel || "T01")}</strong><small>${formatNumber(peakBucket?.busyResourcePct || 0, 0)}% resources busy</small></article>
+        <article><span>Cleaning windows</span><strong>${scheduleBuckets.reduce((sum, item) => sum + item.cleaningOperations, 0)}</strong><small>CIP/SIP and line-release slots</small></article>
+        <article><span>Room bottlenecks</span><strong>${roomOccupancy.filter((item) => item.bottleneckSignal !== "ok").length}</strong><small>suite occupancy review signals</small></article>
+        <article><span>Utility peaks</span><strong>${utilityDemand.filter((item) => item.peakSignal !== "normal").length}</strong><small>WFI, clean steam, cooling, gases</small></article>
+        <article><span>What-if plans</span><strong>${scheduleScenarios.length}</strong><small>capacity and changeover scenarios</small></article>
+      </div>
+      <div class="schedule-command-layout">
+        <article class="schedule-heatmap-card">
+          <header>
+            <div><span>Equipment occupancy chart</span><h4>Reusable assets across the campaign</h4></div>
+            <strong>${equipmentOccupancy.length} units</strong>
+          </header>
+          <div class="schedule-heatmap" role="table" aria-label="Equipment occupancy heatmap">
+            <div class="schedule-heatmap-axis">
+              <span>Resource</span>
+              ${scheduleBuckets.map((bucket) => `<b>${escapeHtml(bucket.bucketLabel)}</b>`).join("")}
+            </div>
+            ${equipmentOccupancy.slice(0, 12).map((resource) => {
+              const rowSegments = scheduleBuckets.map((bucket) => {
+                const busy = ganttRows
+                  .filter((task) => task.resource === resource.equipmentTag || task.operationTag === resource.equipmentTag)
+                  .reduce((sum, task) => sum + Math.max(0, Math.min(task.finishH, bucket.finishH) - Math.max(task.startH, bucket.startH)), 0);
+                const load = Math.min(100, busy / Math.max(0.001, bucket.finishH - bucket.startH) * 100);
+                const isClean = ganttRows.some((task) => (task.resource === resource.equipmentTag || task.operationTag === resource.equipmentTag) && task.phase === "Cleaning/Release" && task.startH < bucket.finishH && task.finishH > bucket.startH);
+                return `<i class="${load > 92 ? "conflict" : load > 0 ? "busy" : "idle"} ${isClean ? "clean" : ""}" style="--load:${load}%;" title="${escapeAttr(`${resource.equipmentTag} ${bucket.bucketLabel}: ${formatNumber(load, 0)}% occupied${isClean ? ", cleaning/release active" : ""}`)}"></i>`;
+              }).join("");
+              return `<div class="schedule-heatmap-row"><span><b>${escapeHtml(resource.equipmentTag)}</b><small>${escapeHtml(resource.equipmentClass)}</small></span>${rowSegments}</div>`;
+            }).join("")}
+          </div>
+        </article>
+        <article class="schedule-flow-card">
+          <header>
+            <div><span>Batch flow lanes</span><h4>Main process vs support load</h4></div>
+            <strong>${formatNumber(schedule.releasePitchH, 1)} h pitch</strong>
+          </header>
+          <div class="schedule-bucket-lanes">
+            ${scheduleBuckets.map((bucket) => `
+              <button type="button" data-factory-time="${formatNumber((bucket.startH + bucket.finishH) / 2, 2)}" title="${escapeAttr(`${bucket.bucketLabel}: ${bucket.activeBatches} batches, ${bucket.processOperations} process, ${bucket.cleaningOperations} cleaning, ${formatNumber(bucket.utilityLoadPct, 0)}% utility load`) }">
+                <span>${escapeHtml(bucket.bucketLabel)}</span>
+                <i class="main" style="--h:${Math.max(4, bucket.mainOperations * 13)}%;"></i>
+                <i class="support" style="--h:${Math.max(4, bucket.supportOperations * 13)}%;"></i>
+                <i class="clean" style="--h:${Math.max(4, bucket.cleaningOperations * 18)}%;"></i>
+                <small>${bucket.activeBatches}B</small>
+              </button>
+            `).join("")}
+          </div>
+        </article>
+      </div>
+      <div class="schedule-command-grid">
+        <article>
+          <span>Equipment reuse</span>
+          <h4>${escapeHtml(equipmentOccupancy[0]?.equipmentTag || "n/a")} drives the schedule</h4>
+          ${equipmentOccupancy.slice(0, 5).map((item) => `<p><b>${escapeHtml(item.equipmentTag)} · ${formatNumber(item.occupancyPct, 0)}%</b><small>${formatNumber(item.processH, 1)} h process · ${formatNumber(item.cleaningH, 1)} h cleaning · ${escapeHtml(item.recommendation)}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Room occupancy</span>
+          <h4>${roomOccupancy.filter((item) => item.bottleneckSignal !== "ok").length} suites need attention</h4>
+          ${roomOccupancy.slice(0, 5).map((item) => `<p><b>${escapeHtml(item.roomName)} · ${formatNumber(item.occupancyPct, 0)}%</b><small>${escapeHtml(item.cleanroomClass)} · peak ${item.peakConcurrentBatches} batches · ${escapeHtml(item.action)}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Utilities and staffing</span>
+          <h4>${escapeHtml(utilityDemand.find((item) => item.peakSignal !== "normal")?.peakSignal || "normal load")}</h4>
+          ${utilityDemand.filter((item, index) => item.peakSignal !== "normal" || index % 6 === 0).slice(0, 5).map((item) => `<p><b>${escapeHtml(item.bucket)} · ${formatNumber(item.operatorFte, 1)} FTE</b><small>${formatNumber(item.wfiDemandL, 0)} L WFI · ${formatNumber(item.cleanSteamKg, 0)} kg steam · ${formatNumber(item.coolingDemandKw, 0)} kW cooling</small></p>`).join("")}
+        </article>
+        <article>
+          <span>What-if scheduler</span>
+          <h4>${scheduleScenarios[0].feasibleAnnualBatches} baseline batches/yr</h4>
+          ${scheduleScenarios.slice(1, 6).map((item) => `<p><b>${escapeHtml(item.scenario)}: ${item.deltaBatchesPerYear >= 0 ? "+" : ""}${item.deltaBatchesPerYear}</b><small>${escapeHtml(item.decision)} · ${escapeHtml(item.planningAction)}</small></p>`).join("")}
+        </article>
+        <article class="schedule-bottleneck-card">
+          <span>Bottleneck ladder</span>
+          <h4>${bottleneckRows.filter((item) => item.bottleneckType !== "monitor").length} capacity signals</h4>
+          ${bottleneckRows.slice(0, 6).map((item) => `<p><b>${escapeHtml(item.resource)} · ${formatNumber(item.occupancyPct, 0)}%</b><small>${escapeHtml(item.bottleneckType)} · ${escapeHtml(item.suggestedAction)}</small></p>`).join("")}
+        </article>
+      </div>
+      <div class="report-button-row">
+        <button data-download-report="schedule-buckets-csv" type="button">Time buckets CSV</button>
+        <button data-download-report="schedule-equipment-occupancy-csv" type="button">Equipment occupancy CSV</button>
+        <button data-download-report="schedule-room-occupancy-csv" type="button">Room occupancy CSV</button>
+        <button data-download-report="schedule-utility-demand-csv" type="button">Utility demand CSV</button>
+        <button data-download-report="schedule-scenarios-csv" type="button">What-if scenarios CSV</button>
+        <button data-download-report="schedule-bottlenecks-csv" type="button">Bottleneck CSV</button>
+      </div>
     </section>
     <section class="simulation-summary">
       <article><span>Route optimizer</span><strong>${bestRoute.label}</strong></article>
@@ -9596,6 +9912,7 @@ function downloadJson(filename, payload, kind = "JSON export") {
 function comprehensiveReport() {
   const solved = solveMassBalance();
   const plantSim = plantSimulationModel();
+  const schedule = campaignSchedule();
   return {
     template: state.template,
     product: activeTemplate().product,
@@ -9610,7 +9927,13 @@ function comprehensiveReport() {
     dynamicProfile: dynamicBatchProfile(),
     unitModels: unitMechanisticModels(),
     physicalBoundaries: physicalBoundaryRows(),
-    schedule: campaignSchedule(),
+    schedule,
+    scheduleBuckets: scheduleBucketRows(schedule),
+    scheduleEquipmentOccupancy: scheduleEquipmentOccupancyRows(schedule),
+    scheduleRoomOccupancy: scheduleRoomOccupancyRows(schedule),
+    scheduleUtilityDemand: scheduleUtilityDemandRows(schedule),
+    scheduleScenarios: scheduleScenarioRows(schedule),
+    scheduleBottlenecks: scheduleBottleneckRows(schedule),
     recipe: recipeEditorRows(),
     routeComparison: routeComparisonRows(),
     routeTopology: routeTopologyRows(),
@@ -9656,7 +9979,7 @@ function comprehensiveReport() {
     debottleneckWorkbook: debottleneckWorkbookRows(),
     databankWorkbook: databankWorkbookRows(),
     exchangeWorkbook: exchangeWorkbookRows(),
-    advancedPlanning: advancedPlanningSuite(),
+    advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
     sources: scientificSources,
@@ -9698,6 +10021,7 @@ function renderReportsBoard() {
       <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
       <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
+      <article><span>Plant utilization suite</span><strong>${formatNumber(dataUtilizationFromSchedule(report.schedule), 0)}%</strong><p>Equipment occupancy chart, room/suite load, time buckets, utility demand peaks, cleaning windows, bottleneck ladder, and finite-capacity What-if scenarios for whole-plant utilization modelling.</p><button data-download-report="schedule-buckets-csv" type="button">Buckets CSV</button><button data-download-report="schedule-equipment-occupancy-csv" type="button">Equipment CSV</button><button data-download-report="schedule-room-occupancy-csv" type="button">Rooms CSV</button><button data-download-report="schedule-utility-demand-csv" type="button">Utilities CSV</button><button data-download-report="schedule-scenarios-csv" type="button">Scenarios CSV</button><button data-download-report="schedule-bottlenecks-csv" type="button">Bottlenecks CSV</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
@@ -10307,6 +10631,18 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-batch-release-schedule.csv`, scheduleBatchReleaseRows(), "Batch release schedule");
   } else if (type === "schedule-utilization-csv") {
     downloadCsv(`${state.template}-schedule-utilization-matrix.csv`, scheduleUtilizationMatrixRows(), "Schedule utilization matrix");
+  } else if (type === "schedule-buckets-csv") {
+    downloadCsv(`${state.template}-schedule-time-buckets.csv`, scheduleBucketRows(), "Finite-capacity schedule time buckets");
+  } else if (type === "schedule-equipment-occupancy-csv") {
+    downloadCsv(`${state.template}-equipment-occupancy-chart.csv`, scheduleEquipmentOccupancyRows(), "Equipment occupancy chart");
+  } else if (type === "schedule-room-occupancy-csv") {
+    downloadCsv(`${state.template}-room-suite-occupancy.csv`, scheduleRoomOccupancyRows(), "Room and suite occupancy");
+  } else if (type === "schedule-utility-demand-csv") {
+    downloadCsv(`${state.template}-scheduled-utility-demand.csv`, scheduleUtilityDemandRows(), "Scheduled utility demand");
+  } else if (type === "schedule-scenarios-csv") {
+    downloadCsv(`${state.template}-schedule-what-if-scenarios.csv`, scheduleScenarioRows(), "Finite-capacity schedule what-if scenarios");
+  } else if (type === "schedule-bottlenecks-csv") {
+    downloadCsv(`${state.template}-schedule-bottleneck-ladder.csv`, scheduleBottleneckRows(), "Schedule bottleneck ladder");
   } else if (type === "schedule-svg") {
     downloadSvg(`${state.template}-finite-capacity-schedule.svg`, scheduleGanttSvg());
   } else if (type === "schedule-json") {
@@ -10317,6 +10653,12 @@ function handleReportDownload(type) {
       msProjectTasks: scheduleMsProjectRows(schedule),
       batchReleases: scheduleBatchReleaseRows(schedule),
       utilizationMatrix: scheduleUtilizationMatrixRows(schedule),
+      timeBuckets: scheduleBucketRows(schedule),
+      equipmentOccupancy: scheduleEquipmentOccupancyRows(schedule),
+      roomOccupancy: scheduleRoomOccupancyRows(schedule),
+      utilityDemand: scheduleUtilityDemandRows(schedule),
+      whatIfScenarios: scheduleScenarioRows(schedule),
+      bottleneckLadder: scheduleBottleneckRows(schedule),
     }, "Finite-capacity schedule package");
   } else if (type === "aps-horizons-csv") {
     downloadCsv(`${state.template}-aps-planning-horizons.csv`, apsHorizonRows(), "Advanced planning horizons");
