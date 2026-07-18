@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-plant-overview-v5" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-plant-photo-ai-v3" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -96,6 +96,7 @@
                 <span>Main process · support systems · data outputs</span>
               </div>
               <div class="plant-map">
+                <img class="plant-photo" src="./assets/axion-biomanufacturing-suite.png" alt="High-tech biomanufacturing production plant with reactors, utilities, process streams and analytics overlays" />
                 <span class="plant-zone zone-media">Media prep</span>
                 <span class="plant-zone zone-seed">Seed train</span>
                 <span class="plant-zone zone-bioreactor">Production bioreactor hall</span>
@@ -118,6 +119,16 @@
                 <i class="plant-flow support-flow flow-cip"></i>
                 <i class="plant-flow support-flow flow-heat"></i>
                 <i class="plant-flow support-flow flow-waste"></i>
+                <div class="plant-tech-layer" aria-hidden="true">
+                  <span class="tech-chip chip-ai">AI design check</span>
+                  <span class="tech-chip chip-cfd">CFD oxygen field</span>
+                  <span class="tech-chip chip-tea">TEA/LCA stream</span>
+                  <span class="tech-chip chip-schedule">Schedule live</span>
+                  <i class="pulse-node pulse-a"></i>
+                  <i class="pulse-node pulse-b"></i>
+                  <i class="pulse-node pulse-c"></i>
+                  <i class="pulse-node pulse-d"></i>
+                </div>
               </div>
               <div class="plant-legend" aria-label="Plant layer legend">
                 <span><i class="main"></i>Main production</span>
@@ -1199,6 +1210,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-plant-overview-v5"></script>
+    <script type="module" src="./app.js?v=20260718-plant-photo-ai-v3"></script>
   </body>
 </html>

@@ -11290,7 +11290,32 @@ button {
     linear-gradient(180deg, rgba(9, 31, 48, 0.72), rgba(9, 40, 49, 0.78));
 }
 
-.plant-map::before,
+.plant-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: linear-gradient(135deg, rgba(4, 14, 25, 0.92), rgba(9, 32, 44, 0.74));
+  filter: saturate(0.86) contrast(1.04) brightness(0.74);
+  opacity: 0.86;
+}
+
+.plant-map::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(8, 24, 39, 0.44), rgba(8, 24, 39, 0.06) 42%, rgba(8, 24, 39, 0.46)),
+    linear-gradient(180deg, rgba(8, 24, 39, 0.12), rgba(8, 24, 39, 0.44));
+}
+
 .plant-map::after {
   content: "";
   position: absolute;
@@ -11301,6 +11326,7 @@ button {
 }
 
 .plant-map::after {
+  z-index: 1;
   inset: 58% 5% 8%;
   border-style: dashed;
   border-color: rgba(117, 208, 199, 0.22);
@@ -11316,9 +11342,10 @@ button {
   padding: 8px;
   color: #f4fbfb;
   background:
-    linear-gradient(145deg, rgba(117, 208, 199, 0.16), rgba(36, 92, 82, 0.34)),
-    rgba(8, 24, 39, 0.66);
-  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.23);
+    linear-gradient(145deg, rgba(117, 208, 199, 0.2), rgba(36, 92, 82, 0.4)),
+    rgba(8, 24, 39, 0.58);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.23), 0 0 26px rgba(117, 208, 199, 0.12);
+  backdrop-filter: blur(12px);
   font-size: 11px;
   font-weight: 880;
   line-height: 1.16;
@@ -11360,7 +11387,7 @@ button {
 
 .plant-flow {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   height: 6px;
   border-radius: 999px;
   transform-origin: left center;
@@ -11377,6 +11404,61 @@ button {
   background:
     repeating-linear-gradient(90deg, rgba(217, 230, 239, 0.72) 0 8px, transparent 8px 18px),
     linear-gradient(90deg, rgba(117, 208, 199, 0.76), rgba(83, 100, 116, 0.12));
+}
+
+.plant-tech-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.tech-chip {
+  position: absolute;
+  display: inline-grid;
+  min-height: 30px;
+  place-items: center;
+  border: 1px solid rgba(223, 248, 244, 0.34);
+  border-radius: 999px;
+  padding: 0 11px;
+  color: #eefafa;
+  background: rgba(8, 24, 39, 0.68);
+  box-shadow: 0 0 28px rgba(117, 208, 199, 0.14);
+  backdrop-filter: blur(14px);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  animation: techChipPulse 2.6s ease-in-out infinite;
+}
+
+.chip-ai { left: 9%; top: 8%; }
+.chip-cfd { right: 10%; top: 10%; animation-delay: 0.4s; }
+.chip-tea { right: 8%; bottom: 16%; animation-delay: 0.8s; }
+.chip-schedule { left: 9%; bottom: 17%; animation-delay: 1.2s; }
+
+.pulse-node {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #dff8f4;
+  box-shadow: 0 0 0 0 rgba(223, 248, 244, 0.48), 0 0 20px rgba(117, 208, 199, 0.42);
+  animation: telemetryPulse 1.7s ease-out infinite;
+}
+
+.pulse-a { left: 28%; top: 43%; }
+.pulse-b { left: 55%; top: 36%; animation-delay: 0.35s; }
+.pulse-c { right: 23%; top: 55%; animation-delay: 0.7s; }
+.pulse-d { right: 14%; bottom: 28%; animation-delay: 1.05s; }
+
+@keyframes techChipPulse {
+  0%, 100% { transform: translateY(0); border-color: rgba(223, 248, 244, 0.24); opacity: 0.78; }
+  50% { transform: translateY(-2px); border-color: rgba(117, 208, 199, 0.56); opacity: 1; }
+}
+
+@keyframes telemetryPulse {
+  0% { box-shadow: 0 0 0 0 rgba(223, 248, 244, 0.48), 0 0 20px rgba(117, 208, 199, 0.42); opacity: 1; }
+  100% { box-shadow: 0 0 0 22px rgba(223, 248, 244, 0), 0 0 26px rgba(117, 208, 199, 0.2); opacity: 0.62; }
 }
 
 .flow-media-seed { left: 18%; top: 26%; width: 58px; }
@@ -11498,6 +11580,26 @@ button {
     border-radius: 16px;
     padding: 6px;
     font-size: 9px;
+  }
+
+  .plant-photo {
+    object-position: center;
+  }
+
+  .tech-chip {
+    min-height: 24px;
+    padding-inline: 8px;
+    font-size: 8px;
+  }
+
+  .chip-ai { left: 5%; top: 2%; }
+  .chip-cfd { right: 5%; top: 2%; }
+  .chip-schedule { left: 5%; bottom: 2%; }
+  .chip-tea { right: 5%; bottom: 2%; }
+
+  .pulse-node {
+    width: 9px;
+    height: 9px;
   }
 
   .plant-header,
@@ -12128,4 +12230,10 @@ body.locked .help-dock {
   .public-hero {
     padding-top: 28px !important;
   }
+}
+
+.hero-product-visual .plant-photo,
+.plant-overview-visual .plant-photo {
+  object-fit: contain !important;
+  object-position: center !important;
 }
