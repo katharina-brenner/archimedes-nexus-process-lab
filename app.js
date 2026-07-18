@@ -1818,44 +1818,6 @@ const twinWorkspace = {
   ],
 };
 
-const marketIntelligence = {
-  caveats: [
-    "Public client lists are partial and do not prove current seat count, usage intensity, or exact contract value.",
-    "Named companies should not be linked to exact licence prices unless they publish that specific contract.",
-    "Use public business channels only: official websites, contact forms, conferences, and LinkedIn.",
-  ],
-  licenseBenchmarks: [
-    { label: "Desktop fixed licence", value: "about 7,000 USD/year", note: "Public benchmark from the provided research context; per computer, not an enterprise contract." },
-    { label: "Simulator + scheduling fixed", value: "about 11,000 USD/year", note: "Public benchmark from the provided research context; support and upgrades during licence term." },
-    { label: "Floating / site / corporate", value: "not public", note: "May involve discounts, multi-user terms, multi-year terms, site or corporate agreements." },
-    { label: "Axion professional individual", value: "2,400 EUR/year", note: "Positioned as entry to a browser workspace, not as a low-cost desktop clone." },
-  ],
-  targetWaves: [
-    { wave: "Wave 1", title: "Highest conversion probability", accounts: "Mosa Meat, Perfect Day, Remilk, UNIVERCELLS, Northway Biotech, PROCESSIUM, Pixon Engineering, MMR Consulting, Nexus PMG, VTU Engineering, smaller CDMOs, European precision-fermentation startups.", reason: "Shorter decision paths, visible scale-up and COGS pain, and strong need for facility modelling." },
-    { wave: "Wave 2", title: "Engineering multipliers", accounts: "NNE, PM Group, CRB, Pharmaplan/TTP/Triplan, Jacobs, Technip Energies, Wood, Tetra Pak.", reason: "One won engineering partner can apply the platform across many client processes." },
-    { wave: "Wave 3", title: "Enterprise after validation", accounts: "WuXi Biologics, Lonza, Thermo Fisher Scientific, Novo Nordisk, Roche, Pfizer, Sanofi, Novartis, Takeda, GSK.", reason: "Requires references, security documentation, enterprise access control, audit trails, and validation evidence." },
-  ],
-  buyerRoles: [
-    "Head/Director of Process Engineering",
-    "Director of Bioprocess Development",
-    "Head of MSAT",
-    "Director of Process Modeling and Simulation",
-    "Head of Techno-Economic Analysis",
-    "Digital Engineering Lead",
-    "Capital Projects / Conceptual Design Lead",
-    "Capacity Planning Lead",
-    "Cost of Goods Modeling Lead",
-    "Principal Process Engineer",
-    "Director of Manufacturing Strategy",
-    "Head of Process Systems Engineering",
-  ],
-  migrationOffer: {
-    title: "Representative process migration pilot",
-    detail: "Keep existing legitimate simulator work. Import or reconstruct one representative process from customer-owned exports, validate mass balance and economics, and show collaborative scenario evaluation in the browser.",
-    includes: ["Report/CSV/Excel import or reconstruction", "Mass-balance and economics validation", "Editable model with versions and comments", "LCA/TEA-ready exports and readiness-gap report"],
-  },
-};
-
 const routeOptions = [
   { key: "primary", label: "Primary route", detail: "Default GMP process train with full downstream and release flow." },
   { key: "intensified", label: "Intensified route", detail: "Scale-out/perfusion-style route with higher parallel capacity and shorter bottleneck residence." },
@@ -7295,7 +7257,6 @@ function comprehensiveReport() {
     sources: scientificSources,
     recommendations: simulationReadinessItems(),
     twinWorkspace,
-    marketIntelligence,
   };
 }
 
@@ -7533,42 +7494,35 @@ function renderRecommendations() {
     </section>
     <section class="market-intel-board">
       <div>
-        <p>Market and adoption intelligence</p>
-        <h3>${marketIntelligence.migrationOffer.title}</h3>
-        <span>${marketIntelligence.migrationOffer.detail}</span>
+        <p>Implementation roadmap</p>
+        <h3>Move from screening model to controlled engineering workspace.</h3>
+        <span>Use the readiness list to replace screening assumptions with project-specific data, connect review outputs, and decide which modules need higher-fidelity modelling next.</span>
       </div>
       <div class="market-caveat-list">
-        ${marketIntelligence.caveats.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+        <span>Validate process-specific kinetics, yields, and impurity behavior.</span>
+        <span>Replace screening costs with supplier quotes and site-specific utility tariffs.</span>
+        <span>Add governance, approvals, and audit trails before regulated production use.</span>
       </div>
     </section>
     <section class="market-wave-grid">
-      ${marketIntelligence.targetWaves.map((item) => `
-        <article>
-          <span>${escapeHtml(item.wave)}</span>
-          <h3>${escapeHtml(item.title)}</h3>
-          <p>${escapeHtml(item.accounts)}</p>
-          <small>${escapeHtml(item.reason)}</small>
-        </article>
-      `).join("")}
-    </section>
-    <section class="license-benchmark-board">
-      ${marketIntelligence.licenseBenchmarks.map((item) => `
-        <article>
-          <span>${escapeHtml(item.label)}</span>
-          <strong>${escapeHtml(item.value)}</strong>
-          <p>${escapeHtml(item.note)}</p>
-        </article>
-      `).join("")}
-    </section>
-    <section class="buyer-role-board">
-      <div>
-        <span>Buying centers</span>
-        <h3>Start with the technical champion, not central procurement.</h3>
-        <p>Use these roles to frame demos and pilots around the problem owner who feels the modelling, collaboration, and scenario-review pain directly.</p>
-      </div>
-      <div>
-        ${marketIntelligence.buyerRoles.map((role) => `<span>${escapeHtml(role)}</span>`).join("")}
-      </div>
+      <article>
+        <span>Step 1</span>
+        <h3>Calibrate the model</h3>
+        <p>Add measured titers, yields, media composition, utility loads, cleaning limits, and representative batch data.</p>
+        <small>Goal: replace defaults with defendable project assumptions.</small>
+      </article>
+      <article>
+        <span>Step 2</span>
+        <h3>Validate the process boundaries</h3>
+        <p>Review oxygen transfer, heat load, ammonium, lactate, hold time, sterility, waste, and scale-up constraints.</p>
+        <small>Goal: identify the next experiments or engineering studies.</small>
+      </article>
+      <article>
+        <span>Step 3</span>
+        <h3>Connect decision outputs</h3>
+        <p>Use exports for TEA, LCA, equipment review, scheduling, source tracking, and stakeholder-ready technical reports.</p>
+        <small>Goal: turn the model into a repeatable engineering workflow.</small>
+      </article>
     </section>
     <section class="ics-coverage-grid">
       ${coverage.map((item) => `
@@ -8462,11 +8416,11 @@ const publicDetailStories = {
     actions: [["mab-reports", "See report gaps"], ["mab-cfd", "See physics gaps"], ["login", "Try it"]],
   },
   "legacy-migration": {
-    eyebrow: "Migration layer",
-    title: "Modernize existing simulator work instead of throwing it away",
-    body: "The strongest offer is not a cheap clone. Axion can import or reconstruct one representative process from legitimate customer-owned exports, validate mass balance and economics against the current workflow, then show browser-based collaboration, versioning, and transparent scenario review.",
+    eyebrow: "Model continuity",
+    title: "Bring existing process knowledge into a browser workspace",
+    body: "Axion can use legitimate customer-owned exports, reports, stream tables, and equipment lists as inputs for a clean browser model with visible assumptions, collaborative review, versioning, and transparent scenario comparison.",
     points: ["Use existing customer-owned reports, stream tables, equipment lists, schedules, and economic outputs as migration inputs.", "Rebuild the process into an editable Axion model with visible assumptions and downloadable review data.", "Compare speed, clarity, collaboration, and model transparency before asking teams to change their workflow."],
-    visual: [["Input", "Reports, CSV, Excel, stream table"], ["Axion", "Editable model, branches, comments"], ["Output", "Validated balance, TEA/LCA, scenario review"]],
+    visual: [["Input", "Reports, CSV, Excel, stream table"], ["Axion", "Editable model, branches, comments"], ["Output", "Balance, TEA/LCA, scenario review"]],
     actions: [["api-first", "See API layer"], ["collaboration-versioning", "See collaboration"], ["login", "Open workspace"]],
   },
   "collaboration-versioning": {
@@ -8505,20 +8459,20 @@ const publicDetailStories = {
     eyebrow: "Economics layer",
     title: "Transparent economics for process decisions",
     body: "The economics layer now treats materials, media, feeds, resin, single-use, QC, cleaning, utilities, waste, CAPEX, validation, and facility burden as explicit drivers rather than one hidden number.",
-    points: ["Pricing and product positioning are not based on being cheaper; they are based on clearer collaboration, APIs, vertical templates, and decision-ready TEA.", "Economics is prepared for vendor quotes, regional indices, inflation, scenario ranges, NPV, IRR, payback, break-even, and cash runway.", "Material cost is intentionally high and itemized for bioprocesses where media and consumables dominate."],
+    points: ["Economics is presented through transparent assumptions, editable drivers, scenario comparisons, and decision-ready TEA exports.", "Economics is prepared for vendor quotes, regional indices, inflation, scenario ranges, NPV, IRR, payback, break-even, and cash runway.", "Material cost is intentionally high and itemized for bioprocesses where media and consumables dominate."],
     visual: [["COGS", "Materials, labor, QA, utilities"], ["CAPEX", "Equipment, install, validation"], ["Finance", "NPV, IRR, payback roadmap"]],
     actions: [["uncertainty", "See uncertainty"], ["pricing", "See pricing"], ["login", "Try it"]],
   },
   "target-engineering": {
-    eyebrow: "Target segment",
-    title: "Engineering and process-design organizations",
-    body: "Engineering partners are attractive because one team can apply the platform across many client projects: conceptual design, sizing, utilities, CAPEX/OPEX, scheduling, and debottlenecking.",
-    points: ["Best fit: process engineering, digital engineering, life-science facility design, conceptual design, and simulation leads.", "Axion supports fast feasibility studies alongside existing simulator workflows instead of forcing immediate replacement.", "The workspace helps compare alternatives and explain assumptions to clients, suppliers, and internal reviewers."],
-    visual: [["Use cases", "Facility design, capacity, CAPEX"], ["Teams", "Process, digital, simulation"], ["Offer", "Migration pilot + team workspace"]],
+    eyebrow: "Workflow example",
+    title: "Engineering and process-design workspaces",
+    body: "Use Axion for conceptual design, sizing, utilities, CAPEX/OPEX, scheduling, debottlenecking, and scenario review across process-development projects.",
+    points: ["Set up process routes with reusable equipment, streams, assumptions, and reports.", "Compare alternatives while keeping model logic and assumptions visible.", "Prepare review material for technical teams, suppliers, and project stakeholders."],
+    visual: [["Use cases", "Facility design, capacity, CAPEX"], ["Teams", "Process, digital, simulation"], ["Output", "Team workspace + reports"]],
     actions: [["legacy-migration", "See migration"], ["pricing", "See pricing"], ["login", "Open workspace"]],
   },
   "target-biopharma": {
-    eyebrow: "Target segment",
+    eyebrow: "Workflow example",
     title: "Biopharma, CDMO, and MSAT teams",
     body: "Biopharma teams need site-standardized, reviewable models for mAbs, vaccines, advanced therapies, tech transfer, COGS, capacity, and customer-specific CDMO scenarios.",
     points: ["Model families include mAbs, continuous/perfusion variants, vaccines, viral vectors, cell and gene therapy, insulin/API, and downstream purification trains.", "CDMOs can use the workflow for rapid customer modelling, capacity planning, and quote-ready TEA exports.", "Enterprise readiness depends on security, validation, audit trails, access control, and source-backed model assumptions."],
@@ -8526,9 +8480,9 @@ const publicDetailStories = {
     actions: [["mab-overview", "See mAb example"], ["recommendations", "See readiness"], ["login", "Try it"]],
   },
   "target-food": {
-    eyebrow: "Target segment",
+    eyebrow: "Workflow example",
     title: "Food, fermentation, and alternative-protein teams",
-    body: "This is a strong wedge because food biotech and precision fermentation need rapid scale-up, media-cost realism, downstream recovery, utilities, sustainability, and investor-readable TEA/LCA outputs.",
+    body: "Food biotech and precision fermentation workflows need rapid scale-up, media-cost realism, downstream recovery, utilities, sustainability, and review-ready TEA/LCA outputs.",
     points: ["Model cultivated meat, precision fermentation, enzyme production, alternative proteins, food processing, media preparation, utilities, wastewater, and heat reuse.", "Make media, feeds, water, cleaning, aeration, fermentation, recovery, drying, waste, and LCA drivers visible.", "Use the same product-brief workflow for founders, university teams, CDMOs, ingredient companies, and engineering partners."],
     visual: [["Core", "Fermentation, media, recovery"], ["Economics", "Media, utilities, waste"], ["Exports", "LCA / TEA / visuals"]],
     actions: [["cultured-meat", "See cultured meat"], ["penicillin", "See fermentation"], ["login", "Open workspace"]],

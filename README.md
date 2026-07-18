@@ -85,9 +85,9 @@ The response contains the activated license key. The user can then log in with t
 
 `KBrenner/kbrenner` and `MAhmed/mahmed` are seeded as payment-exempt internal users and do not need payment.
 
-## Market intelligence notes
+## Public website
 
-The public site includes legacy-simulator migration positioning, target-account segments, buying-center roles, and licence-benchmark caveats. Treat those as market intelligence: public client lists are partial, individual customer contract values are not public, and private contact details should not be used. The recommended wedge is a representative migration pilot: reconstruct or import one existing process from legitimate customer-owned exports, validate mass balance and economics, then demonstrate collaboration, versioning, LCA/TEA exports, API handoffs, and scenario review in the browser.
+The public site presents Axion as a professional process-modelling workspace with platform, workflow, ecosystem, reviews, pricing, and login pages. Customer-facing copy focuses on product capabilities, implementation fit, data governance, and onboarding.
 
 ## Backend API
 
