@@ -1812,6 +1812,12 @@ const equations = [
   eq("Buffer WIP balance", "mass", "WIP_buffer(t+dt) = WIP_buffer(t) + arrivals - departures - rejects", "Work-in-process accumulation for intermediate tanks, harvest pools, cold storage, and logistics buffers."),
   eq("Machine utilization", "economics", "U_machine = busy_time / scheduled_available_time", "Machine and line utilization for bottleneck detection and capacity planning."),
   eq("Buffer utilization", "economics", "U_buffer = average_inventory / usable_buffer_capacity", "Buffer occupancy metric for hold tanks, storage, incubators, cold rooms, and queue spaces."),
+  eq("Finite-capacity load", "economics", "load_resource,h = demand_resource,h / capacity_resource,h", "Advanced planning and scheduling check for machinery, labor, tools, utilities, cleaning skids, and transfer lines."),
+  eq("Due-date lateness", "economics", "lateness = max(0, scheduled_release_time - promised_due_time)", "Delivery-performance metric for customer orders, campaigns, and internal material requests."),
+  eq("Plan adherence", "economics", "adherence = completed_operations_on_plan / planned_operations", "Real-time planning deviation signal for schedule control and shopfloor follow-up."),
+  eq("Inventory reorder point", "economics", "ROP = demand_rate * lead_time + safety_stock", "Raw-material and consumable reorder trigger for media, buffers, filters, resin, single-use assemblies, and cleaning agents."),
+  eq("WIP turn", "economics", "WIP_turns = released_good_mass / average_work_in_process", "Inventory-efficiency and lead-time indicator across intermediate pools and production queues."),
+  eq("Sequence objective", "economics", "min Z = w1*lateness + w2*changeover + w3*idle_time + w4*WIP + w5*priority_miss", "Detailed sequencing objective for feasible production schedules under changing demand and constraints."),
   eq("Sankey flow share", "mass", "share_i = annual_mass_i / sum(annual_mass_relevant)", "Relative material-flow contribution used for Sankey-style process visualization."),
   eq("Genetic optimizer objective", "economics", "min f(x)=w1*COGS+w2*CO2e+w3*cycle_time+w4*risk-w5*yield", "Multi-objective optimization target for route, capacity, resource, and process-parameter screening."),
   eq("Neural surrogate prediction", "kinetics", "y_hat = NN(theta; titer, kLa, media, temperature, pH, feed)", "Machine-learning surrogate placeholder for fast prediction and calibration around mechanistic process models."),
@@ -1917,6 +1923,8 @@ const spdFunctions = [
   { group: "Plant simulation", name: "Experiment manager and optimizer", status: "Implemented", inputs: "Route, batch pitch, parallel units, cleaning, media price, heat recovery, automation", output: "Scenario ranking with genetic-optimizer and neural-surrogate placeholders", note: "Adds browser-native experiment rows, constraints, objective scores, and ready-to-export optimization assumptions." },
   { group: "Plant simulation", name: "Open integration matrix", status: "Implemented", inputs: "JSON, CSV, MQTT, OPC UA, ODBC, SQL, sockets, XML, CAD/JT, automation links", output: "Connector readiness and project-integration report", note: "Makes the integration registry concrete and downloadable for engineering review." },
   { group: "Plant simulation", name: "Value-stream mapping", status: "Implemented", inputs: "Process, transfer, cleaning, wait, release, storage, waste", output: "Value-added and non-value-added time split", note: "Adds a VSM-style view to compare process time, transfer time, cleaning time, waiting time, and QC release time." },
+  { group: "APS", name: "Strategic, tactical, and detailed planning", status: "Implemented", inputs: "Demand, annual target, routes, finite schedule, resource limits", output: "Planning horizon workbook and plan-adherence KPIs", note: "Adds a planning layer from long-range capacity decisions through weekly campaign planning down to shift-level sequencing." },
+  { group: "APS", name: "Delivery, inventory, and replanning control", status: "Implemented", inputs: "Due dates, release events, material costs, lead times, WIP, deviations", output: "Delivery-risk, inventory-risk, and replanning workbooks", note: "Turns scheduling into an operational planning cockpit with on-time delivery, stock coverage, finite-capacity deviations, and corrective actions." },
 ];
 
 const twinWorkspace = {
@@ -3977,6 +3985,213 @@ function scheduleUtilizationMatrixRows(schedule = campaignSchedule()) {
   }));
 }
 
+function advancedPlanningSuite(schedule = campaignSchedule()) {
+  const data = metrics();
+  const annualKg = Math.max(1, data.annualKg);
+  const releaseRows = scheduleBatchReleaseRows(schedule);
+  const operationRows = scheduleOperationRows();
+  const resourceRows = scheduleResourceRows();
+  const materialRows = costRows().filter((row) => row.category === "Materials" && row.unit === "USD/yr");
+  const dailyProductKg = annualKg / 365;
+  const simulatedReleaseKg = data.productPerBatchKg * Math.max(1, releaseRows.length);
+  const onTimeTargetPct = schedule.warnings.length ? 88 : 96;
+  const capacityRiskCount = resourceRows.filter((row) => row.status !== "ok").length;
+  const inventoryRiskCount = materialRows.filter((row) => Number(row.perKgProductUsd || 0) > data.directCost * 0.08).length;
+  const horizons = [
+    {
+      horizon: "Strategic plan",
+      window: "12-36 months",
+      planningQuestion: "Which products, sites, suites, and scales should exist?",
+      decisions: "capacity expansion, parallel trains, make/buy, site fit, major CAPEX",
+      inputs: "portfolio demand, target annual kg, facility constraints, investment envelope",
+      output: `${formatNumber(annualKg, 0)} kg/yr target with ${capacityRiskCount} capacity review signals`,
+      cadence: "monthly / quarterly",
+    },
+    {
+      horizon: "Tactical plan",
+      window: "4-26 weeks",
+      planningQuestion: "Which campaigns should run, in which sequence, with which resources?",
+      decisions: "campaign order, material readiness, suite allocation, QC capacity, cleaning windows",
+      inputs: "forecast, confirmed orders, inventory, lead times, resource calendars",
+      output: `${schedule.feasibleAnnualBatches} feasible annual batches under current assumptions`,
+      cadence: "weekly",
+    },
+    {
+      horizon: "Detailed schedule",
+      window: "0-14 days",
+      planningQuestion: "What exactly runs next and what will block it?",
+      decisions: "operation start, equipment assignment, transfer line slot, operator shift, CIP/SIP queue",
+      inputs: "finite equipment state, batch status, deviations, utility availability",
+      output: `${operationRows.length} scheduled operations and ${schedule.warnings.length} warnings`,
+      cadence: "shift / daily",
+    },
+  ];
+  const capacity = resourceRows.map((row, index) => {
+    const deviationPct = Math.max(-18, Math.min(22, (Number(row.occupancyPct || 0) - 72) * 0.28 + (index % 5 - 2) * 2.4));
+    const projectedLoadPct = Math.max(0, Math.min(140, Number(row.occupancyPct || 0) + deviationPct));
+    return {
+      resource: row.resource,
+      resourceType: row.type,
+      plannedLoadPct: row.occupancyPct,
+      realtimeDeviationPct: deviationPct,
+      projectedLoadPct,
+      capacityIssue: projectedLoadPct > 100 ? "over capacity" : projectedLoadPct > 85 ? "watch" : "ok",
+      correctiveAction: projectedLoadPct > 100 ? "reschedule, add parallel capacity, outsource, or reduce campaign load" : projectedLoadPct > 85 ? "monitor next schedule cycle and protect cleaning/release windows" : "no immediate action",
+      monitorSignal: row.type === "Shared resource" ? "queue length and availability" : row.type.includes("stream") ? "line slot and flush completion" : "equipment state and downtime",
+    };
+  });
+  const delivery = Array.from({ length: Math.max(6, Math.min(10, releaseRows.length || 8)) }, (_, index) => {
+    const release = releaseRows[index % Math.max(1, releaseRows.length)];
+    const promisedH = (release?.qcReleaseH || (index + 1) * schedule.plannedPitchH) * (index % 3 === 0 ? 0.92 : 1.08);
+    const scheduledH = release?.qcReleaseH || (index + 1) * Math.max(8, schedule.releasePitchH);
+    const latenessH = Math.max(0, scheduledH - promisedH);
+    const priority = index % 4 === 0 ? "A" : index % 3 === 0 ? "B" : "C";
+    return {
+      orderId: `ORD-${String(index + 1).padStart(3, "0")}`,
+      product: activeTemplate().product,
+      priority,
+      promisedDueH: promisedH,
+      scheduledReleaseH: scheduledH,
+      latenessH,
+      onTime: latenessH <= (priority === "A" ? 2 : 8) ? "yes" : "risk",
+      quantityKg: data.productPerBatchKg,
+      customerServiceSignal: latenessH > 0 ? "review delivery promise or schedule sequence" : "on schedule",
+      linkedBatch: release?.batchId || `B${String(index + 1).padStart(2, "0")}`,
+    };
+  });
+  const inventory = [
+    ...materialRows.slice(0, 14).map((row, index) => {
+      const dailyDemandUsd = Math.max(1, Number(row.annualValueUsd || 0) / 365);
+      const leadTimeDays = 7 + (index % 5) * 4 + (row.item.toLowerCase().includes("resin") ? 35 : 0);
+      const coverageDays = Math.max(3, 12 + (index % 4) * 8 - (Number(row.perKgProductUsd || 0) > data.directCost * 0.08 ? 6 : 0));
+      return {
+        item: row.item,
+        inventoryClass: row.costType,
+        annualDemandUsd: row.annualValueUsd,
+        dailyDemandUsd,
+        leadTimeDays,
+        coverageDays,
+        reorderPointUsd: dailyDemandUsd * leadTimeDays * 1.25,
+        excessInventoryRisk: coverageDays > 38 ? "high" : "normal",
+        shortageRisk: coverageDays < leadTimeDays ? "risk" : "ok",
+        action: coverageDays < leadTimeDays ? "raise reorder point or lock supplier delivery" : coverageDays > 38 ? "reduce stock target or batch purchasing" : "maintain policy",
+      };
+    }),
+    {
+      item: "Work in process",
+      inventoryClass: "intermediate pools",
+      annualDemandUsd: "",
+      dailyDemandUsd: dailyProductKg,
+      leadTimeDays: Math.max(1, schedule.releasePitchH / 24),
+      coverageDays: Math.max(1, schedule.makespanH / 24),
+      reorderPointUsd: "",
+      excessInventoryRisk: schedule.makespanH > schedule.plannedPitchH * 3 ? "high" : "normal",
+      shortageRisk: "not applicable",
+      action: "reduce waiting, hold time, transfer delay, and QC queue to lower WIP",
+    },
+  ];
+  const sequencing = operationRows.slice(0, 32).map((row, index) => ({
+    sequenceNo: index + 1,
+    batchId: row.batchId,
+    operation: `${row.tag} ${row.operation}`,
+    family: row.group,
+    assignedResource: row.assignedEquipment,
+    priority: row.status === "scheduled" ? "standard" : "expedite review",
+    predecessor: row.predecessor,
+    setupH: row.setupH,
+    processH: row.processH,
+    cleaningH: row.cleanH,
+    transferEndH: row.transferEndH,
+    earliestStartH: row.startH,
+    finiteCapacityStatus: row.status,
+    sequencingRule: row.cleanH > 0 ? "protect cleaning/release before reuse" : "run after predecessor and resource availability",
+  }));
+  const collaboration = [
+    { role: "Planner", responsibility: "maintain finite schedule, sequence priority, and delivery promises", workspaceSignal: `${delivery.filter((row) => row.onTime === "risk").length} delivery risks` },
+    { role: "Process engineer", responsibility: "resolve bottlenecks, operating limits, transfer timing, and recipe assumptions", workspaceSignal: `${capacityRiskCount} capacity or utilization risks` },
+    { role: "Procurement", responsibility: "protect material availability, supplier lead time, safety stock, and substitutions", workspaceSignal: `${inventory.filter((row) => row.shortageRisk === "risk").length} material coverage risks` },
+    { role: "Quality", responsibility: "release batches, assays, deviations, cleaning verification, and hold-time review", workspaceSignal: `${schedule.batchReleases.length} release events` },
+    { role: "Operations", responsibility: "execute equipment state changes, cleaning, line clearance, and shift handover", workspaceSignal: `${sequencing.length} detailed sequence rows` },
+  ];
+  const optimizations = [
+    {
+      scenario: "Protect delivery promise",
+      objective: "minimize lateness and priority misses",
+      decisionVariables: "batch sequence, release queue priority, parallel bottleneck equipment",
+      estimatedImpact: `${formatNumber(Math.max(5, 100 - onTimeTargetPct), 0)}% lateness risk reduction target`,
+      tradeoff: "may increase cleaning or idle time",
+    },
+    {
+      scenario: "Maximize resource utilization",
+      objective: "reduce idle time without exceeding finite capacity",
+      decisionVariables: "operation start times, shared CIP/SIP sequence, transfer-line allocation",
+      estimatedImpact: `${formatNumber(Math.max(1, schedule.bottleneck.occupancyPct - 82), 1)} pt bottleneck review`,
+      tradeoff: "higher utilization can reduce schedule resilience",
+    },
+    {
+      scenario: "Minimize inventory cost",
+      objective: "lower excess raw-material and WIP holding costs",
+      decisionVariables: "batch size, campaign length, reorder point, supplier lead time",
+      estimatedImpact: `${inventoryRiskCount} high-value material classes prioritized`,
+      tradeoff: "lower stock raises supply disruption risk",
+    },
+    {
+      scenario: "Fast replanning after deviation",
+      objective: "restore feasible plan after equipment, QC, or material delay",
+      decisionVariables: "resource reassignment, skipped optional steps, alternate route, overtime",
+      estimatedImpact: `${capacity.filter((row) => row.capacityIssue !== "ok").length} resources recalculated`,
+      tradeoff: "requires validated escalation rules",
+    },
+  ];
+  return {
+    kpis: {
+      planningBasis: "APS screening module for bioprocess production planning",
+      onTimeTargetPct,
+      simulatedReleaseKg,
+      capacityRiskCount,
+      deliveryRiskCount: delivery.filter((row) => row.onTime === "risk").length,
+      inventoryRiskCount: inventory.filter((row) => row.shortageRisk === "risk" || row.excessInventoryRisk === "high").length,
+      planAdherencePct: Math.max(70, Math.min(99, 98 - schedule.warnings.length * 3 - capacityRiskCount * 1.4)),
+      replanningCadence: schedule.warnings.length ? "shift-level replanning recommended" : "daily review sufficient",
+    },
+    horizons,
+    capacity,
+    delivery,
+    inventory,
+    sequencing,
+    collaboration,
+    optimizations,
+  };
+}
+
+function apsHorizonRows() {
+  return advancedPlanningSuite().horizons;
+}
+
+function apsCapacityRows() {
+  return advancedPlanningSuite().capacity;
+}
+
+function apsDeliveryRows() {
+  return advancedPlanningSuite().delivery;
+}
+
+function apsInventoryRows() {
+  return advancedPlanningSuite().inventory;
+}
+
+function apsSequencingRows() {
+  return advancedPlanningSuite().sequencing;
+}
+
+function apsCollaborationRows() {
+  return advancedPlanningSuite().collaboration;
+}
+
+function apsOptimizationRows() {
+  return advancedPlanningSuite().optimizations;
+}
+
 function templateExampleRows() {
   return Object.entries(templates).map(([key, template]) => ({
     exampleId: key,
@@ -5793,6 +6008,7 @@ function renderSimulationBoard() {
   const plantSim = plantSimulationModel();
   const plantExperiments = plantSimulationExperimentRows(plantSim);
   const plantObjects = plantSimulationObjectRows(plantSim);
+  const aps = advancedPlanningSuite(schedule);
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -5823,6 +6039,64 @@ function renderSimulationBoard() {
       <article><span>Route capacity</span><strong>${bestRoute.feasibleAnnualBatches}/${state.batchCount}</strong></article>
       <article><span>Branch steps</span><strong>${bestRoute.branchSteps}</strong></article>
       <article><span>Est. direct cost</span><strong>$${formatNumber(bestRoute.estimatedDirectCost, 0)}/kg</strong></article>
+    </section>
+    <section class="simulation-group aps-panel">
+      <div class="simulation-group-heading">
+        <div>
+          <span>Advanced planning and scheduling</span>
+          <h3>Capacity, delivery, inventory, and sequencing control</h3>
+        </div>
+        <strong>${formatNumber(aps.kpis.planAdherencePct, 0)}% plan adherence</strong>
+      </div>
+      <div class="simulation-summary aps-summary">
+        <article><span>Capacity risks</span><strong class="${aps.kpis.capacityRiskCount ? "risk" : "ok"}">${aps.kpis.capacityRiskCount}</strong></article>
+        <article><span>Delivery risks</span><strong class="${aps.kpis.deliveryRiskCount ? "risk" : "ok"}">${aps.kpis.deliveryRiskCount}</strong></article>
+        <article><span>Inventory risks</span><strong class="${aps.kpis.inventoryRiskCount ? "risk" : "ok"}">${aps.kpis.inventoryRiskCount}</strong></article>
+        <article><span>Replanning</span><strong>${aps.kpis.replanningCadence}</strong></article>
+      </div>
+      <div class="simulation-cards aps-cards">
+        ${aps.horizons.map((item) => `
+          <article class="simulation-card">
+            <div><span>${item.window}</span><h4>${item.horizon}</h4></div>
+            <dl>
+              <dt>Question</dt><dd>${item.planningQuestion}</dd>
+              <dt>Decision</dt><dd>${item.decisions}</dd>
+              <dt>Cadence</dt><dd>${item.cadence}</dd>
+            </dl>
+            <p>${item.output}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="aps-grid">
+        <article>
+          <span>Finite capacity monitor</span>
+          <h4>${aps.capacity.filter((item) => item.capacityIssue !== "ok").length} resources need review</h4>
+          ${aps.capacity.slice(0, 5).map((item) => `<p><b>${item.resource}</b><small>${formatNumber(item.projectedLoadPct, 0)}% projected · ${item.correctiveAction}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Delivery performance</span>
+          <h4>${aps.delivery.filter((item) => item.onTime === "yes").length}/${aps.delivery.length} orders on time</h4>
+          ${aps.delivery.slice(0, 5).map((item) => `<p><b>${item.orderId}</b><small>${item.priority} priority · ${formatNumber(item.latenessH, 1)} h late · ${item.customerServiceSignal}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Inventory and WIP</span>
+          <h4>${aps.inventory.filter((item) => item.shortageRisk === "risk").length} shortage signals</h4>
+          ${aps.inventory.slice(0, 5).map((item) => `<p><b>${item.item}</b><small>${formatNumber(item.coverageDays, 0)} d coverage · ${item.action}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Optimization playbook</span>
+          <h4>${aps.optimizations.length} schedule objectives</h4>
+          ${aps.optimizations.map((item) => `<p><b>${item.scenario}</b><small>${item.objective}</small></p>`).join("")}
+        </article>
+      </div>
+      <div class="report-button-row">
+        <button data-download-report="aps-horizons-csv" type="button">Planning horizons CSV</button>
+        <button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button>
+        <button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button>
+        <button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button>
+        <button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button>
+        <button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button>
+      </div>
     </section>
     ${renderRealtimeTelemetry(true)}
     <section class="simulation-group gproms-panel">
@@ -8156,6 +8430,7 @@ function comprehensiveReport() {
     debottleneckWorkbook: debottleneckWorkbookRows(),
     databankWorkbook: databankWorkbookRows(),
     exchangeWorkbook: exchangeWorkbookRows(),
+    advancedPlanning: advancedPlanningSuite(),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
     sources: scientificSources,
@@ -8195,6 +8470,7 @@ function renderReportsBoard() {
       <article><span>Databank workbook</span><strong>${report.databankWorkbook.length}</strong><p>Original Axion equipment, component, mixture, property, parameter, cost, and CIP/SIP template libraries for project calibration.</p><button data-download-report="databank-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
+      <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
@@ -8777,6 +9053,20 @@ function handleReportDownload(type) {
       batchReleases: scheduleBatchReleaseRows(schedule),
       utilizationMatrix: scheduleUtilizationMatrixRows(schedule),
     }, "Finite-capacity schedule package");
+  } else if (type === "aps-horizons-csv") {
+    downloadCsv(`${state.template}-aps-planning-horizons.csv`, apsHorizonRows(), "Advanced planning horizons");
+  } else if (type === "aps-capacity-csv") {
+    downloadCsv(`${state.template}-aps-finite-capacity-monitor.csv`, apsCapacityRows(), "Advanced planning finite capacity monitor");
+  } else if (type === "aps-delivery-csv") {
+    downloadCsv(`${state.template}-aps-delivery-performance.csv`, apsDeliveryRows(), "Advanced planning delivery performance");
+  } else if (type === "aps-inventory-csv") {
+    downloadCsv(`${state.template}-aps-inventory-and-wip.csv`, apsInventoryRows(), "Advanced planning inventory and WIP");
+  } else if (type === "aps-sequencing-csv") {
+    downloadCsv(`${state.template}-aps-detailed-sequencing.csv`, apsSequencingRows(), "Advanced planning detailed sequencing");
+  } else if (type === "aps-collaboration-csv") {
+    downloadCsv(`${state.template}-aps-collaboration-roles.csv`, apsCollaborationRows(), "Advanced planning collaboration roles");
+  } else if (type === "aps-optimization-csv") {
+    downloadCsv(`${state.template}-aps-optimization-playbook.csv`, apsOptimizationRows(), "Advanced planning optimization playbook");
   } else if (type === "schedule-streams-csv") {
     downloadCsv(`${state.template}-stream-transfer-schedule.csv`, scheduleStreamRows(), "Stream transfer schedule");
   } else if (type === "schedule-cycles-csv") {
