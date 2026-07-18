@@ -6216,6 +6216,12 @@ function renderSimulationBoard() {
   const plantSim = plantSimulationModel();
   const plantExperiments = plantSimulationExperimentRows(plantSim);
   const plantObjects = plantSimulationObjectRows(plantSim);
+  const factoryRooms = factoryRoomRows(schedule);
+  const movingBatches = movingBatchRows(schedule);
+  const personnelRows = personnelPlanRows(schedule);
+  const inventoryRows = inventoryLevelRows(schedule);
+  const stateRows = equipmentStateMachineRows(schedule);
+  const factoryOptimizations = factoryOptimizationRows(schedule);
   const aps = advancedPlanningSuite(schedule);
 
   els.simulationBoard.innerHTML = `
@@ -6696,6 +6702,12 @@ function renderSimulationBoard() {
       </div>
       <div class="plant-layout-scene" aria-label="Object-oriented 3D-style plant simulation preview">
         <div class="plant-layout-floor">
+          ${factoryRooms.slice(0, 6).map((room) => `
+            <div class="factory-room ${room.status.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}" style="--x:${room.xPct}%; --y:${room.yPct}%; --w:${room.widthPct}%; --h:${room.heightPct}%;" title="${escapeAttr(`${room.roomName}: ${room.roomType}; ${formatNumber(room.occupancyPct, 1)}% occupied`)}">
+              <span>${escapeHtml(room.roomName)}</span>
+              <small>${formatNumber(room.occupancyPct, 0)}%</small>
+            </div>
+          `).join("")}
           <div class="plant-zone zone-process">
             <span>Production zone</span>
             ${state.units.filter((item) => unitLayer(item) === "main").slice(0, 12).map((item, index) => `
@@ -6715,11 +6727,17 @@ function renderSimulationBoard() {
           <div class="plant-flow-line flow-a"></div>
           <div class="plant-flow-line flow-b"></div>
           <div class="plant-flow-line flow-c"></div>
+          ${movingBatches.slice(0, 14).map((batch, index) => `
+            <i class="factory-batch-token" style="--x:${batch.xPct}%; --y:${batch.yPct}%; --duration:${batch.animationDurationS}s; --delay:${-index * 0.55}s;" title="${escapeAttr(`${batch.tokenId}: ${batch.batchId} moving to ${batch.to} in ${batch.room}`)}">${index + 1}</i>
+          `).join("")}
+          ${personnelRows.slice(0, 6).map((person, index) => `
+            <i class="factory-person-token" style="--x:${12 + index * 12}%; --y:${86 - (index % 2) * 8}%; --delay:${-index * 0.7}s;" title="${escapeAttr(`${person.role}: ${formatNumber(person.requiredFte, 2)} FTE required`)}"></i>
+          `).join("")}
         </div>
         <aside>
           <span>Live factory twin</span>
           <h4>${escapeHtml(plantSim.basis)}</h4>
-          <p>Animated lines show directional material and resource movement across the current process model. Major equipment is separated from support systems so the plant reads as a logical facility, not just a row of blocks.</p>
+          <p>Animated lines and batch tokens show material moving through rooms, equipment states, cleaning/release, support systems, people, and logistics buffers across the current finite-capacity schedule.</p>
           <button data-download-report="plant-simulation-svg" type="button">Download plant SVG</button>
         </aside>
       </div>
@@ -6743,6 +6761,44 @@ function renderSimulationBoard() {
               const max = Math.max(...plantSim.sankey.map((row) => row.annualKg), 1);
               return `<div title="${escapeAttr(`${item.label}: ${formatNumber(item.annualKg, 0)} kg/yr`) }"><span>${escapeHtml(item.label)}</span><b style="--bar:${Math.max(4, item.annualKg / max * 100)}%; --color:${item.color};"></b><em>${formatNumber(item.annualKg, 0)} kg/yr</em></div>`;
             }).join("")}
+          </div>
+        </article>
+      </div>
+      <div class="factory-digital-twin-grid" aria-label="Factory digital twin details">
+        <article>
+          <span>Rooms</span>
+          <h4>${factoryRooms.length} production spaces</h4>
+          ${factoryRooms.slice(0, 5).map((room) => `<p><b>${escapeHtml(room.roomName)}</b><small>${escapeHtml(room.cleanroomClass)} · ${formatNumber(room.occupancyPct, 0)}% occupied · ${escapeHtml(room.status)}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Moving batches</span>
+          <h4>${movingBatches.length} live batch movements</h4>
+          ${movingBatches.slice(0, 5).map((batch) => `<p><b>${escapeHtml(batch.tokenId)}</b><small>${escapeHtml(batch.from)} → ${escapeHtml(batch.to)} · ${formatNumber(batch.durationH, 1)} h · ${escapeHtml(batch.status)}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Personnel</span>
+          <h4>${personnelRows.length} staffing roles</h4>
+          ${personnelRows.slice(0, 5).map((person) => `<p><b>${escapeHtml(person.role)}</b><small>${formatNumber(person.requiredFte, 2)} FTE · ${formatNumber(person.utilizationPct, 0)}% load · ${escapeHtml(person.handoverNeed)}</small></p>`).join("")}
+        </article>
+        <article>
+          <span>Inventory</span>
+          <h4>${inventoryRows.filter((row) => row.shortageRisk === "risk").length} projected shortages</h4>
+          ${inventoryRows.filter((row, index) => index % 8 === 0).slice(0, 5).map((item) => `<p><b>${escapeHtml(item.item)}</b><small>${formatNumber(item.projectedCoverageDays, 0)} d coverage · ${escapeHtml(item.linkedPolicy)}</small></p>`).join("")}
+        </article>
+      </div>
+      <div class="factory-state-optimizer">
+        <article>
+          <span>Equipment state machines</span>
+          <h4>${stateRows.length} state transitions</h4>
+          <div class="state-machine-strip">
+            ${stateRows.slice(0, 18).map((row) => `<i class="state-${escapeAttr(row.state)}" title="${escapeAttr(`${row.equipmentTag}: ${row.state} ${formatNumber(row.startH, 1)}-${formatNumber(row.finishH, 1)} h`)}"><b>${escapeHtml(row.equipmentTag)}</b><small>${escapeHtml(row.state)}</small></i>`).join("")}
+          </div>
+        </article>
+        <article>
+          <span>Factory optimizer</span>
+          <h4>${factoryOptimizations[0]?.recommendation || "optimization ready"}</h4>
+          <div class="optimizer-ranking">
+            ${factoryOptimizations.slice(0, 5).map((item) => `<p><b>${escapeHtml(item.scenarioId)} · ${formatNumber(item.objectiveScore, 0)}/100</b><small>${escapeHtml(item.route)} · ${item.parallelCapacityFactor}x capacity · CIP ${formatNumber(item.cipTimeFactor, 2)} · staff ${formatNumber(item.staffingFactor, 2)}</small></p>`).join("")}
           </div>
         </article>
       </div>
@@ -6782,11 +6838,17 @@ function renderSimulationBoard() {
       </div>
       <div class="schedule-export-actions" aria-label="Plant simulation exports">
         <button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button>
+        <button data-download-report="factory-rooms-csv" type="button">Rooms CSV</button>
+        <button data-download-report="moving-batches-csv" type="button">Moving batches CSV</button>
+        <button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button>
+        <button data-download-report="inventory-levels-csv" type="button">Inventory levels CSV</button>
+        <button data-download-report="equipment-state-machine-csv" type="button">State machines CSV</button>
+        <button data-download-report="factory-optimizer-csv" type="button">Factory optimizer CSV</button>
         <button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button>
         <button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button>
         <button data-download-report="plant-simulation-svg" type="button">Plant SVG</button>
       </div>
-      <p class="plant-sim-note">${plantObjects.length} object records are export-ready, including hierarchy, equipment instances, stream objects, reusable-state logic, utilization, and editable fields.</p>
+      <p class="plant-sim-note">${plantObjects.length} object records plus rooms, moving batches, personnel, inventory levels, state transitions, and optimizer candidates are export-ready for factory-simulation review.</p>
     </section>
     <section class="simulation-group">
       <h3>Largest computed flows</h3>
@@ -8618,6 +8680,12 @@ function comprehensiveReport() {
     plantSimulationObjects: plantSimulationObjectRows(plantSim),
     plantSimulationExperiments: plantSimulationExperimentRows(plantSim),
     plantSimulationInterfaces: plantSimulationInterfaceRows(),
+    factoryRooms: factoryRoomRows(),
+    movingBatches: movingBatchRows(),
+    personnelPlan: personnelPlanRows(),
+    inventoryLevels: inventoryLevelRows(),
+    equipmentStateMachines: equipmentStateMachineRows(),
+    factoryOptimization: factoryOptimizationRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -8684,7 +8752,8 @@ function renderReportsBoard() {
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
       <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
-      <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
+      <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, rooms, moving batches, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="factory-rooms-csv" type="button">Rooms CSV</button><button data-download-report="moving-batches-csv" type="button">Batches CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
+      <article><span>Factory state + optimizer</span><strong>${report.factoryOptimization[0]?.objectiveScore ? formatNumber(report.factoryOptimization[0].objectiveScore, 0) : "n/a"}</strong><p>Personnel loads, inventory levels, equipment state machines, and deterministic factory optimization candidates for schedule, capacity, CIP, staffing, and WIP tradeoffs.</p><button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button><button data-download-report="inventory-levels-csv" type="button">Inventory CSV</button><button data-download-report="equipment-state-machine-csv" type="button">States CSV</button><button data-download-report="factory-optimizer-csv" type="button">Optimizer CSV</button></article>
       <article><span>Experiment manager</span><strong>${report.plantSimulationExperiments.length}</strong><p>Optimization-ready scenarios for bottleneck parallelization, CIP reduction, heat reuse, media cost, automation, release pitch, CO2e, and risk constraints.</p><button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button></article>
       <article><span>Integration matrix</span><strong>${report.plantSimulationInterfaces.length}</strong><p>Concrete connector registry for JSON, CSV, CAD/JT, MQTT, OPC UA, SQL/ODBC, REST, Python SDK, optimizer, and scheduling/MES handoff.</p><button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button></article>
       <article><span>Original example library</span><strong>${templateExampleRows().length}</strong><p>Download Axion's own example model library for antibodies, penicillin, cultured meat, fermentation, vaccines, plasmids, cell therapy, utilities, and emissions without using copied third-party files.</p><button data-download-report="examples-csv" type="button">Examples CSV</button><button data-download-report="examples-json" type="button">Examples JSON</button></article>
@@ -9309,6 +9378,18 @@ function handleReportDownload(type) {
   } else if (type === "plant-simulation-objects-csv") {
     const plantSim = plantSimulationModel();
     downloadCsv(`${state.template}-plant-simulation-objects.csv`, plantSimulationObjectRows(plantSim), "Object-oriented plant simulation object library");
+  } else if (type === "factory-rooms-csv") {
+    downloadCsv(`${state.template}-factory-rooms.csv`, factoryRoomCsvRows(), "Factory simulation room model");
+  } else if (type === "moving-batches-csv") {
+    downloadCsv(`${state.template}-moving-batch-tokens.csv`, movingBatchCsvRows(), "Factory simulation moving batches");
+  } else if (type === "personnel-plan-csv") {
+    downloadCsv(`${state.template}-personnel-plan.csv`, personnelPlanCsvRows(), "Factory simulation personnel plan");
+  } else if (type === "inventory-levels-csv") {
+    downloadCsv(`${state.template}-inventory-levels.csv`, inventoryLevelCsvRows(), "Factory simulation inventory levels");
+  } else if (type === "equipment-state-machine-csv") {
+    downloadCsv(`${state.template}-equipment-state-machines.csv`, equipmentStateMachineCsvRows(), "Factory simulation equipment state machines");
+  } else if (type === "factory-optimizer-csv") {
+    downloadCsv(`${state.template}-factory-optimizer.csv`, factoryOptimizationCsvRows(), "Factory simulation optimizer");
   } else if (type === "plant-simulation-experiments-csv") {
     const plantSim = plantSimulationModel();
     downloadCsv(`${state.template}-plant-simulation-experiments.csv`, plantSimulationExperimentRows(plantSim), "Plant simulation experiment manager");
