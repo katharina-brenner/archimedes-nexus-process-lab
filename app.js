@@ -198,6 +198,112 @@ const gpromsModelCapabilities = [
   },
 ];
 
+function gpromsAlgorithmRows() {
+  const p = state.params;
+  const data = metrics();
+  const solved = solveMassBalance();
+  const dynamic = dynamicBatchProfile();
+  const cfd = cfdReport()[0];
+  const volumeL = cfd?.volumeL || state.batchSize;
+  const columnLengthM = Math.max(0.8, Math.pow(volumeL / 1000, 1 / 3) * 1.8);
+  const axialVelocityMph = Math.max(0.05, (p.feedRate || state.batchSize * 0.04) / Math.max(volumeL, 1) * columnLengthM);
+  const axialDispersionM2ph = Math.max(0.002, columnLengthM * axialVelocityMph / Math.max(12, p.kla / 4));
+  const peclet = axialVelocityMph * columnLengthM / axialDispersionM2ph;
+  const pvsdCompartments = Math.max(6, Math.round(Math.sqrt(Math.max(volumeL, 1)) / 7));
+  const validationResidual = Math.max(0.8, (100 - solved.totals.closurePct) * 1.4 + Math.max(0, 30 - dynamic.minDoPct) * 0.22 + Math.max(0, dynamic.maxAmmoniaMm - (isCellCultureTemplate() ? 2 : 6)) * 0.7);
+  return [
+    {
+      stage: 1,
+      title: "Choose model objective",
+      modelElement: "Product, impurity, RTD, oxygen, nutrient, or heat profile",
+      axionInput: `${activeTemplate().product}; ${formatNumber(data.annualProduct, 1)} t/year target`,
+      equation: "min J(theta) = sum((y_meas - y_model(theta))^2)",
+      status: "defined",
+      validationMetric: "Objective function ready",
+    },
+    {
+      stage: 2,
+      title: "Select distributed model",
+      modelElement: "Convective-dispersive balance plus PVSD compartment layer",
+      axionInput: `${pvsdCompartments} PVSD compartments; ${formatNumber(columnLengthM, 2)} m characteristic length`,
+      equation: "dC/dt = D_ax*d2C/dz2 - u*dC/dz + R(C,t)",
+      status: "implemented scaffold",
+      validationMetric: `Pe ${formatNumber(peclet, 1)}`,
+    },
+    {
+      stage: 3,
+      title: "Define parameters and geometry",
+      modelElement: "Velocity, axial dispersion, kLa, hold-up, porosity, volume split",
+      axionInput: `u ${formatNumber(axialVelocityMph, 3)} m/h; D_ax ${formatNumber(axialDispersionM2ph, 4)} m2/h; kLa ${formatNumber(p.kla, 1)} 1/h`,
+      equation: "Pe = u*L/D_ax",
+      status: peclet < 8 ? "needs review" : "ready",
+      validationMetric: peclet < 8 ? "Dispersion-dominated" : "Advection/dispersion plausible",
+    },
+    {
+      stage: 4,
+      title: "Set initial and boundary conditions",
+      modelElement: "Danckwerts inlet, zero-gradient outlet, initial concentration field",
+      axionInput: `Substrate ${formatNumber(p.substrateConcentration, 1)} g/L; DO floor ${formatNumber(dynamic.minDoPct, 1)}%`,
+      equation: "u(C_in-C_0)=D_ax*(dC/dz)|z=0; (dC/dz)|z=L=0",
+      status: "ready",
+      validationMetric: "IC/BC package generated",
+    },
+    {
+      stage: 5,
+      title: "Discretize PDE model",
+      modelElement: "Method of lines with finite-volume axial nodes",
+      axionInput: `${Math.max(24, pvsdCompartments * 4)} axial nodes; ${dynamic.points.length} dynamic output points`,
+      equation: "dC_i/dt = D_ax*(C_{i+1}-2C_i+C_{i-1})/dz2 - u*(C_i-C_{i-1})/dz + R_i",
+      status: "screening grid",
+      validationMetric: "Grid independence still required",
+    },
+    {
+      stage: 6,
+      title: "Run dynamic solver",
+      modelElement: "DAE/ODE solve, event schedule, recycle convergence, unit constraints",
+      axionInput: `${formatNumber(dynamic.durationH, 1)} h batch profile; ${solved.convergence.iterations} recycle iterations`,
+      equation: "F(x, dx/dt, z, t, theta) = 0",
+      status: solved.convergence.converged ? "converged" : "review convergence",
+      validationMetric: `${formatNumber(solved.convergence.maxRelativeDelta * 100, 3)}% recycle delta`,
+    },
+    {
+      stage: 7,
+      title: "Validate against data",
+      modelElement: "Compare model outputs with experiments, historian tags, or PAT profiles",
+      axionInput: `Residual score ${formatNumber(validationResidual, 2)}; closure ${formatNumber(solved.totals.closurePct, 2)}%`,
+      equation: "RMSE = sqrt(sum((y_meas-y_model)^2)/n)",
+      status: validationResidual > 6 ? "calibration needed" : "screening pass",
+      validationMetric: validationResidual > 6 ? "Needs measured calibration data" : "Ready for higher-fidelity handoff",
+    },
+    {
+      stage: 8,
+      title: "Iterate or export",
+      modelElement: "Update parameters, refine grid, add data, or export to equation-oriented solver",
+      axionInput: "Equations, parameters, streams, dynamic profile, unit models, CFD screening",
+      equation: "theta_next = theta + Delta theta from estimation/optimization",
+      status: "handoff ready",
+      validationMetric: "CSV/JSON package available",
+    },
+  ];
+}
+
+function pvsdParameterRows() {
+  const rows = gpromsAlgorithmRows();
+  const dynamic = dynamicBatchProfile();
+  const cfd = cfdReport()[0];
+  const p = state.params;
+  return [
+    { parameter: "model_family", value: "Convective-dispersive + PVSD", unit: "", meaning: "Distributed axial transport with compartmental population/volume subdivision layer" },
+    { parameter: "axial_nodes", value: rows.find((row) => row.stage === 5)?.axionInput.match(/\d+/)?.[0] || 24, unit: "nodes", meaning: "Finite-volume method-of-lines discretization size" },
+    { parameter: "pvsd_compartments", value: (rows.find((row) => row.stage === 2)?.axionInput.match(/\d+/)?.[0] || 6), unit: "compartments", meaning: "Compartment count for PVSD-style residence/volume subdivision" },
+    { parameter: "peclet_number", value: rows.find((row) => row.stage === 3)?.validationMetric.replace("Pe ", "") || "", unit: "-", meaning: "Advection-to-axial-dispersion ratio" },
+    { parameter: "kla", value: formatNumber(p.kla, 2), unit: "1/h", meaning: "Gas-liquid oxygen transfer input used by the bioreactor layer" },
+    { parameter: "minimum_do", value: formatNumber(dynamic.minDoPct, 2), unit: "% air saturation", meaning: "Screening validation signal for oxygen limitation" },
+    { parameter: "max_ammonium", value: formatNumber(dynamic.maxAmmoniaMm, 2), unit: "mM", meaning: "Cell-culture metabolic boundary signal" },
+    { parameter: "mixing_time", value: cfd ? formatNumber(cfd.engineering.mixingTimeMin, 2) : "", unit: "min", meaning: "CFD-style screening input for spatial gradients" },
+  ];
+}
+
 const sectionPresets = [
   {
     key: "upstream",
@@ -1484,6 +1590,12 @@ const equations = [
   eq("Cultured meat biomass", "mass", "m_cells = V * X_v * m_cell * viability * recovery", "Cell biomass estimate from viable cell density."),
   eq("Overall mass balance", "mass", "sum(m_in) - sum(m_out) - accumulation = 0", "General conservation equation for each unit operation."),
   eq("Component balance", "mass", "F_in*x_i,in - F_out*x_i,out + r_i*V = d(C_iV)/dt", "Dynamic component balance with reaction."),
+  eq("Convective-dispersive transport", "mass", "dC/dt = D_ax*d2C/dz2 - u*dC/dz + R(C,t)", "Axial distributed balance for concentration fronts, residence-time dispersion, and column/reactor transport."),
+  eq("Danckwerts inlet boundary", "mass", "u(C_in - C_0) = D_ax*(dC/dz)|z=0", "Inlet boundary condition for convective-dispersive distributed models."),
+  eq("Zero-gradient outlet boundary", "mass", "(dC/dz)|z=L = 0", "Outlet boundary condition for dispersed plug-flow style models."),
+  eq("Axial Peclet number", "mass", "Pe = u*L/D_ax", "Dimensionless advection-to-axial-dispersion ratio used to classify transport behavior."),
+  eq("PVSD compartment balance", "mass", "d(C_j*V_j)/dt = F_{j-1}C_{j-1} - F_jC_j + D_j(C_{j+1}-2C_j+C_{j-1}) + R_jV_j", "Population/volume subdivision style compartment balance for distributed hold-up and residence behavior."),
+  eq("Method-of-lines discretization", "mass", "dC_i/dt = D_ax*(C_{i+1}-2C_i+C_{i-1})/dz2 - u*(C_i-C_{i-1})/dz + R_i", "Finite-volume transformation of a PDE into ODE/DAE equations for dynamic simulation."),
   eq("Heat duty", "energy", "Q = m * Cp * DeltaT", "Sensible heat requirement."),
   eq("Bioreactor cooling", "energy", "Q_cool = Q_metabolic + P_agitation - Q_loss", "Cooling load for aerobic bioreactors."),
   eq("Agitation power", "energy", "P/V = Np * rho * N^3 * D^5 / V", "Impeller power density relationship."),
@@ -5039,6 +5151,8 @@ function renderSimulationBoard() {
     .slice(0, 8);
   const modelRiskCount = unitModels.filter((item) => item.severity !== "ok").length;
   const modelTypes = new Set(unitModels.map((item) => item.modelType));
+  const gpromsAlgorithm = gpromsAlgorithmRows();
+  const pvsdParameters = pvsdParameterRows();
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -5093,6 +5207,34 @@ function renderSimulationBoard() {
             <p>${item.example}</p>
           </article>
         `).join("")}
+      </div>
+      <div class="equation-algorithm-panel" aria-label="Equation-oriented gPROMS simulation algorithm">
+        <div class="algorithm-copy">
+          <span>Convective-dispersive + PVSD workflow</span>
+          <h4>Equation-oriented simulation algorithm</h4>
+          <p>Axion turns the process model into a high-fidelity handoff path: define the target, choose the distributed model, set parameters and boundary conditions, discretize the PDE, run the dynamic solver, validate against data, then iterate or export.</p>
+          <button data-download-report="gproms-algorithm-csv" type="button">Download algorithm CSV</button>
+        </div>
+        <div class="algorithm-flow">
+          ${gpromsAlgorithm.map((item) => `
+            <article class="${item.status.includes("review") || item.status.includes("needed") ? "warn" : ""}">
+              <span>${item.stage}</span>
+              <strong>${item.title}</strong>
+              <small>${item.modelElement}</small>
+              <code>${item.equation}</code>
+              <em>${item.status} · ${item.validationMetric}</em>
+            </article>
+          `).join("")}
+        </div>
+        <div class="pvsd-parameter-grid">
+          ${pvsdParameters.map((item) => `
+            <article>
+              <span>${escapeHtml(item.parameter)}</span>
+              <strong>${escapeHtml(String(item.value))}${item.unit ? ` ${escapeHtml(item.unit)}` : ""}</strong>
+              <p>${escapeHtml(item.meaning)}</p>
+            </article>
+          `).join("")}
+        </div>
       </div>
     </section>
     <section class="operation-sequence">
