@@ -11128,3 +11128,55 @@ button {
     justify-self: center;
   }
 }
+
+/* 2026-07-18 top accent cleanup: remove remaining warm/red active strips. */
+.suite-link.active,
+.suite-link[aria-current="page"],
+.suite-link:focus-visible,
+.public-nav nav button.active,
+.public-nav nav button[aria-current="page"],
+.public-nav nav button:focus-visible,
+.topbar .tab.active,
+.tab.active,
+.tool.active,
+.palette-groups button.active,
+.focus-toggle button.active,
+.segmented button.active,
+.template-button.active {
+  color: #071421 !important;
+  border-color: rgba(117, 208, 199, 0.52) !important;
+  background: linear-gradient(135deg, #e6f7f4, #75d0c7) !important;
+  box-shadow: 0 14px 30px rgba(15, 90, 82, 0.16) !important;
+}
+
+.suite-link.active::before,
+.suite-link.active::after,
+.public-nav nav button.active::before,
+.public-nav nav button.active::after,
+.topbar::before,
+.topbar::after,
+.sidebar::before,
+.sidebar::after {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.public-nav,
+.topbar,
+.sidebar {
+  border-color: rgba(173, 195, 205, 0.14) !important;
+}
+
+.danger-button,
+.profile-actions [data-profile-logout],
+.login-error,
+[role="alert"],
+.status-risk,
+.realtime-risk,
+.risk-card.high,
+.risk-card.warning {
+  color: #17313a !important;
+  border-color: rgba(49, 95, 104, 0.32) !important;
+  background: #dce8e8 !important;
+}
