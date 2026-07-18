@@ -1924,6 +1924,7 @@ const els = {
   detailDrawer: document.querySelector("#detailDrawer"),
   helpDock: document.querySelector("#helpDock"),
   helpToggle: document.querySelector("#helpToggle"),
+  helpClose: document.querySelector("#helpClose"),
   helpPrompt: document.querySelector("#helpPrompt"),
   askHelp: document.querySelector("#askHelp"),
   helpResult: document.querySelector("#helpResult"),
@@ -9417,8 +9418,18 @@ function bindAuth() {
     els.profileButton?.setAttribute("aria-expanded", "false");
   });
 
+  const setHelpOpen = (open) => {
+    els.helpDock?.classList.toggle("open", open);
+    els.helpToggle?.setAttribute("aria-expanded", String(open));
+  };
+
   els.helpToggle?.addEventListener("click", () => {
-    els.helpDock?.classList.toggle("open");
+    setHelpOpen(!els.helpDock?.classList.contains("open"));
+  });
+
+  els.helpClose?.addEventListener("click", () => {
+    setHelpOpen(false);
+    els.helpToggle?.focus();
   });
 
   els.askHelp?.addEventListener("click", askToolHelp);

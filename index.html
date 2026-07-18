@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-clean-pricing-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-helper-logo-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -1177,9 +1177,14 @@
     <aside id="detailDrawer" class="detail-drawer" aria-label="Selected item details" aria-live="polite"></aside>
 
     <aside id="helpDock" class="help-dock open" aria-label="Axion command field">
-      <button id="helpToggle" class="help-toggle" type="button">Describe · Build · Refine</button>
-      <div class="help-panel">
-        <strong>System Composer</strong>
+      <button id="helpToggle" class="help-toggle" type="button" aria-label="Open Axion System Composer" aria-controls="helpPanel" aria-expanded="true">
+        <span class="brand-mark technical-logo help-logo" aria-hidden="true"><span></span></span>
+      </button>
+      <div id="helpPanel" class="help-panel">
+        <div class="help-panel-header">
+          <strong>System Composer</strong>
+          <button id="helpClose" class="help-close" type="button" aria-label="Close Axion System Composer">×</button>
+        </div>
         <p>Describe a change. Axion applies clear model edits immediately and shows what changed.</p>
         <textarea id="helpPrompt" rows="3" placeholder="Example: show full PFD, add CIP, improve oxygen transfer, fit canvas"></textarea>
         <button id="askHelp" type="button">Apply to model</button>
@@ -1188,6 +1193,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-clean-pricing-v1"></script>
+    <script type="module" src="./app.js?v=20260718-helper-logo-v1"></script>
   </body>
 </html>

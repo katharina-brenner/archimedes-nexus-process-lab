@@ -3362,7 +3362,7 @@ body.locked .help-dock {
   box-shadow: 0 0 0 4px rgba(117, 208, 199, 0.1);
 }
 
-.help-panel button:not(.help-toggle),
+.help-panel button:not(.help-toggle):not(.help-close),
 .help-result button {
   border-radius: 999px;
   color: #061019;
@@ -3735,7 +3735,7 @@ body.locked .help-dock {
   box-shadow: 0 0 0 4px rgba(117, 208, 199, 0.1);
 }
 
-.help-panel button:not(.help-toggle),
+.help-panel button:not(.help-toggle):not(.help-close),
 .help-result button {
   border-radius: 999px;
   color: #061019;
@@ -9561,7 +9561,7 @@ th {
   resize: vertical;
 }
 
-.help-panel button:not(.help-toggle),
+.help-panel button:not(.help-toggle):not(.help-close),
 .help-result button {
   min-height: 34px;
   border: 0;
@@ -10413,10 +10413,30 @@ body.locked .help-dock {
 
 .help-toggle {
   justify-self: start;
-  min-height: 34px !important;
-  padding: 0 12px !important;
+  display: grid !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 !important;
+  place-items: center !important;
   color: rgba(246, 251, 253, 0.9) !important;
-  background: rgba(8, 24, 39, 0.82) !important;
+  border: 1px solid rgba(199, 225, 232, 0.22) !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04)),
+    rgba(8, 24, 39, 0.86) !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28) !important;
+}
+
+.help-toggle:hover {
+  border-color: rgba(169, 228, 219, 0.46) !important;
+  transform: translateY(-1px);
+}
+
+.help-logo {
+  width: 28px !important;
+  height: 28px !important;
+  transform: scale(0.86);
 }
 
 .help-panel {
@@ -10431,6 +10451,13 @@ body.locked .help-dock {
     rgba(7, 24, 38, 0.92) !important;
   box-shadow: 0 28px 78px rgba(0, 0, 0, 0.32) !important;
   backdrop-filter: blur(22px);
+}
+
+.help-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .help-dock:not(.open) .help-panel {
@@ -10453,11 +10480,33 @@ body.locked .help-dock {
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
-.help-panel button:not(.help-toggle),
+.help-panel button:not(.help-toggle):not(.help-close),
 .help-result button {
   border-radius: 999px !important;
   color: #061019 !important;
   background: linear-gradient(135deg, #dff8f4, #75d0c7) !important;
+}
+
+.help-close {
+  display: grid !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  place-items: center !important;
+  border: 1px solid rgba(199, 225, 232, 0.18) !important;
+  border-radius: 999px !important;
+  color: rgba(246, 251, 253, 0.84) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  font-size: 22px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+}
+
+.help-close:hover {
+  color: #f6fbfd !important;
+  border-color: rgba(169, 228, 219, 0.42) !important;
+  background: rgba(169, 228, 219, 0.12) !important;
 }
 
 .unit.connecting,
