@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-manual-workbooks-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-decision-canvas-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -446,7 +446,7 @@
               <article data-public-detail="brief"><b>Product</b><span>Define product, organism, scale, titer, recovery, quality constraints, and uploaded data.</span><button type="button" data-public-target="publicPlatform" data-public-detail="brief">Open detail</button></article>
               <article data-public-detail="builder"><b>Process</b><span>Generate and edit the flowsheet, unit procedures, streams, utilities, cleaning loops, and recycle paths.</span><button type="button" data-public-target="publicPlatform" data-public-detail="builder">Open detail</button></article>
               <article data-public-detail="mab-cfd"><b>Physics</b><span>Check kLa, OUR, pH, DO, heat load, mixing time, cell boundaries, and CFD-style distribution risks.</span><button type="button" data-public-target="publicPlatform" data-public-detail="mab-cfd">Open detail</button></article>
-              <article data-public-detail="reports"><b>Decision</b><span>Export streams, equations, parameters, balances, LCA inventory, LCA impacts, TEA-ready cost model, SVG visuals, and readiness recommendations.</span><button type="button" data-public-target="publicPlatform" data-public-detail="reports">Open detail</button></article>
+              <article data-public-detail="reports"><b>Decision</b><span>Compare the process against scale-up, cost, quality, utility, and sustainability limits; then choose the next engineering action with the evidence attached.</span><button type="button" data-public-target="publicPlatform" data-public-detail="reports">Open detail</button></article>
             </div>
             <div class="public-example-grid workflow-examples" aria-label="Concrete workflow examples">
               <article>
@@ -728,11 +728,12 @@
                 </div>
               </figure>
               <figure class="explain-visual visual-decision-map">
-                <figcaption><b>Decision clarity</b><span>Axion should show what changed, why it matters, and what to do next.</span></figcaption>
+                <figcaption><b>Decision canvas</b><span>Every recommendation is tied to a signal, evidence, and a next action.</span></figcaption>
                 <div class="decision-matrix">
-                  <span>Risk</span><span>Impact</span><span>Evidence</span><span>Action</span>
-                  <b>Oxygen</b><b>High</b><b>CFD</b><b>Scale-out</b>
-                  <b>Media</b><b>High</b><b>TEA</b><b>Optimize</b>
+                  <span>Question</span><span>Signal</span><span>Decision</span><span>Next step</span>
+                  <b>Can it scale?</b><b>kLa margin</b><b>Split train</b><b>Resize reactor</b>
+                  <b>What drives cost?</b><b>Media share</b><b>Optimize feed</b><b>Run TEA case</b>
+                  <b>Is it reviewable?</b><b>Open gaps</b><b>Hold design</b><b>Add data</b>
                 </div>
               </figure>
             </div>
@@ -1257,6 +1258,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-manual-workbooks-v1"></script>
+    <script type="module" src="./app.js?v=20260718-decision-canvas-v1"></script>
   </body>
 </html>

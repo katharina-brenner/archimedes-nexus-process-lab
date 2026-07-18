@@ -12255,25 +12255,31 @@ button {
 .decision-matrix {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 34px;
+  gap: 10px;
+  margin-top: 28px;
 }
 
 .decision-matrix span,
 .decision-matrix b {
-  min-height: 42px;
+  min-height: 48px;
   border: 1px solid rgba(173, 195, 205, 0.14);
-  border-radius: 16px;
-  padding: 10px;
+  border-radius: 18px;
+  padding: 10px 12px;
   color: #d9e6ef;
   background: rgba(255, 255, 255, 0.055);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.15;
   text-align: center;
+  display: grid;
+  place-items: center;
 }
 
 .decision-matrix span {
   color: #071421;
   background: #dff8f4;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .plan-bars {

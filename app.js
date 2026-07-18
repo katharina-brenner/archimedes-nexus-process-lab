@@ -9264,18 +9264,18 @@ const publicDetailStories = {
   },
   "mab-reports": {
     eyebrow: "Decision outputs",
-    title: "Downloadable outputs that make the model useful",
-    body: "The end of the walkthrough shows what a user gets out of the software: not just a picture, but process data that can be reviewed, exported, challenged, and improved.",
+    title: "A decision canvas for the next engineering move",
+    body: "The end of the walkthrough should answer the questions that matter: can the process scale, what limits it, what costs too much, what evidence is missing, and what should the team change next.",
     points: [
-      "CSV exports for streams, input/output flows, mass balances, energy balances, parameters, costs, LCA inventory, LCA impacts, and dynamic profiles.",
-      "SVG exports for plant architecture, LCA flow maps, impact charts, and TEA cost-stack graphics.",
-      "Readiness recommendations list what is still missing for full production simulation.",
+      "Scale decision: compare working volume, oxygen-transfer margin, heat removal, mixing time, shear, hold time, cleaning load, and annual throughput.",
+      "Cost decision: rank media, feeds, buffers, resin, filters, single-use items, utilities, labor, QA/QC, waste, and facility burden by per-kg impact.",
+      "Evidence decision: show which assumptions are measured, literature-based, supplier-based, screening-only, or still missing before a design review.",
     ],
     visual: [
-      ["Engineering", "Equipment register, streams, equations, balances"],
-      ["Economics", "CAPEX/OPEX drivers, scale exponent, utilization, facility burden"],
-      ["Sustainability", "Water, waste, utilities, CO2e screening, LCA handoff"],
-      ["Review", "Sources, standards, assumptions, gaps, recommendations"],
+      ["Scale", "parallel train vs. larger vessel vs. process-intensification"],
+      ["Cost", "top OPEX/CAPEX drivers and sensitivity direction"],
+      ["Quality", "CQA, sterility, hold-time, cleaning and release gaps"],
+      ["Sustainability", "water, waste, energy, heat reuse and CO2e drivers"],
     ],
     actions: [
       ["pricing", "See pricing"],
