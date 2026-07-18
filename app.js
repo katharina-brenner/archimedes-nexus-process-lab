@@ -8061,7 +8061,9 @@ function accountAccessLabel(account = state.account || {}) {
 
 function accountInitials() {
   const parts = accountName().split(/[\s@._-]+/).filter(Boolean);
-  return (parts[0]?.[0] || "A") + (parts[1]?.[0] || "X");
+  if (parts.length > 1) return (parts[0]?.[0] || "A") + (parts[1]?.[0] || "");
+  const compact = (parts[0] || "Axion").replace(/[^a-z0-9]/gi, "");
+  return compact.slice(0, 2) || "AX";
 }
 
 function accountPrincipal() {
@@ -8100,7 +8102,9 @@ function renderProfileMenu() {
   const paymentStatus = billing.paymentStatus || (account.licenseKey ? "active license" : account.role === "static" ? "static access" : "workspace access");
   const plan = billing.plan || (account.role === "admin" ? "Owner workspace" : account.role === "customer" ? "Professional license" : "Private workspace");
   const principal = account.username || account.email || account.principal || accountName();
-  els.profileInitials.textContent = accountInitials().toUpperCase().slice(0, 2);
+  els.profileInitials.textContent = "";
+  els.profileInitials.setAttribute("aria-hidden", "true");
+  els.profileButton.setAttribute("aria-label", `Open profile for ${accountName()}`);
   els.profileName.textContent = accountName();
   els.profilePanel.innerHTML = `
     <section class="profile-card">
