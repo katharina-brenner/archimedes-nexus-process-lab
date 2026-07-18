@@ -522,6 +522,15 @@ const scientificSources = [
   },
   {
     group: "Paper",
+    title: "gPROMS simulation algorithm for convective-dispersive and PVSD models",
+    appliesTo: ["gproms", "simulation", "chromatography", "filtration", "bioreactor", "digital-twin"],
+    benchmark: "Equation-oriented workflows define objectives, PDE/DAE model structure, boundary and initial conditions, discretization, solver execution, validation, and iterative refinement.",
+    modelUse: "Simulation tab algorithm panel, convective-dispersive equations, PVSD parameter package, and solver handoff export.",
+    source: "ResearchGate figure supplied by user - gPROMS simulation algorithm",
+    url: "https://www.researchgate.net/publication/359984264/figure/fig2/AS:11431281138426322@1680747250888/gPROMS-simulation-algorithm-Convective-dispersive-model-PVSD-model.png",
+  },
+  {
+    group: "Paper",
     title: "CFD parameters for stirred-tank bioreactors",
     appliesTo: ["production-reactor", "seed-reactor", "fermenter", "sparger", "gas-mixing", "sensor"],
     benchmark: "Relevant CFD screening variables include power input, gas hold-up, mixing time, shear stress, oxygen transfer, kLa/OTR, impeller configuration, baffles, and sparging.",
@@ -7395,6 +7404,8 @@ function comprehensiveReport() {
     equations,
     unitEquations: state.units.map((item) => ({ tag: item.id, name: item.name, equations: unitReactions(item) })),
     cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ oxygen: cell.oxygen, nutrient: cell.nutrient, shear: cell.shear, risk: cell.risk })) })),
+    gpromsAlgorithm: gpromsAlgorithmRows(),
+    pvsdParameters: pvsdParameterRows(),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
     sources: scientificSources,
@@ -7426,6 +7437,7 @@ function renderReportsBoard() {
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
+      <article><span>gPROMS-style algorithm</span><strong>${report.gpromsAlgorithm.length}</strong><p>Equation-oriented handoff workflow for convective-dispersive and PVSD-style dynamic models, including objectives, PDEs, IC/BCs, discretization, solver status, validation, and iteration steps.</p><button data-download-report="gproms-algorithm-csv" type="button">Algorithm CSV</button><button data-download-report="pvsd-parameters-csv" type="button">PVSD CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
@@ -7969,6 +7981,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
+  } else if (type === "gproms-algorithm-csv") {
+    downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
+  } else if (type === "pvsd-parameters-csv") {
+    downloadCsv(`${state.template}-pvsd-transport-parameters.csv`, pvsdParameterRows(), "PVSD transport parameter package");
   } else if (type === "schedule-csv") {
     downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows(), "Campaign schedule operations");
   } else if (type === "schedule-gantt-csv") {
@@ -9994,6 +10010,11 @@ function bindEvents() {
   });
 
   els.simulationBoard.addEventListener("click", (event) => {
+    const downloadButton = event.target.closest("[data-download-report]");
+    if (downloadButton) {
+      handleReportDownload(downloadButton.dataset.downloadReport);
+      return;
+    }
     const scheduleUnitButton = event.target.closest("[data-jump-unit]");
     if (scheduleUnitButton) {
       state.selectedId = scheduleUnitButton.dataset.jumpUnit;
