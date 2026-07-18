@@ -5879,35 +5879,35 @@ function renderStartBoard() {
   els.startBoard.innerHTML = `
     <section class="start-hero">
       <div>
-        <p>Product brief first</p>
-        <h3>Tell Axion what plant you want to build.</h3>
-        <span>Describe the product, host organism, scale, quality targets, constraints, and any available data. Axion maps it to the closest process model, loads equipment, streams, equations, boundaries, costs, CFD screening, and downloadable reports.</span>
+        <p>New model briefing</p>
+        <h3>Describe the product. Axion builds the process workspace.</h3>
+        <span>Start with the molecule, cell line or organism, target scale, quality requirements, and constraints. Axion translates the brief into an editable plant model with equipment, streams, equations, balances, scheduling, CFD screening, costs, standards, and downloads.</span>
       </div>
-      <button class="action-button primary" data-build-from-brief type="button">Build plant model</button>
+      <button class="action-button primary" data-build-from-brief type="button">Create workspace</button>
     </section>
     <section class="product-brief-grid">
       <article class="brief-composer">
         <label>
-          <span>Product and plant description</span>
+          <span>What should be manufactured?</span>
           <textarea id="productBriefInput" rows="8" placeholder="Example: I want to model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and downloadable mass balances.">${escapeAttr(state.productBrief)}</textarea>
         </label>
         <div class="brief-row">
           <label>
-            <span>Starting scale</span>
+            <span>Initial scale assumption</span>
             <select id="productScaleSelect">
               ${Object.entries(scalePresets).map(([key, item]) => `<option value="${key}"${key === state.scale ? " selected" : ""}>${item.label}</option>`).join("")}
             </select>
           </label>
           <label>
-            <span>Upload data</span>
+            <span>Optional data files</span>
             <input id="productDataFiles" type="file" multiple />
           </label>
         </div>
-        <button class="action-button primary" data-build-from-brief type="button">Generate process workspace</button>
+        <button class="action-button primary" data-build-from-brief type="button">Build editable model</button>
         <div id="briefResult" class="brief-result" aria-live="polite"></div>
       </article>
       <article class="brief-model-card">
-        <span>Current model</span>
+        <span>Active workspace</span>
         <h3>${selected.label}</h3>
         <p>${selected.description}</p>
         <dl>
@@ -5920,8 +5920,8 @@ function renderStartBoard() {
           ${assumptions.map((item) => `<li>${item}</li>`).join("")}
         </ul>
         <div class="brief-actions">
-          <button data-jump-view="flowsheet" type="button">Open builder</button>
-          <button data-jump-view="reports" type="button">Open downloads</button>
+          <button data-jump-view="flowsheet" type="button">Edit process canvas</button>
+          <button data-jump-view="reports" type="button">Open exports</button>
         </div>
       </article>
     </section>
@@ -7335,7 +7335,7 @@ function renderReportsBoard() {
 
 function pageTitle(view) {
   return {
-    start: "Choose Process",
+    start: "New Model Briefing",
     projects: "Projects",
     overview: "Overview",
     flowsheet: "Process Builder",
@@ -7351,7 +7351,7 @@ function pageTitle(view) {
     twin: "Twin OS",
     economics: "Economics",
     reports: "Downloads",
-  }[view] || "Choose Process";
+  }[view] || "New Model Briefing";
 }
 
 function renderOverview() {
