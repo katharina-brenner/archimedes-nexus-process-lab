@@ -5543,9 +5543,13 @@ function boundarySeverity(value, warn, critical, direction = "max") {
 function severityLabel(severity) {
   return {
     ok: "Within boundary",
-    caution: "Review needed",
+    caution: "Needs more detail",
     critical: "Hard boundary risk",
   }[severity] || "Review needed";
+}
+
+function boundaryStatusPhrase(severity) {
+  return severity === "critical" ? "Must be resolved before design freeze" : severity === "caution" ? "Needs more detail" : "Accepted for screening";
 }
 
 function evaluatePhysicalBoundaries() {
@@ -5573,10 +5577,16 @@ function evaluatePhysicalBoundaries() {
       key: "ammonium",
       title: "Ammonium / ammonia accumulation",
       value: `${formatNumber(p.ammonia, 1)} mM`,
-      limit: cellCulture ? "Target <2 mM; >6 mM hard review" : "Microbial process: review >6-10 mM",
+      limit: cellCulture ? "Screening target <2 mM NH4+/NH3; hard review >6 mM unless product- and clone-specific data justify it" : "Microbial process: review >6-10 mM depending organism and pH",
       severity: ammoniaSeverity,
+      status: boundaryStatusPhrase(ammoniaSeverity),
       source: "Schneider et al.; CHO ammonium/lactate/glutamine study",
-      recommendation: ammoniaSeverity === "ok" ? "Metabolic waste is inside the conservative cell-culture boundary." : "Reduce glutamine burden, intensify perfusion/bleed, adjust feed strategy, and add ammonium soft-sensor tracking.",
+      whyItMatters: "Ammonia is uncharged and crosses cell membranes; total ammonium risk depends on pH, temperature and buffering. At this level the model should no longer treat viable-cell growth, glycosylation risk and product quality as independent from feed design.",
+      likelyRootCause: "Excess glutamine burden, overly aggressive amino-acid feed, insufficient bleed/perfusion, long late-batch residence time, or CO2/pH control pushing the NH3 fraction upward.",
+      operatorSignal: "Trend NH4+, pH/base addition, glutamine, glutamate, viable-cell density, OUR/CER and osmolality together; a single offline NH4+ point is not enough for release of this assumption.",
+      processAction: "Reduce glutamine burden, intensify perfusion/bleed, adjust feed strategy, shorten late-batch hold, and add ammonium soft-sensor tracking tied to pH and viable-cell density.",
+      modelGap: "Needs clone-specific uptake/production rates, pH-dependent NH3 fraction, feed-event timing, bleed/perfusion dynamics, and measured metabolite calibration before this becomes a validated simulator.",
+      recommendation: ammoniaSeverity === "ok" ? "Keep monitoring NH4+/NH3 against pH, glutamine and viable-cell density; this is acceptable for screening but still needs clone-specific calibration." : "Reduce glutamine burden, intensify perfusion/bleed, adjust feed strategy, and add ammonium soft-sensor tracking.",
     },
     {
       key: "bioreactor-volume",
@@ -5584,7 +5594,13 @@ function evaluatePhysicalBoundaries() {
       value: maxBioreactor ? `${formatNumber(maxBioreactor.volume, 0)} L (${maxBioreactor.unit.id})` : "No bioreactor",
       limit: cellCulture ? "Prefer scale-out/intensification above 15,000 L; hard review above 20,000 L" : "20,000 L limit is mammalian-cell specific",
       severity: volumeSeverity,
+      status: boundaryStatusPhrase(volumeSeverity),
       source: "BioPharm International; BioProcess International; Sartorius intensification",
+      whyItMatters: "Scale-up is constrained by oxygen transfer, mixing time, heat removal, gas handling, hold-up, cleaning validation and process comparability, not by geometric volume alone.",
+      likelyRootCause: "Linear scale-up assumption, insufficient kLa margin, overfilled vessel, limited impeller/sparger options, or facility strategy optimized for nominal capacity instead of operability.",
+      operatorSignal: "Compare mixing-time studies, DO probe spread, gas-flow limits, foam events, antifoam demand, heat-removal margin and batch-to-batch variability before approving larger volume.",
+      processAction: "Move to scale-out, intensified perfusion, smaller parallel reactors or a validated scale-down model before committing to the larger vessel.",
+      modelGap: "Needs vendor geometry, impeller map, sparger holes, gas-liquid CFD, scale-down data, hold-time limits and site utility constraints.",
       recommendation: volumeSeverity === "ok" ? "Scale is inside the conservative mammalian-cell reference boundary." : "Do not linearly scale cell culture beyond 20,000 L; use parallel reactors, 2,000 L class intensified single-use/perfusion, or a validated scale-down model.",
     },
     {
@@ -5593,17 +5609,29 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(transferIndex, 2)} transfer index`,
       limit: "Target >1.6; review 1.0-1.6; hard risk <1.0",
       severity: transferSeverity,
+      status: boundaryStatusPhrase(transferSeverity),
       source: "BioProcess International 20,000 L oxygen transfer/shear analysis",
+      whyItMatters: "The reactor can look acceptable on average while local zones are oxygen-limited; OTR margin must be read with OUR, viscosity, sparger regime, gas hold-up and mixing time.",
+      likelyRootCause: "High cell density, low kLa, low DO setpoint, weak sparging, poor impeller placement, high viscosity, overfilled vessel or insufficient oxygen enrichment.",
+      operatorSignal: "Track DO controller output, gas-flow saturation, agitation ceiling, OUR/CER, foam, CO2 stripping and spatial probe disagreement.",
+      processAction: "Review sparging, oxygen enrichment, impeller selection, headspace pressure, working volume and maximum cell-density assumption.",
+      modelGap: "Needs measured kLa/OUR, dynamic DO control, gas-liquid transfer coefficients, two-phase CFD or scale-down validation.",
       recommendation: transferSeverity === "ok" ? "kLa/DO/OUR relationship is inside the model boundary." : "Review sparging, oxygen enrichment, impeller selection, headspace pressure, and maximum cell-density assumption.",
     },
     {
       key: "lactate",
       title: "Lactate accumulation",
       value: `${formatNumber(p.lactate, 1)} g/L`,
-      limit: "Target <2 g/L; hard review >4 g/L for mammalian-cell templates",
+      limit: "Screening target <2 g/L; hard review >4 g/L for mammalian-cell templates unless process-specific metabolic-shift data justify it",
       severity: lactateSeverity,
+      status: boundaryStatusPhrase(lactateSeverity),
       source: "CHO ammonium/lactate/glutamine study",
-      recommendation: lactateSeverity === "ok" ? "Lactate remains inside the conservative boundary." : "Review glucose feed, pH, base addition, lactate metabolic shift, and perfusion/bleed strategy.",
+      whyItMatters: "Lactate is not just a waste number: it couples glucose feed, pH/base addition, osmolality, cell-state transition and late-batch productivity. A process that clears lactate early can still fail if the production phase accumulates it again.",
+      likelyRootCause: "Glucose overfeeding, insufficient metabolic shift, high oxygen stress, suboptimal pH strategy, high osmolality, or late-batch feed ratio not matched to uptake.",
+      operatorSignal: "Trend glucose, lactate, pH/base addition, osmolality, viable-cell density and specific productivity together by feed event and batch phase.",
+      processAction: "Tighten glucose feed, use model-predictive feed control, adjust pH/base strategy, intensify perfusion/bleed, and define a lactate re-consumption or hold-time rule.",
+      modelGap: "Needs time-resolved glucose/lactate uptake kinetics, batch-phase event model, pH/base coupling, osmolality contribution and clone-specific calibration.",
+      recommendation: lactateSeverity === "ok" ? "Lactate remains inside the conservative boundary; keep the time-profile and feed-event logic attached to the assumption." : "Review glucose feed, pH, base addition, lactate metabolic shift, and perfusion/bleed strategy.",
     },
     {
       key: "ph",
@@ -5611,7 +5639,13 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(p.ph, 2)}`,
       limit: "Model target 7.1 ±0.3; hard review outside ±0.6",
       severity: phSeverity,
+      status: boundaryStatusPhrase(phSeverity),
       source: "Mammalian cell-culture operating-window practice",
+      whyItMatters: "pH changes the NH3 fraction, CO2 stripping burden, base addition, osmolality and product-quality risk; it is a control strategy, not just a setpoint.",
+      likelyRootCause: "CO2 accumulation, insufficient stripping, aggressive base addition, sensor drift, poor mixing at feed/base points or wrong deadband.",
+      operatorSignal: "Trend pH, pCO2, base addition, gas flow, DO cascade and local mixing assumptions.",
+      processAction: "Review CO2 stripping, base addition, osmolality, lactate/ammonium formation and control-loop tuning.",
+      modelGap: "Needs buffer chemistry, CO2 carbonate equilibrium, base addition events, probe lag and controller dynamics.",
       recommendation: phSeverity === "ok" ? "pH is inside the modeled cell-culture window." : "Review CO2 stripping, base addition, osmolality, lactate/ammonium formation, and control-loop tuning.",
     },
     {
@@ -5620,7 +5654,13 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(p.osmCrit, 2)} mol/L`,
       limit: "Target <0.32 mol/L; hard review >0.36 mol/L",
       severity: osmolaritySeverity,
+      status: boundaryStatusPhrase(osmolaritySeverity),
       source: "Cell-culture media solubility and osmolarity constraints",
+      whyItMatters: "Osmolality integrates feed concentration, salts, base addition and evaporation; high values can depress growth and change product-quality attributes.",
+      likelyRootCause: "Concentrated feeds, base addition, salt-heavy buffers, evaporation, long batch duration or excessive perfusion concentration factor.",
+      operatorSignal: "Track osmolality with feed addition, base addition, conductivity, evaporation/venting and cell-density phase.",
+      processAction: "Check concentrated feeds, salts, base addition, evaporation and precipitation risk.",
+      modelGap: "Needs full media recipe, electrolyte speciation, solubility limits, conductivity model and measured osmolality per feed event.",
       recommendation: osmolaritySeverity === "ok" ? "Osmolarity proxy is inside boundary." : "Check concentrated feeds, salts, base addition, evaporation, and precipitation risk.",
     },
     {
@@ -5629,7 +5669,13 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(p.temperature, 1)} C`,
       limit: "Model target 36.8 C; review deviation >1 C",
       severity: temperatureSeverity,
+      status: boundaryStatusPhrase(temperatureSeverity),
       source: "Mammalian cell-culture operating-window practice",
+      whyItMatters: "Temperature controls growth rate, productivity, oxygen solubility, viscosity and heat-removal load; local gradients matter in large vessels.",
+      likelyRootCause: "Insufficient heat-transfer area, slow mixing, aggressive metabolic heat, wrong jacket/coil strategy or sensor placement bias.",
+      operatorSignal: "Trend jacket duty, reactor probes, feed temperature, heat-load estimate, agitation and OUR.",
+      processAction: "Review heat-transfer capacity, sensor placement, mixing time and temperature-shift strategy.",
+      modelGap: "Needs heat-transfer coefficient, coil/jacket geometry, metabolic heat calibration and dynamic controller model.",
       recommendation: temperatureSeverity === "ok" ? "Temperature is inside modeled cell-culture boundary." : "Review heat-transfer capacity, sensor placement, mixing time, and temperature-shift strategy.",
     },
     {
@@ -5638,7 +5684,13 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(p.agitation, 2)} W/L`,
       limit: "Review >2.5 W/L; hard review >5 W/L for mammalian cells",
       severity: shearSeverity,
+      status: boundaryStatusPhrase(shearSeverity),
       source: "BioProcess International 20,000 L oxygen transfer/shear analysis",
+      whyItMatters: "Agitation that solves oxygen transfer can create shear, bubble damage, foaming and scale-down mismatch; kLa must be balanced against cell fragility.",
+      likelyRootCause: "High power density, high tip speed, small bubbles, antifoam burden, overfilled reactor or relying on agitation instead of oxygen enrichment.",
+      operatorSignal: "Track viability loss, LDH/cell lysis signal, foam, antifoam, agitation cascade and gas-flow response.",
+      processAction: "Review impeller tip speed, sparger choice, antifoam, cell fragility and kLa alternatives.",
+      modelGap: "Needs impeller geometry, tip-speed map, bubble-size distribution, shear-sensitive clone data and foam model.",
       recommendation: shearSeverity === "ok" ? "Agitation proxy is inside conservative shear boundary." : "Review impeller tip speed, sparger choice, antifoam, cell fragility, and kLa alternatives.",
     },
     {
@@ -5647,7 +5699,13 @@ function evaluatePhysicalBoundaries() {
       value: `${formatNumber(p.doSetpoint, 0)}% air saturation`,
       limit: "Target 30-60%; hard review outside 20-70%",
       severity: doSeverity,
+      status: boundaryStatusPhrase(doSeverity),
       source: "Mammalian cell-culture control practice",
+      whyItMatters: "DO setpoint is only meaningful with kLa, OUR, gas-flow ceiling, mixing and probe placement; an average DO can hide local oxygen starvation.",
+      likelyRootCause: "Weak gas-liquid transfer, poor probe location, insufficient oxygen enrichment, high OUR, high viscosity or poor circulation.",
+      operatorSignal: "Trend DO setpoint, controller output, oxygen enrichment, agitation/aeration cascades and CFD low-O2 zones.",
+      processAction: "Review oxygen transfer, CO2 stripping, cell-density target and controller range.",
+      modelGap: "Needs dynamic controller logic, probe lag, spatial DO field, gas-transfer calibration and OUR profile.",
       recommendation: doSeverity === "ok" ? "DO setpoint is inside modeled operating window." : "Review oxygen transfer, CO2 stripping, cell-density target, and controller range.",
     },
   ];
@@ -5658,6 +5716,25 @@ function boundarySummary() {
   const critical = boundaries.filter((item) => item.severity === "critical").length;
   const caution = boundaries.filter((item) => item.severity === "caution").length;
   return { boundaries, critical, caution, ok: boundaries.length - critical - caution };
+}
+
+function physicalBoundaryRows() {
+  return evaluatePhysicalBoundaries().map((item) => ({
+    boundaryGroup: "Physical boundary",
+    key: item.key,
+    title: item.title,
+    status: item.status || severityLabel(item.severity),
+    severity: item.severity,
+    currentValue: item.value,
+    limit: item.limit,
+    recommendation: item.recommendation,
+    whyItMatters: item.whyItMatters || "",
+    likelyRootCause: item.likelyRootCause || "",
+    operatorSignal: item.operatorSignal || "",
+    processAction: item.processAction || "",
+    fullSimulationGap: item.modelGap || "",
+    sourceBasis: item.source,
+  }));
 }
 
 function parameterGroup(item) {
@@ -7241,9 +7318,9 @@ function renderAiBoard() {
   els.aiBoard.innerHTML = `
     <section class="ai-hero">
       <div>
-        <p>Physics-enhanced AI</p>
+        <p>Physics-enhanced process review</p>
         <h3>${activeTemplate().label} model assistant</h3>
-        <span>Combines mass balance closure, energy balance, scale-up economics, PAT soft sensors, and ML-style bottleneck scoring.</span>
+        <span>Combines mass-balance closure, energy-balance pressure, scale-up economics, metabolite boundaries, PAT soft-sensor logic, and bottleneck scoring into an engineering review layer. Treat this as a senior process-engineering screening package, not as a validated release model.</span>
       </div>
       <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
@@ -7266,7 +7343,7 @@ function renderAiBoard() {
       <article>
         <span>O2 transfer margin</span>
         <strong>${report.physics.oxygenTransferMargin}</strong>
-        <p>kLa and DO compared with oxygen uptake pressure.</p>
+        <p>kLa, DO setpoint and OUR reduced to a first-pass transfer margin; validate with kLa measurement, gas-liquid CFD, probe placement and batch OUR profile.</p>
       </article>
     </section>
     <section class="boundary-board">
@@ -7285,6 +7362,16 @@ function renderAiBoard() {
             <strong>${item.value}</strong>
             <p><b>Boundary:</b> ${item.limit}</p>
             <p>${item.recommendation}</p>
+            <details>
+              <summary>Engineering review</summary>
+              <dl>
+                <dt>Why it matters</dt><dd>${escapeHtml(item.whyItMatters || "Boundary impact requires process-specific review.")}</dd>
+                <dt>Likely root cause</dt><dd>${escapeHtml(item.likelyRootCause || "Not yet assigned.")}</dd>
+                <dt>Operator signal</dt><dd>${escapeHtml(item.operatorSignal || "Add online/offline monitoring signals for this boundary.")}</dd>
+                <dt>Process action</dt><dd>${escapeHtml(item.processAction || item.recommendation)}</dd>
+                <dt>Full-simulation gap</dt><dd>${escapeHtml(item.modelGap || "Replace screening assumptions with validated data before design freeze.")}</dd>
+              </dl>
+            </details>
             <small>${item.source}</small>
           </article>
         `).join("")}
@@ -9128,6 +9215,7 @@ function comprehensiveReport() {
     solver: solved,
     dynamicProfile: dynamicBatchProfile(),
     unitModels: unitMechanisticModels(),
+    physicalBoundaries: physicalBoundaryRows(),
     schedule: campaignSchedule(),
     recipe: recipeEditorRows(),
     routeComparison: routeComparisonRows(),
@@ -9182,15 +9270,15 @@ function renderReportsBoard() {
   els.reportsBoard.innerHTML = `
     <section class="reports-hero">
       <div>
-        <p>Download center</p>
-        <h3>Balances, LCA, TEA, equations, streams, and visualizations</h3>
-        <span>Export spreadsheet-ready CSV files and crisp SVG graphics for Excel, LCA/TEA handoff, thesis appendices, process reviews, and external modelling.</span>
+        <p>Engineering evidence package</p>
+        <h3>Review-ready balances, economics, boundaries, CFD fields, schedules, and source records</h3>
+        <span>Export structured CSV and SVG packages for MSAT review, conceptual design, TEA/LCA handoff, model governance, thesis appendices, and external specialist modelling. Each file states its screening basis so assumptions are not confused with validated plant data.</span>
       </div>
       <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
     <section class="reports-grid">
       <article><span>Mass + energy balances</span><strong>${formatNumber(report.solver.totals.closurePct, 2)}%</strong><p>${report.balances.length} unit balances with component inputs/outputs, generation, loss, closure, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
-      <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, materials, labor, QA/QC, utilities, waste, and direct cost.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
+      <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, raw and auxiliary materials, media, labor, QA/QC, utilities, waste, and direct cost with scale-dependent cost pressure.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
       <article><span>TEA-ready export</span><strong>${report.tea.length}</strong><p>Cost model with annual value, per-kg product values, scenario basis, uncertainty range, scale exponent, utilization, and physical utility drivers.</p><button data-download-report="tea-csv" type="button">Download CSV</button><button data-download-report="tea-cost-svg" type="button">Cost SVG</button></article>
       <article><span>LCA inventory</span><strong>${report.lcaInventory.length}</strong><p>OpenLCA/SimaPro-ready screening inventory with activity type, compartment, per-batch, annual, per-kg, factors, CO2e, water, waste, and data-quality notes.</p><button data-download-report="lca-inventory-csv" type="button">Inventory CSV</button><button data-download-report="lca-impact-csv" type="button">Impact CSV</button></article>
       <article><span>Downloadable visualizations</span><strong>SVG</strong><p>High-resolution process architecture, LCA flow map, LCA impact bars, and TEA cost-stack graphics for slides, thesis appendices, and reviews.</p><button data-download-report="process-svg" type="button">Plant SVG</button><button data-download-report="lca-flow-svg" type="button">LCA flow SVG</button><button data-download-report="lca-impact-svg" type="button">LCA impact SVG</button></article>
@@ -9198,8 +9286,9 @@ function renderReportsBoard() {
       <article><span>Input/output streams</span><strong>${report.solver.totals.solvedStreams}</strong><p>All material, utility, waste, and QC/data streams with solved kg/batch, annual kg, role, phase, and component summary.</p><button data-download-report="streams-csv" type="button">Download CSV</button></article>
       <article><span>Parameters</span><strong>${processParameters.length}</strong><p>Global, biochemical, scale-up, custom, and economic parameters.</p><button data-download-report="parameters-csv" type="button">Download CSV</button></article>
       <article><span>Property package</span><strong>${propertyRows().length}</strong><p>Detailed and aggregate Cp, density, viscosity, osmotic, vapor-pressure, solubility, Henry, and ionic-strength proxies used by the solver.</p><button data-download-report="properties-csv" type="button">Download CSV</button></article>
-      <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
+      <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, energy, and boundary excursions.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
+      <article><span>Physical boundaries</span><strong>${report.physicalBoundaries.filter((item) => item.severity !== "ok").length}</strong><p>Industrial review table for ammonium/ammonia, lactate, oxygen transfer, reactor volume, pH, osmolality, temperature, shear, source basis, operator signal, process action, and validation gaps.</p><button data-download-report="physical-boundaries-csv" type="button">Download CSV</button></article>
       <article><span>gPROMS-style algorithm</span><strong>${report.gpromsAlgorithm.length}</strong><p>Equation-oriented handoff workflow for convective-dispersive and PVSD-style dynamic models, including objectives, PDEs, IC/BCs, discretization, solver status, validation, and iteration steps.</p><button data-download-report="gproms-algorithm-csv" type="button">Algorithm CSV</button><button data-download-report="pvsd-parameters-csv" type="button">PVSD CSV</button></article>
       <article><span>Procedure workbook</span><strong>${report.procedureWorkbook.length}</strong><p>Unit procedures decomposed into charge, transform, transfer, cleaning/release, I/O streams, batch-sheet notes, standards, and linked equations.</p><button data-download-report="procedure-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Resource inventory</span><strong>${report.resourceInventory.length}</strong><p>Equipment, materials, utilities, cleaning agents, schedule resources, occupancy, cost basis, sizing basis, and specification-review needs.</p><button data-download-report="resource-inventory-csv" type="button">Download CSV</button></article>
@@ -9254,12 +9343,13 @@ function renderOverview() {
   const topRisks = boundary.boundaries
     .filter((item) => item.severity !== "ok")
     .slice(0, 3);
+  const leadRisk = topRisks[0];
   els.overviewBoard.innerHTML = `
     <section class="overview-hero">
       <div>
-        <p>Axion Process OS</p>
+        <p>Process engineering review</p>
         <h3>${activeTemplate().label} production model</h3>
-        <span>Enterprise process modeling workspace with process builder, material streams, physical boundaries, scientific sources, standards, and economic readiness.</span>
+        <span>Industrial screening workspace for the first serious design review: equipment architecture, material streams, metabolite and oxygen-transfer boundaries, scheduling pressure, source-backed assumptions, and economics are evaluated together before design freeze.</span>
       </div>
       <button class="action-button primary" data-jump-view="flowsheet" type="button">Open Process Builder</button>
     </section>
@@ -9279,7 +9369,7 @@ function renderOverview() {
       <article class="${boundary.critical ? "overview-risk" : boundary.caution ? "overview-review" : ""}">
         <span>Physical boundaries</span>
         <strong>${boundary.critical}/${boundary.caution}</strong>
-        <p>${boundary.critical} critical and ${boundary.caution} review warnings across chemistry, scale-up, and cell-culture constraints.</p>
+        <p>${boundary.critical} critical and ${boundary.caution} detailed-review items across ammonium, lactate, oxygen transfer, pH, osmolality, shear, working volume, and scale-up constraints.</p>
         <button data-jump-view="ai">Inspect boundaries</button>
       </article>
       <article>
@@ -9310,10 +9400,30 @@ function renderOverview() {
           <h3>${topRisks.length ? "Review required" : "No major boundary warning"}</h3>
         </div>
         ${topRisks.length ? topRisks.map((item) => `
-          <p><b>${item.title}:</b> ${item.value}. ${item.recommendation}</p>
-        `).join("") : `<p>The current scenario is inside the conservative model boundaries. Continue with stream verification, sources, and economics.</p>`}
+          <p><b>${item.title}:</b> ${item.value}. ${item.recommendation} <small>${escapeHtml(item.operatorSignal || "")}</small></p>
+        `).join("") : `<p>The current scenario is inside the conservative screening boundaries. Continue with stream reconciliation, source review, sensitivity analysis, and economics before treating the model as an engineering basis.</p>`}
       </article>
     </section>
+    ${leadRisk ? `
+      <section class="overview-split expert-review-strip">
+        <article>
+          <div>
+            <span>Lead engineering concern</span>
+            <h3>${escapeHtml(leadRisk.title)} · ${escapeHtml(leadRisk.status || severityLabel(leadRisk.severity))}</h3>
+          </div>
+          <p><b>Root cause to challenge:</b> ${escapeHtml(leadRisk.likelyRootCause || "Not assigned.")}</p>
+          <p><b>Immediate process action:</b> ${escapeHtml(leadRisk.processAction || leadRisk.recommendation)}</p>
+        </article>
+        <article>
+          <div>
+            <span>Data required before scale-up</span>
+            <h3>Turn screening into defensible engineering</h3>
+          </div>
+          <p>${escapeHtml(leadRisk.modelGap || "Replace proxy assumptions with measured process data, vendor equipment data, and validated controls before design freeze.")}</p>
+          <button data-jump-view="reports">Download boundary evidence</button>
+        </article>
+      </section>
+    ` : ""}
   `;
 }
 
@@ -9327,9 +9437,9 @@ function simulationReadinessItems() {
     .filter((item) => item.severity !== "ok")
     .map((item) => ({
       group: "Physical boundary",
-      status: item.severity === "critical" ? "Must add for full simulator" : "Needs more detail",
+      status: item.status || (item.severity === "critical" ? "Must add for full simulator" : "Needs more detail"),
       title: item.title,
-      detail: `${item.value}. ${item.recommendation} Source basis: ${item.source}.`,
+      detail: `${item.value}. ${item.recommendation} Likely root cause: ${item.likelyRootCause}. Operator signal: ${item.operatorSignal}. Full-simulation gap: ${item.modelGap}. Source basis: ${item.source}.`,
     }));
   return [
     ...boundaryItems,
@@ -9337,19 +9447,19 @@ function simulationReadinessItems() {
       group: "Thermodynamics",
       status: "Partially covered",
       title: "Component property database",
-      detail: `A property-package v2 now supplies ${propertyRows().length} detailed records plus ${aggregatePropertyRows().length} aggregate solver classes with temperature-corrected Cp, density, viscosity, osmotic index, vapor-pressure, Henry, solubility, ionic-strength, and heat-release proxies. Full simulation still needs validated coefficients, electrolyte speciation, activity coefficients, and product-specific calibration.`,
+      detail: `Current implementation supplies ${propertyRows().length} detailed records and ${aggregatePropertyRows().length} aggregate solver classes with temperature-corrected Cp, density, viscosity, osmotic index, vapor-pressure, Henry, solubility, ionic-strength, and heat-release proxies. For an industrial design package this still needs a governed component registry, supplier material specifications, electrolyte speciation, activity coefficients, pH/osmolality coupling, phase behavior, uncertainty ranges, and product-specific calibration data.`,
     },
     {
       group: "Mass balance",
       status: "Partially covered",
       title: "Component-resolved stream vectors",
-      detail: `A deterministic v1 solver resolves water, substrate, biomass, product, salts, waste, air, and cleaning masses across ${state.streams.length} streams with recycle relaxation over ${solved.convergence.iterations} iterations. Full simulation still needs impurities, HCP/DNA/metabolites, rigorous nonlinear convergence, and time profiles.`,
+      detail: `The v1 solver resolves water, substrate, biomass, product, salts, waste, air, and cleaning masses across ${state.streams.length} streams with recycle relaxation over ${solved.convergence.iterations} iterations. For plant-grade use it still needs impurity classes, HCP/DNA/metabolites, media component breakdown, product-quality attributes, rigorous nonlinear convergence, process sampling points, and a reconciliation workflow against batch records.`,
     },
     {
       group: "Energy balance",
       status: "Partially covered",
       title: "Dynamic heat and utility network",
-      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh, while the solver estimates ${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch net heat duty after ${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch heat recovery. A ${dynamic.points.length}-point dynamic heat profile is now exported. Add heat-exchanger area, approach temperature, pressure drop, steam/condensate headers, and chilled-water constraints.`,
+      detail: `Utility load is estimated at ${formatNumber(data.utilities, 1)} MWh and the solver estimates ${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch net heat duty after ${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch heat recovery. Industrial review still needs exchanger area, U-values, approach temperatures, pressure drop, clean-steam and chilled-water headers, condensate return, utility coincidence, plant turndown, and metered site tariff data.`,
     },
     {
       group: "Dynamic simulation",
@@ -9755,6 +9865,8 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
+  } else if (type === "physical-boundaries-csv") {
+    downloadCsv(`${state.template}-physical-chemical-boundaries.csv`, physicalBoundaryRows(), "Physical and chemical boundary review");
   } else if (type === "cfd-field-csv") {
     downloadCsv(`${state.template}-cfd-transient-field-${formatNumber(state.cfdTimeH || 0, 1)}h.csv`, cfdFieldCsvRows(), "Transient CFD field grid");
   } else if (type === "cfd-time-series-csv") {

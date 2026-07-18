@@ -8546,7 +8546,7 @@ th {
   padding: 12px;
   border: 1px solid rgba(31, 42, 58, 0.12);
   border-left: 4px solid #0f8f83;
-  border-radius: 8px;
+  border-radius: 20px;
   background: linear-gradient(180deg, #fff, #f8fbfa);
 }
 
@@ -8585,22 +8585,78 @@ th {
   color: #6b7788;
 }
 
+.boundary-card details {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 2px;
+  border: 1px solid rgba(43, 58, 85, 0.1);
+  border-radius: 16px;
+  padding: 9px 10px;
+  background: rgba(246, 250, 248, 0.74);
+}
+
+.boundary-card summary {
+  color: #102033;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.boundary-card details[open] summary {
+  margin-bottom: 8px;
+}
+
+.boundary-card dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.boundary-card dt,
+.boundary-card dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.boundary-card dt {
+  color: #0f5a52;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.boundary-card dd {
+  color: #465666;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .boundary-caution {
   border-left-color: #7b8a84;
-  background: linear-gradient(180deg, #fff, #fffaf0);
+  background: linear-gradient(180deg, #fff, #f8fbfa);
 }
 
 .boundary-caution span {
-  color: #8a5d12;
+  color: #536f75;
 }
 
 .boundary-critical {
-  border-left-color: #275f6b;
-  background: linear-gradient(180deg, #fff, #fff7f6);
+  border-left-color: #d0b56d;
+  background: linear-gradient(180deg, #fff, #f7f5ea);
 }
 
 .boundary-critical span {
-  color: #8f2f28;
+  color: #6d5a24;
+}
+
+.expert-review-strip p small {
+  display: block;
+  margin-top: 5px;
+  color: #61708a;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .ics-coverage-grid small {
