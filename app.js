@@ -3990,6 +3990,342 @@ function templateExampleRows() {
   }));
 }
 
+function operationSequenceForUnit(unitItem) {
+  const cls = unitItem.cls;
+  const text = `${unitItem.type} ${unitItem.name}`.toLowerCase();
+  if (cls === "Preparation") return [
+    { phase: "Charge", category: "input", share: 0.18, note: "Charge WFI, raw material, buffer salts, nutrients, or formulation components." },
+    { phase: "Mix and condition", category: "process", share: 0.42, note: "Agitate, dissolve, adjust pH/osmolality/conductivity, and hold inside defined limits." },
+    { phase: "Transfer", category: "output", share: 0.18, note: "Transfer prepared solution to the next hygienic boundary through a scheduled line." },
+    { phase: "Rinse / release", category: "cleaning", share: 0.22, note: "Rinse or CIP the preparation vessel and release it for the next batch." },
+  ];
+  if (cls === "Bioreactor") return [
+    { phase: text.includes("seed") ? "Seed inoculation" : "Production inoculation", category: "input", share: 0.1, note: "Receive inoculum/media under sterile transfer and begin controlled culture." },
+    { phase: "Culture reaction", category: "process", share: 0.58, note: "Run growth/product formation with DO, pH, temperature, feed, foam, and metabolite boundaries." },
+    { phase: "Gas and feed control", category: "control", share: 0.12, note: "Schedule aeration, agitation, feed, base/acid, antifoam, and off-gas monitoring." },
+    { phase: "Harvest transfer", category: "output", share: 0.1, note: "Move broth or cell suspension forward while respecting hold-time and line availability." },
+    { phase: "CIP/SIP release", category: "cleaning", share: 0.1, note: "Clean, sterilize, integrity-check, and return the vessel to available state." },
+  ];
+  if (["Solid-liquid", "Filtration"].includes(cls)) return [
+    { phase: "Pre-use check", category: "setup", share: 0.12, note: "Integrity check, wetting/conditioning, bowl or filter setup." },
+    { phase: cls === "Solid-liquid" ? "Clarify / separate" : "Filter", category: "process", share: 0.52, note: "Separate solids, cells, debris, or bioburden with flux and pressure-drop limits." },
+    { phase: "Wash / chase", category: "process", share: 0.16, note: "Recover product hold-up, wash retained material, and classify losses." },
+    { phase: "Transfer filtrate", category: "output", share: 0.1, note: "Schedule product pool transfer into downstream hold or purification." },
+    { phase: "Flush / clean", category: "cleaning", share: 0.1, note: "Flush the line, dispose or clean the assembly, and release equipment." },
+  ];
+  if (["Purification", "Recovery", "Separation"].includes(cls)) return [
+    { phase: "Equilibrate", category: "setup", share: 0.16, note: "Prepare resin, column, solvent, or separation medium to the target condition." },
+    { phase: "Load", category: "input", share: 0.28, note: "Load feed under capacity, residence-time, and breakthrough constraints." },
+    { phase: "Wash / separate", category: "process", share: 0.22, note: "Remove impurities, by-products, cells, host proteins, salts, or solvent carryover." },
+    { phase: "Elute / recover", category: "output", share: 0.2, note: "Recover target product or product-rich stream with yield and pool-volume tracking." },
+    { phase: "Regenerate / clean", category: "cleaning", share: 0.14, note: "Regenerate media, sanitize, clean, and prepare for reuse or disposal." },
+  ];
+  if (cls === "Concentration") return [
+    { phase: "Concentrate", category: "process", share: 0.42, note: "Concentrate product using membrane area, flux, TMP, viscosity, and fouling checks." },
+    { phase: "Diafilter / exchange", category: "process", share: 0.32, note: "Exchange buffer or remove small molecules with diavolume and loss assumptions." },
+    { phase: "Pool transfer", category: "output", share: 0.12, note: "Transfer retentate or concentrate to hold/formulation." },
+    { phase: "Membrane flush", category: "cleaning", share: 0.14, note: "Flush, clean, store, or discard the membrane assembly." },
+  ];
+  if (["Thermal", "Sterilization", "Viral safety"].includes(cls)) return [
+    { phase: "Ramp", category: "energy", share: 0.22, note: "Heat, cool, pressurize, or condition to target validated setpoint." },
+    { phase: "Hold", category: "process", share: 0.42, note: "Maintain residence time, lethality, viral inactivation, or thermal treatment target." },
+    { phase: "Recover / cool", category: "energy", share: 0.2, note: "Cool, depressurize, and recover heat where feasible." },
+    { phase: "Verification", category: "quality", share: 0.16, note: "Document critical parameters, alarms, and release check." },
+  ];
+  if (cls === "Quality") return [
+    { phase: "Sample receipt", category: "input", share: 0.18, note: "Receive IPC, release, sterility, impurity, or environmental sample." },
+    { phase: "Assay / review", category: "quality", share: 0.62, note: "Execute assay, compare specification, and trigger batch-release queue." },
+    { phase: "Disposition", category: "output", share: 0.2, note: "Release, hold, reject, or request additional investigation." },
+  ];
+  if (["Packaging", "Finishing"].includes(cls)) return [
+    { phase: "Prepare line", category: "setup", share: 0.18, note: "Prepare sterile or controlled filling/packaging boundary." },
+    { phase: "Fill / finish", category: "process", share: 0.54, note: "Fill, close, inspect, label, package, or palletize the product." },
+    { phase: "Line clearance", category: "quality", share: 0.14, note: "Check reconciliation, rejected units, and line-clearance requirements." },
+    { phase: "Clean / reset", category: "cleaning", share: 0.14, note: "Clean or change over the line for the next product or batch." },
+  ];
+  if (unitLayer(unitItem) === "cleaning") return [
+    { phase: "Pre-rinse", category: "cleaning", share: 0.18, note: "Remove gross soil and recover or drain first-rinse load." },
+    { phase: "Caustic / acid wash", category: "cleaning", share: 0.32, note: "Apply validated cleaning chemistry and contact time." },
+    { phase: "Final rinse", category: "cleaning", share: 0.22, note: "Rinse to conductivity, TOC, bioburden, and residue targets." },
+    { phase: "SIP / release", category: "sterility", share: 0.28, note: "Sterilize where required and release the cleaned boundary." },
+  ];
+  if (["Utilities", "Environmental", "Air pollution"].includes(cls)) return [
+    { phase: "Demand receive", category: "input", share: 0.18, note: "Receive utility, waste, air, steam, WFI, or treatment demand from the process." },
+    { phase: "Service / treat", category: "process", share: 0.58, note: "Supply, condition, recover, neutralize, treat, or abate under capacity limits." },
+    { phase: "Monitor", category: "quality", share: 0.12, note: "Track conductivity, temperature, emissions, discharge, pressure, or supply quality." },
+    { phase: "Return / discharge", category: "output", share: 0.12, note: "Return condensate, discharge treated waste, or release utility capacity." },
+  ];
+  return [
+    { phase: "Receive", category: "input", share: 0.22, note: "Receive material, information, utility, or process demand." },
+    { phase: "Transform", category: "process", share: 0.48, note: "Apply the unit-operation model and update balances." },
+    { phase: "Transfer", category: "output", share: 0.16, note: "Send material or signal to the next process object." },
+    { phase: "Release", category: "release", share: 0.14, note: "Make the unit available for the next scheduled use." },
+  ];
+}
+
+function procedureOperationWorkbookRows() {
+  const data = metrics();
+  const orderedUnits = orderedScheduleUnits();
+  return orderedUnits.flatMap((unitItem) => {
+    const processH = scheduleOperationDuration(unitItem, data);
+    const setupH = scheduleSetupDuration(unitItem);
+    const cleanH = scheduleCleaningDuration(unitItem);
+    const inputStreams = state.streams.filter((item) => item.to === unitItem.id).map((item) => item.id).join(" | ");
+    const outputStreams = state.streams.filter((item) => item.from === unitItem.id).map((item) => item.id).join(" | ");
+    const ics = icsCodeForUnit(unitItem);
+    return operationSequenceForUnit(unitItem).map((step, index) => {
+      const estimatedDurationH = step.category === "setup"
+        ? setupH * Math.max(0.3, step.share)
+        : step.category === "cleaning" || step.category === "sterility"
+          ? Math.max(0.02, cleanH * step.share)
+          : Math.max(0.03, processH * step.share);
+      return {
+        procedureTag: unitItem.id,
+        procedureName: unitItem.name,
+        equipmentClass: unitItem.cls,
+        processSection: scheduleUnitGroup(unitItem),
+        unitLayer: unitLayerLabel(unitLayer(unitItem)),
+        icsCode: ics.code,
+        icsName: ics.label,
+        operationNo: index + 1,
+        operationName: step.phase,
+        operationCategory: step.category,
+        operatingMode: unitItem.cls === "Utilities" || unitItem.cls === "Environmental" || unitItem.cls === "Air pollution" ? "continuous / demand-driven" : "batch / campaign",
+        estimatedDurationH,
+        setupH,
+        processH,
+        cleaningH: cleanH,
+        inputStreams,
+        outputStreams,
+        balanceBasis: "linked to mass-energy balance table",
+        schedulingBasis: "finite-capacity operation with reusable equipment state",
+        batchSheetNote: step.note,
+        standards: (unitItem.standards || []).join(" | "),
+        equations: unitReactions(unitItem).map((item) => item.title).join(" | "),
+      };
+    });
+  });
+}
+
+function resourceInventoryRows() {
+  const schedule = campaignSchedule();
+  const resourceByName = Object.fromEntries(schedule.resourceRows.map((item) => [item.resource, item]));
+  const costByCategory = costRows().filter((item) => item.unit === "USD/yr");
+  const equipmentRows = state.units.map((unitItem) => {
+    const ics = icsCodeForUnit(unitItem);
+    const scheduleResource = resourceByName[unitItem.id] || {};
+    return {
+      resourceId: unitItem.id,
+      resourceName: unitItem.name,
+      scope: "Main or auxiliary equipment",
+      class: unitItem.cls,
+      processSection: scheduleUnitGroup(unitItem),
+      role: unitLayerLabel(unitLayer(unitItem)),
+      icsCode: ics.code,
+      quantity: recipeParallelUnits(unitItem),
+      unit: "equipment set",
+      batchDemand: unitSize(unitItem),
+      annualDemand: state.batchCount,
+      costUsdYr: "",
+      occupancyPct: scheduleResource.occupancyPct || 0,
+      status: scheduleResource.status || "not on critical path",
+      purchaseMode: unitItem.cls === "Bioreactor" ? "design/rating review required" : "screening equipment register",
+      specBasis: `${unitItem.isoName || unitItem.name}; ${unitPower(unitItem)}; ${(unitItem.standards || []).join(" | ")}`,
+    };
+  });
+  const materialRows = costByCategory.map((row, index) => ({
+    resourceId: `MAT-${String(index + 1).padStart(3, "0")}`,
+    resourceName: row.item,
+    scope: row.category === "Utilities" ? "Utility cost driver" : row.category === "Waste" ? "Waste treatment driver" : "Material / consumable / service",
+    class: row.category,
+    processSection: row.category,
+    role: row.costType,
+    icsCode: "",
+    quantity: row.annualValueUsd || row.value,
+    unit: row.unit,
+    batchDemand: row.productPerBatchKg || "",
+    annualDemand: row.annualValueUsd || row.value,
+    costUsdYr: row.annualValueUsd || "",
+    occupancyPct: "",
+    status: row.confidence,
+    purchaseMode: row.aggregationRole,
+    specBasis: row.sourceBasis || row.note,
+  }));
+  return [...equipmentRows, ...materialRows, ...schedule.resourceRows.map((row, index) => ({
+    resourceId: `SCH-${String(index + 1).padStart(3, "0")}`,
+    resourceName: row.resource,
+    scope: "Scheduling resource",
+    class: row.type,
+    processSection: row.type,
+    role: "finite-capacity occupancy",
+    icsCode: "",
+    quantity: row.busyH,
+    unit: "busy h per simulated campaign",
+    batchDemand: row.availableH,
+    annualDemand: schedule.feasibleAnnualBatches,
+    costUsdYr: "",
+    occupancyPct: row.occupancyPct,
+    status: row.status,
+    purchaseMode: "capacity / debottlenecking review",
+    specBasis: "Derived from campaign schedule, reusable equipment pools, cleaning, and stream-transfer slots",
+  }))];
+}
+
+function emissionsWorkbookRows() {
+  const annualKg = Math.max(1, metrics().annualKg);
+  const streamEmissionRows = streamRows()
+    .filter((row) => row.lcaCompartment === "air" || row.lcaFlowType.includes("Waste") || /vent|offgas|co2|solvent|ethanol|ipa|spent|waste/i.test(`${row.id} ${row.components} ${row.phase}`))
+    .map((row) => {
+      const text = `${row.id} ${row.components} ${row.phase}`.toLowerCase();
+      const method = text.includes("vent") || text.includes("offgas") || row.phase === "Gas"
+        ? "vent/off-gas emission screen"
+        : text.includes("solvent") || text.includes("ethanol") || text.includes("ipa")
+          ? "solvent loss / recovery screen"
+          : text.includes("cip") || text.includes("spent")
+            ? "cleaning wastewater load"
+            : "waste classification screen";
+      return {
+        emissionId: row.id,
+        sourceType: "stream",
+        source: `${row.from} -> ${row.to}`,
+        sourceName: row.components,
+        phase: row.phase,
+        method,
+        annualQuantityKg: row.annualMassKg,
+        perKgProductKg: row.annualMassKg / annualKg,
+        compartment: row.lcaCompartment,
+        treatment: row.teaDisposition,
+        screeningCo2eKgYr: row.screeningCo2eKgAnnual,
+        requiredNextData: "speciation, abatement efficiency, permit limit, monitoring frequency, and site treatment factor",
+        status: row.lcaCompartment === "air" ? "air review" : row.lcaFlowType.includes("Waste") ? "waste review" : "classified",
+      };
+    });
+  const unitVentRows = state.units
+    .filter((unitItem) => ["Bioreactor", "Environmental", "Air pollution", "Thermal", "Sterilization"].includes(unitItem.cls))
+    .map((unitItem) => ({
+      emissionId: `${unitItem.id}-EM`,
+      sourceType: "unit operation",
+      source: unitItem.id,
+      sourceName: unitItem.name,
+      phase: unitItem.cls === "Bioreactor" ? "Gas / liquid" : "Mixed",
+      method: unitItem.cls === "Bioreactor" ? "respiration off-gas and foam/entrainment screen" : "utility or treatment emission screen",
+      annualQuantityKg: Math.max(1, state.batchSize * state.batchCount * (unitItem.cls === "Bioreactor" ? 0.012 : 0.003)),
+      perKgProductKg: Math.max(1, state.batchSize * state.batchCount * (unitItem.cls === "Bioreactor" ? 0.012 : 0.003)) / annualKg,
+      compartment: unitItem.cls === "Environmental" || unitItem.cls === "Air pollution" ? "air / treatment" : "air",
+      treatment: unitItem.cls === "Air pollution" ? "abatement" : "monitor / classify",
+      screeningCo2eKgYr: Math.max(1, state.batchSize * state.batchCount * (unitItem.cls === "Bioreactor" ? 0.012 : 0.003)),
+      requiredNextData: "measured off-gas CO2/O2/VOC, humidity, bioburden, filter retention, and abatement efficiency",
+      status: "needs measured emission factors",
+    }));
+  return [...streamEmissionRows, ...unitVentRows];
+}
+
+function debottleneckWorkbookRows() {
+  const schedule = campaignSchedule();
+  const balanceByTag = Object.fromEntries(balanceRows().map((row) => [row.tag, row]));
+  return schedule.resourceRows.map((row, index) => {
+    const unitItem = state.units.find((item) => item.id === row.resource);
+    const balance = balanceByTag[row.resource] || {};
+    const sizeRisk = unitItem && Number.parseFloat(unitSize(unitItem)) > state.batchSize * 0.9 ? "check selected rating" : "screening ok";
+    const action = row.status === "bottleneck"
+      ? "add parallel capacity, reduce process/cleaning time, or change route"
+      : row.status === "review"
+        ? "inspect occupancy, dependency, transfer line, and cleaning assumptions"
+        : "monitor in scenario comparisons";
+    return {
+      rank: index + 1,
+      resource: row.resource,
+      resourceType: row.type,
+      linkedUnitName: unitItem?.name || "",
+      class: unitItem?.cls || row.type,
+      busyH: row.busyH,
+      availableH: row.availableH,
+      occupancyPct: row.occupancyPct,
+      status: row.status,
+      sizeRisk,
+      massInKgBatch: balance.massInKgBatch || "",
+      heatDutyKwhBatch: balance.netHeatDutyKwhBatch || "",
+      power: unitItem ? unitPower(unitItem) : "",
+      recommendedAction: action,
+      scaleUpNote: "Review nonlinear CAPEX/OPEX, vessel working-volume limit, oxygen transfer, heat removal, and finite scheduling before increasing throughput.",
+      validationNeed: "replace screening values with equipment rating, vendor curve, measured cycle time, and site calendar",
+    };
+  });
+}
+
+function databankWorkbookRows() {
+  const equipmentTypes = [...new Map(palette.map((item) => [item.type, item])).values()].map((item) => ({
+    databank: "Equipment types",
+    key: item.type,
+    name: item.label,
+    category: item.cls,
+    value: item.isoName,
+    unit: "",
+    status: "native Axion library",
+    reviewNeed: `Add vendor sizing curve, material of construction, max rating, turndown, surface finish, and purchase-cost model. Standards: ${(item.standards || []).join(" | ")}`,
+  }));
+  const componentRows = Object.entries(componentProperties).map(([key, item]) => ({
+    databank: "Components / mixtures",
+    key,
+    name: item.label,
+    category: item.category,
+    value: item.formula || item.classKey,
+    unit: "",
+    status: "screening property set",
+    reviewNeed: `Cp ${item.cp}; density ${item.density}; viscosity ${item.viscosity}; source basis: ${item.source}`,
+  }));
+  const parameterRows = processParameters.map((item) => ({
+    databank: "Process parameters",
+    key: item.key,
+    name: item.label,
+    category: parameterGroup(item),
+    value: state.params[item.key],
+    unit: item.unit || "",
+    status: item.custom ? "custom project parameter" : "default parameter",
+    reviewNeed: "Calibrate with project data, experimental measurements, site limits, or literature assumptions before regulated use.",
+  }));
+  const cleaningRows = [
+    ["CIP pre-rinse", "ambient or warm WFI rinse", "conductivity / visible soil endpoint"],
+    ["Caustic wash", "alkaline detergent or sodium hydroxide", "validated contact time and temperature"],
+    ["Intermediate rinse", "WFI/process-water rinse", "conductivity trend and carryover check"],
+    ["Acid wash", "acid rinse where process requires mineral removal", "pH/conductivity endpoint"],
+    ["Final rinse / SIP", "final WFI rinse and optional steam sterilization", "TOC, bioburden, endotoxin, temperature hold"],
+  ].map(([name, value, reviewNeed], index) => ({
+    databank: "Cleaning templates",
+    key: `CIP-${String(index + 1).padStart(2, "0")}`,
+    name,
+    category: "CIP/SIP",
+    value,
+    unit: "",
+    status: "editable template",
+    reviewNeed,
+  }));
+  return [...equipmentTypes, ...componentRows, ...parameterRows, ...cleaningRows];
+}
+
+function exchangeWorkbookRows() {
+  const model = comprehensiveReportShallow();
+  return [
+    { target: "Spreadsheet / Excel", direction: "export", payload: "streams, equipment, balances, economics, LCA, schedule", format: "CSV", status: "implemented", detail: `${model.streams} streams and ${model.units} units available as tables` },
+    { target: "Project planning", direction: "export", payload: "Gantt tasks, resources, predecessors, batch releases", format: "CSV", status: "implemented", detail: "MS Project compatible task table and schedule matrix" },
+    { target: "API process model", direction: "import/export", payload: "project, versions, users, units, streams, parameters, reports", format: "JSON / REST scaffold", status: "scaffold", detail: "Backend routes exist for projects/invites/payment; production API auth still needs hardening" },
+    { target: "Historian / SCADA", direction: "import", payload: "DO, pH, temperature, feeds, agitation, pressure, off-gas", format: "OPC UA / MQTT / CSV", status: "planned connector", detail: "Map plant tags to dynamic profile and boundary checks" },
+    { target: "CFD solver", direction: "export/import", payload: "reactor geometry, impeller, sparger, viscosity, density, OUR, mesh and field summary", format: "case package", status: "screening handoff", detail: "Browser CFD is a visual/physics screen; rigorous CFD still needs external solver or validated backend" },
+    { target: "LCA software", direction: "export", payload: "inventory flows, compartments, per-batch, annual and per-kg quantities", format: "CSV", status: "implemented", detail: "Ready for OpenLCA/SimaPro mapping after supplier/site factor replacement" },
+    { target: "TEA / finance model", direction: "export", payload: "cost stack, uncertainty ranges, scale exponents, physical drivers", format: "CSV", status: "implemented", detail: "Use as a screening model before quote-backed CAPEX/OPEX" },
+    { target: "Documentation / QMS", direction: "export", payload: "operation workbook, batch-sheet notes, standards, equations, sources", format: "CSV / report JSON", status: "implemented workbook", detail: "Useful for engineering review, but not yet validated electronic batch record" },
+  ];
+}
+
+function comprehensiveReportShallow() {
+  return {
+    units: state.units.length,
+    streams: state.streams.length,
+    parameters: processParameters.length,
+    equations: equations.length,
+  };
+}
+
 function routeComparisonRows() {
   return routeOptions.map((route) => {
     const schedule = campaignSchedule(route.key);
@@ -7814,6 +8150,12 @@ function comprehensiveReport() {
     cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ oxygen: cell.oxygen, nutrient: cell.nutrient, shear: cell.shear, risk: cell.risk })) })),
     gpromsAlgorithm: gpromsAlgorithmRows(),
     pvsdParameters: pvsdParameterRows(),
+    procedureWorkbook: procedureOperationWorkbookRows(),
+    resourceInventory: resourceInventoryRows(),
+    emissionsWorkbook: emissionsWorkbookRows(),
+    debottleneckWorkbook: debottleneckWorkbookRows(),
+    databankWorkbook: databankWorkbookRows(),
+    exchangeWorkbook: exchangeWorkbookRows(),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
     sources: scientificSources,
@@ -7846,6 +8188,12 @@ function renderReportsBoard() {
       <article><span>Dynamic profile</span><strong>${report.dynamicProfile.points.length}</strong><p>Time-resolved batch profile for product, recovery, substrate, biomass, DO, lactate, ammonium, heat load, and energy.</p><button data-download-report="dynamic-csv" type="button">Download CSV</button></article>
       <article><span>Unit-operation models</span><strong>${report.unitModels.length}</strong><p>Mechanistic screening models for bioreactors, filtration, chromatography, thermal steps, cleaning, utilities, QC, and generic unit hold-up.</p><button data-download-report="unit-models-csv" type="button">Download CSV</button></article>
       <article><span>gPROMS-style algorithm</span><strong>${report.gpromsAlgorithm.length}</strong><p>Equation-oriented handoff workflow for convective-dispersive and PVSD-style dynamic models, including objectives, PDEs, IC/BCs, discretization, solver status, validation, and iteration steps.</p><button data-download-report="gproms-algorithm-csv" type="button">Algorithm CSV</button><button data-download-report="pvsd-parameters-csv" type="button">PVSD CSV</button></article>
+      <article><span>Procedure workbook</span><strong>${report.procedureWorkbook.length}</strong><p>Unit procedures decomposed into charge, transform, transfer, cleaning/release, I/O streams, batch-sheet notes, standards, and linked equations.</p><button data-download-report="procedure-workbook-csv" type="button">Download CSV</button></article>
+      <article><span>Resource inventory</span><strong>${report.resourceInventory.length}</strong><p>Equipment, materials, utilities, cleaning agents, schedule resources, occupancy, cost basis, sizing basis, and specification-review needs.</p><button data-download-report="resource-inventory-csv" type="button">Download CSV</button></article>
+      <article><span>Emissions workbook</span><strong>${report.emissionsWorkbook.length}</strong><p>Off-gas, vent, solvent-loss, cleaning-wastewater, waste-treatment, abatement, monitoring, and missing-data review table.</p><button data-download-report="emissions-workbook-csv" type="button">Download CSV</button></article>
+      <article><span>Debottlenecking workbook</span><strong>${report.debottleneckWorkbook.length}</strong><p>Equipment-time, size, heat, power, occupancy, cleaning, transfer-line, and scale-up review actions for capacity planning.</p><button data-download-report="debottleneck-workbook-csv" type="button">Download CSV</button></article>
+      <article><span>Databank workbook</span><strong>${report.databankWorkbook.length}</strong><p>Original Axion equipment, component, mixture, property, parameter, cost, and CIP/SIP template libraries for project calibration.</p><button data-download-report="databank-workbook-csv" type="button">Download CSV</button></article>
+      <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
@@ -8396,6 +8744,18 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
   } else if (type === "pvsd-parameters-csv") {
     downloadCsv(`${state.template}-pvsd-transport-parameters.csv`, pvsdParameterRows(), "PVSD transport parameter package");
+  } else if (type === "procedure-workbook-csv") {
+    downloadCsv(`${state.template}-procedure-operation-workbook.csv`, procedureOperationWorkbookRows(), "Procedure and unit-operation workbook");
+  } else if (type === "resource-inventory-csv") {
+    downloadCsv(`${state.template}-resource-inventory.csv`, resourceInventoryRows(), "Resource inventory workbook");
+  } else if (type === "emissions-workbook-csv") {
+    downloadCsv(`${state.template}-emissions-workbook.csv`, emissionsWorkbookRows(), "Emissions and waste workbook");
+  } else if (type === "debottleneck-workbook-csv") {
+    downloadCsv(`${state.template}-debottlenecking-workbook.csv`, debottleneckWorkbookRows(), "Debottlenecking workbook");
+  } else if (type === "databank-workbook-csv") {
+    downloadCsv(`${state.template}-databank-workbook.csv`, databankWorkbookRows(), "Databank workbook");
+  } else if (type === "exchange-workbook-csv") {
+    downloadCsv(`${state.template}-exchange-workbook.csv`, exchangeWorkbookRows(), "Exchange and connector workbook");
   } else if (type === "schedule-csv") {
     downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows(), "Campaign schedule operations");
   } else if (type === "schedule-gantt-csv") {
