@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-public-quiet-v2" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-canvas-story-v2" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -140,28 +140,65 @@
             </div>
           </section>
 
-          <section class="public-screenshot-story public-page active-public-page" data-public-page="home" aria-label="Axion product screenshots">
+          <section class="public-canvas-story public-page active-public-page" data-public-page="home" aria-label="Axion product canvas preview">
             <div class="section-heading">
-              <p>Product View</p>
-              <h2>See the whole plant first. Then open the model behind it.</h2>
+              <p>Product Canvas</p>
+              <h2>See the complete plant as a structured model, not as a static image.</h2>
             </div>
-            <figure class="screenshot-showcase">
-              <img src="./assets/axion-biomanufacturing-suite.png" alt="Industrial biomanufacturing production plant with reactors, piping, utilities and technical overlays" />
-              <figcaption>
-                <b>Complete production plant</b>
-                <span>Main process, support systems, utilities, cleaning, data outputs and review layers are shown as one readable production architecture.</span>
-              </figcaption>
-            </figure>
-            <div class="screenshot-grid">
-              <figure>
-                <img src="./assets/axion-process-os-hero.png" alt="Axion Process OS application workspace screenshot with process engineering modules" />
-                <figcaption><b>Workspace cockpit</b><span>Briefing, process builder, equations, simulation, CFD, economics and downloads stay connected.</span></figcaption>
+            <div class="canvas-story-layout">
+              <figure class="product-canvas-preview" aria-label="Axion plant canvas with process and support layers">
+                <div class="canvas-preview-topbar">
+                  <b>Complete production canvas</b>
+                  <span>Main process · support systems · model outputs</span>
+                </div>
+                <div class="canvas-preview-map">
+                  <div class="canvas-main-row">
+                    <span class="canvas-node media">Media prep</span>
+                    <i></i>
+                    <span class="canvas-node seed">Seed train</span>
+                    <i></i>
+                    <span class="canvas-node reactor">Production bioreactor hall</span>
+                    <i></i>
+                    <span class="canvas-node harvest">Harvest</span>
+                    <i></i>
+                    <span class="canvas-node dsp">Purification / DSP</span>
+                  </div>
+                  <div class="canvas-support-row">
+                    <span>WFI + clean steam</span>
+                    <span>CIP/SIP</span>
+                    <span>Heat reuse</span>
+                    <span>Wastewater</span>
+                    <span>LCA/TEA exports</span>
+                  </div>
+                  <div class="canvas-signal-row">
+                    <span>AI design check</span>
+                    <span>CFD oxygen field</span>
+                    <span>Boundary warnings</span>
+                    <span>Schedule load</span>
+                  </div>
+                </div>
+                <figcaption>
+                  <b>Plant architecture first</b>
+                  <span>The user sees the whole production logic before opening equations, equipment data, costs, CFD, or reports.</span>
+                </figcaption>
               </figure>
-              <article>
-                <span>How it works</span>
-                <h3>One clear path through the model.</h3>
-                <p>The page explains Axion in the same order a user experiences it: describe the product, see the generated plant, refine the flowsheet, simulate the bottlenecks, then export the evidence.</p>
-              </article>
+              <aside class="canvas-model-stack" aria-label="Axion workspace model layers">
+                <article>
+                  <span>01</span>
+                  <h3>Briefing</h3>
+                  <p>Product, organism, scale, constraints and uploaded data become the model basis.</p>
+                </article>
+                <article>
+                  <span>02</span>
+                  <h3>Process Builder</h3>
+                  <p>Equipment and animated streams stay editable on one clean canvas.</p>
+                </article>
+                <article>
+                  <span>03</span>
+                  <h3>Simulation Layers</h3>
+                  <p>Balances, CFD, scheduling, economics, LCA, standards and recommendations stay attached.</p>
+                </article>
+              </aside>
             </div>
           </section>
 
@@ -1220,6 +1257,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-public-quiet-v2"></script>
+    <script type="module" src="./app.js?v=20260718-canvas-story-v2"></script>
   </body>
 </html>

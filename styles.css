@@ -14299,3 +14299,317 @@ body.locked .public-page:not(.active-public-page) {
 .public-scroll {
   padding-top: 100px !important;
 }
+
+/* Canvas story replacement: no duplicate screenshots, no AI-looking image cards. */
+.public-canvas-story {
+  display: grid;
+  gap: 22px;
+  width: min(100%, 1220px);
+  margin: 0 auto;
+  padding: 34px clamp(20px, 4vw, 56px) 62px;
+  border-bottom: 1px solid rgba(173, 195, 205, 0.12);
+}
+
+.canvas-story-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.product-canvas-preview,
+.canvas-model-stack article {
+  margin: 0;
+  border: 1px solid rgba(173, 195, 205, 0.16);
+  border-radius: 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.028)),
+    rgba(7, 20, 36, 0.64);
+  box-shadow: 0 26px 84px rgba(3, 14, 27, 0.2);
+}
+
+.product-canvas-preview {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr) auto;
+  overflow: hidden;
+}
+
+.canvas-preview-topbar,
+.product-canvas-preview figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 22px;
+}
+
+.canvas-preview-topbar {
+  border-bottom: 1px solid rgba(173, 195, 205, 0.12);
+}
+
+.product-canvas-preview figcaption {
+  border-top: 1px solid rgba(173, 195, 205, 0.12);
+}
+
+.canvas-preview-topbar b,
+.product-canvas-preview figcaption b {
+  color: #f4fbfb;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.canvas-preview-topbar span,
+.product-canvas-preview figcaption span {
+  max-width: 56ch;
+  color: rgba(218, 232, 239, 0.72);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.canvas-preview-map {
+  display: grid;
+  gap: 18px;
+  align-content: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 52% 38%, rgba(117, 208, 199, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(6, 18, 31, 0.55), rgba(6, 18, 31, 0.86));
+}
+
+.canvas-main-row {
+  display: grid;
+  grid-template-columns: 0.82fr 34px 0.9fr 34px 1.36fr 34px 0.82fr 34px 0.92fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-main-row i {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(90deg, rgba(235, 255, 252, 0.82) 0 9px, transparent 9px 20px),
+    linear-gradient(90deg, #aee5df, rgba(117, 208, 199, 0.12));
+  animation: flowPulse 1.05s linear infinite;
+}
+
+.canvas-node {
+  display: grid;
+  place-items: center;
+  min-height: 104px;
+  padding: 14px;
+  border: 1px solid rgba(127, 214, 205, 0.28);
+  border-radius: 28px;
+  color: #f4fbfb;
+  background:
+    linear-gradient(145deg, rgba(127, 214, 205, 0.18), rgba(127, 214, 205, 0.07)),
+    rgba(13, 39, 58, 0.78);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.16;
+  text-align: center;
+}
+
+.canvas-node.reactor {
+  min-height: 164px;
+  border-radius: 42px;
+  background:
+    radial-gradient(circle at 50% 78%, rgba(226, 248, 245, 0.22), transparent 7%),
+    linear-gradient(145deg, rgba(127, 214, 205, 0.26), rgba(36, 92, 82, 0.44));
+}
+
+.canvas-support-row,
+.canvas-signal-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.canvas-support-row span,
+.canvas-signal-row span {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid rgba(173, 195, 205, 0.13);
+  border-radius: 22px;
+  color: rgba(235, 245, 246, 0.82);
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.canvas-signal-row span {
+  min-height: 40px;
+  color: #aee5df;
+  background: rgba(127, 214, 205, 0.055);
+}
+
+.canvas-model-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.canvas-model-stack article {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  min-height: 0;
+  padding: 22px;
+}
+
+.canvas-model-stack span {
+  color: #aee5df;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.canvas-model-stack h3,
+.canvas-model-stack p {
+  margin: 0;
+}
+
+.canvas-model-stack h3 {
+  color: #f4fbfb;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.canvas-model-stack p {
+  color: rgba(218, 232, 239, 0.76);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Bring the actual builder canvas closer to the front-page plant architecture. */
+.flowsheet-canvas {
+  background:
+    radial-gradient(circle at 52% 30%, rgba(117, 208, 199, 0.1), transparent 30%),
+    linear-gradient(180deg, #081929 0%, #0d2438 100%) !important;
+}
+
+.canvas-stage {
+  margin: 0 96px 180px 0;
+}
+
+.process-lane {
+  border-color: rgba(173, 195, 205, 0.12) !important;
+  border-radius: 28px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.process-lane span,
+.canvas-focus-note {
+  border-color: rgba(173, 195, 205, 0.16) !important;
+  color: rgba(232, 244, 244, 0.76) !important;
+  background: rgba(7, 20, 36, 0.74) !important;
+}
+
+.unit {
+  border-color: rgba(173, 195, 205, 0.18) !important;
+  border-left-width: 0 !important;
+  border-radius: 28px !important;
+  color: #f4fbfb !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
+    rgba(12, 31, 48, 0.92) !important;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.26) !important;
+}
+
+.unit::before {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 22px !important;
+}
+
+.unit h3 {
+  color: #f7fbfb !important;
+}
+
+.unit p,
+.unit small,
+.unit-pfd-tag {
+  color: rgba(218, 232, 239, 0.72) !important;
+}
+
+.unit-role {
+  border-color: rgba(173, 195, 205, 0.12) !important;
+  color: rgba(232, 244, 244, 0.82) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.unit-layer-main {
+  border-color: rgba(127, 214, 205, 0.36) !important;
+  background:
+    linear-gradient(145deg, rgba(127, 214, 205, 0.18), rgba(255, 255, 255, 0.04)),
+    rgba(14, 47, 57, 0.94) !important;
+}
+
+.unit-layer-support,
+.unit-layer-quality,
+.unit-layer-cleaning,
+.unit-layer-recycle,
+.unit-layer-heat,
+.unit-layer-waste {
+  opacity: 0.92 !important;
+}
+
+.unit-icon {
+  border-radius: 18px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.unit-bioreactor .unit-icon {
+  border-radius: 50% !important;
+}
+
+.stream-label {
+  border-color: rgba(173, 195, 205, 0.16) !important;
+  border-radius: 18px !important;
+  color: #f4fbfb !important;
+  background: rgba(7, 20, 36, 0.82) !important;
+}
+
+.stream-label b {
+  color: #f4fbfb !important;
+}
+
+.stream-label span {
+  color: rgba(218, 232, 239, 0.72) !important;
+}
+
+.stream-line {
+  opacity: 0.82 !important;
+}
+
+.stream-utility,
+.stream-waste,
+.stream-qc {
+  height: 4px !important;
+  opacity: 0.46 !important;
+  box-shadow: 0 0 0 1px rgba(173, 195, 205, 0.08), 0 0 12px rgba(117, 208, 199, 0.08) !important;
+}
+
+.stream-label-utility,
+.stream-label-waste,
+.stream-label-qc {
+  opacity: 0.72 !important;
+}
+
+@media (max-width: 980px) {
+  .canvas-model-stack,
+  .canvas-main-row,
+  .canvas-support-row,
+  .canvas-signal-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .canvas-main-row i {
+    width: 6px;
+    height: 24px;
+    justify-self: center;
+  }
+}
