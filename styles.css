@@ -6473,7 +6473,7 @@ dd {
 
 .cfd-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 0.78fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(560px, 1.12fr) minmax(360px, 0.88fr);
   align-items: start;
   gap: 14px;
 }
@@ -7192,7 +7192,7 @@ dd {
   place-items: center;
   --working-volume: 80%;
   --liquid-top: calc(88% - var(--working-volume));
-  min-height: 420px;
+  min-height: 560px;
   overflow: hidden;
   border: 1px solid rgba(43, 58, 85, 0.14);
   border-radius: 34% 34% 18% 18% / 10% 10% 7% 7%;
@@ -7202,6 +7202,198 @@ dd {
   box-shadow:
     inset 0 0 44px rgba(8, 23, 43, 0.16),
     inset 0 -28px 42px rgba(8, 23, 43, 0.12);
+}
+
+.cfd-engineering-svg {
+  position: absolute;
+  inset: 24px 24px 34px;
+  z-index: 4;
+  width: calc(100% - 48px);
+  height: calc(100% - 58px);
+  pointer-events: none;
+}
+
+.cfd-streamline,
+.cfd-feed-vector,
+.cfd-thermal-vector,
+.cfd-jacket-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cfd-streamline {
+  stroke: rgba(21, 59, 70, 0.64);
+  stroke-width: 4.5;
+  stroke-dasharray: 14 18;
+  animation: cfdDashFlow 1.35s linear infinite;
+}
+
+.cfd-streamline.primary {
+  stroke: rgba(15, 143, 131, 0.78);
+  stroke-width: 5.5;
+}
+
+.cfd-streamline.radial {
+  stroke: rgba(21, 59, 70, 0.52);
+  stroke-width: 4;
+}
+
+.cfd-streamline.axial {
+  stroke: rgba(15, 143, 131, 0.62);
+}
+
+.cfd-streamline.down {
+  stroke: rgba(21, 59, 70, 0.7);
+  stroke-width: 5;
+}
+
+.cfd-feed-vector {
+  stroke: rgba(15, 143, 131, 0.9);
+  stroke-width: 5;
+  stroke-dasharray: 10 12;
+  animation: cfdDashFlow 1.05s linear infinite;
+}
+
+.cfd-thermal-vector {
+  stroke: rgba(112, 126, 138, 0.56);
+  stroke-width: 4;
+  stroke-dasharray: 8 12;
+  animation: cfdDashFlow 1.8s linear infinite reverse;
+}
+
+.cfd-jacket-line {
+  stroke: rgba(83, 111, 117, 0.42);
+  stroke-width: 8;
+  stroke-dasharray: 16 14;
+  animation: cfdDashFlow 2.8s linear infinite;
+}
+
+.cfd-streamline.delay-a { animation-delay: -0.32s; }
+.cfd-streamline.delay-b { animation-delay: -0.64s; }
+.cfd-streamline.delay-c { animation-delay: -0.96s; }
+.cfd-streamline.delay-d { animation-delay: -1.18s; }
+
+.cfd-bubble-train circle {
+  fill: rgba(15, 143, 131, 0.5);
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1;
+  animation: cfdBubbleRise 2.8s ease-in-out infinite;
+}
+
+.cfd-bubble-train circle:nth-child(2n) { animation-delay: -0.7s; }
+.cfd-bubble-train circle:nth-child(3n) { animation-delay: -1.4s; }
+
+.cfd-headplate,
+.cfd-gas-outlet,
+.cfd-feed-port,
+.cfd-sample-port,
+.cfd-harvest-port,
+.cfd-sprayball,
+.cfd-jacket-label {
+  position: absolute;
+  z-index: 10;
+  border: 1px solid rgba(43, 58, 85, 0.14);
+  color: #102033;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 10px 26px rgba(8, 23, 43, 0.08);
+}
+
+.cfd-headplate {
+  left: 50%;
+  top: 36px;
+  width: 118px;
+  min-height: 28px;
+  border-radius: 12px 12px 4px 4px;
+  transform: translateX(-50%);
+}
+
+.cfd-headplate span,
+.cfd-gas-outlet span,
+.cfd-feed-port span,
+.cfd-sample-port span,
+.cfd-harvest-port span,
+.cfd-sprayball span,
+.cfd-jacket-label {
+  display: block;
+  padding: 5px 8px;
+  color: #102033;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cfd-gas-outlet {
+  left: 22%;
+  top: 52px;
+  border-radius: 999px;
+}
+
+.cfd-feed-port {
+  right: 18%;
+  top: 52px;
+  border-color: rgba(15, 143, 131, 0.28);
+  border-radius: 999px;
+  background: rgba(226, 248, 245, 0.94);
+}
+
+.cfd-sample-port {
+  right: 6%;
+  top: 49%;
+  border-radius: 999px;
+}
+
+.cfd-harvest-port {
+  left: 50%;
+  bottom: 18px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.cfd-sprayball {
+  left: 50%;
+  top: 78px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  padding: 4px;
+  transform: translateX(-50%);
+}
+
+.cfd-sprayball i {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #102033 0 3px, transparent 4px),
+    conic-gradient(from 0deg, rgba(15, 143, 131, 0.25), rgba(83, 111, 117, 0.18), rgba(15, 143, 131, 0.25));
+  box-shadow:
+    -16px 12px 0 -9px rgba(15, 143, 131, 0.5),
+    16px 12px 0 -9px rgba(15, 143, 131, 0.5),
+    0 18px 0 -9px rgba(15, 143, 131, 0.5);
+}
+
+.cfd-jacket-label {
+  border-radius: 999px;
+  color: #52647e;
+  background: rgba(239, 245, 246, 0.82);
+}
+
+.jacket-left {
+  left: 3%;
+  top: 36%;
+  transform: rotate(-90deg);
+}
+
+.jacket-right {
+  right: -2%;
+  top: 40%;
+  transform: rotate(90deg);
 }
 
 .cfd-vessel-body::after {
@@ -7716,6 +7908,21 @@ dd {
 .zone-top { top: 62px; }
 .zone-mid { top: 196px; }
 .zone-bottom { bottom: 50px; }
+.zone-mrf-top {
+  left: auto;
+  right: 18px;
+  top: 31%;
+  color: #102033;
+  background: rgba(226, 248, 245, 0.86);
+}
+
+.zone-mrf-bottom {
+  left: auto;
+  right: 18px;
+  top: 55%;
+  color: #102033;
+  background: rgba(226, 248, 245, 0.86);
+}
 
 .cfd-detail {
   display: grid;
@@ -7784,9 +7991,16 @@ dd {
   line-height: 1.25;
 }
 
+.cfd-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .cfd-actions,
 .cfd-reactions,
-.cfd-profile-card {
+.cfd-profile-card,
+.cfd-spec-grid article {
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -7799,12 +8013,15 @@ dd {
 .cfd-actions ul,
 .cfd-reactions h4,
 .cfd-reactions p,
-.cfd-profile-card p {
+.cfd-profile-card p,
+.cfd-spec-grid h4,
+.cfd-spec-grid p {
   margin: 0;
 }
 
 .cfd-actions h4,
-.cfd-reactions h4 {
+.cfd-reactions h4,
+.cfd-spec-grid h4 {
   color: #071a31;
   font-size: 13px;
 }
@@ -7816,25 +8033,35 @@ dd {
 }
 
 .cfd-actions li,
-.cfd-reactions p {
+.cfd-reactions p,
+.cfd-spec-grid p {
   color: #4b596b;
   font-size: 12px;
   line-height: 1.42;
 }
 
-.cfd-reactions p {
+.cfd-reactions p,
+.cfd-spec-grid p {
   display: grid;
   gap: 3px;
 }
 
-.cfd-reactions b {
+.cfd-reactions b,
+.cfd-spec-grid b {
   color: #071a31;
 }
 
-.cfd-reactions span {
+.cfd-reactions span,
+.cfd-spec-grid span {
   color: #52647e;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
+}
+
+.cfd-spec-grid small {
+  color: #61708a;
+  font-size: 11px;
+  line-height: 1.36;
 }
 
 .cfd-profile-card {
@@ -7929,6 +8156,17 @@ dd {
 @keyframes bubbleRise {
   0%, 100% { transform: translateY(7px); opacity: 0.36; }
   50% { transform: translateY(-12px); opacity: 0.78; }
+}
+
+@keyframes cfdBubbleRise {
+  0% { transform: translate(0, 16px) scale(0.78); opacity: 0.22; }
+  50% { transform: translate(8px, -10px) scale(1); opacity: 0.74; }
+  100% { transform: translate(-5px, -28px) scale(0.84); opacity: 0.28; }
+}
+
+@keyframes cfdDashFlow {
+  0% { stroke-dashoffset: 42; }
+  100% { stroke-dashoffset: 0; }
 }
 
 @keyframes bubbleWobble {
@@ -10877,6 +11115,7 @@ th {
   .cfd-openfoam-heading,
   .cfd-handoff-grid,
   .cfd-openfoam-grid,
+  .cfd-spec-grid,
   .route-map-grid {
     grid-template-columns: 1fr;
   }

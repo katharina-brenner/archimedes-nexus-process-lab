@@ -8691,6 +8691,48 @@ function cfdMeshRows(report = cfdReport()) {
   }));
 }
 
+function cfdGeometryRows(report = cfdReport()) {
+  return report.flatMap((unit) => {
+    const eng = unit.engineering || {};
+    const volumeM3 = Math.max(0.02, unit.volumeL / 1000);
+    const aspectRatio = 2.7;
+    const tankDiameterM = Math.max(0.25, Math.cbrt((4 * volumeM3) / (Math.PI * aspectRatio)));
+    const liquidHeightM = tankDiameterM * aspectRatio * (eng.workingVolumePct || 80) / 100;
+    const impellerDiameterM = tankDiameterM * (isCellCultureTemplate() ? 0.42 : 0.36);
+    const baffleWidthM = tankDiameterM * 0.1;
+    return [
+      { reactor: unit.id, feature: "Cylindrical vessel", tag: "TANK", value: formatNumber(tankDiameterM, 2), unit: "m diameter", location: "full height", cfdRole: "Defines wall boundary, hydrostatic head, liquid volume and scale-dependent mixing length." },
+      { reactor: unit.id, feature: "Liquid height", tag: "HL", value: formatNumber(liquidHeightM, 2), unit: "m", location: `${formatNumber(eng.workingVolumePct || 80, 0)}% working volume`, cfdRole: "Sets liquid surface, headspace and gas-disengagement boundary." },
+      { reactor: unit.id, feature: "Central shaft", tag: "SH-1", value: formatNumber(eng.rpm || 0, 0), unit: "rpm", location: "axis x/D = 0.5", cfdRole: "Rotating reference frame / momentum source for the impeller zones." },
+      { reactor: unit.id, feature: "Upper impeller", tag: "IMP-1", value: formatNumber(impellerDiameterM, 2), unit: "m diameter", location: "z/H = 0.62", cfdRole: "Radial jet and local shear generation; interacts with upper circulation loop." },
+      { reactor: unit.id, feature: "Lower impeller", tag: "IMP-2", value: formatNumber(impellerDiameterM, 2), unit: "m diameter", location: "z/H = 0.34", cfdRole: "Gas dispersion and lower circulation loop; critical for bottom dead-zone removal." },
+      { reactor: unit.id, feature: "Four wall baffles", tag: "BF-1..4", value: formatNumber(baffleWidthM, 2), unit: "m width", location: "90 degree intervals", cfdRole: "Suppresses vortex formation and creates high-gradient near-wall regions." },
+      { reactor: unit.id, feature: "Ring sparger", tag: "SP-1", value: state.cfdOxygenInlet, unit: "", location: "bottom tangent plane", cfdRole: "Gas inlet for alpha.gas, bubble plume and oxygen scalar source." },
+      { reactor: unit.id, feature: "Feed inlet", tag: "FD-1", value: state.cfdNutrientInlet, unit: "", location: "top/subsurface/feed-ring depending on setting", cfdRole: "Nutrient scalar boundary coupled to batch phase and uptake demand." },
+      { reactor: unit.id, feature: "DO / pH probes", tag: "AN-1..2", value: "2 sensors", unit: "", location: "side insertion at two axial levels", cfdRole: "Shows possible measurement bias if sensors sit outside low-transfer cells." },
+      { reactor: unit.id, feature: "Jacket / coil", tag: "HX-J", value: formatNumber(eng.powerDensity || 0, 2), unit: "kW/m3 proxy", location: "outside wall", cfdRole: "Thermal boundary for heat removal/addition and viscosity-sensitive operation." },
+      { reactor: unit.id, feature: "CIP sprayball", tag: "CIP-1", value: "spray coverage", unit: "", location: "headplate", cfdRole: "Not part of production CFD; shown so cleaning boundary and nozzle shadowing are visible." },
+      { reactor: unit.id, feature: "Harvest / drain", tag: "HV-1", value: "bottom outlet", unit: "", location: "lowest point", cfdRole: "Defines drainability, hold-up and late-batch concentration gradients." },
+    ];
+  });
+}
+
+function cfdFlowPathRows(report = cfdReport()) {
+  return report.flatMap((unit) => {
+    const eng = unit.engineering || {};
+    return [
+      { reactor: unit.id, path: "Gas dispersion", from: "SP-1 ring sparger", to: "headspace pressure outlet", direction: "upward bubble plume", variable: "alpha.gas + C_O2", intensity: formatNumber(unit.oxygenIndex * 100, 0), unit: "% oxygen field", designCheck: "Bubble plume should not bypass probes or leave wall-side oxygen-starved zones." },
+      { reactor: unit.id, path: "Lower radial jet", from: "IMP-2 swept volume", to: "baffles and wall", direction: "horizontal radial discharge", variable: "U.liquid + shear", intensity: formatNumber(unit.velocityIndex * 100, 0), unit: "% velocity index", designCheck: "Primary gas break-up and bottom solids/cell suspension region." },
+      { reactor: unit.id, path: "Upper radial jet", from: "IMP-1 swept volume", to: "baffles and wall", direction: "horizontal radial discharge", variable: "U.liquid + shear", intensity: formatNumber(unit.shearIndex * 100, 0), unit: "% shear index", designCheck: "Controls blend time, feed incorporation and top-loop circulation." },
+      { reactor: unit.id, path: "Wall return flow", from: "outer wall", to: "upper and lower loop", direction: "upflow along baffles, inward near surface", variable: "U.liquid", intensity: formatNumber((1 - (eng.deadZonePct || 0) / 100) * 100, 0), unit: "% active volume", designCheck: "Poor return flow creates corner dead zones and biased sensor readings." },
+      { reactor: unit.id, path: "Center downflow", from: "liquid surface / upper loop", to: "sparger region", direction: "axial down along shaft", variable: "U.liquid", intensity: formatNumber(unit.velocityIndex * 100, 0), unit: "% velocity index", designCheck: "Required to close the circulation loop and bring nutrients/oxygen into the core." },
+      { reactor: unit.id, path: "Nutrient feed plume", from: "FD-1 feed inlet", to: "nearest circulation loop", direction: state.cfdNutrientInlet === "top-feed" ? "top-down entrainment" : state.cfdNutrientInlet === "feed-ring" ? "distributed radial injection" : "subsurface side injection", variable: "C_N", intensity: formatNumber(unit.nutrientIndex * 100, 0), unit: "% nutrient field", designCheck: "Avoid local substrate shock, osmolality spikes and unmixed feed pockets." },
+      { reactor: unit.id, path: "Heat boundary", from: "broth bulk", to: "jacket / coil", direction: "radial heat flux", variable: "T / viscosity coupling", intensity: formatNumber(eng.powerDensity || 0, 2), unit: "kW/m3 proxy", designCheck: "Temperature gradients change viscosity, kLa and local cell stress." },
+      { reactor: unit.id, path: "Sampling and analytics", from: "bulk liquid", to: "DO / pH / Raman / offgas sensors", direction: "measurement extraction", variable: "sensor bias", intensity: formatNumber(Math.max(unit.lowOxygenCells, unit.lowNutrientCells), 0), unit: "flagged cells", designCheck: "Probe location must be validated against local gradients, not only bulk averages." },
+    ];
+  });
+}
+
 function renderCfdBoard() {
   const report = cfdReport();
   if (!report.length) {
@@ -8715,6 +8757,8 @@ function renderCfdBoard() {
   const residualRows = cfdResidualRows([selected]);
   const meshRows = cfdMeshRows([selected]);
   const residualMax = Math.max(...residualRows.map((row) => row.convergenceRatio), 1);
+  const geometryRows = cfdGeometryRows([selected]);
+  const flowPathRows = cfdFlowPathRows([selected]);
   const layerLabels = {
     oxygen: "Dissolved oxygen",
     nutrient: "Nutrient concentration",
@@ -8754,6 +8798,8 @@ function renderCfdBoard() {
           <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
           <button data-download-report="cfd-case-csv" type="button">Case CSV</button>
           <button data-download-report="cfd-boundary-conditions-csv" type="button">Boundary CSV</button>
+          <button data-download-report="cfd-geometry-csv" type="button">Geometry CSV</button>
+          <button data-download-report="cfd-flow-paths-csv" type="button">Flow paths CSV</button>
         </div>
       </div>
       <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" />
@@ -8841,7 +8887,46 @@ function renderCfdBoard() {
           <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")} · axial slice</strong>
         </div>
         <div class="cfd-vessel-body" style="--working-volume:${formatNumber(eng.workingVolumePct, 1)}%;">
+          <svg class="cfd-engineering-svg" viewBox="0 0 720 520" aria-hidden="true">
+            <defs>
+              <marker id="cfdArrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L9,4.5 L0,9 Z" fill="#153b46"></path>
+              </marker>
+              <marker id="cfdArrowTeal" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L9,4.5 L0,9 Z" fill="#0f8f83"></path>
+              </marker>
+            </defs>
+            <path class="cfd-jacket-line" d="M82 66 C38 122 44 392 86 452 M638 66 C682 122 676 392 634 452"></path>
+            <path class="cfd-streamline primary" d="M360 178 C485 164 548 204 545 268 C542 330 468 350 375 332" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline primary delay-a" d="M360 326 C235 342 172 302 175 238 C178 176 252 156 345 174" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline radial" d="M360 196 C274 195 220 214 182 260" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-b" d="M360 196 C446 195 500 214 538 260" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-c" d="M360 332 C270 330 212 352 170 402" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-d" d="M360 332 C450 330 508 352 550 402" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline axial" d="M158 388 C122 310 120 212 162 142" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline axial delay-b" d="M562 388 C598 310 600 212 558 142" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline down" d="M360 150 C352 212 352 276 360 406" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-feed-vector" d="M546 34 L546 128 C525 154 498 166 458 176" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-thermal-vector" d="M640 218 C600 230 570 250 542 286" marker-end="url(#cfdArrow)"></path>
+            <g class="cfd-bubble-train">
+              <circle cx="298" cy="422" r="5"></circle>
+              <circle cx="326" cy="390" r="4"></circle>
+              <circle cx="350" cy="354" r="5"></circle>
+              <circle cx="382" cy="316" r="4"></circle>
+              <circle cx="408" cy="278" r="5"></circle>
+              <circle cx="432" cy="236" r="4"></circle>
+              <circle cx="454" cy="194" r="5"></circle>
+            </g>
+          </svg>
           <div class="cfd-headspace"><span>headspace</span></div>
+          <div class="cfd-headplate"><span>sealed headplate</span></div>
+          <div class="cfd-sprayball" title="CIP sprayball and headspace wash coverage"><i></i><span>CIP sprayball</span></div>
+          <div class="cfd-gas-outlet" title="Gas outlet / top pressure boundary"><span>gas out</span></div>
+          <div class="cfd-feed-port" title="Nutrient feed inlet / scalar boundary"><span>feed in</span></div>
+          <div class="cfd-sample-port" title="Sterile sample port and PAT side stream"><span>sample / PAT</span></div>
+          <div class="cfd-harvest-port" title="Bottom harvest and drain boundary"><span>harvest</span></div>
+          <div class="cfd-jacket-label jacket-left">jacket cooling</div>
+          <div class="cfd-jacket-label jacket-right">heat flux boundary</div>
           <div class="cfd-liquid-level"><span>working volume ${formatNumber(eng.workingVolumePct, 0)}%</span></div>
           <div class="cfd-baffle baffle-left"></div>
           <div class="cfd-baffle baffle-right"></div>
@@ -8868,6 +8953,8 @@ function renderCfdBoard() {
           <div class="cfd-zone-label zone-top">foam / gas disengagement</div>
           <div class="cfd-zone-label zone-mid">bulk mixing</div>
           <div class="cfd-zone-label zone-bottom">sparger + dead-zone watch</div>
+          <div class="cfd-zone-label zone-mrf-top">MRF / impeller zone 1</div>
+          <div class="cfd-zone-label zone-mrf-bottom">MRF / impeller zone 2</div>
           <div class="cfd-vector-field" aria-hidden="true">
             ${selected.cells.filter((cell) => cell.xIndex % 3 === 1 && cell.yIndex % 4 === 1).map((cell) => `
               <i style="--x:${cell.x * 100}%; --y:${cell.y * 100}%; --angle:${cell.x < 0.5 ? -55 + cell.velocity * 40 : 235 - cell.velocity * 40}deg; --speed:${cell.velocity};"></i>
@@ -8900,6 +8987,20 @@ function renderCfdBoard() {
           <article><span>OTR margin</span><strong>${formatNumber(eng.otrMargin, 2)}x</strong><small>${formatNumber(eng.otrMmolLh, 2)} mmol/L/h proxy</small></article>
           <article><span>Gas hold-up</span><strong>${formatNumber(eng.gasHoldUpPct, 1)}%</strong><small>sparger/aeration proxy</small></article>
           <article><span>Working volume</span><strong>${formatNumber(eng.workingVolumePct, 0)}%</strong><small>of vessel volume, max 80% screen</small></article>
+        </div>
+        <div class="cfd-spec-grid">
+          <article>
+            <h4>Reactor internals</h4>
+            ${geometryRows.slice(0, 8).map((row) => `
+              <p><b>${escapeHtml(row.tag)}</b><span>${escapeHtml(row.feature)} · ${escapeHtml(row.location)}</span><small>${escapeHtml(row.cfdRole)}</small></p>
+            `).join("")}
+          </article>
+          <article>
+            <h4>Resolved flow paths</h4>
+            ${flowPathRows.slice(0, 8).map((row) => `
+              <p><b>${escapeHtml(row.path)}</b><span>${escapeHtml(row.from)} &rarr; ${escapeHtml(row.to)}</span><small>${escapeHtml(row.designCheck)}</small></p>
+            `).join("")}
+          </article>
         </div>
         <div class="cfd-profile-card">
           <div>
@@ -9448,6 +9549,8 @@ function comprehensiveReport() {
     cfdBoundaryConditions: cfdBoundaryConditionRows(),
     cfdResiduals: cfdResidualRows(),
     cfdMesh: cfdMeshRows(),
+    cfdGeometry: cfdGeometryRows(),
+    cfdFlowPaths: cfdFlowPathRows(),
     gpromsAlgorithm: gpromsAlgorithmRows(),
     pvsdParameters: pvsdParameterRows(),
     procedureWorkbook: procedureOperationWorkbookRows(),
@@ -10077,6 +10180,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-cfd-boundary-conditions.csv`, cfdBoundaryConditionRows(), "CFD boundary conditions");
   } else if (type === "cfd-residuals-csv") {
     downloadCsv(`${state.template}-cfd-residual-targets.csv`, cfdResidualRows(), "CFD solver residual targets");
+  } else if (type === "cfd-geometry-csv") {
+    downloadCsv(`${state.template}-cfd-reactor-geometry.csv`, cfdGeometryRows(), "CFD reactor geometry and internals");
+  } else if (type === "cfd-flow-paths-csv") {
+    downloadCsv(`${state.template}-cfd-flow-paths.csv`, cfdFlowPathRows(), "CFD flow paths and design checks");
   } else if (type === "gproms-algorithm-csv") {
     downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
   } else if (type === "pvsd-parameters-csv") {
