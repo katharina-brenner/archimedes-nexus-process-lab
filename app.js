@@ -458,6 +458,15 @@ const scientificSources = [
     url: "https://www.bioprocessintl.com/bioreactors/characterizing-oxygen-mass-transfer-and-shear-during-cell-culture-calculating-the-maximum-cell-density-supported-by-a-20-000-liter-stirred-tank-bioreactor",
   },
   {
+    group: "Open source",
+    title: "BiRD / Bio-Reactor Design OpenFOAM framework",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "sparger", "gas-mixing", "sensor", "cfd"],
+    benchmark: "Public BSD-3-Clause GitHub repository for bioreactor CFD with OpenFOAM-9 and a custom multiphase solver; tutorial cases include 20 L bubble-column style reactor studies.",
+    modelUse: "CFD workbench basis: Euler-Euler gas/liquid fields, scalar oxygen and nutrient transport, oxygen-uptake sink terms, sparger boundaries, mesh-quality checks, and OpenFOAM handoff exports.",
+    source: "NatLabRockies/BioReactorDesign - Bio-Reactor Design framework",
+    url: "https://github.com/NatLabRockies/BioReactorDesign",
+  },
+  {
     group: "Industry",
     title: "Process intensification and 2,000 L scale-out",
     appliesTo: ["production-reactor", "perfusion", "seed-reactor", "wave"],
@@ -8557,6 +8566,131 @@ function cfdFieldCsvRows() {
   })));
 }
 
+function cfdOpenFoamCaseRows(report = cfdReport()) {
+  return report.flatMap((unit) => {
+    const eng = unit.engineering || {};
+    return [
+      {
+        reactor: unit.id,
+        modelBlock: "Case directory",
+        setting: "Reference pattern",
+        value: "tutorial_cases/bubble_column_20L adapted to Axion generated case",
+        unit: "",
+        implementation: "Browser case builder; export handoff for external OpenFOAM/BiRD run",
+        sourceBasis: "NatLabRockies/BioReactorDesign public BSD-3-Clause repository",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Solver",
+        setting: "Multiphase CFD",
+        value: "birdmultiphaseEulerFoam / OpenFOAM-9 style",
+        unit: "",
+        implementation: "Euler-Euler gas/liquid concept with scalar transport and uptake sinks",
+        sourceBasis: "BiRD framework structure, represented as Axion screening logic",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Geometry",
+        setting: "Axial reactor slice",
+        value: `${formatNumber(unit.volumeL, 0)} L vessel, ${formatNumber(eng.workingVolumePct || 80, 0)}% working volume`,
+        unit: "",
+        implementation: "2D browser field for design review; 3D mesh required for validated CFD",
+        sourceBasis: "Industrial stirred-tank / bubble-column CFD workflow",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Gas phase",
+        setting: "Oxygen inlet",
+        value: unit.oxygenInlet,
+        unit: "",
+        implementation: "Sparger boundary sets gas source, bubble plume, local hold-up and OTR proxy",
+        sourceBasis: "Gas-liquid mass-transfer case setup",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Liquid phase",
+        setting: "Nutrient inlet",
+        value: unit.nutrientInlet,
+        unit: "",
+        implementation: "Scalar feed source couples nutrient field to circulation and biomass demand",
+        sourceBasis: "Scalar transport plus cell-uptake sink",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Reaction sink",
+        setting: "Oxygen uptake",
+        value: `OUR proxy ${formatNumber(state.params.our || 1.1, 2)}`,
+        unit: "mmol/L/h",
+        implementation: "S_O2 = -qO2 * X; low-oxygen cells trigger design warnings",
+        sourceBasis: "Bioprocess oxygen transfer model",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Engineering checks",
+        setting: "Scale-up constraints",
+        value: `mixing ${formatNumber(eng.mixingTimeMin || 0, 1)} min, OTR margin ${formatNumber(eng.otrMargin || 0, 2)}x`,
+        unit: "",
+        implementation: "Warns on oxygen, nutrient, shear, dead-zone and working-volume limits",
+        sourceBasis: "Industrial CFD pre-check before validated 3D solving",
+      },
+    ];
+  });
+}
+
+function cfdBoundaryConditionRows(report = cfdReport()) {
+  return report.flatMap((unit) => {
+    const p = state.params;
+    const eng = unit.engineering || {};
+    return [
+      { reactor: unit.id, boundary: "gas_inlet", variable: "alpha.gas / U.gas / C_O2", type: unit.oxygenInlet, value: `aeration ${formatNumber(p.aeration || 0.35, 2)} vvm; DO target ${formatNumber(p.doSetpoint || 0.45, 2)}`, unit: "vvm / fraction", engineeringMeaning: "Defines gas holdup, plume location and oxygen source distribution." },
+      { reactor: unit.id, boundary: "feed_inlet", variable: "C_N / glucose / glutamine proxy", type: unit.nutrientInlet, value: `feed factor ${formatNumber(p.feedConcentration || 1, 2)}; phase ${unit.batchPhase}`, unit: "relative", engineeringMeaning: "Defines nutrient scalar addition and local feed-risk zones." },
+      { reactor: unit.id, boundary: "walls_baffles", variable: "U.liquid", type: "noSlip", value: "stationary wall and baffle surfaces", unit: "", engineeringMeaning: "Creates near-wall velocity penalty and possible mixing dead zones." },
+      { reactor: unit.id, boundary: "top_headspace", variable: "p_rgh / alpha.gas", type: "pressure outlet / gas disengagement", value: "open degassing boundary", unit: "", engineeringMeaning: "Represents headspace and foam/gas-disengagement region." },
+      { reactor: unit.id, boundary: "impeller_zone", variable: "MRF / momentum source", type: "horizontal rotating reference frame proxy", value: `${formatNumber(eng.rpm || 0, 0)} rpm; tip speed ${formatNumber(eng.tipSpeed || 0, 2)}`, unit: "rpm / m/s", engineeringMeaning: "Defines horizontal circulation plane, local shear and bulk mixing energy." },
+      { reactor: unit.id, boundary: "cell_uptake", variable: "S_O2 / S_N", type: "volumetric sink", value: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, unit: "mmol/L/h / 10^6 cells/mL", engineeringMeaning: "Consumes oxygen and nutrients over time; drives late-batch gradients." },
+      { reactor: unit.id, boundary: "mesh_quality", variable: "cell quality", type: "3D handoff requirement", value: "browser 18 x 24 axial screen; validated case needs 3D mesh refinement", unit: "cells", engineeringMeaning: "Screening contour is not a validated CFD solution until solved externally." },
+    ];
+  });
+}
+
+function cfdResidualRows(report = cfdReport()) {
+  return report.flatMap((unit) => {
+    const risk = Math.max(0.02, unit.riskIndex || 0.2);
+    const residuals = [
+      ["p_rgh", 1.2e-3 * (1 + risk), 1.0e-4, risk < 0.45 ? "near target" : "requires tighter convergence"],
+      ["U.liquid", 2.6e-4 * (1 + risk * 1.8), 5.0e-5, "check impeller-zone refinement"],
+      ["alpha.gas", 7.8e-4 * (1 + (1 - unit.oxygenIndex)), 1.0e-4, "sensitive to sparger boundary"],
+      ["C_O2", 9.5e-4 * (1 + unit.lowOxygenCells / Math.max(1, unit.cells.length)), 1.0e-4, "oxygen scalar should converge before scale decisions"],
+      ["C_N", 8.8e-4 * (1 + unit.lowNutrientCells / Math.max(1, unit.cells.length)), 1.0e-4, "feed scalar should converge before feed-point recommendation"],
+      ["k / epsilon", 4.2e-4 * (1 + unit.shearIndex), 1.0e-4, "turbulence closure must be validated against mixing-time data"],
+    ];
+    return residuals.map(([equation, currentResidual, targetResidual, note], index) => ({
+      reactor: unit.id,
+      solverStep: index + 1,
+      equation,
+      currentResidual,
+      targetResidual,
+      convergenceRatio: currentResidual / targetResidual,
+      status: currentResidual <= targetResidual * 5 ? "screening acceptable" : "needs external CFD solve",
+      note,
+    }));
+  });
+}
+
+function cfdMeshRows(report = cfdReport()) {
+  return report.map((unit) => ({
+    reactor: unit.id,
+    browserGridCells: unit.gridW * unit.gridH,
+    axialColumns: unit.gridW,
+    axialRows: unit.gridH,
+    recommended3dCellsLow: unit.volumeL > 20000 ? 1500000 : 450000,
+    recommended3dCellsHigh: unit.volumeL > 20000 ? 6000000 : 2200000,
+    refinementZones: "sparger, impeller swept volume, baffles, wall boundary layers, probes, feed inlet, liquid surface",
+    validationDataNeeded: "mixing time, kLa, gas hold-up, power draw, DO probe response, tracer pulse, broth viscosity",
+    solverMeaning: "Use the browser map for engineering triage; use exported setup to run full 3D CFD before design freeze.",
+  }));
+}
+
 function renderCfdBoard() {
   const report = cfdReport();
   if (!report.length) {
@@ -8576,6 +8710,11 @@ function renderCfdBoard() {
   const eng = selected.engineering;
   const timeBounds = cfdTimeBounds();
   const timeSeries = selectedUnit ? cfdTimeSeriesRows(selectedUnit) : [];
+  const caseRows = cfdOpenFoamCaseRows([selected]);
+  const boundaryRows = cfdBoundaryConditionRows([selected]);
+  const residualRows = cfdResidualRows([selected]);
+  const meshRows = cfdMeshRows([selected]);
+  const residualMax = Math.max(...residualRows.map((row) => row.convergenceRatio), 1);
   const layerLabels = {
     oxygen: "Dissolved oxygen",
     nutrient: "Nutrient concentration",
@@ -8597,9 +8736,9 @@ function renderCfdBoard() {
   els.cfdBoard.innerHTML = `
     <section class="cfd-hero">
       <div>
-        <p>Interactive bioreactor CFD workbench</p>
+        <p>OpenFOAM / BiRD inspired CFD workbench</p>
         <h3>${selected.id} · ${selected.name}</h3>
-        <span>Transient CFD-style analysis for oxygen transfer, nutrient distribution, velocity, shear, dead zones, and feed-point placement. Choose the field, move the batch time, and change where O₂ and nutrients enter the reactor.</span>
+        <span>Transient axial-slice screening for oxygen transfer, nutrient distribution, velocity, shear, dead zones, and feed-point placement. The browser view builds the CFD case logic; a validated design still needs an external 3D OpenFOAM/BiRD solve.</span>
       </div>
       <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
     </section>
@@ -8608,11 +8747,13 @@ function renderCfdBoard() {
         <div>
           <span>Transient solver view</span>
           <strong>${formatNumber(selected.timeH, 1)} h · ${escapeHtml(selected.batchPhase)}</strong>
-          <small>Screening model: convective circulation + dispersed gas source + nutrient feed source + uptake demand over batch time.</small>
+          <small>Case-builder model: dispersed gas source, liquid circulation, scalar oxygen/nutrient transport, uptake sink, wall/baffle penalties, and mesh-quality handoff.</small>
         </div>
         <div class="cfd-control-actions">
           <button data-download-report="cfd-field-csv" type="button">Field CSV</button>
           <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
+          <button data-download-report="cfd-case-csv" type="button">Case CSV</button>
+          <button data-download-report="cfd-boundary-conditions-csv" type="button">Boundary CSV</button>
         </div>
       </div>
       <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" />
@@ -8638,11 +8779,66 @@ function renderCfdBoard() {
         `).join("")}
       </div>
     </section>
+    <section class="cfd-openfoam-panel">
+      <div class="cfd-openfoam-heading">
+        <div>
+          <span>Public CFD basis</span>
+          <h4>BiRD-style OpenFOAM case setup for stirred or sparged bioreactors</h4>
+          <p>Axion now separates three layers: browser screening, solver handoff, and validated CFD evidence. This makes the reactor view useful for design conversations without pretending that a browser animation is a final Navier-Stokes result.</p>
+        </div>
+        <a href="https://github.com/NatLabRockies/BioReactorDesign" target="_blank" rel="noreferrer">Reference repo</a>
+      </div>
+      <div class="cfd-openfoam-grid">
+        ${caseRows.slice(1, 7).map((row) => `
+          <article>
+            <span>${escapeHtml(row.modelBlock)}</span>
+            <strong>${escapeHtml(row.setting)}</strong>
+            <p>${escapeHtml(row.implementation)}</p>
+            <small>${escapeHtml(row.value)}</small>
+          </article>
+        `).join("")}
+      </div>
+      <div class="cfd-handoff-grid">
+        <article class="cfd-case-table">
+          <div>
+            <span>Boundary conditions</span>
+            <strong>What the real CFD solver needs</strong>
+          </div>
+          ${boundaryRows.slice(0, 6).map((row) => `
+            <p>
+              <b>${escapeHtml(row.boundary)}</b>
+              <span>${escapeHtml(row.variable)} · ${escapeHtml(row.type)}</span>
+              <small>${escapeHtml(row.engineeringMeaning)}</small>
+            </p>
+          `).join("")}
+        </article>
+        <article class="cfd-residual-panel">
+          <div>
+            <span>Solver convergence preview</span>
+            <strong>Residual targets for external CFD</strong>
+          </div>
+          ${residualRows.map((row) => `
+            <p title="${escapeAttr(row.note)}">
+              <span>${escapeHtml(row.equation)}</span>
+              <b style="--residual:${Math.min(100, row.convergenceRatio / residualMax * 100)}%;"></b>
+              <small>${formatNumber(row.currentResidual, 5)} / ${formatNumber(row.targetResidual, 5)}</small>
+            </p>
+          `).join("")}
+          <button data-download-report="cfd-residuals-csv" type="button">Download residual CSV</button>
+        </article>
+        <article class="cfd-mesh-card">
+          <span>Mesh and validation</span>
+          <strong>${formatNumber(meshRows[0].recommended3dCellsLow, 0)}-${formatNumber(meshRows[0].recommended3dCellsHigh, 0)} cells</strong>
+          <p>${escapeHtml(meshRows[0].refinementZones)}</p>
+          <small>${escapeHtml(meshRows[0].validationDataNeeded)}</small>
+        </article>
+      </div>
+    </section>
     <section class="cfd-layout">
       <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
-          <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")}</strong>
+          <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")} · axial slice</strong>
         </div>
         <div class="cfd-vessel-body" style="--working-volume:${formatNumber(eng.workingVolumePct, 1)}%;">
           <div class="cfd-headspace"><span>headspace</span></div>
@@ -9248,6 +9444,10 @@ function comprehensiveReport() {
     cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ xIndex: cell.xIndex, yIndex: cell.yIndex, oxygen: cell.oxygen, nutrient: cell.nutrient, velocity: cell.velocity, shear: cell.shear, risk: cell.risk })) })),
     cfdField: cfdFieldCsvRows(),
     cfdTimeSeries: cfdBioreactors().flatMap((unit) => cfdTimeSeriesRows(unit)),
+    cfdOpenFoamCase: cfdOpenFoamCaseRows(),
+    cfdBoundaryConditions: cfdBoundaryConditionRows(),
+    cfdResiduals: cfdResidualRows(),
+    cfdMesh: cfdMeshRows(),
     gpromsAlgorithm: gpromsAlgorithmRows(),
     pvsdParameters: pvsdParameterRows(),
     procedureWorkbook: procedureOperationWorkbookRows(),
@@ -9871,6 +10071,12 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-cfd-transient-field-${formatNumber(state.cfdTimeH || 0, 1)}h.csv`, cfdFieldCsvRows(), "Transient CFD field grid");
   } else if (type === "cfd-time-series-csv") {
     downloadCsv(`${state.template}-cfd-time-series.csv`, cfdBioreactors().flatMap((unit) => cfdTimeSeriesRows(unit)), "CFD time series");
+  } else if (type === "cfd-case-csv") {
+    downloadCsv(`${state.template}-openfoam-bird-case-setup.csv`, cfdOpenFoamCaseRows(), "OpenFOAM BiRD case setup");
+  } else if (type === "cfd-boundary-conditions-csv") {
+    downloadCsv(`${state.template}-cfd-boundary-conditions.csv`, cfdBoundaryConditionRows(), "CFD boundary conditions");
+  } else if (type === "cfd-residuals-csv") {
+    downloadCsv(`${state.template}-cfd-residual-targets.csv`, cfdResidualRows(), "CFD solver residual targets");
   } else if (type === "gproms-algorithm-csv") {
     downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
   } else if (type === "pvsd-parameters-csv") {
