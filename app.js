@@ -1818,6 +1818,10 @@ const equations = [
   eq("Inventory reorder point", "economics", "ROP = demand_rate * lead_time + safety_stock", "Raw-material and consumable reorder trigger for media, buffers, filters, resin, single-use assemblies, and cleaning agents."),
   eq("WIP turn", "economics", "WIP_turns = released_good_mass / average_work_in_process", "Inventory-efficiency and lead-time indicator across intermediate pools and production queues."),
   eq("Sequence objective", "economics", "min Z = w1*lateness + w2*changeover + w3*idle_time + w4*WIP + w5*priority_miss", "Detailed sequencing objective for feasible production schedules under changing demand and constraints."),
+  eq("Room occupancy", "economics", "U_room = busy_time_room / available_time_room", "Room and suite occupancy for production, support, QC, warehouse, and cleaning areas."),
+  eq("Personnel load", "economics", "FTE_required = labor_hours / scheduled_shift_hours", "Operator, QA, QC, maintenance, and material-handler staffing load by planning period."),
+  eq("Equipment state transition", "economics", "state_next = transition(state_current, event, resource_available)", "Discrete-event machine state logic for setup, processing, transfer, cleaning, waiting, blocked, and released states."),
+  eq("Factory optimization score", "economics", "score = 100 - w1*lateness - w2*overload - w3*WIP - w4*cost - w5*risk", "Factory-level optimization score across capacity, delivery, inventory, staffing, cleaning, and route choices."),
   eq("Sankey flow share", "mass", "share_i = annual_mass_i / sum(annual_mass_relevant)", "Relative material-flow contribution used for Sankey-style process visualization."),
   eq("Genetic optimizer objective", "economics", "min f(x)=w1*COGS+w2*CO2e+w3*cycle_time+w4*risk-w5*yield", "Multi-objective optimization target for route, capacity, resource, and process-parameter screening."),
   eq("Neural surrogate prediction", "kinetics", "y_hat = NN(theta; titer, kLa, media, temperature, pH, feed)", "Machine-learning surrogate placeholder for fast prediction and calibration around mechanistic process models."),
@@ -4772,6 +4776,210 @@ function plantSimulationModel() {
     bottlenecks: topBottlenecks,
     interfaces: plantSimulationInterfaceRows(),
   };
+}
+
+function factoryRoomRows(schedule = campaignSchedule()) {
+  const groups = [...new Set(state.units.map((item) => scheduleUnitGroup(item)))];
+  const resourceByArea = Object.fromEntries(schedule.resourceRows.filter((item) => item.type === "Process area").map((item) => [item.resource, item]));
+  const roomMeta = {
+    "Upstream": { roomType: "cell culture / fermentation suite", cleanroom: "ISO 8 / CNC support depending process", pressure: "positive to corridor", x: 8, y: 14, w: 30, h: 30 },
+    "Downstream": { roomType: "purification suite", cleanroom: "ISO 8 / controlled", pressure: "positive cascade", x: 42, y: 14, w: 30, h: 30 },
+    "Preparation": { roomType: "media and buffer preparation", cleanroom: "controlled support", pressure: "neutral / positive", x: 8, y: 50, w: 26, h: 26 },
+    "Utilities": { roomType: "utility mezzanine", cleanroom: "technical area", pressure: "segregated", x: 70, y: 52, w: 22, h: 28 },
+    "Quality": { roomType: "QC and release lab", cleanroom: "controlled lab", pressure: "segregated", x: 38, y: 52, w: 24, h: 24 },
+    "Environmental": { roomType: "waste and abatement", cleanroom: "contained technical area", pressure: "negative / exhausted", x: 64, y: 18, w: 26, h: 24 },
+  };
+  return groups.map((group, index) => {
+    const units = state.units.filter((item) => scheduleUnitGroup(item) === group);
+    const resource = resourceByArea[group] || {};
+    const meta = roomMeta[group] || { roomType: `${group} room`, cleanroom: "project-defined", pressure: "project-defined", x: 8 + (index % 3) * 30, y: 18 + Math.floor(index / 3) * 30, w: 24, h: 22 };
+    const occupancyPct = Number(resource.occupancyPct || 0);
+    return {
+      roomId: `RM-${String(index + 1).padStart(2, "0")}`,
+      roomName: group,
+      roomType: meta.roomType,
+      cleanroomClass: meta.cleanroom,
+      pressureCascade: meta.pressure,
+      xPct: meta.x,
+      yPct: meta.y,
+      widthPct: meta.w,
+      heightPct: meta.h,
+      equipmentCount: units.length,
+      mainEquipment: units.filter((item) => unitLayer(item) === "main").map((item) => item.id).join(" | "),
+      supportEquipment: units.filter((item) => unitLayer(item) !== "main").map((item) => item.id).join(" | "),
+      occupancyPct,
+      status: occupancyPct > 92 ? "room bottleneck" : occupancyPct > 75 ? "room review" : "available",
+      editableNow: "room assignment, capacity, cleanroom class, pressure cascade, people/material flow",
+    };
+  });
+}
+
+function movingBatchRows(schedule = campaignSchedule()) {
+  const ops = schedule.operations.filter((item) => item.batchId === "B01").slice(0, 18);
+  const total = Math.max(1, schedule.makespanH);
+  return ops.map((item, index) => {
+    const from = index ? ops[index - 1].tag : "Raw materials";
+    const x = 10 + (item.startH / total) * 72;
+    const y = 24 + (index % 5) * 12;
+    const duration = Math.max(4, Math.min(16, item.processH / Math.max(1, total) * 34 + 4));
+    return {
+      tokenId: `BT-${String(index + 1).padStart(2, "0")}`,
+      batchId: item.batchId,
+      from,
+      to: item.tag,
+      operation: item.operation,
+      room: item.group,
+      startH: item.startH,
+      finishH: item.finishH,
+      durationH: item.finishH - item.startH,
+      xPct: Math.max(8, Math.min(86, x)),
+      yPct: Math.max(16, Math.min(80, y)),
+      animationDurationS: duration,
+      status: item.status,
+      contents: activeTemplate().product,
+    };
+  });
+}
+
+function personnelPlanRows(schedule = campaignSchedule()) {
+  const shiftHours = Math.max(1, state.params.operatorShiftHours || 8);
+  const operations = schedule.operations;
+  const roleConfig = [
+    { role: "Upstream operator", match: (item) => item.class === "Bioreactor" || item.group === "Upstream", load: 0.42 },
+    { role: "Downstream operator", match: (item) => ["Downstream", "Purification"].includes(item.group) || ["Purification", "Concentration", "Recovery", "Separation"].includes(item.class), load: 0.36 },
+    { role: "Utility / CIP technician", match: (item) => item.cleanH > 0 || /cip|sip|utility|steam|wfi/i.test(`${item.operation} ${item.class}`), load: 0.3 },
+    { role: "QC analyst", match: (item) => item.class === "Quality" || /qc|release|sample/i.test(item.operation), load: 0.34 },
+    { role: "Material handler", match: (item) => item.transferEndH > item.processEndH || /prep|buffer|media|hold/i.test(item.operation), load: 0.22 },
+    { role: "Maintenance / automation", match: () => true, load: 0.08 },
+  ];
+  return roleConfig.map((config) => {
+    const matched = operations.filter(config.match);
+    const laborHours = matched.reduce((sum, item) => sum + (item.setupH + item.processH + item.cleanH) * config.load, 0);
+    const fte = laborHours / Math.max(1, schedule.makespanH / shiftHours * shiftHours);
+    return {
+      role: config.role,
+      laborHours,
+      shiftHours,
+      requiredFte: fte,
+      assignedFteScreen: Math.max(1, Math.ceil(fte * 1.15)),
+      utilizationPct: Math.min(140, fte / Math.max(1, Math.ceil(fte * 1.15)) * 100),
+      linkedOperations: matched.length,
+      status: fte > Math.ceil(fte * 1.15) ? "understaffed" : fte > 0.85 ? "review" : "ok",
+      handoverNeed: matched.length > 16 ? "shift handover checklist required" : "standard shift note",
+    };
+  });
+}
+
+function inventoryLevelRows(schedule = campaignSchedule()) {
+  const apsInventory = apsInventoryRows();
+  return apsInventory.slice(0, 12).flatMap((item, itemIndex) => {
+    const startCoverage = Number(item.coverageDays || 0);
+    return Array.from({ length: 8 }, (_, bucketIndex) => {
+      const day = bucketIndex * 3;
+      const replenishment = bucketIndex === 4 ? Number(item.leadTimeDays || 0) * 0.65 : 0;
+      const projectedCoverage = Math.max(0, startCoverage - day * 0.68 + replenishment);
+      return {
+        item: item.item,
+        inventoryClass: item.inventoryClass,
+        day,
+        projectedCoverageDays: projectedCoverage,
+        leadTimeDays: item.leadTimeDays,
+        reorderPointUsd: item.reorderPointUsd,
+        shortageRisk: projectedCoverage < Number(item.leadTimeDays || 0) * 0.55 ? "risk" : "ok",
+        excessRisk: projectedCoverage > 40 ? "excess" : "normal",
+        linkedPolicy: item.action,
+        lane: itemIndex % 4 === 0 ? "raw material" : itemIndex % 4 === 1 ? "consumable" : itemIndex % 4 === 2 ? "utility/chemical" : "WIP",
+      };
+    });
+  });
+}
+
+function equipmentStateMachineRows(schedule = campaignSchedule()) {
+  return schedule.operations.slice(0, 80).flatMap((item) => {
+    const states = [
+      { state: "idle", event: "resource released", startH: Math.max(0, item.startH - Math.max(0.1, item.setupH * 0.6)), finishH: item.startH },
+      { state: "setup", event: "recipe starts", startH: item.startH, finishH: item.startH + item.setupH },
+      { state: "process", event: "setup complete", startH: item.startH + item.setupH, finishH: item.processEndH },
+      { state: "transfer", event: "process complete", startH: item.processEndH, finishH: item.transferEndH },
+      { state: item.cleanH > 0 ? "clean" : "release", event: item.cleanH > 0 ? "transfer complete" : "no cleaning required", startH: item.cleanStartH, finishH: item.cleanStartH + item.cleanH },
+      { state: item.status === "scheduled" ? "available" : "blocked", event: item.status, startH: item.finishH, finishH: item.availableH },
+    ];
+    return states.filter((stateRow) => stateRow.finishH >= stateRow.startH).map((stateRow, index) => ({
+      batchId: item.batchId,
+      equipmentTag: item.tag,
+      equipmentName: item.operation,
+      sequence: index + 1,
+      state: stateRow.state,
+      triggeringEvent: stateRow.event,
+      startH: stateRow.startH,
+      finishH: stateRow.finishH,
+      durationH: Math.max(0, stateRow.finishH - stateRow.startH),
+      nextState: states[index + 1]?.state || "available",
+      resourceConstraint: item.assignedEquipment,
+      status: item.status,
+    }));
+  });
+}
+
+function factoryOptimizationRows(schedule = campaignSchedule()) {
+  const data = metrics();
+  const routeRows = routeOptimizationRows();
+  const aps = advancedPlanningSuite(schedule);
+  const options = [];
+  routeRows.slice(0, 3).forEach((route) => {
+    [1, 2].forEach((parallelBoost) => {
+      [0.85, 1, 1.15].forEach((cipFactor) => {
+        [0.9, 1, 1.12].forEach((staffFactor) => {
+          const overloadPenalty = Math.max(0, aps.kpis.capacityRiskCount * 5 - (parallelBoost - 1) * 12 - (staffFactor - 1) * 18);
+          const latenessPenalty = Math.max(0, aps.kpis.deliveryRiskCount * 6 - (staffFactor - 1) * 10 - (parallelBoost - 1) * 8);
+          const wipPenalty = Math.max(0, plantSimulationValueStreamRows(schedule).find((item) => item.category === "non-value")?.sharePct || 0) * 0.35;
+          const costPenalty = (parallelBoost - 1) * 8 + Math.abs(1 - cipFactor) * 9 + (staffFactor - 1) * 6;
+          const cleaningRisk = cipFactor < 0.95 ? 8 : cipFactor > 1.05 ? 1 : 3;
+          const score = Math.max(0, Math.min(100, route.score - overloadPenalty - latenessPenalty - wipPenalty - costPenalty - cleaningRisk));
+          options.push({
+            scenarioId: `OPT-${String(options.length + 1).padStart(3, "0")}`,
+            route: route.label,
+            parallelCapacityFactor: parallelBoost,
+            cipTimeFactor: cipFactor,
+            staffingFactor: staffFactor,
+            objectiveScore: score,
+            estimatedCostUsdKg: data.directCost * (1 + (parallelBoost - 1) * 0.08 + (staffFactor - 1) * 0.06 - (1 - cipFactor) * 0.03),
+            estimatedReleasePitchH: Math.max(0.1, schedule.releasePitchH / parallelBoost * cipFactor / Math.max(0.85, staffFactor)),
+            capacityPenalty: overloadPenalty,
+            deliveryPenalty: latenessPenalty,
+            wipPenalty,
+            cleaningRisk,
+            recommendation: score >= 82 ? "best candidate for detailed validation" : score >= 70 ? "viable candidate" : "do not prioritize",
+          });
+        });
+      });
+    });
+  });
+  return options.sort((a, b) => b.objectiveScore - a.objectiveScore).slice(0, 18);
+}
+
+function factoryRoomCsvRows() {
+  return factoryRoomRows();
+}
+
+function movingBatchCsvRows() {
+  return movingBatchRows();
+}
+
+function personnelPlanCsvRows() {
+  return personnelPlanRows();
+}
+
+function inventoryLevelCsvRows() {
+  return inventoryLevelRows();
+}
+
+function equipmentStateMachineCsvRows() {
+  return equipmentStateMachineRows();
+}
+
+function factoryOptimizationCsvRows() {
+  return factoryOptimizationRows();
 }
 
 function plantSimulationObjectRows(model = plantSimulationModel()) {
