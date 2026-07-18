@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260717-command-canvas-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-designer-audit-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -90,8 +90,39 @@
                 <span><strong>ICS 71.120</strong> mapped</span>
               </div>
             </div>
-            <figure class="hero-product-visual" aria-label="Axion Process OS product visualization">
-              <img src="./assets/axion-process-os-hero.png" alt="Axion Process OS interface preview with flowsheet, bioreactor, balances, scheduling, and analytics panels" />
+            <figure class="hero-product-visual product-wireframe" aria-label="Axion Process OS product visualization">
+              <div class="wireframe-top">
+                <span></span><span></span><span></span>
+                <b>Axion Process OS</b>
+              </div>
+              <div class="wireframe-body">
+                <aside>
+                  <b>Model</b>
+                  <span class="active">mAb fed-batch</span>
+                  <span>Penicillin</span>
+                  <span>Cultured meat</span>
+                  <span>Utilities + CIP</span>
+                </aside>
+                <div class="wireframe-canvas">
+                  <div class="wire-node node-a">Media</div>
+                  <i class="wire-flow flow-1"></i>
+                  <div class="wire-node node-b primary">Seed</div>
+                  <i class="wire-flow flow-2"></i>
+                  <div class="wire-node node-c reactor">STR</div>
+                  <i class="wire-flow flow-3"></i>
+                  <div class="wire-node node-d">Capture</div>
+                  <i class="wire-flow flow-4"></i>
+                  <div class="wire-node node-e">UF/DF</div>
+                  <div class="wire-node node-f utility">CIP/SIP</div>
+                  <i class="wire-flow utility-flow"></i>
+                </div>
+                <section>
+                  <b>Live checks</b>
+                  <span><i></i> kLa margin</span>
+                  <span><i></i> Mass balance</span>
+                  <span><i></i> LCA/TEA ready</span>
+                </section>
+              </div>
             </figure>
           </section>
 
@@ -100,8 +131,16 @@
               <span>Prompt to plant</span>
               <h2>Start with words. Continue with an editable engineering model.</h2>
               <p>The first step is not a template menu. Describe the product, scale, organism, quality target, and constraints; Axion chooses a process family and opens the workspace.</p>
-              <figure class="bento-product-image">
-                <img src="./assets/axion-biomanufacturing-suite.png" alt="Digital twin view of a modern biomanufacturing process suite with bioreactors, piping, utilities, and sensor overlays" />
+              <figure class="bento-product-image facility-wireframe" aria-label="Axion facility model preview">
+                <div class="facility-room room-media">Media</div>
+                <div class="facility-room room-seed">Seed</div>
+                <div class="facility-room room-production">Production</div>
+                <div class="facility-room room-dsp">DSP</div>
+                <div class="facility-room room-qc">QC</div>
+                <span class="facility-line line-a"></span>
+                <span class="facility-line line-b"></span>
+                <span class="facility-line line-c"></span>
+                <span class="facility-badge">Factory → room → equipment → CFD</span>
               </figure>
             </article>
             <article class="bento-card">
@@ -1044,6 +1083,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260717-command-canvas-v1"></script>
+    <script type="module" src="./app.js?v=20260718-designer-audit-v1"></script>
   </body>
 </html>
