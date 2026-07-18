@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-layout-calm-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-homepage-stack-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -48,47 +48,6 @@
               </div>
               <h1>Build a biomanufacturing plant from a product brief.</h1>
               <span>Write the plant you want. Axion opens a technical workspace with flowsheets, equipment, balances, CFD, standards, sources, LCA/TEA-ready datasets, and downloadable visualizations.</span>
-              <div class="hero-composer" aria-label="Product brief composer preview">
-                <div class="composer-topline">
-                  <span>What should Axion model?</span>
-                  <b>Prompt-to-process</b>
-                </div>
-                <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and CFD screening.</p>
-                <div class="composer-actions">
-                  <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
-                  <button class="public-secondary" type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">See the mAb example</button>
-                </div>
-              </div>
-              <div class="hero-outcome-panel" aria-label="Generated workspace preview">
-                <span>Generated workspace includes</span>
-                <b>76 units</b>
-                <b>81 streams</b>
-                <b>39 boundary checks</b>
-                <b>16 report modules</b>
-              </div>
-              <div class="hero-process-ribbon" aria-label="Animated generated process">
-                <span>Media</span>
-                <i></i>
-                <span>Seed</span>
-                <i></i>
-                <span class="process-core">Bioreactor</span>
-                <i></i>
-                <span>Purification</span>
-                <i></i>
-                <span>Fill</span>
-              </div>
-              <div class="prompt-suggestions" aria-label="Example process prompts">
-                <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
-                <button type="button" data-public-target="loginPanel">Penicillin fermentation</button>
-                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">Antibody GMP facility</button>
-                <button type="button" data-public-target="loginPanel">Wastewater + heat reuse</button>
-              </div>
-              <div class="hero-trust-strip" aria-label="Axion workspace highlights">
-                <span><strong>120+</strong> equipment items</span>
-                <span><strong>210</strong> equations</span>
-                <span><strong>LCA/TEA</strong> exports</span>
-                <span><strong>ICS 71.120</strong> mapped</span>
-              </div>
             </div>
             <figure class="hero-product-visual plant-overview-visual" aria-label="Complete Axion biomanufacturing plant overview">
               <div class="plant-header">
@@ -136,6 +95,74 @@
                 <span><i class="data"></i>Reports and decisions</span>
               </div>
             </figure>
+            <div class="hero-action-stack">
+              <div class="hero-composer" aria-label="Product brief composer preview">
+                <div class="composer-topline">
+                  <span>What should Axion model?</span>
+                  <b>Prompt-to-process</b>
+                </div>
+                <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium boundary checks, and CFD screening.</p>
+                <div class="composer-actions">
+                  <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
+                  <button class="public-secondary" type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">See the mAb example</button>
+                </div>
+              </div>
+              <div class="hero-outcome-panel" aria-label="Generated workspace preview">
+                <span>Generated workspace includes</span>
+                <b>76 units</b>
+                <b>81 streams</b>
+                <b>39 boundary checks</b>
+                <b>16 report modules</b>
+              </div>
+              <div class="hero-process-ribbon" aria-label="Animated generated process">
+                <span>Media</span>
+                <i></i>
+                <span>Seed</span>
+                <i></i>
+                <span class="process-core">Bioreactor</span>
+                <i></i>
+                <span>Purification</span>
+                <i></i>
+                <span>Fill</span>
+              </div>
+              <div class="prompt-suggestions" aria-label="Example process prompts">
+                <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
+                <button type="button" data-public-target="loginPanel">Penicillin fermentation</button>
+                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">Antibody GMP facility</button>
+                <button type="button" data-public-target="loginPanel">Wastewater + heat reuse</button>
+              </div>
+              <div class="hero-trust-strip" aria-label="Axion workspace highlights">
+                <span><strong>120+</strong> equipment items</span>
+                <span><strong>210</strong> equations</span>
+                <span><strong>LCA/TEA</strong> exports</span>
+                <span><strong>ICS 71.120</strong> mapped</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="public-screenshot-story public-page active-public-page" data-public-page="home" aria-label="Axion product screenshots">
+            <div class="section-heading">
+              <p>Product View</p>
+              <h2>See the whole plant first. Then open the model behind it.</h2>
+            </div>
+            <figure class="screenshot-showcase">
+              <img src="./assets/axion-biomanufacturing-suite.png" alt="Industrial biomanufacturing production plant with reactors, piping, utilities and technical overlays" />
+              <figcaption>
+                <b>Complete production plant</b>
+                <span>Main process, support systems, utilities, cleaning, data outputs and review layers are shown as one readable production architecture.</span>
+              </figcaption>
+            </figure>
+            <div class="screenshot-grid">
+              <figure>
+                <img src="./assets/axion-process-os-hero.png" alt="Axion Process OS application workspace screenshot with process engineering modules" />
+                <figcaption><b>Workspace cockpit</b><span>Briefing, process builder, equations, simulation, CFD, economics and downloads stay connected.</span></figcaption>
+              </figure>
+              <article>
+                <span>How it works</span>
+                <h3>One clear path through the model.</h3>
+                <p>The page explains Axion in the same order a user experiences it: describe the product, see the generated plant, refine the flowsheet, simulate the bottlenecks, then export the evidence.</p>
+              </article>
+            </div>
           </section>
 
           <section class="public-bento public-page active-public-page" data-public-page="home" aria-label="Axion product details">
@@ -1200,6 +1227,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-layout-calm-v1"></script>
+    <script type="module" src="./app.js?v=20260718-homepage-stack-v1"></script>
   </body>
 </html>
