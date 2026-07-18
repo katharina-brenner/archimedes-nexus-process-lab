@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-login-clean-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-story-clean-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -165,38 +165,46 @@
             </div>
           </section>
 
-          <section class="public-bento public-page active-public-page" data-public-page="home" aria-label="Axion product details">
-            <article class="bento-card bento-large">
-              <span>Prompt to plant</span>
-              <h2>Start with words. Continue with an editable engineering model.</h2>
-              <p>The first step is not a template menu. Describe the product, scale, organism, quality target, and constraints; Axion chooses a process family and opens the workspace.</p>
-              <figure class="bento-product-image facility-wireframe" aria-label="Axion facility model preview">
-                <div class="facility-room room-media">Media</div>
-                <div class="facility-room room-seed">Seed</div>
-                <div class="facility-room room-production">Production</div>
-                <div class="facility-room room-dsp">DSP</div>
-                <div class="facility-room room-qc">QC</div>
-                <span class="facility-line line-a"></span>
-                <span class="facility-line line-b"></span>
-                <span class="facility-line line-c"></span>
-                <span class="facility-badge">Factory → room → equipment → CFD</span>
-              </figure>
-            </article>
-            <article class="bento-card">
-              <span>Visual builder</span>
-              <h3>Drag, connect, inspect</h3>
-              <p>Build PFD-like flows with main process, utilities, cleaning, heat reuse, recycle, QC, and emissions layers.</p>
-            </article>
-            <article class="bento-card">
-              <span>Physics layer</span>
-              <h3>CFD without leaving the tool</h3>
-              <p>Screen oxygen, nutrients, shear, feed zones, and hotspots before commissioning rigorous CFD.</p>
-            </article>
-            <article class="bento-card bento-wide">
-              <span>Engineering memory</span>
-              <h3>Sources, standards, equations, and downloads stay attached.</h3>
-              <p>Every model can connect to assumptions, SOP notes, literature, stream tables, mass balances, LCA inventory, TEA drivers, cost-stack graphics, and readiness recommendations.</p>
-            </article>
+          <section class="public-product-story public-page active-public-page" data-public-page="home" aria-label="Axion product details">
+            <div class="section-heading product-story-heading">
+              <p>Product Logic</p>
+              <h2>From brief to model, without visual noise.</h2>
+            </div>
+            <div class="product-story-stack">
+              <article class="product-story-card story-with-visual">
+                <div>
+                  <span>01 · Prompt to plant</span>
+                  <h3>Start with words. Continue with an editable engineering model.</h3>
+                  <p>Describe the product, scale, organism, quality target, and constraints. Axion turns the brief into a process family, an equipment train, streams, assumptions, and review outputs.</p>
+                </div>
+                <figure class="story-mini-flow" aria-label="Axion facility model preview">
+                  <span>Media</span>
+                  <i></i>
+                  <span>Seed</span>
+                  <i></i>
+                  <span class="story-core">Production</span>
+                  <i></i>
+                  <span>DSP</span>
+                  <i></i>
+                  <span>QC</span>
+                </figure>
+              </article>
+              <article class="product-story-card">
+                <span>02 · Visual builder</span>
+                <h3>Drag, connect, inspect.</h3>
+                <p>Build readable PFD-like flows with main process equipment, utilities, cleaning, heat reuse, recycle, QC, emissions, valves, pumps, sensors, and support infrastructure.</p>
+              </article>
+              <article class="product-story-card">
+                <span>03 · Physics layer</span>
+                <h3>Screen process limits before they become expensive.</h3>
+                <p>Check oxygen transfer, nutrients, heat load, shear, feed zones, hotspots, ammonium, lactate, pH, and working-volume boundaries before commissioning rigorous specialist simulations.</p>
+              </article>
+              <article class="product-story-card">
+                <span>04 · Engineering memory</span>
+                <h3>Sources, standards, equations, and downloads stay attached.</h3>
+                <p>Keep assumptions, SOP notes, literature, stream tables, mass balances, LCA inventory, TEA drivers, cost-stack graphics, and readiness recommendations connected to the model.</p>
+              </article>
+            </div>
           </section>
 
           <section class="public-build-loop public-page active-public-page" data-public-page="home" aria-label="Prompt to workspace loop">
@@ -1212,6 +1220,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-login-clean-v1"></script>
+    <script type="module" src="./app.js?v=20260718-story-clean-v1"></script>
   </body>
 </html>
