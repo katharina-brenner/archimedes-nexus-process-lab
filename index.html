@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-plant-simulation-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-layout-calm-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -898,17 +898,21 @@
         </button>
 
         <nav class="suite-nav" aria-label="Main pages">
+          <span class="suite-nav-label">Create</span>
           <button class="suite-link active" data-view="start">New Model</button>
           <button class="suite-link" data-view="projects">Projects</button>
           <button class="suite-link" data-view="overview">Overview</button>
+          <span class="suite-nav-label">Build</span>
           <button class="suite-link" data-view="flowsheet">Process Builder</button>
           <button class="suite-link" data-view="equipment">Equipment Register</button>
           <button class="suite-link" data-view="streams">Stream Table</button>
           <button class="suite-link" data-view="equations">Equations</button>
+          <span class="suite-nav-label">Simulate</span>
           <button class="suite-link" data-view="simulation">Simulation</button>
           <button class="suite-link" data-view="cfd">Bioreactor CFD</button>
           <button class="suite-link" data-view="ai">Boundaries + AI</button>
           <button class="suite-link" data-view="standards">Standards</button>
+          <span class="suite-nav-label">Review</span>
           <button class="suite-link" data-view="sources">Scientific Data</button>
           <button class="suite-link" data-view="recommendations">Readiness Roadmap</button>
           <button class="suite-link" data-view="twin">Twin OS</button>
@@ -1179,8 +1183,8 @@
 
     <aside id="detailDrawer" class="detail-drawer" aria-label="Selected item details" aria-live="polite"></aside>
 
-    <aside id="helpDock" class="help-dock open" aria-label="Axion command field">
-      <button id="helpToggle" class="help-toggle" type="button" aria-label="Open Axion System Composer" aria-controls="helpPanel" aria-expanded="true">
+    <aside id="helpDock" class="help-dock" aria-label="Axion command field">
+      <button id="helpToggle" class="help-toggle" type="button" aria-label="Open Axion System Composer" aria-controls="helpPanel" aria-expanded="false">
         <span class="brand-mark technical-logo help-logo" aria-hidden="true"><span></span></span>
       </button>
       <div id="helpPanel" class="help-panel">
@@ -1196,6 +1200,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-plant-simulation-v1"></script>
+    <script type="module" src="./app.js?v=20260718-layout-calm-v1"></script>
   </body>
 </html>
