@@ -6871,6 +6871,18 @@ dd {
   background: linear-gradient(135deg, #102033, #0f5a52);
 }
 
+.cfd-control-actions button:disabled {
+  cursor: not-allowed;
+  color: #7a8794;
+  background: rgba(229, 236, 237, 0.82);
+}
+
+.cfd-run-button.running {
+  color: #061421;
+  background: linear-gradient(135deg, #e8fffb, #8fe4da);
+  box-shadow: 0 0 0 4px rgba(143, 228, 218, 0.16);
+}
+
 .cfd-layer-tabs button,
 .cfd-inlet-grid button {
   min-height: 34px;
@@ -6962,6 +6974,11 @@ dd {
   background:
     linear-gradient(90deg, #1b7884 0 var(--o2), transparent var(--o2) 100%),
     linear-gradient(90deg, rgba(208, 181, 109, 0.26) 0 var(--risk), rgba(16, 32, 51, 0.08) var(--risk) 100%);
+}
+
+.cfd-time-series.inactive {
+  opacity: 0.42;
+  pointer-events: none;
 }
 
 .cfd-openfoam-panel {
@@ -7207,6 +7224,23 @@ dd {
     inset 0 -28px 42px rgba(8, 23, 43, 0.08);
 }
 
+.solver-idle .cfd-vessel-body {
+  background:
+    linear-gradient(rgba(43, 58, 85, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 58, 85, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 50% 38%, rgba(149, 199, 189, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(241, 247, 248, 0.98), rgba(226, 234, 236, 0.98));
+}
+
+.solver-idle .cfd-engineering-svg *,
+.solver-paused .cfd-engineering-svg * {
+  animation-play-state: paused !important;
+}
+
+.solver-started .cfd-engineering-svg {
+  opacity: 0.74;
+}
+
 .cfd-engineering-svg {
   position: absolute;
   inset: 16px 10px 16px;
@@ -7214,6 +7248,96 @@ dd {
   width: calc(100% - 20px);
   height: calc(100% - 32px);
   pointer-events: none;
+}
+
+.cfd-start-overlay {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  z-index: 15;
+  display: grid;
+  gap: 3px;
+  min-width: min(72%, 360px);
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 72, 79, 0.14);
+  border-radius: 999px;
+  color: #102033;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 12px 28px rgba(8, 23, 43, 0.1);
+  transform: translateX(-50%);
+}
+
+.cfd-start-overlay strong,
+.cfd-start-overlay span {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfd-start-overlay strong {
+  color: #071a31;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cfd-start-overlay span {
+  color: #536273;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.solver-running .cfd-start-overlay {
+  border-color: rgba(15, 143, 131, 0.24);
+  background: rgba(232, 255, 251, 0.88);
+}
+
+.cfd-field-contours,
+.cfd-iso-surfaces {
+  position: absolute;
+  left: 31%;
+  right: 31%;
+  top: 30%;
+  bottom: 14%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cfd-field-contours span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: calc(var(--size) * 0.72);
+  border-radius: 50%;
+  background: var(--cell);
+  opacity: var(--alpha);
+  filter: blur(12px);
+  transform: translate(-50%, -50%);
+}
+
+.solver-running .cfd-field-contours span {
+  animation: cfdContourBreathe 2.8s ease-in-out infinite;
+}
+
+.cfd-iso-surfaces i {
+  position: absolute;
+  left: 50%;
+  top: var(--top);
+  width: var(--width);
+  height: 48px;
+  border: 2px solid rgba(15, 143, 131, var(--alpha));
+  border-top-color: rgba(208, 181, 109, calc(var(--alpha) * 0.76));
+  border-radius: 50%;
+  transform: translate(-50%, -50%) perspective(360px) rotateX(67deg);
+  box-shadow: 0 0 22px rgba(15, 143, 131, 0.08);
+}
+
+.solver-running .cfd-iso-surfaces i {
+  animation: cfdIsoPulse 3.6s ease-in-out infinite;
 }
 
 .cfd-vessel-shell {
@@ -8297,6 +8421,16 @@ dd {
 @keyframes cfdDashFlow {
   0% { stroke-dashoffset: 42; }
   100% { stroke-dashoffset: 0; }
+}
+
+@keyframes cfdContourBreathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.96); filter: blur(13px); }
+  50% { transform: translate(-50%, -50%) scale(1.06); filter: blur(10px); }
+}
+
+@keyframes cfdIsoPulse {
+  0%, 100% { opacity: 0.46; transform: translate(-50%, -50%) perspective(360px) rotateX(67deg) scaleX(0.98); }
+  50% { opacity: 0.82; transform: translate(-50%, -50%) perspective(360px) rotateX(67deg) scaleX(1.04); }
 }
 
 @keyframes bubbleWobble {

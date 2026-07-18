@@ -2051,6 +2051,9 @@ const state = {
   cfdLayer: "oxygen",
   cfdOxygenInlet: "ring-sparger",
   cfdNutrientInlet: "top-feed",
+  cfdSolverStarted: false,
+  cfdSolverRunning: false,
+  cfdIteration: 0,
 };
 
 const els = {
@@ -8824,7 +8827,9 @@ function cfdReport() {
   const gridH = 24;
   const bounds = cfdTimeBounds();
   const requestedTime = state.cfdTimeH === null || state.cfdTimeH === undefined ? NaN : Number(state.cfdTimeH);
-  state.cfdTimeH = Math.max(bounds.minH, Math.min(bounds.maxH, Number.isFinite(requestedTime) ? requestedTime : bounds.suggestedH));
+  state.cfdTimeH = state.cfdSolverStarted
+    ? Math.max(bounds.minH, Math.min(bounds.maxH, Number.isFinite(requestedTime) ? requestedTime : bounds.suggestedH))
+    : 0;
   return units.map((unit) => {
     const cells = Array.from({ length: gridW * gridH }, (_, index) => cfdScore(unit, index % gridW, Math.floor(index / gridW), gridW, gridH, state.cfdTimeH));
     const engineering = cfdEngineeringMetrics(unit, cells);
@@ -8860,6 +8865,43 @@ function cfdReport() {
       cells,
     };
   });
+}
+
+function startCfdSolver() {
+  const bounds = cfdTimeBounds();
+  if (!state.cfdSolverStarted) {
+    state.cfdTimeH = bounds.minH;
+    state.cfdIteration = 0;
+  }
+  state.cfdSolverStarted = true;
+  state.cfdSolverRunning = true;
+  window.clearInterval(startCfdSolver.timer);
+  startCfdSolver.timer = window.setInterval(() => {
+    if (!state.cfdSolverRunning) return;
+    state.cfdIteration += 1;
+    const nextTime = (Number(state.cfdTimeH) || 0) + Math.max(0.7, bounds.maxH / 180);
+    state.cfdTimeH = nextTime > bounds.maxH ? bounds.minH : nextTime;
+    if (document.body.dataset.activeView === "cfd") renderCfdBoard();
+  }, 2400);
+  renderCfdBoard();
+  showToast("CFD solver started");
+}
+
+function pauseCfdSolver() {
+  state.cfdSolverRunning = false;
+  window.clearInterval(startCfdSolver.timer);
+  renderCfdBoard();
+  showToast("CFD solver paused");
+}
+
+function resetCfdSolver() {
+  state.cfdSolverRunning = false;
+  state.cfdSolverStarted = false;
+  state.cfdIteration = 0;
+  state.cfdTimeH = 0;
+  window.clearInterval(startCfdSolver.timer);
+  renderCfdBoard();
+  showToast("CFD solver reset");
 }
 
 function cfdTimeSeriesRows(unit) {
@@ -9113,6 +9155,8 @@ function renderCfdBoard() {
     return;
   }
   const selected = report.find((item) => item.id === state.selectedId) || report[0];
+  const solverStarted = Boolean(state.cfdSolverStarted);
+  const solverRunning = Boolean(state.cfdSolverRunning);
   const hotspotCells = selected.cells.filter((cell) => cell.risk > 0.62).length;
   const transferScore = Math.max(0, Math.min(100, (selected.oxygenIndex * 0.38 + selected.nutrientIndex * 0.28 + selected.velocityIndex * 0.16 + (1 - selected.shearIndex) * 0.18) * 100));
   const selectedUnit = state.units.find((item) => item.id === selected.id);
@@ -9146,12 +9190,29 @@ function renderCfdBoard() {
   const profileRows = selected.cells
     .filter((cell) => cell.xIndex === Math.floor(selected.gridW / 2))
     .sort((a, b) => a.yIndex - b.yIndex);
+  const activeLayerValue = (cell) => state.cfdLayer === "risk"
+    ? cell.risk
+    : state.cfdLayer === "velocity"
+      ? cell.velocity
+      : state.cfdLayer === "shear"
+        ? cell.shear
+        : state.cfdLayer === "nutrient"
+          ? cell.nutrient
+          : cell.oxygen;
+  const contourBands = selected.cells
+    .filter((cell) => cell.xIndex % 3 === 1 && cell.yIndex % 3 === 1)
+    .slice(0, 48);
+  const isoLines = [
+    { label: "upper circulation loop", top: 31, width: 54, intensity: selected.velocityIndex },
+    { label: "lower gas dispersion loop", top: 56, width: 58, intensity: selected.oxygenIndex },
+    { label: "feed entrainment zone", top: state.cfdNutrientInlet === "top-feed" ? 25 : state.cfdNutrientInlet === "feed-ring" ? 39 : 47, width: state.cfdNutrientInlet === "feed-ring" ? 46 : 30, intensity: selected.nutrientIndex },
+  ];
   els.cfdBoard.innerHTML = `
     <section class="cfd-hero">
       <div>
-        <p>OpenFOAM / BiRD inspired CFD workbench</p>
+        <p>Real-time CFD screening workbench</p>
         <h3>${selected.id} · ${selected.name}</h3>
-        <span>Transient axial-slice screening for oxygen transfer, nutrient distribution, velocity, shear, dead zones, and feed-point placement. The browser view builds the CFD case logic; a validated design still needs an external 3D OpenFOAM/BiRD solve.</span>
+        <span>Start the solver to run a transient axial-slice transport screen for oxygen transfer, nutrient distribution, liquid velocity, shear, dead zones, and feed-point placement. This is an interactive engineering solver and case builder; validated final CFD still needs a full 3D backend or external CFD run.</span>
       </div>
       <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
     </section>
@@ -9159,10 +9220,13 @@ function renderCfdBoard() {
       <div class="cfd-control-head">
         <div>
           <span>Transient solver view</span>
-          <strong>${formatNumber(selected.timeH, 1)} h · ${escapeHtml(selected.batchPhase)}</strong>
-          <small>Case-builder model: dispersed gas source, liquid circulation, scalar oxygen/nutrient transport, uptake sink, wall/baffle penalties, and mesh-quality handoff.</small>
+          <strong>${solverStarted ? `${formatNumber(selected.timeH, 1)} h · ${escapeHtml(selected.batchPhase)}` : "Case ready · press Start CFD"}</strong>
+          <small>${solverStarted ? `Running finite-volume style field update, iteration ${state.cfdIteration}.` : "Fields and contours remain inactive until Start CFD is pressed, so the view does not pretend to be a running simulation."} Model terms: dispersed gas source, liquid circulation, scalar oxygen/nutrient transport, uptake sink, wall/baffle penalties, shear and mesh-quality handoff.</small>
         </div>
         <div class="cfd-control-actions">
+          <button class="cfd-run-button ${solverRunning ? "running" : ""}" data-cfd-action="start" type="button">${solverRunning ? "Running" : "Start CFD"}</button>
+          <button data-cfd-action="pause" type="button" ${solverStarted ? "" : "disabled"}>Pause</button>
+          <button data-cfd-action="reset" type="button" ${solverStarted ? "" : "disabled"}>Reset</button>
           <button data-download-report="cfd-field-csv" type="button">Field CSV</button>
           <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
           <button data-download-report="cfd-case-csv" type="button">Case CSV</button>
@@ -9171,7 +9235,7 @@ function renderCfdBoard() {
           <button data-download-report="cfd-flow-paths-csv" type="button">Flow paths CSV</button>
         </div>
       </div>
-      <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" />
+      <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" ${solverStarted ? "" : "disabled"} />
       <div class="cfd-layer-tabs" aria-label="CFD field layer">
         ${Object.entries(layerLabels).map(([key, label]) => `<button type="button" data-cfd-layer="${key}" class="${state.cfdLayer === key ? "active" : ""}">${label}</button>`).join("")}
       </div>
@@ -9185,7 +9249,7 @@ function renderCfdBoard() {
           <div>${inletOptions.filter((item) => item.kind === "nutrient").map((item) => `<button type="button" data-cfd-nutrient-inlet="${item.key}" class="${state.cfdNutrientInlet === item.key ? "active" : ""}">${item.label}</button>`).join("")}</div>
         </article>
       </div>
-      <div class="cfd-time-series" aria-label="CFD time series">
+      <div class="cfd-time-series ${solverStarted ? "" : "inactive"}" aria-label="CFD time series">
         ${timeSeries.map((row) => `
           <button type="button" data-cfd-time="${formatNumber(row.timeH, 2)}" class="${Math.abs(row.timeH - selected.timeH) < timeBounds.maxH / 40 ? "active" : ""}" title="${escapeAttr(`${row.phase}: O2 ${formatNumber(row.oxygenIndex * 100, 0)}%, nutrient ${formatNumber(row.nutrientIndex * 100, 0)}%, risk ${formatNumber(row.riskIndex * 100, 0)}%`)}">
             <span>${formatNumber(row.timeH, 0)}</span>
@@ -9249,7 +9313,7 @@ function renderCfdBoard() {
         </article>
       </div>
     </section>
-    <section class="cfd-layout">
+    <section class="cfd-layout ${solverStarted ? "solver-started" : "solver-idle"} ${solverRunning ? "solver-running" : "solver-paused"}">
       <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
@@ -9310,17 +9374,6 @@ function renderCfdBoard() {
             <path class="cfd-nozzle side-left" d="M210 252 L160 252"></path>
             <path class="cfd-nozzle side-right" d="M510 276 L560 276"></path>
             <path class="cfd-nozzle bottom" d="M360 492 L360 518"></path>
-            <path class="cfd-streamline primary" d="M360 214 C438 214 484 236 484 276 C484 324 432 342 368 336" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline primary delay-a" d="M360 336 C282 336 236 314 236 274 C236 226 288 208 352 214" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline radial" d="M360 214 C314 214 276 226 238 252" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-b" d="M360 214 C406 214 444 226 482 252" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-c" d="M360 336 C310 336 274 352 232 388" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-d" d="M360 336 C410 336 446 352 488 388" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline axial" d="M250 394 C220 316 220 226 250 156" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline axial delay-b" d="M470 394 C500 316 500 226 470 156" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline down" d="M360 144 C352 212 352 302 360 410" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-feed-vector" d="M438 32 L438 122 C418 148 396 162 372 178" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-thermal-vector" d="M532 256 C496 262 480 286 464 316" marker-end="url(#cfdArrow)"></path>
             <g class="cfd-bubble-train">
               <circle cx="300" cy="414" r="5"></circle>
               <circle cx="326" cy="386" r="4"></circle>
@@ -9368,15 +9421,18 @@ function renderCfdBoard() {
           <div class="cfd-zone-label zone-bottom">sparger + dead-zone watch</div>
           <div class="cfd-zone-label zone-mrf-top">MRF / impeller zone 1</div>
           <div class="cfd-zone-label zone-mrf-bottom">MRF / impeller zone 2</div>
-          <div class="cfd-vector-field" aria-hidden="true">
-            ${selected.cells.filter((cell) => cell.xIndex % 3 === 1 && cell.yIndex % 4 === 1).map((cell) => `
-              <i style="--x:${cell.x * 100}%; --y:${cell.y * 100}%; --angle:${cell.x < 0.5 ? -55 + cell.velocity * 40 : 235 - cell.velocity * 40}deg; --speed:${cell.velocity};"></i>
-            `).join("")}
+          <div class="cfd-start-overlay">
+            <strong>${solverStarted ? (solverRunning ? "Solving transient field" : "Solver paused") : "CFD case ready"}</strong>
+            <span>${solverStarted ? `Iteration ${state.cfdIteration} · ${escapeHtml(layerLabels[state.cfdLayer] || "Field")} contours` : "Click Start CFD to calculate contours and time evolution."}</span>
           </div>
-          <div class="cfd-map layer-${state.cfdLayer}" style="--grid-x:${selected.gridW}; --grid-y:${selected.gridH};" aria-label="CFD ${escapeAttr(layerLabels[state.cfdLayer] || "field")} contour map">
-            ${selected.cells.map((cell) => `
-              <span style="--cell:${cfdCellColor(cell)}; opacity:${0.48 + (state.cfdLayer === "risk" ? cell.risk : state.cfdLayer === "oxygen" ? cell.oxygen : state.cfdLayer === "nutrient" ? cell.nutrient : state.cfdLayer === "velocity" ? cell.velocity : cell.shear) * 0.46};" title="t ${formatNumber(selected.timeH, 1)} h · O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, velocity ${formatNumber(cell.velocity * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%, risk ${formatNumber(cell.risk * 100, 0)}%"></span>
-            `).join("")}
+          <div class="cfd-field-contours ${solverStarted ? "active" : ""}" aria-label="CFD ${escapeAttr(layerLabels[state.cfdLayer] || "field")} contour map">
+            ${solverStarted ? contourBands.map((cell) => {
+              const value = activeLayerValue(cell);
+              return `<span style="--x:${cell.x * 100}%; --y:${cell.y * 100}%; --size:${26 + value * 42}px; --cell:${cfdCellColor(cell)}; --alpha:${0.18 + value * 0.46};" title="t ${formatNumber(selected.timeH, 1)} h · O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, velocity ${formatNumber(cell.velocity * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%, risk ${formatNumber(cell.risk * 100, 0)}%"></span>`;
+            }).join("") : ""}
+          </div>
+          <div class="cfd-iso-surfaces" aria-hidden="true">
+            ${solverStarted ? isoLines.map((line) => `<i style="--top:${line.top}%; --width:${line.width}%; --alpha:${0.22 + line.intensity * 0.44};" title="${escapeAttr(line.label)}"></i>`).join("") : ""}
           </div>
         </div>
       </div>
@@ -12798,6 +12854,14 @@ function bindEvents() {
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 
   els.cfdBoard.addEventListener("click", (event) => {
+    const actionButton = event.target.closest("[data-cfd-action]");
+    if (actionButton) {
+      const action = actionButton.dataset.cfdAction;
+      if (action === "start") startCfdSolver();
+      if (action === "pause") pauseCfdSolver();
+      if (action === "reset") resetCfdSolver();
+      return;
+    }
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
       handleReportDownload(downloadButton.dataset.downloadReport);
@@ -12831,6 +12895,10 @@ function bindEvents() {
     }
     const timeButton = event.target.closest("[data-cfd-time]");
     if (timeButton) {
+      if (!state.cfdSolverStarted) {
+        showToast("Start CFD first");
+        return;
+      }
       state.cfdTimeH = Number(timeButton.dataset.cfdTime) || 0;
       renderCfdBoard();
       showToast(`CFD time set to ${formatNumber(state.cfdTimeH, 1)} h`);
@@ -12848,6 +12916,7 @@ function bindEvents() {
   els.cfdBoard.addEventListener("input", (event) => {
     const timeInput = event.target.closest("#cfdTimeSlider");
     if (!timeInput) return;
+    if (!state.cfdSolverStarted) return;
     state.cfdTimeH = Number(timeInput.value) || 0;
     window.clearTimeout(els.cfdBoard.cfdTimeTimer);
     els.cfdBoard.cfdTimeTimer = window.setTimeout(() => {
