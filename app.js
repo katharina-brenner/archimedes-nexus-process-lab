@@ -2011,6 +2011,10 @@ const state = {
   connectorResults: {},
   projectFolders: {},
   factoryTimeH: null,
+  cfdTimeH: null,
+  cfdLayer: "oxygen",
+  cfdOxygenInlet: "ring-sparger",
+  cfdNutrientInlet: "top-feed",
 };
 
 const els = {
@@ -8210,12 +8214,60 @@ function animateSurfaceClick(item, event) {
   window.setTimeout(() => item.classList.remove("surface-pop"), 420);
 }
 
-function cfdCellColor(cell) {
-  if (cell.risk > 0.68) return "#b8534d";
-  if (cell.risk > 0.48) return "#c7922e";
-  if (cell.oxygen < 0.45) return "#3e6d9c";
-  if (cell.nutrient < 0.45) return "#7d6a42";
-  return "#0f8f83";
+function cfdFieldColor(value, layer = state.cfdLayer) {
+  const v = Math.max(0, Math.min(1, Number(value) || 0));
+  const palettes = {
+    oxygen: [
+      [0.12, "#071a31"],
+      [0.32, "#173d63"],
+      [0.55, "#1b7884"],
+      [0.78, "#6fc9be"],
+      [1, "#d8fff7"],
+    ],
+    nutrient: [
+      [0.12, "#102033"],
+      [0.35, "#315f68"],
+      [0.58, "#5a8f7f"],
+      [0.82, "#d0b56d"],
+      [1, "#fff1bc"],
+    ],
+    velocity: [
+      [0.1, "#102033"],
+      [0.34, "#28435f"],
+      [0.58, "#16706b"],
+      [0.78, "#95c7bd"],
+      [1, "#effbf6"],
+    ],
+    shear: [
+      [0.16, "#eaf3ef"],
+      [0.38, "#95c7bd"],
+      [0.62, "#526f75"],
+      [0.82, "#d0b56d"],
+      [1, "#7d6a42"],
+    ],
+    risk: [
+      [0.18, "#eaf3ef"],
+      [0.42, "#95c7bd"],
+      [0.64, "#526f75"],
+      [0.82, "#d0b56d"],
+      [1, "#7d6a42"],
+    ],
+  };
+  const palette = palettes[layer] || palettes.risk;
+  return palette.find(([stop]) => v <= stop)?.[1] || palette.at(-1)[1];
+}
+
+function cfdCellColor(cell, layer = state.cfdLayer) {
+  const value = layer === "oxygen"
+    ? cell.oxygen
+    : layer === "nutrient"
+      ? cell.nutrient
+      : layer === "velocity"
+        ? cell.velocity
+        : layer === "shear"
+          ? cell.shear
+          : cell.risk;
+  return cfdFieldColor(value, layer);
 }
 
 function cfdBioreactors() {
@@ -8228,6 +8280,11 @@ function cfdMixingTimeMinutes(item) {
   const scaleTerm = Math.pow(Math.max(0.05, volumeL / 1000), 0.22);
   const powerTerm = Math.max(0.25, p.agitation + p.aeration * 1.8 + p.kla / 180);
   return Math.max(0.8, 5.8 * scaleTerm / Math.sqrt(powerTerm));
+}
+
+function cfdTimeBounds() {
+  const dynamic = dynamicBatchProfile();
+  return { minH: 0, maxH: Math.max(12, dynamic.durationH || 72), suggestedH: Math.max(1, (dynamic.durationH || 72) * 0.42) };
 }
 
 function cfdEngineeringMetrics(unit, cells) {
@@ -8268,32 +8325,69 @@ function cfdEngineeringMetrics(unit, cells) {
   };
 }
 
-function cfdScore(unit, xIndex, yIndex) {
+function cfdInletDistance(x, y, inlet) {
+  const points = {
+    "ring-sparger": [[0.36, 0.9], [0.5, 0.88], [0.64, 0.9]],
+    "center-lance": [[0.5, 0.82]],
+    "side-sparger": [[0.25, 0.78], [0.75, 0.78]],
+    "top-feed": [[0.72, 0.22]],
+    "subsurface-feed": [[0.66, 0.42]],
+    "feed-ring": [[0.36, 0.36], [0.5, 0.34], [0.64, 0.36]],
+  };
+  const selected = points[inlet] || points["ring-sparger"];
+  return Math.min(...selected.map(([px, py]) => Math.hypot(x - px, y - py)));
+}
+
+function cfdBatchPhase(timeH) {
+  const bounds = cfdTimeBounds();
+  const t = Math.max(0, Math.min(1, timeH / Math.max(1, bounds.maxH)));
+  if (t < 0.16) return { phase: "Charge + inoculation", demand: 0.48, feed: 0.45, gas: 0.62, viscosity: 0.85 };
+  if (t < 0.46) return { phase: "Exponential growth", demand: 1.12, feed: 0.92, gas: 1.0, viscosity: 1.0 };
+  if (t < 0.78) return { phase: "Production plateau", demand: 0.96, feed: 1.08, gas: 0.92, viscosity: 1.1 };
+  return { phase: "Late batch / harvest approach", demand: 0.72, feed: 0.62, gas: 0.78, viscosity: 1.22 };
+}
+
+function cfdScore(unit, xIndex, yIndex, gridW = 18, gridH = 24, timeH = state.cfdTimeH) {
   const p = state.params;
   const volume = estimatedBioreactorVolumeL(unit);
-  const radial = Math.abs(xIndex - 5.5) / 5.5;
-  const height = 1 - yIndex / 11;
+  const bounds = cfdTimeBounds();
+  const now = state.cfdTimeH === null || state.cfdTimeH === undefined ? bounds.suggestedH : Number(timeH) || 0;
+  const phase = cfdBatchPhase(now);
+  const x = gridW <= 1 ? 0.5 : xIndex / (gridW - 1);
+  const y = gridH <= 1 ? 0.5 : yIndex / (gridH - 1);
+  const radial = Math.abs(x - 0.5) / 0.5;
+  const height = 1 - y;
   const wallPenalty = Math.min(1, radial * 1.08);
-  const bottomDeadZone = yIndex > 8 ? (yIndex - 8) / 3 : 0;
-  const topFoamZone = yIndex < 2 ? (2 - yIndex) / 3 : 0;
+  const bottomDeadZone = y > 0.76 ? (y - 0.76) / 0.24 : 0;
+  const topFoamZone = y < 0.17 ? (0.17 - y) / 0.17 : 0;
   const impellerBand = Math.min(
-    Math.abs(yIndex - 4.2),
-    Math.abs(yIndex - 7.1),
+    Math.abs(yIndex - gridH * 0.36),
+    Math.abs(yIndex - gridH * 0.6),
   );
-  const circulationBoost = Math.max(0, 1 - impellerBand / 2.8) * (1 - wallPenalty * 0.36);
-  const mixingPower = Math.max(0.05, p.agitation * 0.36 + p.aeration * 0.62 + p.kla / 165);
+  const timeWave = Math.sin((now / Math.max(1, bounds.maxH)) * Math.PI * 4 + x * 3.2 - y * 2.4) * 0.06;
+  const circulationBoost = Math.max(0, 1 - impellerBand / (gridH * 0.18)) * (1 - wallPenalty * 0.36);
+  const oxygenSource = Math.max(0, 1 - cfdInletDistance(x, y, state.cfdOxygenInlet) / 0.48);
+  const nutrientSource = Math.max(0, 1 - cfdInletDistance(x, y, state.cfdNutrientInlet) / 0.45);
+  const mixingPower = Math.max(0.05, (p.agitation * 0.36 + p.aeration * 0.62 + p.kla / 165) / phase.viscosity);
   const scalePenalty = Math.max(0, Math.log10(Math.max(100, volume) / 2000)) * 0.22;
-  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint / Math.max(1, p.our * 98)) + circulationBoost * 0.18 - wallPenalty * 0.17 - bottomDeadZone * 0.22 - topFoamZone * 0.06 - scalePenalty));
-  const nutrient = Math.max(0, Math.min(1, mixingPower + circulationBoost * 0.24 - wallPenalty * 0.16 - bottomDeadZone * 0.25 - scalePenalty * 0.72));
-  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 5.4 : 9.8) + circulationBoost * 0.26 - wallPenalty * 0.06 + height * 0.03));
+  const oxygenDemand = Math.max(0.6, phase.demand * (p.our || 1) / 1.15);
+  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint * phase.gas / Math.max(1, oxygenDemand * 98)) + oxygenSource * 0.26 + circulationBoost * 0.18 - wallPenalty * 0.17 - bottomDeadZone * 0.22 - topFoamZone * 0.06 - scalePenalty + timeWave));
+  const nutrient = Math.max(0, Math.min(1, mixingPower + nutrientSource * 0.33 * phase.feed + circulationBoost * 0.24 - wallPenalty * 0.16 - bottomDeadZone * 0.25 - scalePenalty * 0.72 - Math.max(0, phase.demand - 1) * 0.12 - timeWave * 0.4));
+  const velocity = Math.max(0, Math.min(1, mixingPower * 0.58 + circulationBoost * 0.42 + oxygenSource * 0.08 - wallPenalty * 0.12 - bottomDeadZone * 0.16));
+  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 5.4 : 9.8) + circulationBoost * 0.26 + velocity * 0.12 - wallPenalty * 0.06 + height * 0.03));
   const risk = Math.max(0, Math.min(1, (1 - oxygen) * 0.46 + (1 - nutrient) * 0.34 + shear * (isCellCultureTemplate() ? 0.28 : 0.12)));
-  return { oxygen, nutrient, shear, risk };
+  return { xIndex, yIndex, x, y, oxygen, nutrient, velocity, shear, risk, phase: phase.phase };
 }
 
 function cfdReport() {
   const units = cfdBioreactors();
+  const gridW = 18;
+  const gridH = 24;
+  const bounds = cfdTimeBounds();
+  const requestedTime = state.cfdTimeH === null || state.cfdTimeH === undefined ? NaN : Number(state.cfdTimeH);
+  state.cfdTimeH = Math.max(bounds.minH, Math.min(bounds.maxH, Number.isFinite(requestedTime) ? requestedTime : bounds.suggestedH));
   return units.map((unit) => {
-    const cells = Array.from({ length: 144 }, (_, index) => cfdScore(unit, index % 12, Math.floor(index / 12)));
+    const cells = Array.from({ length: gridW * gridH }, (_, index) => cfdScore(unit, index % gridW, Math.floor(index / gridW), gridW, gridH, state.cfdTimeH));
     const engineering = cfdEngineeringMetrics(unit, cells);
     const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
     const lowOxygen = cells.filter((item) => item.oxygen < 0.45).length;
@@ -8311,6 +8405,13 @@ function cfdReport() {
       lowOxygenCells: lowOxygen,
       lowNutrientCells: lowNutrient,
       highShearCells: highShear,
+      velocityIndex: avg("velocity"),
+      gridW,
+      gridH,
+      timeH: state.cfdTimeH,
+      batchPhase: cfdBatchPhase(state.cfdTimeH).phase,
+      oxygenInlet: state.cfdOxygenInlet,
+      nutrientInlet: state.cfdNutrientInlet,
       engineering,
       recommendation: risk > 0.62
         ? "High CFD screening risk: increase kLa or aeration, review impeller layout, reduce working volume, add feed distribution points, or split into parallel reactors."
@@ -8320,6 +8421,53 @@ function cfdReport() {
       cells,
     };
   });
+}
+
+function cfdTimeSeriesRows(unit) {
+  const bounds = cfdTimeBounds();
+  const steps = 18;
+  const savedTime = state.cfdTimeH;
+  const rows = Array.from({ length: steps }, (_, index) => {
+    const timeH = bounds.maxH * index / Math.max(1, steps - 1);
+    const gridW = 18;
+    const gridH = 24;
+    const cells = Array.from({ length: gridW * gridH }, (_, cellIndex) => cfdScore(unit, cellIndex % gridW, Math.floor(cellIndex / gridW), gridW, gridH, timeH));
+    const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
+    return {
+      reactor: unit.id,
+      timeH,
+      phase: cfdBatchPhase(timeH).phase,
+      oxygenIndex: avg("oxygen"),
+      nutrientIndex: avg("nutrient"),
+      velocityIndex: avg("velocity"),
+      shearIndex: avg("shear"),
+      riskIndex: avg("risk"),
+      lowOxygenCells: cells.filter((item) => item.oxygen < 0.45).length,
+      lowNutrientCells: cells.filter((item) => item.nutrient < 0.45).length,
+      highShearCells: cells.filter((item) => item.shear > 0.72).length,
+    };
+  });
+  state.cfdTimeH = savedTime;
+  return rows;
+}
+
+function cfdFieldCsvRows() {
+  return cfdReport().flatMap((unit) => unit.cells.map((cell) => ({
+    reactor: unit.id,
+    timeH: unit.timeH,
+    phase: unit.batchPhase,
+    oxygenInlet: unit.oxygenInlet,
+    nutrientInlet: unit.nutrientInlet,
+    xIndex: cell.xIndex,
+    yIndex: cell.yIndex,
+    xNormalized: cell.x,
+    yNormalized: cell.y,
+    oxygen: cell.oxygen,
+    nutrient: cell.nutrient,
+    velocity: cell.velocity,
+    shear: cell.shear,
+    risk: cell.risk,
+  })));
 }
 
 function renderCfdBoard() {
@@ -8335,24 +8483,79 @@ function renderCfdBoard() {
   }
   const selected = report.find((item) => item.id === state.selectedId) || report[0];
   const hotspotCells = selected.cells.filter((cell) => cell.risk > 0.62).length;
-  const transferScore = Math.max(0, Math.min(100, (selected.oxygenIndex * 0.46 + selected.nutrientIndex * 0.34 + (1 - selected.shearIndex) * 0.2) * 100));
+  const transferScore = Math.max(0, Math.min(100, (selected.oxygenIndex * 0.38 + selected.nutrientIndex * 0.28 + selected.velocityIndex * 0.16 + (1 - selected.shearIndex) * 0.18) * 100));
   const selectedUnit = state.units.find((item) => item.id === selected.id);
   const selectedReactions = selectedUnit ? unitReactions(selectedUnit).slice(0, 3) : [];
   const eng = selected.engineering;
+  const timeBounds = cfdTimeBounds();
+  const timeSeries = selectedUnit ? cfdTimeSeriesRows(selectedUnit) : [];
+  const layerLabels = {
+    oxygen: "Dissolved oxygen",
+    nutrient: "Nutrient concentration",
+    velocity: "Velocity magnitude",
+    shear: "Shear field",
+    risk: "Composite transfer risk",
+  };
+  const inletOptions = [
+    { key: "ring-sparger", label: "Ring sparger", kind: "oxygen" },
+    { key: "center-lance", label: "Center lance", kind: "oxygen" },
+    { key: "side-sparger", label: "Side sparger", kind: "oxygen" },
+    { key: "top-feed", label: "Top feed", kind: "nutrient" },
+    { key: "subsurface-feed", label: "Subsurface feed", kind: "nutrient" },
+    { key: "feed-ring", label: "Feed ring", kind: "nutrient" },
+  ];
+  const profileRows = selected.cells
+    .filter((cell) => cell.xIndex === Math.floor(selected.gridW / 2))
+    .sort((a, b) => a.yIndex - b.yIndex);
   els.cfdBoard.innerHTML = `
     <section class="cfd-hero">
       <div>
         <p>Interactive bioreactor CFD workbench</p>
         <h3>${selected.id} · ${selected.name}</h3>
-        <span>Screen oxygen transfer, nutrient distribution, shear, dead zones, and feed-point risk directly in the tool. The vessel is shown as a vertical stirred-tank bioreactor with horizontal impeller planes, central downflow, wall upflow, sparging, and feed-zone gradients.</span>
+        <span>Transient CFD-style analysis for oxygen transfer, nutrient distribution, velocity, shear, dead zones, and feed-point placement. Choose the field, move the batch time, and change where O₂ and nutrients enter the reactor.</span>
       </div>
       <button class="action-button primary" data-jump-view="ai" type="button">Review boundaries</button>
+    </section>
+    <section class="cfd-control-panel" aria-label="Transient CFD controls">
+      <div class="cfd-control-head">
+        <div>
+          <span>Transient solver view</span>
+          <strong>${formatNumber(selected.timeH, 1)} h · ${escapeHtml(selected.batchPhase)}</strong>
+          <small>Screening model: convective circulation + dispersed gas source + nutrient feed source + uptake demand over batch time.</small>
+        </div>
+        <div class="cfd-control-actions">
+          <button data-download-report="cfd-field-csv" type="button">Field CSV</button>
+          <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
+        </div>
+      </div>
+      <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" />
+      <div class="cfd-layer-tabs" aria-label="CFD field layer">
+        ${Object.entries(layerLabels).map(([key, label]) => `<button type="button" data-cfd-layer="${key}" class="${state.cfdLayer === key ? "active" : ""}">${label}</button>`).join("")}
+      </div>
+      <div class="cfd-inlet-grid">
+        <article>
+          <span>O₂ boundary condition</span>
+          <div>${inletOptions.filter((item) => item.kind === "oxygen").map((item) => `<button type="button" data-cfd-oxygen-inlet="${item.key}" class="${state.cfdOxygenInlet === item.key ? "active" : ""}">${item.label}</button>`).join("")}</div>
+        </article>
+        <article>
+          <span>Nutrient boundary condition</span>
+          <div>${inletOptions.filter((item) => item.kind === "nutrient").map((item) => `<button type="button" data-cfd-nutrient-inlet="${item.key}" class="${state.cfdNutrientInlet === item.key ? "active" : ""}">${item.label}</button>`).join("")}</div>
+        </article>
+      </div>
+      <div class="cfd-time-series" aria-label="CFD time series">
+        ${timeSeries.map((row) => `
+          <button type="button" data-cfd-time="${formatNumber(row.timeH, 2)}" class="${Math.abs(row.timeH - selected.timeH) < timeBounds.maxH / 40 ? "active" : ""}" title="${escapeAttr(`${row.phase}: O2 ${formatNumber(row.oxygenIndex * 100, 0)}%, nutrient ${formatNumber(row.nutrientIndex * 100, 0)}%, risk ${formatNumber(row.riskIndex * 100, 0)}%`)}">
+            <span>${formatNumber(row.timeH, 0)}</span>
+            <b style="--o2:${row.oxygenIndex * 100}%; --risk:${row.riskIndex * 100}%;"></b>
+          </button>
+        `).join("")}
+      </div>
     </section>
     <section class="cfd-layout">
       <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
-          <strong>${selected.id}</strong>
+          <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")}</strong>
         </div>
         <div class="cfd-vessel-body" style="--working-volume:${formatNumber(eng.workingVolumePct, 1)}%;">
           <div class="cfd-headspace"><span>headspace</span></div>
@@ -8375,16 +8578,21 @@ function renderCfdBoard() {
           <div class="cfd-axial-flow axial-down"></div>
           <div class="cfd-circulation circulation-a"></div>
           <div class="cfd-circulation circulation-b"></div>
-          <div class="cfd-gas-plume"></div>
-          <div class="cfd-feed-line"></div>
-          <div class="cfd-feed-zone"></div>
-          <div class="cfd-sparger"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-gas-plume inlet-${state.cfdOxygenInlet}"></div>
+          <div class="cfd-feed-line inlet-${state.cfdNutrientInlet}"></div>
+          <div class="cfd-feed-zone inlet-${state.cfdNutrientInlet}"></div>
+          <div class="cfd-sparger inlet-${state.cfdOxygenInlet}"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="cfd-zone-label zone-top">foam / gas disengagement</div>
           <div class="cfd-zone-label zone-mid">bulk mixing</div>
           <div class="cfd-zone-label zone-bottom">sparger + dead-zone watch</div>
-          <div class="cfd-map" aria-label="CFD risk heatmap">
+          <div class="cfd-vector-field" aria-hidden="true">
+            ${selected.cells.filter((cell) => cell.xIndex % 3 === 1 && cell.yIndex % 4 === 1).map((cell) => `
+              <i style="--x:${cell.x * 100}%; --y:${cell.y * 100}%; --angle:${cell.x < 0.5 ? -55 + cell.velocity * 40 : 235 - cell.velocity * 40}deg; --speed:${cell.velocity};"></i>
+            `).join("")}
+          </div>
+          <div class="cfd-map layer-${state.cfdLayer}" style="--grid-x:${selected.gridW}; --grid-y:${selected.gridH};" aria-label="CFD ${escapeAttr(layerLabels[state.cfdLayer] || "field")} contour map">
             ${selected.cells.map((cell) => `
-              <span style="--cell:${cfdCellColor(cell)}; opacity:${0.42 + cell.risk * 0.5};" title="O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%"></span>
+              <span style="--cell:${cfdCellColor(cell)}; opacity:${0.48 + (state.cfdLayer === "risk" ? cell.risk : state.cfdLayer === "oxygen" ? cell.oxygen : state.cfdLayer === "nutrient" ? cell.nutrient : state.cfdLayer === "velocity" ? cell.velocity : cell.shear) * 0.46};" title="t ${formatNumber(selected.timeH, 1)} h · O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, velocity ${formatNumber(cell.velocity * 100, 0)}%, shear ${formatNumber(cell.shear * 100, 0)}%, risk ${formatNumber(cell.risk * 100, 0)}%"></span>
             `).join("")}
           </div>
         </div>
@@ -8401,6 +8609,7 @@ function renderCfdBoard() {
         <div class="cfd-metric-grid">
           <article><span>O2</span><strong>${formatNumber(selected.oxygenIndex * 100, 0)}%</strong><small>${selected.lowOxygenCells} low-O2 cells</small></article>
           <article><span>Nutrient</span><strong>${formatNumber(selected.nutrientIndex * 100, 0)}%</strong><small>${selected.lowNutrientCells} weak-feed cells</small></article>
+          <article><span>Velocity</span><strong>${formatNumber(selected.velocityIndex * 100, 0)}%</strong><small>circulation strength</small></article>
           <article><span>Shear</span><strong>${formatNumber(selected.shearIndex * 100, 0)}%</strong><small>${selected.highShearCells} high-shear cells</small></article>
           <article><span>Hotspots</span><strong>${hotspotCells}</strong><small>risk zones / ${selected.cells.length}</small></article>
           <article><span>Mixing time</span><strong>${formatNumber(eng.mixingTimeMin, 1)}</strong><small>min, CFD screening</small></article>
@@ -8408,6 +8617,18 @@ function renderCfdBoard() {
           <article><span>OTR margin</span><strong>${formatNumber(eng.otrMargin, 2)}x</strong><small>${formatNumber(eng.otrMmolLh, 2)} mmol/L/h proxy</small></article>
           <article><span>Gas hold-up</span><strong>${formatNumber(eng.gasHoldUpPct, 1)}%</strong><small>sparger/aeration proxy</small></article>
           <article><span>Working volume</span><strong>${formatNumber(eng.workingVolumePct, 0)}%</strong><small>of vessel volume, max 80% screen</small></article>
+        </div>
+        <div class="cfd-profile-card">
+          <div>
+            <span>Vertical centerline profile</span>
+            <strong>${escapeHtml(layerLabels[state.cfdLayer] || "Field")}</strong>
+          </div>
+          <svg viewBox="0 0 520 136" role="img" aria-label="CFD centerline profile">
+            <path d="${sparklinePath(profileRows, state.cfdLayer === "risk" ? "risk" : state.cfdLayer === "velocity" ? "velocity" : state.cfdLayer === "shear" ? "shear" : state.cfdLayer)}" fill="none" stroke="#0f5a52" stroke-width="5" />
+            <path d="${sparklinePath(profileRows, "oxygen")}" fill="none" stroke="#315f68" stroke-width="3" opacity="0.42" />
+            <path d="${sparklinePath(profileRows, "nutrient")}" fill="none" stroke="#d0b56d" stroke-width="3" opacity="0.42" />
+          </svg>
+          <p>Dark green is the selected layer; muted blue and gold remain visible as O₂ and nutrient references.</p>
         </div>
         ${renderRealtimeTelemetry(true)}
         <div class="cfd-actions">
@@ -8936,7 +9157,9 @@ function comprehensiveReport() {
     lcaImpacts: lcaImpactRows(),
     equations,
     unitEquations: state.units.map((item) => ({ tag: item.id, name: item.name, equations: unitReactions(item) })),
-    cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ oxygen: cell.oxygen, nutrient: cell.nutrient, shear: cell.shear, risk: cell.risk })) })),
+    cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ xIndex: cell.xIndex, yIndex: cell.yIndex, oxygen: cell.oxygen, nutrient: cell.nutrient, velocity: cell.velocity, shear: cell.shear, risk: cell.risk })) })),
+    cfdField: cfdFieldCsvRows(),
+    cfdTimeSeries: cfdBioreactors().flatMap((unit) => cfdTimeSeriesRows(unit)),
     gpromsAlgorithm: gpromsAlgorithmRows(),
     pvsdParameters: pvsdParameterRows(),
     procedureWorkbook: procedureOperationWorkbookRows(),
@@ -9532,6 +9755,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
+  } else if (type === "cfd-field-csv") {
+    downloadCsv(`${state.template}-cfd-transient-field-${formatNumber(state.cfdTimeH || 0, 1)}h.csv`, cfdFieldCsvRows(), "Transient CFD field grid");
+  } else if (type === "cfd-time-series-csv") {
+    downloadCsv(`${state.template}-cfd-time-series.csv`, cfdBioreactors().flatMap((unit) => cfdTimeSeriesRows(unit)), "CFD time series");
   } else if (type === "gproms-algorithm-csv") {
     downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
   } else if (type === "pvsd-parameters-csv") {
@@ -11707,9 +11934,42 @@ function bindEvents() {
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 
   els.cfdBoard.addEventListener("click", (event) => {
+    const downloadButton = event.target.closest("[data-download-report]");
+    if (downloadButton) {
+      handleReportDownload(downloadButton.dataset.downloadReport);
+      return;
+    }
     const jumpButton = event.target.closest("[data-jump-view]");
     if (jumpButton) {
       setView(jumpButton.dataset.jumpView);
+      return;
+    }
+    const layerButton = event.target.closest("[data-cfd-layer]");
+    if (layerButton) {
+      state.cfdLayer = layerButton.dataset.cfdLayer;
+      renderCfdBoard();
+      showToast(`${layerButton.textContent.trim()} field shown`);
+      return;
+    }
+    const oxygenInletButton = event.target.closest("[data-cfd-oxygen-inlet]");
+    if (oxygenInletButton) {
+      state.cfdOxygenInlet = oxygenInletButton.dataset.cfdOxygenInlet;
+      renderCfdBoard();
+      showToast(`O2 inlet set to ${oxygenInletButton.textContent.trim()}`);
+      return;
+    }
+    const nutrientInletButton = event.target.closest("[data-cfd-nutrient-inlet]");
+    if (nutrientInletButton) {
+      state.cfdNutrientInlet = nutrientInletButton.dataset.cfdNutrientInlet;
+      renderCfdBoard();
+      showToast(`Nutrient inlet set to ${nutrientInletButton.textContent.trim()}`);
+      return;
+    }
+    const timeButton = event.target.closest("[data-cfd-time]");
+    if (timeButton) {
+      state.cfdTimeH = Number(timeButton.dataset.cfdTime) || 0;
+      renderCfdBoard();
+      showToast(`CFD time set to ${formatNumber(state.cfdTimeH, 1)} h`);
       return;
     }
     const selectButton = event.target.closest("[data-select-cfd]");
@@ -11719,6 +11979,16 @@ function bindEvents() {
       renderCanvas();
       return;
     }
+  });
+
+  els.cfdBoard.addEventListener("input", (event) => {
+    const timeInput = event.target.closest("#cfdTimeSlider");
+    if (!timeInput) return;
+    state.cfdTimeH = Number(timeInput.value) || 0;
+    window.clearTimeout(els.cfdBoard.cfdTimeTimer);
+    els.cfdBoard.cfdTimeTimer = window.setTimeout(() => {
+      renderCfdBoard();
+    }, 90);
   });
 
   els.reportsBoard.addEventListener("click", (event) => {
