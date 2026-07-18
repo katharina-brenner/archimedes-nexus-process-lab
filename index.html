@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-public-visuals-v3" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-plant-overview-v5" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -90,38 +90,39 @@
                 <span><strong>ICS 71.120</strong> mapped</span>
               </div>
             </div>
-            <figure class="hero-product-visual product-wireframe" aria-label="Axion Process OS product visualization">
-              <div class="wireframe-top">
-                <span></span><span></span><span></span>
-                <b>Axion Process OS</b>
+            <figure class="hero-product-visual plant-overview-visual" aria-label="Complete Axion biomanufacturing plant overview">
+              <div class="plant-header">
+                <b>Complete production plant</b>
+                <span>Main process · support systems · data outputs</span>
               </div>
-              <div class="wireframe-body">
-                <aside>
-                  <b>Model</b>
-                  <span class="active">mAb fed-batch</span>
-                  <span>Penicillin</span>
-                  <span>Cultured meat</span>
-                  <span>Utilities + CIP</span>
-                </aside>
-                <div class="wireframe-canvas">
-                  <div class="wire-node node-a">Media</div>
-                  <i class="wire-flow flow-1"></i>
-                  <div class="wire-node node-b primary">Seed</div>
-                  <i class="wire-flow flow-2"></i>
-                  <div class="wire-node node-c reactor">STR</div>
-                  <i class="wire-flow flow-3"></i>
-                  <div class="wire-node node-d">Capture</div>
-                  <i class="wire-flow flow-4"></i>
-                  <div class="wire-node node-e">UF/DF</div>
-                  <div class="wire-node node-f utility">CIP/SIP</div>
-                  <i class="wire-flow utility-flow"></i>
-                </div>
-                <section>
-                  <b>Live checks</b>
-                  <span><i></i> kLa margin</span>
-                  <span><i></i> Mass balance</span>
-                  <span><i></i> LCA/TEA ready</span>
-                </section>
+              <div class="plant-map">
+                <span class="plant-zone zone-media">Media prep</span>
+                <span class="plant-zone zone-seed">Seed train</span>
+                <span class="plant-zone zone-bioreactor">Production bioreactor hall</span>
+                <span class="plant-zone zone-harvest">Harvest</span>
+                <span class="plant-zone zone-dsp">Purification / DSP</span>
+                <span class="plant-zone zone-fill">Fill + finish</span>
+                <span class="plant-zone zone-qc">QC release</span>
+                <span class="plant-zone support zone-wfi">WFI · clean steam</span>
+                <span class="plant-zone support zone-cip">CIP/SIP</span>
+                <span class="plant-zone support zone-heat">Heat reuse</span>
+                <span class="plant-zone support zone-waste">Wastewater</span>
+                <span class="plant-zone support zone-data">LCA/TEA exports</span>
+                <i class="plant-flow flow-media-seed"></i>
+                <i class="plant-flow flow-seed-br"></i>
+                <i class="plant-flow flow-br-harvest"></i>
+                <i class="plant-flow flow-harvest-dsp"></i>
+                <i class="plant-flow flow-dsp-fill"></i>
+                <i class="plant-flow flow-qc"></i>
+                <i class="plant-flow support-flow flow-wfi"></i>
+                <i class="plant-flow support-flow flow-cip"></i>
+                <i class="plant-flow support-flow flow-heat"></i>
+                <i class="plant-flow support-flow flow-waste"></i>
+              </div>
+              <div class="plant-legend" aria-label="Plant layer legend">
+                <span><i class="main"></i>Main production</span>
+                <span><i class="support"></i>Support systems</span>
+                <span><i class="data"></i>Reports and decisions</span>
               </div>
             </figure>
           </section>
@@ -1198,6 +1199,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-public-visuals-v3"></script>
+    <script type="module" src="./app.js?v=20260718-plant-overview-v5"></script>
   </body>
 </html>
