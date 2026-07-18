@@ -7195,22 +7195,113 @@ dd {
   min-height: 560px;
   overflow: hidden;
   border: 1px solid rgba(43, 58, 85, 0.14);
-  border-radius: 34% 34% 18% 18% / 10% 10% 7% 7%;
+  border-radius: 28px;
   background:
-    linear-gradient(90deg, rgba(7, 26, 49, 0.1), transparent 12%, transparent 88%, rgba(7, 26, 49, 0.12)),
-    linear-gradient(180deg, rgba(238, 247, 251, 0.96), rgba(208, 224, 238, 0.98));
+    linear-gradient(rgba(43, 58, 85, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 58, 85, 0.055) 1px, transparent 1px),
+    radial-gradient(circle at 50% 38%, rgba(149, 199, 189, 0.22), transparent 38%),
+    linear-gradient(180deg, rgba(241, 247, 248, 0.98), rgba(221, 232, 234, 0.98));
+  background-size: 26px 26px, 26px 26px, auto, auto;
   box-shadow:
-    inset 0 0 44px rgba(8, 23, 43, 0.16),
-    inset 0 -28px 42px rgba(8, 23, 43, 0.12);
+    inset 0 0 44px rgba(8, 23, 43, 0.09),
+    inset 0 -28px 42px rgba(8, 23, 43, 0.08);
 }
 
 .cfd-engineering-svg {
   position: absolute;
-  inset: 24px 24px 34px;
+  inset: 16px 10px 16px;
   z-index: 4;
-  width: calc(100% - 48px);
-  height: calc(100% - 58px);
+  width: calc(100% - 20px);
+  height: calc(100% - 32px);
   pointer-events: none;
+}
+
+.cfd-vessel-shell {
+  fill: url("#vesselSteel");
+  stroke: rgba(16, 32, 51, 0.48);
+  stroke-width: 3;
+}
+
+.cfd-vessel-lip {
+  fill: rgba(255, 255, 255, 0.62);
+  stroke: rgba(16, 32, 51, 0.32);
+  stroke-width: 2;
+}
+
+.cfd-liquid-shape {
+  fill: url("#brothFill");
+  stroke: rgba(15, 143, 131, 0.24);
+  stroke-width: 2;
+}
+
+.cfd-liquid-surface {
+  fill: rgba(222, 255, 249, 0.78);
+  stroke: rgba(15, 143, 131, 0.62);
+  stroke-width: 3;
+}
+
+.cfd-dished-bottom {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.26);
+  stroke-width: 2;
+}
+
+.cfd-baffle-svg {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.42);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.cfd-baffle-svg.rear-left,
+.cfd-baffle-svg.rear-right {
+  opacity: 0.34;
+}
+
+.cfd-baffle-svg.front-left,
+.cfd-baffle-svg.front-right {
+  stroke-width: 10;
+  opacity: 0.62;
+}
+
+.cfd-shaft-svg {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.76);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.cfd-impeller-disc {
+  fill: rgba(255, 255, 255, 0.26);
+  stroke: rgba(16, 32, 51, 0.58);
+  stroke-width: 2;
+}
+
+.cfd-impeller-blade {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.88);
+  stroke-width: 7;
+  stroke-linecap: round;
+  animation: impellerBladeFlash 1.35s linear infinite;
+}
+
+.cfd-impeller-blade:nth-of-type(2n) {
+  stroke: rgba(15, 90, 82, 0.86);
+}
+
+.cfd-sparger-svg {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.66);
+  stroke-width: 5;
+  stroke-dasharray: 10 7;
+  animation: cfdDashFlow 1.8s linear infinite reverse;
+}
+
+.cfd-nozzle {
+  fill: none;
+  stroke: rgba(16, 32, 51, 0.7);
+  stroke-width: 7;
+  stroke-linecap: round;
 }
 
 .cfd-streamline,
@@ -7397,27 +7488,11 @@ dd {
 }
 
 .cfd-vessel-body::after {
-  content: "";
-  position: absolute;
-  left: 9%;
-  right: 9%;
-  top: var(--liquid-top);
-  bottom: 40px;
-  z-index: 0;
-  border-radius: 26% 26% 16% 16% / 6% 6% 7% 7%;
-  background:
-    linear-gradient(90deg, rgba(31, 183, 166, 0.12), rgba(255, 255, 255, 0.06), rgba(31, 183, 166, 0.12)),
-    linear-gradient(180deg, rgba(31, 183, 166, 0.2), rgba(69, 121, 152, 0.28));
+  display: none;
 }
 
 .cfd-vessel-body::before {
-  content: "";
-  position: absolute;
-  inset: 24px 48px 36px;
-  border: 1px solid rgba(43, 58, 85, 0.12);
-  border-radius: 32% 32% 18% 18% / 8% 8% 7% 7%;
-  background:
-    repeating-linear-gradient(180deg, rgba(7, 26, 49, 0.04) 0 1px, transparent 1px 38px);
+  display: none;
 }
 
 .cfd-liquid-level {
@@ -7924,6 +7999,56 @@ dd {
   background: rgba(226, 248, 245, 0.86);
 }
 
+.cfd-liquid-level {
+  left: 32%;
+  right: 32%;
+  top: 28%;
+}
+
+.cfd-headspace {
+  left: 30%;
+  right: 30%;
+  top: 76px;
+  z-index: 9;
+  height: 78px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
+}
+
+.cfd-map {
+  left: 31%;
+  right: 31%;
+  top: 30%;
+  bottom: 14%;
+  border-radius: 20px 20px 54% 54% / 4% 4% 10% 10%;
+}
+
+.cfd-vector-field {
+  left: 32%;
+  right: 32%;
+  top: 31%;
+  bottom: 15%;
+}
+
+.zone-top { top: 78px; }
+.zone-mid { top: 45%; }
+.zone-bottom { bottom: 76px; }
+
+.cfd-baffle,
+.cfd-shaft,
+.cfd-motor,
+.cfd-impeller,
+.cfd-horizontal-plane,
+.cfd-center-downflow,
+.cfd-wall-upflow,
+.cfd-axial-flow,
+.cfd-circulation,
+.cfd-gas-plume,
+.cfd-feed-line,
+.cfd-feed-zone,
+.cfd-sparger {
+  display: none;
+}
+
 .cfd-detail {
   display: grid;
   align-content: start;
@@ -8113,6 +8238,11 @@ dd {
 @keyframes impellerBladeOrbit {
   0% { transform: rotate(calc(var(--blade-angle) + 0deg)) translateX(8px); }
   100% { transform: rotate(calc(var(--blade-angle) + 360deg)) translateX(8px); }
+}
+
+@keyframes impellerBladeFlash {
+  0%, 100% { opacity: 0.58; stroke-width: 6; }
+  50% { opacity: 0.94; stroke-width: 8; }
 }
 
 @keyframes horizontalPlaneSpin {

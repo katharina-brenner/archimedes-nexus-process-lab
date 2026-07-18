@@ -468,6 +468,33 @@ const scientificSources = [
   },
   {
     group: "Industry",
+    title: "Stirred-tank bioreactor components and functions",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "sparger", "gas-mixing", "sensor", "cfd"],
+    benchmark: "A stirred-tank bioreactor is represented with vessel, temperature control, baffles, sparger, sensors/control system, gassing system, valves, clamps, ports and foam-control features.",
+    modelUse: "CFD reactor drawing basis: real internals, ports, probes, baffles, sparger, headspace, heat boundary and flow-path annotations.",
+    source: "Cytiva - Parts of a stirred-tank bioreactor and their function",
+    url: "https://www.cytivalifesciences.com/en/us/insights/parts-of-a-stirred-tank-bioreactor-and-their-function",
+  },
+  {
+    group: "Industry",
+    title: "Bioreactor flow and scale-up geometry",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "sparger", "gas-mixing", "sensor", "cfd"],
+    benchmark: "Efficient single-impeller mixing typically uses impeller diameter between 0.25 and 0.50 of tank diameter; liquid-height/tank-diameter ratio and distance from impeller drive mixing limits.",
+    modelUse: "Geometry ratios, impeller-zone placement, flow-path warnings, mixing-time interpretation and scale-up constraints.",
+    source: "BioProcess International - Fluid Flow and Mixing With Bioreactor Scale-Up",
+    url: "https://www.bioprocessintl.com/bioreactors/lessons-in-bioreactor-scale-up-part-2-a-refresher-on-fluid-flow-and-mixing",
+  },
+  {
+    group: "Paper",
+    title: "Bioreactor aspect-ratio reference",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "cfd"],
+    benchmark: "Bioreactors for mammalian or animal cells are commonly represented with aspect ratio around 2:1, while microbial fermentation can move toward 3:1.",
+    modelUse: "Axion CFD geometry uses process-specific vessel aspect ratio, liquid height and impeller count instead of a generic decorative tank.",
+    source: "IntechOpen - Development, Engineering and Biological Characterization of Stem Cell Spheroids",
+    url: "https://www.intechopen.com/chapters/62384",
+  },
+  {
+    group: "Industry",
     title: "Process intensification and 2,000 L scale-out",
     appliesTo: ["production-reactor", "perfusion", "seed-reactor", "wave"],
     benchmark: "Process-intensification strategies can reduce dependence on 20,000 L stainless-steel scale-up by moving toward smaller 2,000 L class single-use or scale-out configurations.",
@@ -8691,23 +8718,48 @@ function cfdMeshRows(report = cfdReport()) {
   }));
 }
 
+function cfdReactorDesign(unit) {
+  const volumeM3 = Math.max(0.02, unit.volumeL / 1000);
+  const cellCulture = isCellCultureTemplate();
+  const aspectRatio = cellCulture ? 2.05 : state.template === "penicillin" || state.template === "industrial-fermentation" ? 3.0 : 2.3;
+  const vesselVolumeM3 = volumeM3 / 0.8;
+  const tankDiameterM = Math.max(0.25, Math.cbrt((4 * vesselVolumeM3) / (Math.PI * aspectRatio)));
+  const straightSideM = tankDiameterM * aspectRatio;
+  const liquidHeightM = straightSideM * 0.8;
+  const impellerCount = straightSideM / tankDiameterM > 2.55 ? 3 : 2;
+  const impellerDiameterRatio = cellCulture ? 0.46 : 0.38;
+  const impellerDiameterM = tankDiameterM * impellerDiameterRatio;
+  const baffleWidthM = tankDiameterM * 0.1;
+  const spargerDiameterM = tankDiameterM * 0.55;
+  const bottomClearanceM = tankDiameterM * 0.33;
+  return {
+    aspectRatio,
+    vesselVolumeM3,
+    tankDiameterM,
+    straightSideM,
+    liquidHeightM,
+    impellerCount,
+    impellerDiameterRatio,
+    impellerDiameterM,
+    baffleWidthM,
+    spargerDiameterM,
+    bottomClearanceM,
+  };
+}
+
 function cfdGeometryRows(report = cfdReport()) {
   return report.flatMap((unit) => {
     const eng = unit.engineering || {};
-    const volumeM3 = Math.max(0.02, unit.volumeL / 1000);
-    const aspectRatio = 2.7;
-    const tankDiameterM = Math.max(0.25, Math.cbrt((4 * volumeM3) / (Math.PI * aspectRatio)));
-    const liquidHeightM = tankDiameterM * aspectRatio * (eng.workingVolumePct || 80) / 100;
-    const impellerDiameterM = tankDiameterM * (isCellCultureTemplate() ? 0.42 : 0.36);
-    const baffleWidthM = tankDiameterM * 0.1;
+    const design = cfdReactorDesign(unit);
     return [
-      { reactor: unit.id, feature: "Cylindrical vessel", tag: "TANK", value: formatNumber(tankDiameterM, 2), unit: "m diameter", location: "full height", cfdRole: "Defines wall boundary, hydrostatic head, liquid volume and scale-dependent mixing length." },
-      { reactor: unit.id, feature: "Liquid height", tag: "HL", value: formatNumber(liquidHeightM, 2), unit: "m", location: `${formatNumber(eng.workingVolumePct || 80, 0)}% working volume`, cfdRole: "Sets liquid surface, headspace and gas-disengagement boundary." },
+      { reactor: unit.id, feature: "Cylindrical STR vessel", tag: "TANK", value: formatNumber(design.tankDiameterM, 2), unit: "m tank diameter", location: `H/T ${formatNumber(design.aspectRatio, 2)}`, cfdRole: "Defines the wall boundary, hydrostatic head, liquid volume and scale-dependent mixing length." },
+      { reactor: unit.id, feature: "Liquid height", tag: "HL", value: formatNumber(design.liquidHeightM, 2), unit: "m", location: `${formatNumber(eng.workingVolumePct || 80, 0)}% working volume`, cfdRole: "Sets the free surface, headspace and gas-disengagement boundary; max working volume is screened at about 80%." },
       { reactor: unit.id, feature: "Central shaft", tag: "SH-1", value: formatNumber(eng.rpm || 0, 0), unit: "rpm", location: "axis x/D = 0.5", cfdRole: "Rotating reference frame / momentum source for the impeller zones." },
-      { reactor: unit.id, feature: "Upper impeller", tag: "IMP-1", value: formatNumber(impellerDiameterM, 2), unit: "m diameter", location: "z/H = 0.62", cfdRole: "Radial jet and local shear generation; interacts with upper circulation loop." },
-      { reactor: unit.id, feature: "Lower impeller", tag: "IMP-2", value: formatNumber(impellerDiameterM, 2), unit: "m diameter", location: "z/H = 0.34", cfdRole: "Gas dispersion and lower circulation loop; critical for bottom dead-zone removal." },
-      { reactor: unit.id, feature: "Four wall baffles", tag: "BF-1..4", value: formatNumber(baffleWidthM, 2), unit: "m width", location: "90 degree intervals", cfdRole: "Suppresses vortex formation and creates high-gradient near-wall regions." },
+      { reactor: unit.id, feature: "Impeller train", tag: "IMP-1..n", value: `${design.impellerCount} x ${formatNumber(design.impellerDiameterM, 2)}`, unit: "m diameter", location: `D/T ${formatNumber(design.impellerDiameterRatio, 2)}`, cfdRole: "Represents pitched-blade or hydrofoil impellers with separate MRF/momentum zones, radial discharge and axial return flow." },
+      { reactor: unit.id, feature: "Lower impeller clearance", tag: "C/T", value: formatNumber(design.bottomClearanceM, 2), unit: "m", location: "above dished bottom", cfdRole: "Controls gas dispersion from the sparger and bottom dead-zone risk." },
+      { reactor: unit.id, feature: "Four wall baffles", tag: "BF-1..4", value: formatNumber(design.baffleWidthM, 2), unit: "m width", location: "90 degree intervals", cfdRole: "Suppresses vortex formation, increases turbulence and creates near-wall gradients that need mesh refinement." },
       { reactor: unit.id, feature: "Ring sparger", tag: "SP-1", value: state.cfdOxygenInlet, unit: "", location: "bottom tangent plane", cfdRole: "Gas inlet for alpha.gas, bubble plume and oxygen scalar source." },
+      { reactor: unit.id, feature: "Sparger ring diameter", tag: "SP-D", value: formatNumber(design.spargerDiameterM, 2), unit: "m", location: "below lower impeller", cfdRole: "Determines initial bubble plume width and interaction with lower impeller pumping." },
       { reactor: unit.id, feature: "Feed inlet", tag: "FD-1", value: state.cfdNutrientInlet, unit: "", location: "top/subsurface/feed-ring depending on setting", cfdRole: "Nutrient scalar boundary coupled to batch phase and uptake demand." },
       { reactor: unit.id, feature: "DO / pH probes", tag: "AN-1..2", value: "2 sensors", unit: "", location: "side insertion at two axial levels", cfdRole: "Shows possible measurement bias if sensors sit outside low-transfer cells." },
       { reactor: unit.id, feature: "Jacket / coil", tag: "HX-J", value: formatNumber(eng.powerDensity || 0, 2), unit: "kW/m3 proxy", location: "outside wall", cfdRole: "Thermal boundary for heat removal/addition and viscosity-sensitive operation." },
@@ -8759,6 +8811,7 @@ function renderCfdBoard() {
   const residualMax = Math.max(...residualRows.map((row) => row.convergenceRatio), 1);
   const geometryRows = cfdGeometryRows([selected]);
   const flowPathRows = cfdFlowPathRows([selected]);
+  const reactorDesign = cfdReactorDesign(selected);
   const layerLabels = {
     oxygen: "Dissolved oxygen",
     nutrient: "Nutrient concentration",
@@ -8884,11 +8937,22 @@ function renderCfdBoard() {
       <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
-          <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")} · axial slice</strong>
+          <strong>${escapeHtml(layerLabels[state.cfdLayer] || "CFD field")} · STR axial section · H/T ${formatNumber(reactorDesign.aspectRatio, 2)} · D/T ${formatNumber(reactorDesign.impellerDiameterRatio, 2)}</strong>
         </div>
         <div class="cfd-vessel-body" style="--working-volume:${formatNumber(eng.workingVolumePct, 1)}%;">
           <svg class="cfd-engineering-svg" viewBox="0 0 720 520" aria-hidden="true">
             <defs>
+              <linearGradient id="vesselSteel" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stop-color="#6f8392" stop-opacity="0.42"></stop>
+                <stop offset="18%" stop-color="#eff6f7" stop-opacity="0.72"></stop>
+                <stop offset="50%" stop-color="#9db2bf" stop-opacity="0.18"></stop>
+                <stop offset="82%" stop-color="#eff6f7" stop-opacity="0.72"></stop>
+                <stop offset="100%" stop-color="#607485" stop-opacity="0.46"></stop>
+              </linearGradient>
+              <linearGradient id="brothFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#d7fff9" stop-opacity="0.66"></stop>
+                <stop offset="100%" stop-color="#6fb9b6" stop-opacity="0.5"></stop>
+              </linearGradient>
               <marker id="cfdArrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
                 <path d="M0,0 L9,4.5 L0,9 Z" fill="#153b46"></path>
               </marker>
@@ -8896,26 +8960,59 @@ function renderCfdBoard() {
                 <path d="M0,0 L9,4.5 L0,9 Z" fill="#0f8f83"></path>
               </marker>
             </defs>
-            <path class="cfd-jacket-line" d="M82 66 C38 122 44 392 86 452 M638 66 C682 122 676 392 634 452"></path>
-            <path class="cfd-streamline primary" d="M360 178 C485 164 548 204 545 268 C542 330 468 350 375 332" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline primary delay-a" d="M360 326 C235 342 172 302 175 238 C178 176 252 156 345 174" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline radial" d="M360 196 C274 195 220 214 182 260" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-b" d="M360 196 C446 195 500 214 538 260" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-c" d="M360 332 C270 330 212 352 170 402" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline radial delay-d" d="M360 332 C450 330 508 352 550 402" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-streamline axial" d="M158 388 C122 310 120 212 162 142" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline axial delay-b" d="M562 388 C598 310 600 212 558 142" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-streamline down" d="M360 150 C352 212 352 276 360 406" marker-end="url(#cfdArrow)"></path>
-            <path class="cfd-feed-vector" d="M546 34 L546 128 C525 154 498 166 458 176" marker-end="url(#cfdArrowTeal)"></path>
-            <path class="cfd-thermal-vector" d="M640 218 C600 230 570 250 542 286" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-vessel-shell" d="M210 72 C228 46 492 46 510 72 L510 402 C510 464 458 492 360 492 C262 492 210 464 210 402 Z"></path>
+            <ellipse class="cfd-vessel-lip" cx="360" cy="74" rx="150" ry="28"></ellipse>
+            <path class="cfd-liquid-shape" d="M232 150 C252 129 468 129 488 150 L488 398 C488 440 444 458 360 458 C276 458 232 440 232 398 Z"></path>
+            <ellipse class="cfd-liquid-surface" cx="360" cy="151" rx="128" ry="19"></ellipse>
+            <path class="cfd-dished-bottom" d="M232 398 C252 444 468 444 488 398"></path>
+            <path class="cfd-jacket-line" d="M188 92 C158 160 158 354 188 426 M532 92 C562 160 562 354 532 426"></path>
+            <path class="cfd-baffle-svg rear-left" d="M264 116 L264 416"></path>
+            <path class="cfd-baffle-svg rear-right" d="M456 116 L456 416"></path>
+            <path class="cfd-baffle-svg front-left" d="M238 132 L238 392"></path>
+            <path class="cfd-baffle-svg front-right" d="M482 132 L482 392"></path>
+            <path class="cfd-shaft-svg" d="M360 54 L360 438"></path>
+            <ellipse class="cfd-impeller-disc upper" cx="360" cy="214" rx="82" ry="18"></ellipse>
+            <ellipse class="cfd-impeller-disc lower" cx="360" cy="336" rx="82" ry="18"></ellipse>
+            <path class="cfd-impeller-blade upper-b1" d="M360 214 L286 188"></path>
+            <path class="cfd-impeller-blade upper-b2" d="M360 214 L434 188"></path>
+            <path class="cfd-impeller-blade upper-b3" d="M360 214 L287 240"></path>
+            <path class="cfd-impeller-blade upper-b4" d="M360 214 L433 240"></path>
+            <path class="cfd-impeller-blade lower-b1" d="M360 336 L286 310"></path>
+            <path class="cfd-impeller-blade lower-b2" d="M360 336 L434 310"></path>
+            <path class="cfd-impeller-blade lower-b3" d="M360 336 L287 362"></path>
+            <path class="cfd-impeller-blade lower-b4" d="M360 336 L433 362"></path>
+            ${reactorDesign.impellerCount > 2 ? `
+              <ellipse class="cfd-impeller-disc middle" cx="360" cy="274" rx="80" ry="17"></ellipse>
+              <path class="cfd-impeller-blade middle-b1" d="M360 274 L289 250"></path>
+              <path class="cfd-impeller-blade middle-b2" d="M360 274 L431 250"></path>
+              <path class="cfd-impeller-blade middle-b3" d="M360 274 L289 298"></path>
+              <path class="cfd-impeller-blade middle-b4" d="M360 274 L431 298"></path>
+            ` : ""}
+            <ellipse class="cfd-sparger-svg" cx="360" cy="424" rx="86" ry="18"></ellipse>
+            <path class="cfd-nozzle top-left" d="M286 70 L286 32"></path>
+            <path class="cfd-nozzle top-right" d="M438 70 L438 32"></path>
+            <path class="cfd-nozzle side-left" d="M210 252 L160 252"></path>
+            <path class="cfd-nozzle side-right" d="M510 276 L560 276"></path>
+            <path class="cfd-nozzle bottom" d="M360 492 L360 518"></path>
+            <path class="cfd-streamline primary" d="M360 214 C438 214 484 236 484 276 C484 324 432 342 368 336" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline primary delay-a" d="M360 336 C282 336 236 314 236 274 C236 226 288 208 352 214" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline radial" d="M360 214 C314 214 276 226 238 252" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-b" d="M360 214 C406 214 444 226 482 252" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-c" d="M360 336 C310 336 274 352 232 388" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline radial delay-d" d="M360 336 C410 336 446 352 488 388" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-streamline axial" d="M250 394 C220 316 220 226 250 156" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline axial delay-b" d="M470 394 C500 316 500 226 470 156" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-streamline down" d="M360 144 C352 212 352 302 360 410" marker-end="url(#cfdArrow)"></path>
+            <path class="cfd-feed-vector" d="M438 32 L438 122 C418 148 396 162 372 178" marker-end="url(#cfdArrowTeal)"></path>
+            <path class="cfd-thermal-vector" d="M532 256 C496 262 480 286 464 316" marker-end="url(#cfdArrow)"></path>
             <g class="cfd-bubble-train">
-              <circle cx="298" cy="422" r="5"></circle>
-              <circle cx="326" cy="390" r="4"></circle>
-              <circle cx="350" cy="354" r="5"></circle>
-              <circle cx="382" cy="316" r="4"></circle>
-              <circle cx="408" cy="278" r="5"></circle>
-              <circle cx="432" cy="236" r="4"></circle>
-              <circle cx="454" cy="194" r="5"></circle>
+              <circle cx="300" cy="414" r="5"></circle>
+              <circle cx="326" cy="386" r="4"></circle>
+              <circle cx="350" cy="350" r="5"></circle>
+              <circle cx="378" cy="312" r="4"></circle>
+              <circle cx="402" cy="270" r="5"></circle>
+              <circle cx="426" cy="228" r="4"></circle>
+              <circle cx="448" cy="184" r="5"></circle>
             </g>
           </svg>
           <div class="cfd-headspace"><span>headspace</span></div>
