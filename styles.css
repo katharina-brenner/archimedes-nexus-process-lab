@@ -15690,3 +15690,329 @@ body.locked .public-page:not(.active-public-page) {
     justify-self: center;
   }
 }
+
+/* Contrast guardrails: dark surfaces always get light text; light surfaces keep dark text. */
+:where(
+  .public-site,
+  .public-nav,
+  .public-hero,
+  .public-section,
+  .public-bento,
+  .public-build-loop,
+  .public-case-study,
+  .public-detail-panel,
+  .public-product-story,
+  .public-canvas-story,
+  .public-screenshot-story,
+  .public-mission,
+  .hero-product-visual,
+  .hero-outcome-panel,
+  .hero-process-ribbon,
+  .login-gate,
+  .login-card,
+  .sidebar,
+  .flowsheet-canvas,
+  .canvas-preview,
+  .canvas-preview-map,
+  .canvas-node,
+  .process-lane,
+  .unit,
+  .stream-label,
+  .cfd-hero
+) {
+  color: #f4fbfb;
+}
+
+:where(
+  .public-site,
+  .public-nav,
+  .public-hero,
+  .public-section,
+  .public-bento,
+  .public-build-loop,
+  .public-case-study,
+  .public-detail-panel,
+  .public-product-story,
+  .public-canvas-story,
+  .public-screenshot-story,
+  .public-mission,
+  .hero-product-visual,
+  .hero-outcome-panel,
+  .hero-process-ribbon,
+  .login-gate,
+  .login-card,
+  .sidebar,
+  .flowsheet-canvas,
+  .canvas-preview,
+  .canvas-preview-map,
+  .canvas-node,
+  .process-lane,
+  .unit,
+  .stream-label,
+  .cfd-hero
+) :where(h1, h2, h3, h4, strong, b, label) {
+  color: #f8fcfc !important;
+}
+
+:where(
+  .public-site,
+  .public-nav,
+  .public-hero,
+  .public-section,
+  .public-bento,
+  .public-build-loop,
+  .public-case-study,
+  .public-detail-panel,
+  .public-product-story,
+  .public-canvas-story,
+  .public-screenshot-story,
+  .public-mission,
+  .hero-product-visual,
+  .hero-outcome-panel,
+  .hero-process-ribbon,
+  .login-gate,
+  .login-card,
+  .sidebar,
+  .flowsheet-canvas,
+  .canvas-preview,
+  .canvas-preview-map,
+  .canvas-node,
+  .process-lane,
+  .unit,
+  .stream-label,
+  .cfd-hero
+) :where(p, span, small, li, dd, em) {
+  color: rgba(226, 238, 242, 0.82) !important;
+}
+
+:where(
+  .public-site,
+  .public-nav,
+  .public-hero,
+  .public-section,
+  .public-bento,
+  .public-build-loop,
+  .public-case-study,
+  .public-detail-panel,
+  .public-product-story,
+  .public-canvas-story,
+  .public-screenshot-story,
+  .public-mission,
+  .hero-product-visual,
+  .hero-outcome-panel,
+  .hero-process-ribbon,
+  .login-gate,
+  .login-card,
+  .sidebar,
+  .flowsheet-canvas,
+  .canvas-preview,
+  .canvas-preview-map,
+  .canvas-node,
+  .process-lane,
+  .unit,
+  .stream-label,
+  .cfd-hero
+) :where(a, .eyebrow, .source-links a, .public-detail-copy > span, .canvas-model-stack span) {
+  color: #aee5df !important;
+}
+
+:where(
+  .public-primary,
+  .public-nav nav button.active,
+  .tab.active,
+  .tool.active,
+  .action-button.primary,
+  .public-detail-actions .public-next-primary,
+  .hero-composer .public-primary,
+  .cfd-control-actions button,
+  .cfd-openfoam-heading a,
+  .cfd-residual-panel button
+) {
+  color: #061421 !important;
+  background: linear-gradient(135deg, #effffd, #8fe4da) !important;
+}
+
+:where(
+  .public-primary,
+  .public-nav nav button.active,
+  .tab.active,
+  .tool.active,
+  .action-button.primary,
+  .public-detail-actions .public-next-primary,
+  .hero-composer .public-primary,
+  .cfd-control-actions button,
+  .cfd-openfoam-heading a,
+  .cfd-residual-panel button
+) :where(span, strong, b, small) {
+  color: #061421 !important;
+}
+
+:where(
+  .public-secondary,
+  .public-nav nav button:not(.active),
+  .tab:not(.active),
+  .tool:not(.active),
+  .text-button,
+  .icon-button,
+  .profile-button
+) {
+  color: #eef7f7 !important;
+}
+
+:where(
+  .public-secondary,
+  .public-nav nav button:not(.active),
+  .tab:not(.active),
+  .tool:not(.active),
+  .text-button,
+  .icon-button,
+  .profile-button
+) :where(span, strong, b, small) {
+  color: inherit !important;
+}
+
+:where(
+  .hero-composer,
+  .topbar,
+  .cfd-control-panel,
+  .cfd-openfoam-panel,
+  .cfd-detail,
+  .cfd-score-card,
+  .cfd-metric-grid article,
+  .cfd-profile-card,
+  .cfd-actions,
+  .cfd-reactions,
+  .profile-card,
+  .reports-grid article,
+  .economics-grid article,
+  .parameter-dashboard article,
+  .project-card,
+  .connector-workbench,
+  .connector-card,
+  .quick-add-button,
+  .palette-item,
+  .template-button,
+  .segmented button
+) {
+  color: #102033;
+}
+
+:where(
+  .hero-composer,
+  .topbar,
+  .cfd-control-panel,
+  .cfd-openfoam-panel,
+  .cfd-detail,
+  .cfd-score-card,
+  .cfd-metric-grid article,
+  .cfd-profile-card,
+  .cfd-actions,
+  .cfd-reactions,
+  .profile-card,
+  .reports-grid article,
+  .economics-grid article,
+  .parameter-dashboard article,
+  .project-card,
+  .connector-workbench,
+  .connector-card,
+  .quick-add-button,
+  .palette-item,
+  .template-button,
+  .segmented button
+) :where(h1, h2, h3, h4, strong, b, label) {
+  color: #102033 !important;
+}
+
+:where(
+  .hero-composer,
+  .topbar,
+  .cfd-control-panel,
+  .cfd-openfoam-panel,
+  .cfd-detail,
+  .cfd-score-card,
+  .cfd-metric-grid article,
+  .cfd-profile-card,
+  .cfd-actions,
+  .cfd-reactions,
+  .profile-card,
+  .reports-grid article,
+  .economics-grid article,
+  .parameter-dashboard article,
+  .project-card,
+  .connector-workbench,
+  .connector-card,
+  .quick-add-button,
+  .palette-item,
+  .template-button,
+  .segmented button
+) :where(p, span, small, li, dd, em) {
+  color: #52647e !important;
+}
+
+.unit :where(h3, strong, b),
+.stream-label :where(b, strong),
+.canvas-node :where(strong, b),
+.cfd-hero :where(h3, strong, b) {
+  color: #f8fcfc !important;
+}
+
+.unit :where(p, span, small),
+.stream-label :where(span, small),
+.canvas-node :where(p, span, small),
+.cfd-hero :where(p, span, small) {
+  color: rgba(226, 238, 242, 0.82) !important;
+}
+
+:where(
+  .hero-badge-row span,
+  .hero-process-ribbon .process-core,
+  .case-study-map button b,
+  .public-detail-stepper button b,
+  .public-detail-stepper button.active,
+  .public-detail-stepper button.active span,
+  .public-detail-actions .public-next-primary,
+  .source-links a:hover,
+  .public-example-grid button:hover,
+  .public-primary,
+  .public-nav nav button.active,
+  .action-button.primary,
+  .tab.active,
+  .tool.active,
+  .cfd-layer-tabs button.active,
+  .cfd-inlet-grid button.active
+) {
+  color: #061421 !important;
+}
+
+:where(
+  .hero-badge-row span,
+  .hero-process-ribbon .process-core,
+  .public-detail-stepper button.active,
+  .public-detail-actions .public-next-primary,
+  .source-links a:hover,
+  .public-example-grid button:hover,
+  .public-primary,
+  .public-nav nav button.active,
+  .action-button.primary,
+  .tab.active,
+  .tool.active,
+  .cfd-layer-tabs button.active,
+  .cfd-inlet-grid button.active
+) :where(span, strong, b, small) {
+  color: #061421 !important;
+}
+
+:where(
+  .hero-badge-row b,
+  .hero-trust-strip,
+  .hero-trust-strip span,
+  .hero-outcome-panel span,
+  .public-detail-stepper button:not(.active),
+  .public-detail-stepper button:not(.active) span,
+  .public-detail-visual span,
+  .public-detail-list li,
+  .case-study-map button span,
+  .partner-strip span
+) {
+  color: rgba(226, 238, 242, 0.86) !important;
+}
