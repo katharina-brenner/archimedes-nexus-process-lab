@@ -12254,24 +12254,33 @@ button {
 
 .decision-matrix {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 9px;
   margin-top: 28px;
 }
 
-.decision-matrix span,
-.decision-matrix b {
-  min-height: 48px;
+.decision-matrix article {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.68fr) minmax(136px, 1.1fr) minmax(146px, 1.2fr) minmax(132px, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
   border: 1px solid rgba(173, 195, 205, 0.14);
   border-radius: 18px;
-  padding: 10px 12px;
+  padding: 10px;
   color: #d9e6ef;
-  background: rgba(255, 255, 255, 0.055);
-  font-size: 11px;
-  line-height: 1.15;
-  text-align: center;
-  display: grid;
-  place-items: center;
+  background:
+    linear-gradient(135deg, rgba(117, 208, 199, 0.1), transparent 72%),
+    rgba(255, 255, 255, 0.055);
+}
+
+.decision-matrix span,
+.decision-matrix b,
+.decision-matrix small,
+.decision-matrix em {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.22;
 }
 
 .decision-matrix span {
@@ -12279,7 +12288,33 @@ button {
   background: #dff8f4;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.decision-matrix b {
+  color: #f4fbfb;
+  font-size: 12px;
+}
+
+.decision-matrix small {
+  color: #aebed0;
+  font-size: 11px;
+}
+
+.decision-matrix em {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: #bff7ee;
+  background: rgba(117, 208, 199, 0.11);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: center;
 }
 
 .plan-bars {
@@ -12348,6 +12383,14 @@ button {
   .public-detail-visual {
     grid-template-columns: 1fr !important;
   }
+
+  .decision-matrix article {
+    grid-template-columns: minmax(100px, 0.7fr) minmax(160px, 1.3fr);
+  }
+
+  .decision-matrix em {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 720px) {
@@ -12370,6 +12413,16 @@ button {
   .loop-orbit,
   .network-map {
     min-height: 340px;
+  }
+
+  .decision-matrix article {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .decision-matrix span,
+  .decision-matrix em {
+    justify-self: start;
   }
 
   .loop-orbit span,

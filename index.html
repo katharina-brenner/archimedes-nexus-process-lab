@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260718-decision-canvas-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260718-decision-cards-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -730,10 +730,36 @@
               <figure class="explain-visual visual-decision-map">
                 <figcaption><b>Decision canvas</b><span>Every recommendation is tied to a signal, evidence, and a next action.</span></figcaption>
                 <div class="decision-matrix">
-                  <span>Question</span><span>Signal</span><span>Decision</span><span>Next step</span>
-                  <b>Can it scale?</b><b>kLa margin</b><b>Split train</b><b>Resize reactor</b>
-                  <b>What drives cost?</b><b>Media share</b><b>Optimize feed</b><b>Run TEA case</b>
-                  <b>Is it reviewable?</b><b>Open gaps</b><b>Hold design</b><b>Add data</b>
+                  <article>
+                    <span>Scale-up</span>
+                    <b>Can this volume run safely?</b>
+                    <small>kLa, mixing, heat, working volume</small>
+                    <em>Resize or split the train</em>
+                  </article>
+                  <article>
+                    <span>Cost</span>
+                    <b>What drives €/kg?</b>
+                    <small>media, resin, filters, utilities</small>
+                    <em>Run TEA sensitivity</em>
+                  </article>
+                  <article>
+                    <span>Quality</span>
+                    <b>Is the batch releasable?</b>
+                    <small>CQA, hold time, CIP/SIP, sterility</small>
+                    <em>Add missing controls</em>
+                  </article>
+                  <article>
+                    <span>Sustainability</span>
+                    <b>Where is the footprint?</b>
+                    <small>WFI, heat, waste, CO2e, solvents</small>
+                    <em>Improve reuse loops</em>
+                  </article>
+                  <article>
+                    <span>Evidence</span>
+                    <b>What is not proven yet?</b>
+                    <small>measured, supplier, literature, default</small>
+                    <em>Collect data before review</em>
+                  </article>
                 </div>
               </figure>
             </div>
@@ -1258,6 +1284,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260718-decision-canvas-v1"></script>
+    <script type="module" src="./app.js?v=20260718-decision-cards-v1"></script>
   </body>
 </html>
