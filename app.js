@@ -2010,6 +2010,7 @@ const state = {
   selectedIntegration: "",
   connectorResults: {},
   projectFolders: {},
+  factoryTimeH: null,
 };
 
 const els = {
@@ -4814,11 +4815,29 @@ function factoryRoomRows(schedule = campaignSchedule()) {
   });
 }
 
-function movingBatchRows(schedule = campaignSchedule()) {
-  const ops = schedule.operations.filter((item) => item.batchId === "B01").slice(0, 18);
+function movingBatchRows(schedule = campaignSchedule(), timeH = null) {
+  const now = Number(timeH);
+  const hasLiveTime = Number.isFinite(now);
+  const liveWindow = Math.max(8, schedule.releasePitchH || 24);
+  const candidateOps = hasLiveTime
+    ? schedule.operations
+      .filter((item) => item.startH <= now + liveWindow && item.finishH >= now - liveWindow)
+      .sort((a, b) => {
+        const aLive = now >= a.startH && now <= a.finishH ? 0 : 1;
+        const bLive = now >= b.startH && now <= b.finishH ? 0 : 1;
+        return (aLive - bLive) || Math.abs((a.startH + a.finishH) / 2 - now) - Math.abs((b.startH + b.finishH) / 2 - now);
+      })
+    : schedule.operations.filter((item) => item.batchId === "B01");
+  const fallbackOps = schedule.operations
+    .slice()
+    .sort((a, b) => Math.abs((a.startH + a.finishH) / 2 - (hasLiveTime ? now : 0)) - Math.abs((b.startH + b.finishH) / 2 - (hasLiveTime ? now : 0)));
+  const ops = (candidateOps.length ? candidateOps : fallbackOps).slice(0, 18);
   const total = Math.max(1, schedule.makespanH);
   return ops.map((item, index) => {
-    const from = index ? ops[index - 1].tag : "Raw materials";
+    const previous = schedule.operations
+      .filter((candidate) => candidate.batchId === item.batchId && candidate.finishH <= item.startH && candidate.tag !== item.tag)
+      .sort((a, b) => b.finishH - a.finishH)[0];
+    const from = previous?.tag || (index ? ops[index - 1].tag : "Raw materials");
     const x = 10 + (item.startH / total) * 72;
     const y = 24 + (index % 5) * 12;
     const duration = Math.max(4, Math.min(16, item.processH / Math.max(1, total) * 34 + 4));
@@ -4958,6 +4977,174 @@ function factoryOptimizationRows(schedule = campaignSchedule()) {
   return options.sort((a, b) => b.objectiveScore - a.objectiveScore).slice(0, 18);
 }
 
+function factoryTimeBounds(schedule = campaignSchedule()) {
+  const maxH = Math.max(24, schedule.makespanH || 0, ...schedule.operations.map((item) => item.availableH || item.finishH || 0));
+  const suggested = Math.min(maxH, Math.max(0, schedule.releasePitchH * 1.35));
+  return { minH: 0, maxH, suggestedH: suggested };
+}
+
+function operationStateAtTime(item, timeH) {
+  const phases = [
+    { state: "setup", startH: item.startH, finishH: item.startH + item.setupH, label: "Setup / charge", nextState: "process" },
+    { state: "process", startH: item.startH + item.setupH, finishH: item.processEndH, label: "Production phase", nextState: "transfer" },
+    { state: "transfer", startH: item.processEndH, finishH: item.transferEndH, label: "Material transfer", nextState: item.cleanH > 0 ? "clean" : "available" },
+    { state: item.cleanH > 0 ? "clean" : "release", startH: item.cleanStartH, finishH: item.cleanStartH + item.cleanH, label: item.cleanH > 0 ? "CIP/SIP or changeover" : "Release check", nextState: "available" },
+    { state: "available", startH: item.finishH, finishH: item.availableH, label: "Released to scheduler", nextState: "idle" },
+  ];
+  return phases.find((phase) => timeH >= phase.startH && timeH < phase.finishH) || null;
+}
+
+function factoryActiveEquipmentRows(schedule = campaignSchedule(), timeH = state.factoryTimeH) {
+  const now = Number(timeH) || 0;
+  return schedule.operations
+    .map((item) => {
+      const phase = operationStateAtTime(item, now);
+      if (!phase) return null;
+      const phaseDuration = Math.max(0.001, phase.finishH - phase.startH);
+      const progressPct = Math.max(0, Math.min(100, (now - phase.startH) / phaseDuration * 100));
+      return {
+        batchId: item.batchId,
+        equipmentTag: item.tag,
+        equipmentName: item.operation,
+        equipmentClass: item.class,
+        room: item.group,
+        state: phase.state,
+        stateLabel: phase.label,
+        startH: phase.startH,
+        finishH: phase.finishH,
+        remainingH: Math.max(0, phase.finishH - now),
+        progressPct,
+        nextState: phase.nextState,
+        resourceConstraint: item.assignedEquipment,
+        status: item.status,
+        dispatchSignal: item.status === "blocked" ? "resolve dependency before release" : phase.state === "clean" ? "cleaning queue active" : phase.state === "transfer" ? "verify line availability" : "inside planned window",
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.finishH - b.finishH);
+}
+
+function factoryRoomLiveRows(schedule = campaignSchedule(), timeH = state.factoryTimeH) {
+  const activeRows = factoryActiveEquipmentRows(schedule, timeH);
+  const activeByRoom = activeRows.reduce((acc, item) => {
+    acc[item.room] = acc[item.room] || [];
+    acc[item.room].push(item);
+    return acc;
+  }, {});
+  return factoryRoomRows(schedule).map((room) => {
+    const active = activeByRoom[room.roomName] || [];
+    const cleaningCount = active.filter((item) => item.state === "clean").length;
+    const transferCount = active.filter((item) => item.state === "transfer").length;
+    const processCount = active.filter((item) => item.state === "process").length;
+    const liveOccupancyPct = Math.min(100, room.occupancyPct * 0.55 + active.length * 13 + transferCount * 5);
+    const liveStatus = cleaningCount ? "cleaning" : processCount ? "running" : transferCount ? "transfer" : active.length ? "setup" : "quiet";
+    return {
+      ...room,
+      activeBatches: [...new Set(active.map((item) => item.batchId))].length,
+      activeEquipment: active.map((item) => item.equipmentTag).join(" | "),
+      liveOccupancyPct,
+      liveStatus,
+      cleaningCount,
+      transferCount,
+      processCount,
+    };
+  });
+}
+
+function factoryTimelineRows(schedule = campaignSchedule()) {
+  const maxH = factoryTimeBounds(schedule).maxH;
+  const bucketCount = 12;
+  const widthH = Math.max(1, maxH / bucketCount);
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const startH = index * widthH;
+    const finishH = Math.min(maxH, startH + widthH);
+    const active = schedule.operations.filter((item) => item.startH < finishH && item.availableH > startH);
+    const processing = active.filter((item) => item.processEndH > startH && item.startH + item.setupH < finishH).length;
+    const cleaning = active.filter((item) => item.cleanStartH < finishH && item.cleanStartH + item.cleanH > startH).length;
+    const transfers = active.filter((item) => item.processEndH < finishH && item.transferEndH > startH).length;
+    const risk = active.filter((item) => item.status !== "scheduled").length + (cleaning > 5 ? 1 : 0);
+    return {
+      bucket: `T${String(index + 1).padStart(2, "0")}`,
+      startH,
+      finishH,
+      activeOperations: active.length,
+      processOperations: processing,
+      transferOperations: transfers,
+      cleaningOperations: cleaning,
+      riskSignals: risk,
+      intensityPct: Math.min(100, active.length / Math.max(1, schedule.operations.length / bucketCount) * 72 + cleaning * 4),
+    };
+  });
+}
+
+function factoryDispatchRecommendations(schedule = campaignSchedule(), timeH = state.factoryTimeH) {
+  const liveEquipment = factoryActiveEquipmentRows(schedule, timeH);
+  const liveRooms = factoryRoomLiveRows(schedule, timeH);
+  const aps = advancedPlanningSuite(schedule);
+  const recommendations = [];
+  const overloadedRoom = liveRooms.find((room) => room.liveOccupancyPct > 82);
+  const cleaningActive = liveEquipment.filter((item) => item.state === "clean").length;
+  const transferActive = liveEquipment.filter((item) => item.state === "transfer").length;
+  const inventoryRisk = aps.inventory.find((item) => item.shortageRisk === "risk");
+  const bottleneckActive = liveEquipment.find((item) => item.equipmentTag === schedule.bottleneck.tag || item.resourceConstraint === schedule.bottleneck.tag);
+
+  if (bottleneckActive) {
+    recommendations.push({
+      priority: "High",
+      area: bottleneckActive.room,
+      action: `Protect ${bottleneckActive.equipmentTag} until ${formatNumber(bottleneckActive.finishH, 1)} h`,
+      reason: `${bottleneckActive.stateLabel} is on the current bottleneck path.`,
+      expectedImpact: "reduces release-pitch drift and late batch risk",
+    });
+  }
+  if (overloadedRoom) {
+    recommendations.push({
+      priority: "High",
+      area: overloadedRoom.roomName,
+      action: `Split traffic or shift one transfer out of ${overloadedRoom.roomName}`,
+      reason: `${formatNumber(overloadedRoom.liveOccupancyPct, 0)}% live room load with ${overloadedRoom.activeBatches} active batches.`,
+      expectedImpact: "reduces operator congestion, hold-time risk, and material-flow crossing",
+    });
+  }
+  if (cleaningActive > 2) {
+    recommendations.push({
+      priority: "Medium",
+      area: "Cleaning",
+      action: "Reserve CIP/SIP skid time before releasing the next production batch",
+      reason: `${cleaningActive} equipment objects are in cleaning/changeover at this clock time.`,
+      expectedImpact: "prevents avoidable waiting after transfer completion",
+    });
+  }
+  if (transferActive > 3) {
+    recommendations.push({
+      priority: "Medium",
+      area: "Logistics",
+      action: "Check transfer-line occupancy and buffer receiving capacity",
+      reason: `${transferActive} simultaneous transfer windows are active.`,
+      expectedImpact: "keeps WIP movement visible and prevents line conflicts",
+    });
+  }
+  if (inventoryRisk) {
+    recommendations.push({
+      priority: "Medium",
+      area: "Inventory",
+      action: `Trigger replenishment review for ${inventoryRisk.item}`,
+      reason: `${formatNumber(inventoryRisk.coverageDays, 0)} d coverage versus ${formatNumber(inventoryRisk.leadTimeDays, 0)} d lead time.`,
+      expectedImpact: "reduces campaign interruption risk",
+    });
+  }
+  if (!recommendations.length) {
+    recommendations.push({
+      priority: "Low",
+      area: "Factory",
+      action: "Continue schedule execution and keep monitoring the next cleaning window",
+      reason: "No live bottleneck, room, transfer, or inventory alarm is active at this time.",
+      expectedImpact: "maintains plan adherence",
+    });
+  }
+  return recommendations.slice(0, 6);
+}
+
 function factoryRoomCsvRows() {
   return factoryRoomRows();
 }
@@ -4980,6 +5167,20 @@ function equipmentStateMachineCsvRows() {
 
 function factoryOptimizationCsvRows() {
   return factoryOptimizationRows();
+}
+
+function factoryLiveStateCsvRows() {
+  const schedule = campaignSchedule();
+  return factoryActiveEquipmentRows(schedule, state.factoryTimeH);
+}
+
+function factoryTimelineCsvRows() {
+  return factoryTimelineRows();
+}
+
+function factoryDispatchCsvRows() {
+  const schedule = campaignSchedule();
+  return factoryDispatchRecommendations(schedule, state.factoryTimeH);
 }
 
 function plantSimulationObjectRows(model = plantSimulationModel()) {
@@ -6217,11 +6418,18 @@ function renderSimulationBoard() {
   const plantExperiments = plantSimulationExperimentRows(plantSim);
   const plantObjects = plantSimulationObjectRows(plantSim);
   const factoryRooms = factoryRoomRows(schedule);
-  const movingBatches = movingBatchRows(schedule);
   const personnelRows = personnelPlanRows(schedule);
   const inventoryRows = inventoryLevelRows(schedule);
   const stateRows = equipmentStateMachineRows(schedule);
   const factoryOptimizations = factoryOptimizationRows(schedule);
+  const timeBounds = factoryTimeBounds(schedule);
+  const requestedFactoryTime = state.factoryTimeH === null || state.factoryTimeH === undefined ? NaN : Number(state.factoryTimeH);
+  state.factoryTimeH = Math.max(timeBounds.minH, Math.min(timeBounds.maxH, Number.isFinite(requestedFactoryTime) ? requestedFactoryTime : timeBounds.suggestedH));
+  const movingBatches = movingBatchRows(schedule, state.factoryTimeH);
+  const liveRooms = factoryRoomLiveRows(schedule, state.factoryTimeH);
+  const liveEquipment = factoryActiveEquipmentRows(schedule, state.factoryTimeH);
+  const timelineRows = factoryTimelineRows(schedule);
+  const dispatchRows = factoryDispatchRecommendations(schedule, state.factoryTimeH);
   const aps = advancedPlanningSuite(schedule);
 
   els.simulationBoard.innerHTML = `
@@ -6698,14 +6906,31 @@ function renderSimulationBoard() {
         <article><span>Total objects</span><strong>${plantSim.objects.totalObjects}</strong><small>${plantSim.objects.equipment} equipment · ${plantSim.objects.streams} streams</small></article>
         <article><span>Throughput</span><strong>${formatNumber(plantSim.kpis.throughputKgH, 2)} kg/h</strong><small>${plantSim.kpis.feasibleAnnualBatches}/${plantSim.kpis.targetAnnualBatches} batches/yr</small></article>
         <article><span>Bottleneck</span><strong>${escapeHtml(plantSim.kpis.bottleneckTag)}</strong><small>${formatNumber(plantSim.kpis.bottleneckPct, 1)}% occupancy</small></article>
-        <article><span>Logistics index</span><strong>${formatNumber(plantSim.kpis.logisticsIndex, 0)}%</strong><small>${plantSim.kpis.bufferUnits} buffers / hold spaces</small></article>
+        <article><span>Factory clock</span><strong>${formatNumber(state.factoryTimeH, 1)} h</strong><small>${liveEquipment.length} active objects now</small></article>
+      </div>
+      <div class="factory-time-control" aria-label="Factory simulation time control">
+        <div>
+          <span>Live operations layer</span>
+          <strong>${formatNumber(state.factoryTimeH, 1)} h / ${formatNumber(timeBounds.maxH, 1)} h</strong>
+          <small>Drag the clock to see room load, batch movement, staff load, and equipment states at a concrete campaign moment.</small>
+        </div>
+        <input id="factoryTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(state.factoryTimeH, 1)}" aria-label="Factory simulation time in hours" />
+        <div class="factory-timeline-spark">
+          ${timelineRows.map((bucket) => `
+            <button type="button" data-factory-time="${formatNumber((bucket.startH + bucket.finishH) / 2, 2)}" class="${state.factoryTimeH >= bucket.startH && state.factoryTimeH < bucket.finishH ? "active" : ""}" style="--intensity:${bucket.intensityPct}%;"
+              title="${escapeAttr(`${bucket.bucket}: ${formatNumber(bucket.startH, 1)}-${formatNumber(bucket.finishH, 1)} h, ${bucket.activeOperations} active operations, ${bucket.cleaningOperations} cleaning windows`)}">
+              <span>${bucket.bucket}</span>
+              <b></b>
+            </button>
+          `).join("")}
+        </div>
       </div>
       <div class="plant-layout-scene" aria-label="Object-oriented 3D-style plant simulation preview">
         <div class="plant-layout-floor">
-          ${factoryRooms.slice(0, 6).map((room) => `
-            <div class="factory-room ${room.status.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}" style="--x:${room.xPct}%; --y:${room.yPct}%; --w:${room.widthPct}%; --h:${room.heightPct}%;" title="${escapeAttr(`${room.roomName}: ${room.roomType}; ${formatNumber(room.occupancyPct, 1)}% occupied`)}">
+          ${liveRooms.slice(0, 6).map((room) => `
+            <div class="factory-room ${room.status.replace(/[^a-z0-9]+/gi, "-").toLowerCase()} live-${room.liveStatus}" style="--x:${room.xPct}%; --y:${room.yPct}%; --w:${room.widthPct}%; --h:${room.heightPct}%; --load:${room.liveOccupancyPct}%;" title="${escapeAttr(`${room.roomName}: ${room.roomType}; ${formatNumber(room.liveOccupancyPct, 1)}% live load; ${room.activeBatches} active batches`)}">
               <span>${escapeHtml(room.roomName)}</span>
-              <small>${formatNumber(room.occupancyPct, 0)}%</small>
+              <small>${formatNumber(room.liveOccupancyPct, 0)}% · ${escapeHtml(room.liveStatus)}</small>
             </div>
           `).join("")}
           <div class="plant-zone zone-process">
@@ -6719,7 +6944,7 @@ function renderSimulationBoard() {
           <div class="plant-zone zone-support">
             <span>Support, utilities, cleaning</span>
             ${state.units.filter((item) => unitLayer(item) !== "main").slice(0, 14).map((item, index) => `
-              <button data-jump-unit="${escapeAttr(item.id)}" type="button" style="--x:${8 + (index % 5) * 18}%; --y:${18 + Math.floor(index / 5) * 28}%;" title="${escapeAttr(`${item.id} ${item.name}: ${unitLayerLabel(unitLayer(item))}. Click to focus on the canvas.`)}">
+              <button data-jump-unit="${escapeAttr(item.id)}" type="button" style="--x:${8 + (index % 2) * 44}%; --y:${18 + Math.floor(index / 2) * 11}%;" title="${escapeAttr(`${item.id} ${item.name}: ${unitLayerLabel(unitLayer(item))}. Click to focus on the canvas.`)}">
                 <i>${escapeHtml(item.icon)}</i><b>${escapeHtml(item.id)}</b>
               </button>
             `).join("")}
@@ -6727,9 +6952,12 @@ function renderSimulationBoard() {
           <div class="plant-flow-line flow-a"></div>
           <div class="plant-flow-line flow-b"></div>
           <div class="plant-flow-line flow-c"></div>
-          ${movingBatches.slice(0, 14).map((batch, index) => `
-            <i class="factory-batch-token" style="--x:${batch.xPct}%; --y:${batch.yPct}%; --duration:${batch.animationDurationS}s; --delay:${-index * 0.55}s;" title="${escapeAttr(`${batch.tokenId}: ${batch.batchId} moving to ${batch.to} in ${batch.room}`)}">${index + 1}</i>
-          `).join("")}
+          ${movingBatches.slice(0, 14).map((batch, index) => {
+            const isActive = state.factoryTimeH >= batch.startH && state.factoryTimeH <= batch.finishH;
+            const nearTime = Math.abs(state.factoryTimeH - batch.startH) < schedule.releasePitchH;
+            return `
+            <i class="factory-batch-token ${isActive ? "active" : nearTime ? "near" : "ghost"}" style="--x:${batch.xPct}%; --y:${batch.yPct}%; --duration:${batch.animationDurationS}s; --delay:${-index * 0.55}s;" title="${escapeAttr(`${batch.tokenId}: ${batch.batchId} ${isActive ? "active" : "scheduled"} from ${formatNumber(batch.startH, 1)}-${formatNumber(batch.finishH, 1)} h, moving to ${batch.to} in ${batch.room}`)}">${index + 1}</i>
+          `}).join("")}
           ${personnelRows.slice(0, 6).map((person, index) => `
             <i class="factory-person-token" style="--x:${12 + index * 12}%; --y:${86 - (index % 2) * 8}%; --delay:${-index * 0.7}s;" title="${escapeAttr(`${person.role}: ${formatNumber(person.requiredFte, 2)} FTE required`)}"></i>
           `).join("")}
@@ -6766,14 +6994,14 @@ function renderSimulationBoard() {
       </div>
       <div class="factory-digital-twin-grid" aria-label="Factory digital twin details">
         <article>
-          <span>Rooms</span>
-          <h4>${factoryRooms.length} production spaces</h4>
-          ${factoryRooms.slice(0, 5).map((room) => `<p><b>${escapeHtml(room.roomName)}</b><small>${escapeHtml(room.cleanroomClass)} · ${formatNumber(room.occupancyPct, 0)}% occupied · ${escapeHtml(room.status)}</small></p>`).join("")}
+          <span>Live room load</span>
+          <h4>${liveRooms.filter((room) => room.activeBatches > 0).length} active spaces</h4>
+          ${liveRooms.slice(0, 5).map((room) => `<p><b>${escapeHtml(room.roomName)}</b><small>${escapeHtml(room.cleanroomClass)} · ${formatNumber(room.liveOccupancyPct, 0)}% live load · ${escapeHtml(room.activeEquipment || "quiet")}</small></p>`).join("")}
         </article>
         <article>
-          <span>Moving batches</span>
-          <h4>${movingBatches.length} live batch movements</h4>
-          ${movingBatches.slice(0, 5).map((batch) => `<p><b>${escapeHtml(batch.tokenId)}</b><small>${escapeHtml(batch.from)} → ${escapeHtml(batch.to)} · ${formatNumber(batch.durationH, 1)} h · ${escapeHtml(batch.status)}</small></p>`).join("")}
+          <span>Live equipment state</span>
+          <h4>${liveEquipment.length || "No"} objects active now</h4>
+          ${(liveEquipment.length ? liveEquipment : stateRows.slice(0, 5)).slice(0, 5).map((item) => `<p><b>${escapeHtml(item.equipmentTag)}</b><small>${escapeHtml(item.stateLabel || item.state)} · ${formatNumber(item.progressPct || 0, 0)}% complete · next: ${escapeHtml(item.nextState)}</small></p>`).join("")}
         </article>
         <article>
           <span>Personnel</span>
@@ -6785,13 +7013,18 @@ function renderSimulationBoard() {
           <h4>${inventoryRows.filter((row) => row.shortageRisk === "risk").length} projected shortages</h4>
           ${inventoryRows.filter((row, index) => index % 8 === 0).slice(0, 5).map((item) => `<p><b>${escapeHtml(item.item)}</b><small>${formatNumber(item.projectedCoverageDays, 0)} d coverage · ${escapeHtml(item.linkedPolicy)}</small></p>`).join("")}
         </article>
+        <article>
+          <span>Dispatch now</span>
+          <h4>${dispatchRows[0]?.priority || "Low"} priority</h4>
+          ${dispatchRows.slice(0, 5).map((item) => `<p><b>${escapeHtml(item.area)}</b><small>${escapeHtml(item.action)} · ${escapeHtml(item.expectedImpact)}</small></p>`).join("")}
+        </article>
       </div>
       <div class="factory-state-optimizer">
         <article>
           <span>Equipment state machines</span>
-          <h4>${stateRows.length} state transitions</h4>
+          <h4>${liveEquipment.length ? `${liveEquipment.length} live states` : `${stateRows.length} state transitions`}</h4>
           <div class="state-machine-strip">
-            ${stateRows.slice(0, 18).map((row) => `<i class="state-${escapeAttr(row.state)}" title="${escapeAttr(`${row.equipmentTag}: ${row.state} ${formatNumber(row.startH, 1)}-${formatNumber(row.finishH, 1)} h`)}"><b>${escapeHtml(row.equipmentTag)}</b><small>${escapeHtml(row.state)}</small></i>`).join("")}
+            ${(liveEquipment.length ? liveEquipment : stateRows).slice(0, 18).map((row) => `<i class="state-${escapeAttr(row.state)}" style="--progress:${formatNumber(row.progressPct || 100, 0)}%;" title="${escapeAttr(`${row.equipmentTag}: ${row.state} ${formatNumber(row.startH, 1)}-${formatNumber(row.finishH, 1)} h`)}"><b>${escapeHtml(row.equipmentTag)}</b><small>${escapeHtml(row.state)}</small></i>`).join("")}
           </div>
         </article>
         <article>
@@ -6844,6 +7077,9 @@ function renderSimulationBoard() {
         <button data-download-report="inventory-levels-csv" type="button">Inventory levels CSV</button>
         <button data-download-report="equipment-state-machine-csv" type="button">State machines CSV</button>
         <button data-download-report="factory-optimizer-csv" type="button">Factory optimizer CSV</button>
+        <button data-download-report="factory-live-state-csv" type="button">Live state CSV</button>
+        <button data-download-report="factory-timeline-csv" type="button">Timeline CSV</button>
+        <button data-download-report="factory-dispatch-csv" type="button">Dispatch CSV</button>
         <button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button>
         <button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button>
         <button data-download-report="plant-simulation-svg" type="button">Plant SVG</button>
@@ -8686,6 +8922,9 @@ function comprehensiveReport() {
     inventoryLevels: inventoryLevelRows(),
     equipmentStateMachines: equipmentStateMachineRows(),
     factoryOptimization: factoryOptimizationRows(),
+    factoryLiveState: factoryLiveStateCsvRows(),
+    factoryTimeline: factoryTimelineCsvRows(),
+    factoryDispatch: factoryDispatchCsvRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -8753,7 +8992,7 @@ function renderReportsBoard() {
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
       <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
       <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, rooms, moving batches, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="factory-rooms-csv" type="button">Rooms CSV</button><button data-download-report="moving-batches-csv" type="button">Batches CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
-      <article><span>Factory state + optimizer</span><strong>${report.factoryOptimization[0]?.objectiveScore ? formatNumber(report.factoryOptimization[0].objectiveScore, 0) : "n/a"}</strong><p>Personnel loads, inventory levels, equipment state machines, and deterministic factory optimization candidates for schedule, capacity, CIP, staffing, and WIP tradeoffs.</p><button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button><button data-download-report="inventory-levels-csv" type="button">Inventory CSV</button><button data-download-report="equipment-state-machine-csv" type="button">States CSV</button><button data-download-report="factory-optimizer-csv" type="button">Optimizer CSV</button></article>
+      <article><span>Factory state + optimizer</span><strong>${report.factoryOptimization[0]?.objectiveScore ? formatNumber(report.factoryOptimization[0].objectiveScore, 0) : "n/a"}</strong><p>Personnel loads, inventory levels, live equipment states, dispatch actions, time buckets, and deterministic factory optimization candidates for schedule, capacity, CIP, staffing, and WIP tradeoffs.</p><button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button><button data-download-report="inventory-levels-csv" type="button">Inventory CSV</button><button data-download-report="equipment-state-machine-csv" type="button">States CSV</button><button data-download-report="factory-live-state-csv" type="button">Live CSV</button><button data-download-report="factory-timeline-csv" type="button">Timeline CSV</button><button data-download-report="factory-dispatch-csv" type="button">Dispatch CSV</button><button data-download-report="factory-optimizer-csv" type="button">Optimizer CSV</button></article>
       <article><span>Experiment manager</span><strong>${report.plantSimulationExperiments.length}</strong><p>Optimization-ready scenarios for bottleneck parallelization, CIP reduction, heat reuse, media cost, automation, release pitch, CO2e, and risk constraints.</p><button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button></article>
       <article><span>Integration matrix</span><strong>${report.plantSimulationInterfaces.length}</strong><p>Concrete connector registry for JSON, CSV, CAD/JT, MQTT, OPC UA, SQL/ODBC, REST, Python SDK, optimizer, and scheduling/MES handoff.</p><button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button></article>
       <article><span>Original example library</span><strong>${templateExampleRows().length}</strong><p>Download Axion's own example model library for antibodies, penicillin, cultured meat, fermentation, vaccines, plasmids, cell therapy, utilities, and emissions without using copied third-party files.</p><button data-download-report="examples-csv" type="button">Examples CSV</button><button data-download-report="examples-json" type="button">Examples JSON</button></article>
@@ -9390,6 +9629,12 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-equipment-state-machines.csv`, equipmentStateMachineCsvRows(), "Factory simulation equipment state machines");
   } else if (type === "factory-optimizer-csv") {
     downloadCsv(`${state.template}-factory-optimizer.csv`, factoryOptimizationCsvRows(), "Factory simulation optimizer");
+  } else if (type === "factory-live-state-csv") {
+    downloadCsv(`${state.template}-factory-live-state-${formatNumber(state.factoryTimeH, 1)}h.csv`, factoryLiveStateCsvRows(), "Factory simulation live state");
+  } else if (type === "factory-timeline-csv") {
+    downloadCsv(`${state.template}-factory-timeline.csv`, factoryTimelineCsvRows(), "Factory simulation time buckets");
+  } else if (type === "factory-dispatch-csv") {
+    downloadCsv(`${state.template}-factory-dispatch-${formatNumber(state.factoryTimeH, 1)}h.csv`, factoryDispatchCsvRows(), "Factory simulation dispatch recommendations");
   } else if (type === "plant-simulation-experiments-csv") {
     const plantSim = plantSimulationModel();
     downloadCsv(`${state.template}-plant-simulation-experiments.csv`, plantSimulationExperimentRows(plantSim), "Plant simulation experiment manager");
@@ -11359,6 +11604,15 @@ function bindEvents() {
   });
 
   els.simulationBoard.addEventListener("input", (event) => {
+    const factoryTimeInput = event.target.closest("#factoryTimeSlider");
+    if (factoryTimeInput) {
+      state.factoryTimeH = Number(factoryTimeInput.value) || 0;
+      window.clearTimeout(els.simulationBoard.factoryTimeTimer);
+      els.simulationBoard.factoryTimeTimer = window.setTimeout(() => {
+        renderSimulationBoard();
+      }, 90);
+      return;
+    }
     const input = event.target.closest("[data-recipe-field]");
     if (!input || !applyRecipeInput(input)) return;
     window.clearTimeout(els.simulationBoard.recipeInputTimer);
@@ -11373,6 +11627,13 @@ function bindEvents() {
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
       handleReportDownload(downloadButton.dataset.downloadReport);
+      return;
+    }
+    const factoryTimeButton = event.target.closest("[data-factory-time]");
+    if (factoryTimeButton) {
+      state.factoryTimeH = Number(factoryTimeButton.dataset.factoryTime) || 0;
+      renderSimulationBoard();
+      showToast(`Factory clock set to ${formatNumber(state.factoryTimeH, 1)} h`);
       return;
     }
     const scheduleUnitButton = event.target.closest("[data-jump-unit]");

@@ -12624,10 +12624,120 @@ body.locked .help-dock {
   border: 1px solid rgba(223, 239, 240, 0.13);
   border-radius: 24px;
   background:
+    linear-gradient(90deg, rgba(149, 199, 189, 0.2) 0 var(--load, 0%), transparent var(--load, 0%) 100%),
     linear-gradient(145deg, rgba(215, 232, 232, 0.08), rgba(13, 40, 55, 0.1)),
     rgba(255, 255, 255, 0.035);
   box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.025);
   pointer-events: none;
+}
+
+.factory-room.live-running,
+.factory-room.live-cleaning,
+.factory-room.live-transfer {
+  border-color: rgba(149, 199, 189, 0.58);
+  box-shadow: inset 0 0 34px rgba(149, 199, 189, 0.12), 0 0 32px rgba(149, 199, 189, 0.09);
+}
+
+.factory-room.live-cleaning {
+  border-color: rgba(217, 185, 111, 0.56);
+}
+
+.factory-time-control {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(18, 34, 52, 0.11);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 30px rgba(7, 17, 31, 0.055);
+}
+
+.factory-time-control > div:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.factory-time-control span {
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.factory-time-control strong {
+  color: #102033;
+  font-size: 20px;
+  line-height: 1.05;
+}
+
+.factory-time-control small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.factory-time-control input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: #0f5a52;
+}
+
+.factory-timeline-spark {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.factory-timeline-spark button {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: 52px;
+  border: 1px solid rgba(18, 34, 52, 0.11);
+  border-radius: 18px;
+  padding: 8px;
+  color: #102033;
+  background: rgba(246, 250, 248, 0.86);
+  font: inherit;
+  cursor: pointer;
+}
+
+.factory-timeline-spark button:hover,
+.factory-timeline-spark button.active {
+  border-color: rgba(15, 90, 82, 0.38);
+  background: rgba(234, 246, 242, 0.98);
+  box-shadow: 0 10px 24px rgba(7, 17, 31, 0.07);
+}
+
+.factory-timeline-spark button span {
+  color: #536f75;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.factory-timeline-spark button b {
+  display: block;
+  align-self: end;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 90, 82, 0.13);
+}
+
+.factory-timeline-spark button b::after {
+  display: block;
+  width: var(--intensity);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #95c7bd, #0f5a52);
+  content: "";
 }
 
 .factory-room span,
@@ -12742,6 +12852,27 @@ body.locked .help-dock {
   white-space: nowrap;
 }
 
+.zone-support button {
+  grid-template-columns: 26px minmax(0, 1fr);
+  min-width: 70px;
+  max-width: 86px;
+  min-height: 38px;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 15px;
+}
+
+.zone-support i {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  font-size: 9px;
+}
+
+.zone-support b {
+  font-size: 10px;
+}
+
 .plant-flow-line {
   position: absolute;
   height: 3px;
@@ -12768,7 +12899,7 @@ body.locked .help-dock {
 
 .flow-c {
   left: 235px;
-  width: 430px;
+  right: 88px;
   bottom: 90px;
   transform: rotate(-10deg);
   animation-delay: -1.2s;
@@ -12797,6 +12928,22 @@ body.locked .help-dock {
   font-weight: 950;
   animation: movingBatchToken var(--duration) linear infinite;
   animation-delay: var(--delay);
+}
+
+.factory-batch-token.active {
+  width: 28px;
+  height: 28px;
+  box-shadow: 0 0 0 9px rgba(149, 199, 189, 0.17), 0 0 30px rgba(149, 199, 189, 0.62);
+}
+
+.factory-batch-token.near {
+  opacity: 0.72;
+}
+
+.factory-batch-token.ghost {
+  opacity: 0.24;
+  filter: grayscale(0.5);
+  animation-play-state: paused;
 }
 
 .factory-person-token {
@@ -12892,7 +13039,7 @@ body.locked .help-dock {
 }
 
 .factory-digital-twin-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .factory-state-optimizer {
@@ -12971,7 +13118,9 @@ body.locked .help-dock {
   min-height: 52px;
   border-radius: 18px;
   padding: 9px;
-  background: rgba(246, 250, 248, 0.92);
+  background:
+    linear-gradient(90deg, rgba(149, 199, 189, 0.28) 0 var(--progress, 0%), transparent var(--progress, 0%) 100%),
+    rgba(246, 250, 248, 0.92);
   color: #102033;
   font-style: normal;
 }
