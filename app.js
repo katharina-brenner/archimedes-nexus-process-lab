@@ -1807,6 +1807,15 @@ const equations = [
   eq("Resource bottleneck index", "economics", "RBI = max(resource_demand_t / resource_capacity_t)", "Resource bottleneck check for labor, utilities, heat agents, materials, and auxiliaries."),
   eq("Inventory coverage", "economics", "coverage_days = inventory_on_hand / average_daily_consumption", "Material inventory coverage for raw materials, cleaning agents, solvents, and buffers."),
   eq("Cleaning validation sampling", "mass", "N_samples = equipment_surface_groups * swab_points_per_group + rinse_samples", "Sampling workload for cleaning validation and release documentation."),
+  eq("Discrete-event equipment state", "economics", "state_u(t) in {idle, setup, process, transfer, clean, blocked}", "Finite-capacity production simulation state model for reusable equipment, transfer lines, and shared auxiliary resources."),
+  eq("Throughput from event releases", "economics", "throughput = released_good_mass / simulated_calendar_time", "Discrete-event throughput based on actual release events rather than a purely linear annualization."),
+  eq("Buffer WIP balance", "mass", "WIP_buffer(t+dt) = WIP_buffer(t) + arrivals - departures - rejects", "Work-in-process accumulation for intermediate tanks, harvest pools, cold storage, and logistics buffers."),
+  eq("Machine utilization", "economics", "U_machine = busy_time / scheduled_available_time", "Machine and line utilization for bottleneck detection and capacity planning."),
+  eq("Buffer utilization", "economics", "U_buffer = average_inventory / usable_buffer_capacity", "Buffer occupancy metric for hold tanks, storage, incubators, cold rooms, and queue spaces."),
+  eq("Sankey flow share", "mass", "share_i = annual_mass_i / sum(annual_mass_relevant)", "Relative material-flow contribution used for Sankey-style process visualization."),
+  eq("Genetic optimizer objective", "economics", "min f(x)=w1*COGS+w2*CO2e+w3*cycle_time+w4*risk-w5*yield", "Multi-objective optimization target for route, capacity, resource, and process-parameter screening."),
+  eq("Neural surrogate prediction", "kinetics", "y_hat = NN(theta; titer, kLa, media, temperature, pH, feed)", "Machine-learning surrogate placeholder for fast prediction and calibration around mechanistic process models."),
+  eq("Always-on twin residual", "mass", "residual = measured_tag_value - model_prediction", "Live digital-twin residual for historian, OPC UA, MQTT, CSV, or API-connected process tags."),
 ];
 
 const spdFunctions = [
@@ -1902,6 +1911,12 @@ const spdFunctions = [
   { group: "Economics", name: "Vendor quotes and regional cost indices", status: "Planned connector", inputs: "Supplier quote, region, inflation, equipment family, material BOM", output: "Updated CAPEX/OPEX basis", note: "Prepared for ERP/procurement links, regional cost indices, and quote-backed capital and material costs." },
   { group: "Economics", name: "NPV, IRR, payback and break-even roadmap", status: "Planned module", inputs: "Revenue, COGS, CAPEX, depreciation, tax, ramp-up, utilization", output: "Investment-decision model", note: "Pricing research highlights transparent economics as a key differentiator; the current tool exposes COGS drivers and is ready for full cash-flow metrics." },
   { group: "Migration", name: "Representative process reconstruction", status: "Implemented workflow", inputs: "Existing report, stream table, equipment list, assumptions", output: "Editable Axion model for side-by-side review", note: "The recommended migration offer is not to replace everything instantly, but to reconstruct one representative model and compare speed, collaboration, and transparency." },
+  { group: "Plant simulation", name: "Object-oriented plant hierarchy", status: "Implemented", inputs: "Factory, area, room, line, machine, stream, buffer objects", output: "Hierarchical production model with reusable object classes", note: "Adds factory-to-machine decomposition, object counts, inheritance-style library records, and instance-level process data." },
+  { group: "Plant simulation", name: "3D-style factory layout preview", status: "Implemented", inputs: "Equipment coordinates, process role, stream role, utilization", output: "Downloadable factory-layout SVG and live browser preview", note: "Shows the production plant as zones, vessels, buffers, utilities, cleaning resources, logistics, and animated material-flow routes." },
+  { group: "Plant simulation", name: "Material-flow and logistics analysis", status: "Implemented", inputs: "Streams, transfer times, buffer occupancy, release pitch, WIP", output: "Bottleneck, throughput, Sankey, and value-stream indicators", note: "Extends the scheduler with material-flow analysis from raw materials through production, cleaning, waste, storage, and release." },
+  { group: "Plant simulation", name: "Experiment manager and optimizer", status: "Implemented", inputs: "Route, batch pitch, parallel units, cleaning, media price, heat recovery, automation", output: "Scenario ranking with genetic-optimizer and neural-surrogate placeholders", note: "Adds browser-native experiment rows, constraints, objective scores, and ready-to-export optimization assumptions." },
+  { group: "Plant simulation", name: "Open integration matrix", status: "Implemented", inputs: "JSON, CSV, MQTT, OPC UA, ODBC, SQL, sockets, XML, CAD/JT, automation links", output: "Connector readiness and project-integration report", note: "Makes the integration registry concrete and downloadable for engineering review." },
+  { group: "Plant simulation", name: "Value-stream mapping", status: "Implemented", inputs: "Process, transfer, cleaning, wait, release, storage, waste", output: "Value-added and non-value-added time split", note: "Adds a VSM-style view to compare process time, transfer time, cleaning time, waiting time, and QC release time." },
 ];
 
 const twinWorkspace = {
@@ -4101,6 +4116,283 @@ function routeOptimizationRows() {
   }).sort((a, b) => b.score - a.score);
 }
 
+function plantSimulationInterfaceRows() {
+  return [
+    { interface: "JSON process model", direction: "import/export", status: "implemented", payload: "equipment, streams, parameters, schedules, reports", axionUse: "Native model exchange and API handoff" },
+    { interface: "CSV/XLSX tables", direction: "import/export", status: "implemented", payload: "balances, costs, LCA, TEA, schedules, object library", axionUse: "Engineering, LCA, TEA, and planning handoff" },
+    { interface: "CAD/JT factory geometry", direction: "import", status: "planned connector", payload: "rooms, equipment solids, layout coordinates, access zones", axionUse: "3D plant-layout calibration" },
+    { interface: "MQTT sensor stream", direction: "ingest", status: "planned connector", payload: "PAT, DO, pH, temperature, agitation, airflow, pressure", axionUse: "Live digital-twin residuals and anomaly checks" },
+    { interface: "OPC UA / OPC Classic", direction: "ingest/control", status: "planned connector", payload: "PLC tags, batch phase, equipment state, alarms", axionUse: "Shopfloor connection and operating envelope comparison" },
+    { interface: "ODBC / SQL / Oracle", direction: "ingest/export", status: "planned connector", payload: "historian, ERP, LIMS, MES, inventory, material prices", axionUse: "Data calibration, material costs, and batch genealogy" },
+    { interface: "REST API + webhooks", direction: "automation", status: "implemented scaffold", payload: "project events, model versions, simulation runs, report-ready events", axionUse: "SaaS automation and collaboration workflows" },
+    { interface: "Python SDK", direction: "automation", status: "planned connector", payload: "parameter sweeps, Monte Carlo, calibration, notebooks", axionUse: "Scientific and data-science workflows" },
+    { interface: "Simulation optimizer", direction: "handoff", status: "implemented scaffold", payload: "objective, variables, constraints, experiment rows", axionUse: "Genetic optimization and neural-surrogate experiments" },
+    { interface: "Scheduling/MES bridge", direction: "handoff", status: "implemented scaffold", payload: "Gantt, resources, release events, equipment states", axionUse: "Production planning and repeated equipment use" },
+  ];
+}
+
+function plantSimulationHierarchyRows() {
+  const schedule = campaignSchedule();
+  const mainUnits = state.units.filter((item) => unitLayer(item) === "main");
+  const supportUnits = state.units.filter((item) => unitLayer(item) !== "main");
+  const processAreas = [...new Set(state.units.map((item) => scheduleUnitGroup(item)))];
+  const activeClasses = [...new Set(state.units.map((item) => item.cls))];
+  return [
+    { level: "L0 Global network", parent: "Enterprise", objects: 1, scope: "multi-site capacity, product portfolio, regional demand, supply chain", editableNow: "scenario assumptions and exports" },
+    { level: "L1 Site / plant", parent: "Global network", objects: 1, scope: `${activeTemplate().label} plant with production, utilities, waste, QC, storage`, editableNow: "scale, annual batches, utilization, economics" },
+    { level: "L2 Building / suite", parent: "Site / plant", objects: processAreas.length, scope: processAreas.join(", "), editableNow: "process-area grouping and schedule occupancy" },
+    { level: "L3 Production line", parent: "Building / suite", objects: Math.max(1, routeComparisonRows().length), scope: "primary, intensified, and lean route variants", editableNow: "route branch, active steps, predecessors" },
+    { level: "L4 Machine / equipment", parent: "Production line", objects: state.units.length, scope: activeClasses.join(", "), editableNow: "drag/drop, duplicate, connect, recipe times, sizing" },
+    { level: "L5 Transfer / logistics", parent: "Machine / equipment", objects: state.streams.length, scope: "process streams, utility lines, waste, QC/data, release flows", editableNow: "stream connections, role, phase, mass flow" },
+    { level: "L6 Resource state", parent: "Transfer / logistics", objects: schedule.resourceRows.length, scope: "equipment, buffers, operators, CIP/SIP, QC release, transfer lines", editableNow: "finite-capacity utilization and conflict exports" },
+  ];
+}
+
+function plantSimulationValueStreamRows(schedule = campaignSchedule()) {
+  const operations = schedule.operations;
+  const processH = operations.reduce((sum, item) => sum + item.setupH + item.processH, 0);
+  const transferH = operations.reduce((sum, item) => sum + Math.max(0, item.transferEndH - item.processEndH), 0);
+  const cleaningH = operations.reduce((sum, item) => sum + item.cleanH, 0);
+  const waitH = operations.reduce((sum, item) => sum + item.waitingH + item.lineWaitH, 0);
+  const qcH = schedule.batchReleases.reduce((sum, item) => sum + Math.max(0, item.qcReleaseH - item.processCompleteH), 0);
+  const total = Math.max(0.001, processH + transferH + cleaningH + waitH + qcH);
+  return [
+    { lane: "Value-added process", category: "process", timeH: processH, sharePct: processH / total * 100, interpretation: "reaction, growth, separation, formulation, or packaging time" },
+    { lane: "Material transfer", category: "logistics", timeH: transferH, sharePct: transferH / total * 100, interpretation: "line occupancy, pumping, transfer, flush, and handoff windows" },
+    { lane: "Cleaning / release", category: "cleaning", timeH: cleaningH, sharePct: cleaningH / total * 100, interpretation: "CIP/SIP, rinse, disposable assembly exchange, and equipment release" },
+    { lane: "Waiting / blocked", category: "non-value", timeH: waitH, sharePct: waitH / total * 100, interpretation: "equipment wait, line wait, dependency gaps, and hold-time risk" },
+    { lane: "QC release queue", category: "release", timeH: qcH, sharePct: qcH / total * 100, interpretation: "analytical release, QA queue, and batch disposition" },
+  ];
+}
+
+function plantSimulationModel() {
+  const data = metrics();
+  const schedule = campaignSchedule();
+  const streams = streamRows();
+  const mainUnits = state.units.filter((item) => unitLayer(item) === "main");
+  const supportUnits = state.units.filter((item) => unitLayer(item) !== "main");
+  const bufferUnits = state.units.filter((item) => /buffer|hold|storage|tank|warehouse|cold|incubator/i.test(`${item.type} ${item.name} ${item.cls}`));
+  const totalObjects = state.units.length + state.streams.length + schedule.resourceRows.length + plantSimulationInterfaceRows().length + routeOptions.length + 6;
+  const modelTier = totalObjects <= 500 ? "Essentials-scale digital model" : totalObjects <= 4000 ? "Standard-scale digital model" : "Advanced enterprise digital model";
+  const inputMass = streams.filter((item) => item.direction === "Input").reduce((sum, item) => sum + Number(item.annualMassKg || 0), 0);
+  const outputMass = streams.filter((item) => item.direction === "Output").reduce((sum, item) => sum + Number(item.annualMassKg || 0), 0);
+  const wasteMass = streams.filter((item) => /waste|spent|drain|reject|purge|sludge|emission/i.test(`${item.role} ${item.components} ${item.teaDisposition}`)).reduce((sum, item) => sum + Number(item.annualMassKg || 0), 0);
+  const resourceAverage = schedule.resourceRows.reduce((sum, item) => sum + Number(item.occupancyPct || 0), 0) / Math.max(1, schedule.resourceRows.length);
+  const logisticsIndex = Math.min(100, Math.max(0, (schedule.streamOperations.length / Math.max(1, state.streams.length * schedule.simulatedBatches)) * 100));
+  const sankey = [
+    { label: "Raw materials + media", role: "input", annualKg: inputMass, color: "#95c7bd" },
+    { label: "Main product", role: "product", annualKg: data.annualKg, color: "#d9b96f" },
+    { label: "Waste + emissions", role: "waste", annualKg: wasteMass, color: "#596a64" },
+    { label: "Reusable transfers", role: "internal", annualKg: Math.max(0, streams.filter((item) => item.direction === "Internal").reduce((sum, item) => sum + Number(item.annualMassKg || 0), 0)), color: "#6f8794" },
+    { label: "Final outputs", role: "output", annualKg: outputMass, color: "#275f6b" },
+  ];
+  const topBottlenecks = schedule.resourceRows
+    .slice()
+    .sort((a, b) => Number(b.occupancyPct || 0) - Number(a.occupancyPct || 0))
+    .slice(0, 5);
+  return {
+    basis: "Axion object-oriented plant simulation layer v1",
+    modelTier,
+    objects: {
+      totalObjects,
+      equipment: state.units.length,
+      streams: state.streams.length,
+      resources: schedule.resourceRows.length,
+      interfaces: plantSimulationInterfaceRows().length,
+      hierarchyLevels: plantSimulationHierarchyRows().length,
+    },
+    kpis: {
+      throughputKgH: data.annualKg / Math.max(1, schedule.effectiveAotH || 1),
+      releasePitchH: schedule.releasePitchH,
+      feasibleAnnualBatches: schedule.feasibleAnnualBatches,
+      targetAnnualBatches: state.batchCount,
+      resourceAveragePct: resourceAverage,
+      bottleneckTag: schedule.bottleneck.tag,
+      bottleneckPct: schedule.bottleneck.occupancyPct,
+      logisticsIndex,
+      bufferUnits: bufferUnits.length,
+      mainUnits: mainUnits.length,
+      supportUnits: supportUnits.length,
+      nonValueTimePct: plantSimulationValueStreamRows(schedule).filter((item) => item.category === "non-value")[0]?.sharePct || 0,
+    },
+    hierarchy: plantSimulationHierarchyRows(),
+    valueStream: plantSimulationValueStreamRows(schedule),
+    sankey,
+    bottlenecks: topBottlenecks,
+    interfaces: plantSimulationInterfaceRows(),
+  };
+}
+
+function plantSimulationObjectRows(model = plantSimulationModel()) {
+  const schedule = campaignSchedule();
+  const resourceByName = Object.fromEntries(schedule.resourceRows.map((item) => [item.resource, item]));
+  const unitRows = state.units.map((item) => {
+    const resource = resourceByName[item.id] || {};
+    return {
+      objectId: item.id,
+      objectKind: "Equipment object",
+      objectClass: item.cls,
+      parentLevel: scheduleUnitGroup(item),
+      libraryClass: item.type,
+      processRole: unitLayerLabel(unitLayer(item)),
+      x: item.x,
+      y: item.y,
+      reusable: scheduleReusePolicy(item).mode,
+      utilizationPct: resource.occupancyPct || 0,
+      stateModel: "idle/setup/process/transfer/clean/blocked",
+      inheritance: "inherits class icon, sizing, standards, default recipe and cost curve",
+      editableNow: "position, duplicate, connect, timing, active state, route branch, predecessor",
+      status: item.status || "Ready",
+    };
+  });
+  const streamRowsForExport = streamRows().map((item) => {
+    const resource = resourceByName[item.id] || {};
+    return {
+      objectId: item.id,
+      objectKind: "Transfer/logistics object",
+      objectClass: item.role,
+      parentLevel: `${item.from} -> ${item.to}`,
+      libraryClass: item.phase,
+      processRole: item.direction,
+      x: "",
+      y: "",
+      reusable: "line flush/release after transfer",
+      utilizationPct: resource.occupancyPct || 0,
+      stateModel: "idle/transfer/flush/blocked",
+      inheritance: "inherits stream role, phase, flow class, LCA/TEA classification",
+      editableNow: "source, destination, composition, phase, stream role",
+      status: item.solverStatus,
+    };
+  });
+  const hierarchyRows = model.hierarchy.map((item) => ({
+    objectId: item.level,
+    objectKind: "Hierarchy object",
+    objectClass: item.parent,
+    parentLevel: item.parent,
+    libraryClass: "factory hierarchy",
+    processRole: item.scope,
+    x: "",
+    y: "",
+    reusable: "library object can instantiate child objects",
+    utilizationPct: "",
+    stateModel: "container",
+    inheritance: "changes cascade to child instances when model libraries are connected",
+    editableNow: item.editableNow,
+    status: "implemented",
+  }));
+  return [...hierarchyRows, ...unitRows, ...streamRowsForExport];
+}
+
+function plantSimulationExperimentRows(model = plantSimulationModel()) {
+  const data = metrics();
+  const schedule = campaignSchedule();
+  const baseCost = Math.max(1, data.directCost);
+  const baseScore = routeOptimizationRows()[0]?.score || 70;
+  const scenarios = [
+    { id: "EXP-001", name: "Baseline finite-capacity twin", variables: "current recipe, current route, current scale", costFactor: 1, pitchFactor: 1, riskDelta: 0, co2Factor: 1, method: "deterministic event simulation" },
+    { id: "EXP-002", name: "Parallel bottleneck equipment", variables: `add parallel capacity at ${model.kpis.bottleneckTag}`, costFactor: 0.92, pitchFactor: 0.72, riskDelta: -10, co2Factor: 1.05, method: "genetic optimizer candidate" },
+    { id: "EXP-003", name: "Shorter CIP with verified rinse endpoint", variables: "reduce clean time 15%, keep MACO/rinse constraints", costFactor: 0.96, pitchFactor: 0.88, riskDelta: -4, co2Factor: 0.92, method: "constraint-aware experiment" },
+    { id: "EXP-004", name: "Heat recovery and condensate reuse", variables: "increase heat recovery and hot rinse reuse", costFactor: 0.94, pitchFactor: 0.98, riskDelta: -2, co2Factor: 0.76, method: "energy optimization experiment" },
+    { id: "EXP-005", name: "Media and feed cost reduction", variables: "media price -15%, titer unchanged, viability boundary active", costFactor: 0.86, pitchFactor: 1.02, riskDelta: 6, co2Factor: 0.93, method: "neural-surrogate screen" },
+    { id: "EXP-006", name: "Higher automation / lower manual queue", variables: "automation +12%, operator queue -20%", costFactor: 0.9, pitchFactor: 0.84, riskDelta: -7, co2Factor: 0.98, method: "resource utilization experiment" },
+  ];
+  return scenarios.map((item) => {
+    const directCostUsdKg = baseCost * item.costFactor;
+    const releasePitchH = Math.max(0.1, schedule.releasePitchH * item.pitchFactor);
+    const feasibleAnnualBatches = Math.floor(schedule.feasibleAnnualBatches / Math.max(0.25, item.pitchFactor));
+    const objectiveScore = Math.max(0, Math.min(100, baseScore + (1 - item.costFactor) * 70 + (1 - item.pitchFactor) * 35 - item.riskDelta * 0.35 + (1 - item.co2Factor) * 20));
+    return {
+      experimentId: item.id,
+      experimentName: item.name,
+      variables: item.variables,
+      method: item.method,
+      objective: "minimize COGS + CO2e + release pitch + boundary risk while preserving yield",
+      directCostUsdKg,
+      releasePitchH,
+      feasibleAnnualBatches,
+      bottleneck: model.kpis.bottleneckTag,
+      estimatedCo2eFactor: item.co2Factor,
+      riskDeltaPoints: item.riskDelta,
+      objectiveScore,
+      recommendation: objectiveScore >= 82 ? "run detailed validation" : objectiveScore >= 70 ? "keep as candidate" : "screen out or revise constraints",
+      constraints: "mass closure, hold time, oxygen transfer, ammonia/lactate, cleaning, QC release, resource occupancy",
+    };
+  }).sort((a, b) => b.objectiveScore - a.objectiveScore);
+}
+
+function plantSimulationSvg() {
+  const width = 1280;
+  const height = 720;
+  const maxX = Math.max(1, ...state.units.map((item) => item.x + unitWidth(item)));
+  const maxY = Math.max(1, ...state.units.map((item) => item.y + unitHeight(item)));
+  const scale = Math.min((width - 170) / maxX, (height - 170) / maxY);
+  const offsetX = 84;
+  const offsetY = 108;
+  const colorForLayer = (layer) => ({
+    main: "#0f5a52",
+    support: "#5d707b",
+    utility: "#275f6b",
+    cleaning: "#95c7bd",
+    waste: "#596a64",
+    data: "#d9b96f",
+  }[layer] || "#526271");
+  const streams = state.streams.slice(0, 90).map((item) => {
+    const from = state.units.find((unitItem) => unitItem.id === item.from);
+    const to = state.units.find((unitItem) => unitItem.id === item.to);
+    if (!from || !to) return "";
+    const layer = streamKind(item, from, to);
+    const x1 = offsetX + (from.x + unitWidth(from)) * scale;
+    const y1 = offsetY + unitMidline(from) * scale;
+    const x2 = offsetX + to.x * scale;
+    const y2 = offsetY + unitMidline(to) * scale;
+    const color = layer === "waste" ? "#596a64" : layer === "utility" ? "#6f8794" : layer === "qc" ? "#d9b96f" : "#95c7bd";
+    return `<path d="M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} L${formatNumber(x2, 1)} ${formatNumber(y2, 1)}" fill="none" stroke="${color}" stroke-width="${layer === "main" ? 4 : 2.4}" opacity="0.72" marker-end="url(#arrow)"/>`;
+  }).join("");
+  const units = state.units.slice(0, 90).map((item) => {
+    const layer = unitLayer(item);
+    const x = offsetX + item.x * scale;
+    const y = offsetY + item.y * scale;
+    const w = unitWidth(item) * scale;
+    const h = unitHeight(item) * scale;
+    const color = colorForLayer(layer);
+    return `
+      <g>
+        <rect x="${formatNumber(x, 1)}" y="${formatNumber(y, 1)}" width="${formatNumber(w, 1)}" height="${formatNumber(h, 1)}" rx="18" fill="#f7faf9" stroke="${color}" stroke-width="2"/>
+        <rect x="${formatNumber(x + 12, 1)}" y="${formatNumber(y + 14, 1)}" width="${formatNumber(Math.min(48, w * 0.22), 1)}" height="${formatNumber(Math.min(48, h * 0.48), 1)}" rx="14" fill="${color}"/>
+        <text x="${formatNumber(x + Math.min(74, w * 0.32), 1)}" y="${formatNumber(y + 32, 1)}" fill="#102033" font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="800">${svgEscape(item.id)}</text>
+        <text x="${formatNumber(x + Math.min(74, w * 0.32), 1)}" y="${formatNumber(y + 52, 1)}" fill="#526271" font-family="Manrope, Arial, sans-serif" font-size="11">${svgEscape(item.name).slice(0, 28)}</text>
+      </g>`;
+  }).join("");
+  const model = plantSimulationModel();
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Axion plant simulation layout">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#95c7bd"/>
+    </marker>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop offset="0" stop-color="#071a31"/>
+      <stop offset="1" stop-color="#173452"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <path d="M70 94 H1210 M70 626 H1210 M70 94 V626 M1210 94 V626" fill="none" stroke="#5d707b" stroke-width="1" opacity="0.25"/>
+  <g opacity="0.22">${Array.from({ length: 17 }, (_, index) => `<path d="M${70 + index * 70} 94 V626" stroke="#e7f1ef" stroke-width="1"/>`).join("")}${Array.from({ length: 8 }, (_, index) => `<path d="M70 ${136 + index * 58} H1210" stroke="#e7f1ef" stroke-width="1"/>`).join("")}</g>
+  <text x="72" y="52" fill="#f4fbfa" font-family="Manrope, Arial, sans-serif" font-size="24" font-weight="900">Axion Process OS · ${svgEscape(activeTemplate().label)} plant simulation</text>
+  <text x="72" y="78" fill="#b9c8cf" font-family="Manrope, Arial, sans-serif" font-size="13">${svgEscape(model.modelTier)} · ${model.objects.totalObjects} objects · ${formatNumber(model.kpis.throughputKgH, 2)} kg/h · ${svgEscape(exportDateIso().slice(0, 10))}</text>
+  <g>${streams}</g>
+  <g>${units}</g>
+  <g font-family="Manrope, Arial, sans-serif" font-size="12" fill="#dbe8eb">
+    <rect x="72" y="656" width="20" height="10" rx="5" fill="#0f5a52"/><text x="100" y="665">Main process</text>
+    <rect x="210" y="656" width="20" height="10" rx="5" fill="#5d707b"/><text x="238" y="665">Support/logistics</text>
+    <rect x="370" y="656" width="20" height="10" rx="5" fill="#275f6b"/><text x="398" y="665">Utilities</text>
+    <rect x="488" y="656" width="20" height="10" rx="5" fill="#95c7bd"/><text x="516" y="665">CIP/SIP</text>
+    <rect x="594" y="656" width="20" height="10" rx="5" fill="#596a64"/><text x="622" y="665">Waste/recycle</text>
+    <rect x="738" y="656" width="20" height="10" rx="5" fill="#d9b96f"/><text x="766" y="665">Data/QC</text>
+  </g>
+</svg>`.trim();
+}
+
 function scheduleResourceRows() {
   return campaignSchedule().resourceRows.map((item) => ({
     resource: item.resource,
@@ -5162,6 +5454,9 @@ function renderSimulationBoard() {
   const modelTypes = new Set(unitModels.map((item) => item.modelType));
   const gpromsAlgorithm = gpromsAlgorithmRows();
   const pvsdParameters = pvsdParameterRows();
+  const plantSim = plantSimulationModel();
+  const plantExperiments = plantSimulationExperimentRows(plantSim);
+  const plantObjects = plantSimulationObjectRows(plantSim);
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -5566,6 +5861,114 @@ function renderSimulationBoard() {
           </article>
         `).join("")}
       </div>
+    </section>
+    <section class="simulation-group plant-sim-panel">
+      <div class="simulation-group-heading">
+        <div>
+          <span>Object-oriented plant simulation</span>
+          <h3>Factory layout, material flow, logistics, experiments, and integrations</h3>
+        </div>
+        <strong>${plantSim.modelTier}</strong>
+      </div>
+      <div class="plant-sim-kpis">
+        <article><span>Total objects</span><strong>${plantSim.objects.totalObjects}</strong><small>${plantSim.objects.equipment} equipment · ${plantSim.objects.streams} streams</small></article>
+        <article><span>Throughput</span><strong>${formatNumber(plantSim.kpis.throughputKgH, 2)} kg/h</strong><small>${plantSim.kpis.feasibleAnnualBatches}/${plantSim.kpis.targetAnnualBatches} batches/yr</small></article>
+        <article><span>Bottleneck</span><strong>${escapeHtml(plantSim.kpis.bottleneckTag)}</strong><small>${formatNumber(plantSim.kpis.bottleneckPct, 1)}% occupancy</small></article>
+        <article><span>Logistics index</span><strong>${formatNumber(plantSim.kpis.logisticsIndex, 0)}%</strong><small>${plantSim.kpis.bufferUnits} buffers / hold spaces</small></article>
+      </div>
+      <div class="plant-layout-scene" aria-label="Object-oriented 3D-style plant simulation preview">
+        <div class="plant-layout-floor">
+          <div class="plant-zone zone-process">
+            <span>Production zone</span>
+            ${state.units.filter((item) => unitLayer(item) === "main").slice(0, 12).map((item, index) => `
+              <button data-jump-unit="${escapeAttr(item.id)}" type="button" style="--x:${8 + (index % 4) * 22}%; --y:${16 + Math.floor(index / 4) * 26}%;" title="${escapeAttr(`${item.id} ${item.name}: main process equipment. Click to focus on the canvas.`)}">
+                <i>${escapeHtml(item.icon)}</i><b>${escapeHtml(item.id)}</b>
+              </button>
+            `).join("")}
+          </div>
+          <div class="plant-zone zone-support">
+            <span>Support, utilities, cleaning</span>
+            ${state.units.filter((item) => unitLayer(item) !== "main").slice(0, 14).map((item, index) => `
+              <button data-jump-unit="${escapeAttr(item.id)}" type="button" style="--x:${8 + (index % 5) * 18}%; --y:${18 + Math.floor(index / 5) * 28}%;" title="${escapeAttr(`${item.id} ${item.name}: ${unitLayerLabel(unitLayer(item))}. Click to focus on the canvas.`)}">
+                <i>${escapeHtml(item.icon)}</i><b>${escapeHtml(item.id)}</b>
+              </button>
+            `).join("")}
+          </div>
+          <div class="plant-flow-line flow-a"></div>
+          <div class="plant-flow-line flow-b"></div>
+          <div class="plant-flow-line flow-c"></div>
+        </div>
+        <aside>
+          <span>Live factory twin</span>
+          <h4>${escapeHtml(plantSim.basis)}</h4>
+          <p>Animated lines show directional material and resource movement across the current process model. Major equipment is separated from support systems so the plant reads as a logical facility, not just a row of blocks.</p>
+          <button data-download-report="plant-simulation-svg" type="button">Download plant SVG</button>
+        </aside>
+      </div>
+      <div class="plant-sim-columns">
+        <article>
+          <h4>Hierarchy</h4>
+          <div class="plant-object-grid">
+            ${plantSim.hierarchy.map((item) => `
+              <button type="button" data-jump-view="${item.level.includes("Machine") || item.level.includes("Transfer") ? "flowsheet" : "overview"}" title="${escapeAttr(item.scope)}">
+                <span>${escapeHtml(item.level)}</span>
+                <strong>${item.objects}</strong>
+                <small>${escapeHtml(item.editableNow)}</small>
+              </button>
+            `).join("")}
+          </div>
+        </article>
+        <article>
+          <h4>Material flow / Sankey</h4>
+          <div class="sankey-bars">
+            ${plantSim.sankey.map((item) => {
+              const max = Math.max(...plantSim.sankey.map((row) => row.annualKg), 1);
+              return `<div title="${escapeAttr(`${item.label}: ${formatNumber(item.annualKg, 0)} kg/yr`) }"><span>${escapeHtml(item.label)}</span><b style="--bar:${Math.max(4, item.annualKg / max * 100)}%; --color:${item.color};"></b><em>${formatNumber(item.annualKg, 0)} kg/yr</em></div>`;
+            }).join("")}
+          </div>
+        </article>
+      </div>
+      <div class="plant-vsm-lane" aria-label="Value stream map">
+        ${plantSim.valueStream.map((item) => `
+          <article class="${item.category}">
+            <span>${escapeHtml(item.lane)}</span>
+            <strong>${formatNumber(item.sharePct, 1)}%</strong>
+            <div style="--share:${Math.max(4, item.sharePct)}%;"></div>
+            <p>${escapeHtml(item.interpretation)} · ${formatNumber(item.timeH, 1)} h</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="plant-experiment-grid">
+        ${plantExperiments.slice(0, 6).map((item) => `
+          <article>
+            <span>${escapeHtml(item.method)}</span>
+            <h4>${escapeHtml(item.experimentName)}</h4>
+            <dl>
+              <dt>Score</dt><dd>${formatNumber(item.objectiveScore, 0)}/100</dd>
+              <dt>Cost</dt><dd>$${formatNumber(item.directCostUsdKg, 0)}/kg</dd>
+              <dt>Pitch</dt><dd>${formatNumber(item.releasePitchH, 1)} h</dd>
+            </dl>
+            <p>${escapeHtml(item.recommendation)} · ${escapeHtml(item.variables)}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="plant-integration-grid">
+        ${plantSim.interfaces.map((item) => `
+          <article class="${item.status.includes("implemented") ? "ready" : ""}">
+            <span>${escapeHtml(item.status)}</span>
+            <h4>${escapeHtml(item.interface)}</h4>
+            <p>${escapeHtml(item.axionUse)}</p>
+            <small>${escapeHtml(item.direction)} · ${escapeHtml(item.payload)}</small>
+          </article>
+        `).join("")}
+      </div>
+      <div class="schedule-export-actions" aria-label="Plant simulation exports">
+        <button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button>
+        <button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button>
+        <button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button>
+        <button data-download-report="plant-simulation-svg" type="button">Plant SVG</button>
+      </div>
+      <p class="plant-sim-note">${plantObjects.length} object records are export-ready, including hierarchy, equipment instances, stream objects, reusable-state logic, utilization, and editable fields.</p>
     </section>
     <section class="simulation-group">
       <h3>Largest computed flows</h3>
@@ -7374,6 +7777,7 @@ function downloadJson(filename, payload, kind = "JSON export") {
 
 function comprehensiveReport() {
   const solved = solveMassBalance();
+  const plantSim = plantSimulationModel();
   return {
     template: state.template,
     product: activeTemplate().product,
@@ -7392,6 +7796,10 @@ function comprehensiveReport() {
     routeComparison: routeComparisonRows(),
     routeTopology: routeTopologyRows(),
     routeOptimization: routeOptimizationRows(),
+    plantSimulation: plantSim,
+    plantSimulationObjects: plantSimulationObjectRows(plantSim),
+    plantSimulationExperiments: plantSimulationExperimentRows(plantSim),
+    plantSimulationInterfaces: plantSimulationInterfaceRows(),
     propertyPackage: aggregateComponentProperties(state.params.temperature || 25),
     detailedPropertyPackage: propertyRows(),
     equipment: state.units,
@@ -7444,6 +7852,9 @@ function renderReportsBoard() {
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
       <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
+      <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
+      <article><span>Experiment manager</span><strong>${report.plantSimulationExperiments.length}</strong><p>Optimization-ready scenarios for bottleneck parallelization, CIP reduction, heat reuse, media cost, automation, release pitch, CO2e, and risk constraints.</p><button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button></article>
+      <article><span>Integration matrix</span><strong>${report.plantSimulationInterfaces.length}</strong><p>Concrete connector registry for JSON, CSV, CAD/JT, MQTT, OPC UA, SQL/ODBC, REST, Python SDK, optimizer, and scheduling/MES handoff.</p><button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button></article>
       <article><span>Original example library</span><strong>${templateExampleRows().length}</strong><p>Download Axion's own example model library for antibodies, penicillin, cultured meat, fermentation, vaccines, plasmids, cell therapy, utilities, and emissions without using copied third-party files.</p><button data-download-report="examples-csv" type="button">Examples CSV</button><button data-download-report="examples-json" type="button">Examples JSON</button></article>
     </section>
   `;
@@ -8037,6 +8448,16 @@ function handleReportDownload(type) {
     }))));
   } else if (type === "route-optimizer-csv") {
     downloadCsv(`${state.template}-route-optimizer.csv`, routeOptimizationRows());
+  } else if (type === "plant-simulation-objects-csv") {
+    const plantSim = plantSimulationModel();
+    downloadCsv(`${state.template}-plant-simulation-objects.csv`, plantSimulationObjectRows(plantSim), "Object-oriented plant simulation object library");
+  } else if (type === "plant-simulation-experiments-csv") {
+    const plantSim = plantSimulationModel();
+    downloadCsv(`${state.template}-plant-simulation-experiments.csv`, plantSimulationExperimentRows(plantSim), "Plant simulation experiment manager");
+  } else if (type === "plant-simulation-interfaces-csv") {
+    downloadCsv(`${state.template}-plant-simulation-interfaces.csv`, plantSimulationInterfaceRows(), "Plant simulation integration matrix");
+  } else if (type === "plant-simulation-svg") {
+    downloadSvg(`${state.template}-plant-simulation-layout.svg`, plantSimulationSvg());
   } else if (type === "examples-csv") {
     downloadCsv("axion-original-example-library.csv", templateExampleRows(), "Original example library");
   } else if (type === "examples-json") {

@@ -12465,3 +12465,510 @@ body.locked .help-dock {
   object-fit: contain !important;
   object-position: center !important;
 }
+
+.plant-sim-panel {
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(243, 247, 246, 0.965)),
+    radial-gradient(circle at 90% 6%, rgba(15, 90, 82, 0.12), transparent 42%);
+}
+
+.plant-sim-panel .simulation-group-heading strong {
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #e8f4f1;
+  background: linear-gradient(135deg, #102033, #214c43);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.plant-sim-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.plant-sim-kpis article {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(18, 34, 52, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 26px rgba(7, 17, 31, 0.06);
+}
+
+.plant-sim-kpis span,
+.plant-sim-kpis small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.plant-sim-kpis span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plant-sim-kpis strong {
+  color: #102033;
+  font-size: 22px;
+  line-height: 1.05;
+}
+
+.plant-sim-kpis small {
+  font-size: 11px;
+}
+
+.plant-layout-scene {
+  display: grid;
+  grid-template-columns: minmax(480px, 1.45fr) minmax(220px, 0.55fr);
+  gap: 14px;
+  margin: 14px 0;
+  min-width: 0;
+}
+
+.plant-layout-floor {
+  position: relative;
+  min-height: 380px;
+  overflow: hidden;
+  border: 1px solid rgba(202, 214, 222, 0.5);
+  border-radius: 30px;
+  background:
+    linear-gradient(rgba(226, 238, 235, 0.42) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(226, 238, 235, 0.42) 1px, transparent 1px),
+    linear-gradient(145deg, #102033, #173452 58%, #214c43);
+  background-size: 28px 28px, 28px 28px, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 42px rgba(7, 17, 31, 0.12);
+}
+
+.plant-zone {
+  position: absolute;
+  display: block;
+  border: 1px solid rgba(225, 238, 241, 0.18);
+  border-radius: 28px;
+  background: rgba(4, 16, 29, 0.2);
+  box-shadow: inset 0 0 38px rgba(255, 255, 255, 0.035);
+}
+
+.zone-process {
+  inset: 34px 220px 42px 34px;
+}
+
+.zone-support {
+  top: 54px;
+  right: 34px;
+  bottom: 64px;
+  width: 165px;
+}
+
+.plant-zone > span {
+  position: absolute;
+  left: 18px;
+  top: 14px;
+  z-index: 2;
+  color: rgba(234, 244, 246, 0.78);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.plant-zone button {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 104px;
+  max-width: 158px;
+  min-height: 48px;
+  border: 1px solid rgba(232, 244, 241, 0.34);
+  border-radius: 18px;
+  padding: 6px 9px;
+  color: #eef7f7;
+  background: rgba(8, 25, 42, 0.74);
+  box-shadow: 0 12px 28px rgba(3, 10, 18, 0.28);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.plant-zone button:hover {
+  transform: translateY(-3px);
+  border-color: rgba(149, 199, 189, 0.82);
+  background: rgba(15, 48, 58, 0.92);
+}
+
+.plant-zone i {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 13px;
+  color: #102033;
+  background: linear-gradient(135deg, #dbe8e5, #95c7bd);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.plant-zone b {
+  min-width: 0;
+  overflow: hidden;
+  color: #f7fbfb;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plant-flow-line {
+  position: absolute;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(149, 199, 189, 0.35), rgba(217, 185, 111, 0.95), rgba(149, 199, 189, 0.35), transparent);
+  background-size: 220% 100%;
+  filter: drop-shadow(0 0 10px rgba(149, 199, 189, 0.48));
+  animation: plantPulse 2.4s linear infinite;
+  transform-origin: left center;
+}
+
+.flow-a {
+  left: 94px;
+  right: 254px;
+  top: 150px;
+}
+
+.flow-b {
+  left: 140px;
+  right: 270px;
+  top: 250px;
+  animation-delay: -0.7s;
+}
+
+.flow-c {
+  left: 235px;
+  width: 430px;
+  bottom: 90px;
+  transform: rotate(-10deg);
+  animation-delay: -1.2s;
+}
+
+@keyframes plantPulse {
+  from {
+    background-position: 220% 0;
+  }
+
+  to {
+    background-position: -20% 0;
+  }
+}
+
+.plant-layout-scene aside {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(18, 34, 52, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.plant-layout-scene aside span,
+.plant-layout-scene aside p {
+  color: var(--muted);
+}
+
+.plant-layout-scene aside span {
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plant-layout-scene aside h4,
+.plant-layout-scene aside p {
+  margin: 0;
+}
+
+.plant-layout-scene aside h4 {
+  color: #102033;
+  font-size: 17px;
+}
+
+.plant-layout-scene aside p {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.plant-layout-scene aside button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  color: #eaf6f3;
+  background: linear-gradient(135deg, #102033, #0f5a52);
+  font-weight: 900;
+}
+
+.plant-sim-columns {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+  gap: 14px;
+}
+
+.plant-sim-columns > article,
+.plant-experiment-grid article,
+.plant-integration-grid article,
+.plant-vsm-lane article {
+  min-width: 0;
+  border: 1px solid rgba(18, 34, 52, 0.11);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.plant-sim-columns > article {
+  padding: 14px;
+}
+
+.plant-sim-columns h4,
+.plant-experiment-grid h4,
+.plant-integration-grid h4 {
+  margin: 0;
+  color: #102033;
+}
+
+.plant-object-grid,
+.plant-integration-grid,
+.plant-experiment-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.plant-object-grid button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+  min-height: 54px;
+  border: 1px solid rgba(15, 90, 82, 0.12);
+  border-radius: 18px;
+  padding: 10px 12px;
+  color: #102033;
+  background: rgba(246, 250, 248, 0.92);
+  font: inherit;
+  text-align: left;
+}
+
+.plant-object-grid button:hover {
+  border-color: rgba(15, 90, 82, 0.42);
+  background: rgba(225, 238, 235, 0.88);
+}
+
+.plant-object-grid span,
+.plant-object-grid small,
+.plant-experiment-grid span,
+.plant-experiment-grid p,
+.plant-integration-grid span,
+.plant-integration-grid p,
+.plant-integration-grid small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.plant-object-grid span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.plant-object-grid strong {
+  grid-row: span 2;
+  justify-self: end;
+  color: #0f5a52;
+  font-size: 20px;
+}
+
+.plant-object-grid small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sankey-bars {
+  display: grid;
+  gap: 11px;
+}
+
+.sankey-bars div {
+  display: grid;
+  grid-template-columns: 150px minmax(120px, 1fr) 92px;
+  gap: 10px;
+  align-items: center;
+  min-height: 30px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sankey-bars span,
+.sankey-bars em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sankey-bars b {
+  position: relative;
+  display: block;
+  height: 13px;
+  border-radius: 999px;
+  background: rgba(226, 233, 231, 0.94);
+}
+
+.sankey-bars b::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--bar);
+  border-radius: inherit;
+  background: var(--color);
+  content: "";
+}
+
+.plant-vsm-lane {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(145px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.plant-vsm-lane article {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+}
+
+.plant-vsm-lane span,
+.plant-vsm-lane p {
+  color: var(--muted);
+}
+
+.plant-vsm-lane span {
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plant-vsm-lane strong {
+  color: #102033;
+  font-size: 21px;
+}
+
+.plant-vsm-lane div {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f5a52 var(--share), rgba(215, 225, 222, 0.86) var(--share));
+}
+
+.plant-vsm-lane p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.plant-experiment-grid,
+.plant-integration-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 14px;
+}
+
+.plant-experiment-grid article,
+.plant-integration-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  box-shadow: 0 8px 20px rgba(7, 17, 31, 0.045);
+}
+
+.plant-experiment-grid span,
+.plant-integration-grid span {
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.plant-experiment-grid dl {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 4px 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.plant-experiment-grid p,
+.plant-integration-grid p,
+.plant-integration-grid small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.plant-integration-grid article.ready {
+  border-color: rgba(15, 90, 82, 0.24);
+  background: rgba(239, 248, 245, 0.9);
+}
+
+.plant-sim-note {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1120px) {
+  .plant-layout-scene,
+  .plant-sim-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .plant-sim-kpis,
+  .plant-vsm-lane {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .plant-sim-kpis,
+  .plant-vsm-lane {
+    grid-template-columns: 1fr;
+  }
+
+  .plant-layout-floor {
+    min-height: 520px;
+  }
+
+  .zone-process {
+    inset: 26px 26px 214px 26px;
+  }
+
+  .zone-support {
+    left: 26px;
+    right: 26px;
+    top: auto;
+    bottom: 26px;
+    width: auto;
+    height: 164px;
+  }
+
+  .sankey-bars div {
+    grid-template-columns: 1fr;
+  }
+}
