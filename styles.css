@@ -14117,3 +14117,19 @@ body[data-active-view="projects"] .kpi-strip {
     grid-template-columns: 1fr;
   }
 }
+
+/* Navigation-safe public sections: jumped sections should never hide below the fixed nav. */
+.public-page,
+.public-section,
+.public-screenshot-story,
+.public-product-story,
+.public-build-loop,
+.public-mission,
+#publicDetailPanel {
+  scroll-margin-top: 112px !important;
+}
+
+.section-heading,
+.product-story-heading {
+  scroll-margin-top: 112px !important;
+}
