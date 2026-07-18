@@ -14133,3 +14133,169 @@ body[data-active-view="projects"] .kpi-strip {
 .product-story-heading {
   scroll-margin-top: 112px !important;
 }
+
+/* Quiet public system pass: fewer decorative lines, tighter sections, clearer product pages. */
+.login-gate,
+.public-site {
+  background:
+    radial-gradient(circle at 50% -12%, rgba(128, 219, 208, 0.12), transparent 32%),
+    linear-gradient(152deg, #071421 0%, #0b1c30 44%, #12314a 100%) !important;
+}
+
+.public-section {
+  display: grid !important;
+  gap: 22px !important;
+  width: min(100%, 1220px) !important;
+  margin-inline: auto !important;
+  padding: 68px clamp(20px, 4vw, 56px) !important;
+}
+
+.section-heading {
+  justify-items: center !important;
+  max-width: 860px !important;
+  margin: 0 auto 6px !important;
+  text-align: center !important;
+}
+
+.section-heading h2 {
+  max-width: 860px !important;
+  font-size: 42px !important;
+  line-height: 1.08 !important;
+  letter-spacing: 0 !important;
+}
+
+.section-heading p {
+  margin: 0 0 8px !important;
+}
+
+.public-visual-pair {
+  gap: 14px !important;
+  width: min(100%, 1120px) !important;
+  margin: 0 auto 6px !important;
+}
+
+.explain-visual {
+  min-height: 248px !important;
+  padding: 22px !important;
+  border-radius: 28px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03)),
+    rgba(7, 20, 36, 0.62) !important;
+}
+
+.explain-visual::before {
+  display: none !important;
+}
+
+.visual-flow-row,
+.visual-access-map .access-flow,
+.mini-canvas-grid,
+.schedule-bars,
+.source-ledger,
+.review-layers,
+.value-stack,
+.private-vault,
+.decision-matrix,
+.plan-bars {
+  margin-top: 20px !important;
+}
+
+.visual-flow-row span,
+.access-flow span,
+.mini-canvas-grid span,
+.loop-orbit span,
+.network-map span,
+.review-layers span,
+.value-stack span,
+.private-vault span,
+.visual-data-stack span,
+.source-ledger span,
+.schedule-bars span,
+.decision-matrix span,
+.decision-matrix b {
+  border-radius: 18px !important;
+}
+
+.loop-orbit::before,
+.network-map::before {
+  opacity: 0.38 !important;
+}
+
+.platform-grid,
+.ecosystem-grid,
+.workflow-rail,
+.public-example-grid,
+.migration-grid,
+.review-grid,
+.faq-grid,
+.module-copy-grid,
+.pricing-grid,
+.market-matrix,
+.target-segment-grid {
+  gap: 12px !important;
+  width: min(100%, 1120px) !important;
+  margin-inline: auto !important;
+}
+
+.platform-grid article,
+.ecosystem-grid article,
+.workflow-rail article,
+.public-example-grid article,
+.migration-grid article,
+.review-grid article,
+.faq-grid article,
+.module-copy-grid article,
+.pricing-grid article,
+.market-matrix article,
+.target-segment-grid article {
+  min-height: 0 !important;
+  padding: 22px !important;
+  border-radius: 26px !important;
+}
+
+.platform-grid article p,
+.ecosystem-grid article p,
+.workflow-rail article span,
+.public-example-grid article p,
+.migration-grid article p,
+.review-grid article p,
+.faq-grid article p,
+.module-copy-grid article p,
+.pricing-grid article p,
+.market-matrix article p,
+.target-segment-grid article p {
+  line-height: 1.58 !important;
+}
+
+.public-case-study,
+.market-alert,
+.market-offer,
+.pricing-intro,
+.pricing-note,
+.access-panel {
+  width: min(100%, 1120px) !important;
+  margin-inline: auto !important;
+}
+
+@media (max-width: 820px) {
+  .public-section {
+    padding-block: 54px !important;
+  }
+
+  .section-heading h2 {
+    font-size: 34px !important;
+  }
+}
+
+body.show-public .public-page:not(.active-public-page),
+body.locked .public-page:not(.active-public-page) {
+  display: none !important;
+  visibility: hidden !important;
+  block-size: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.public-scroll {
+  padding-top: 100px !important;
+}

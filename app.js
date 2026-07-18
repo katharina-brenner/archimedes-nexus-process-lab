@@ -9069,7 +9069,7 @@ const publicDetailStories = {
   },
 };
 
-function renderPublicDetail(key = "mab-overview") {
+function renderPublicDetail(key = "mab-overview", { scroll = true } = {}) {
   const story = publicDetailStories[key] || publicDetailStories["mab-overview"];
   const panel = document.querySelector("#publicDetailPanel");
   if (!panel) return;
@@ -9111,7 +9111,7 @@ function renderPublicDetail(key = "mab-overview") {
   document.querySelectorAll("[data-public-detail]").forEach((button) => {
     button.classList.toggle("active", button.dataset.publicDetail === key);
   });
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scroll) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function openPublicDetail(key = "mab-overview", { scroll = true } = {}) {
@@ -9139,7 +9139,7 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {
     els.loginUser?.focus({ preventScroll: true });
     window.setTimeout(() => els.loginUser?.focus(), 260);
   }
-  if (targetPage === "platform") window.setTimeout(() => renderPublicDetail("mab-overview"), 80);
+  if (targetPage === "platform") window.setTimeout(() => renderPublicDetail("mab-overview", { scroll: false }), 80);
 }
 
 function scrollPublicTarget(targetId, focusLogin = false) {
