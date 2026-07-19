@@ -9027,13 +9027,13 @@ function cfdBoundaryConditionRows(report = cfdReport()) {
     const p = state.params;
     const eng = unit.engineering || {};
     return [
-      { reactor: unit.id, boundary: "gas_inlet", variable: "alpha.gas / U.gas / C_O2", type: unit.oxygenInlet, value: `aeration ${formatNumber(p.aeration || 0.35, 2)} vvm; DO target ${formatNumber(p.doSetpoint || 0.45, 2)}`, unit: "vvm / fraction", engineeringMeaning: "Defines gas holdup, plume location and oxygen source distribution." },
-      { reactor: unit.id, boundary: "feed_inlet", variable: "C_N / glucose / glutamine proxy", type: unit.nutrientInlet, value: `feed factor ${formatNumber(p.feedConcentration || 1, 2)}; phase ${unit.batchPhase}`, unit: "relative", engineeringMeaning: "Defines nutrient scalar addition and local feed-risk zones." },
-      { reactor: unit.id, boundary: "walls_baffles", variable: "U.liquid", type: "noSlip", value: "stationary wall and baffle surfaces", unit: "", engineeringMeaning: "Creates near-wall velocity penalty and possible mixing dead zones." },
-      { reactor: unit.id, boundary: "top_headspace", variable: "p_rgh / alpha.gas", type: "pressure outlet / gas disengagement", value: "open degassing boundary", unit: "", engineeringMeaning: "Represents headspace and foam/gas-disengagement region." },
-      { reactor: unit.id, boundary: "impeller_zone", variable: "MRF / momentum source", type: "horizontal rotating reference frame proxy", value: `${formatNumber(eng.rpm || 0, 0)} rpm; tip speed ${formatNumber(eng.tipSpeed || 0, 2)}`, unit: "rpm / m/s", engineeringMeaning: "Defines horizontal circulation plane, local shear and bulk mixing energy." },
-      { reactor: unit.id, boundary: "cell_uptake", variable: "S_O2 / S_N", type: "volumetric sink", value: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, unit: "mmol/L/h / 10^6 cells/mL", engineeringMeaning: "Consumes oxygen and nutrients over time; drives late-batch gradients." },
-      { reactor: unit.id, boundary: "mesh_quality", variable: "cell quality", type: "3D handoff requirement", value: "browser 18 x 24 axial screen; validated case needs 3D mesh refinement", unit: "cells", engineeringMeaning: "Screening contour is not a validated CFD solution until solved externally." },
+      { reactor: unit.id, boundary: "gas_inlet", variable: "alpha.gas / U.gas / C_O2", type: "ring-sparger", activeSetting: unit.oxygenInlet, value: `aeration ${formatNumber(p.aeration || 0.35, 2)} vvm; DO target ${formatNumber(p.doSetpoint || 0.45, 2)}`, unit: "vvm / fraction", engineeringMeaning: "Defines gas holdup, plume location and oxygen source distribution." },
+      { reactor: unit.id, boundary: "feed_inlet", variable: "C_N / glucose / glutamine proxy", type: "top-feed", activeSetting: unit.nutrientInlet, value: `feed factor ${formatNumber(p.feedConcentration || 1, 2)}; phase ${unit.batchPhase}`, unit: "relative", engineeringMeaning: "Defines nutrient scalar addition and local feed-risk zones." },
+      { reactor: unit.id, boundary: "walls_baffles", variable: "U.liquid", type: "noSlip", activeSetting: "stationary wall and baffle surfaces", value: "stationary wall and baffle surfaces", unit: "", engineeringMeaning: "Creates near-wall velocity penalty and possible mixing dead zones." },
+      { reactor: unit.id, boundary: "top_headspace", variable: "p_rgh / alpha.gas", type: "pressure outlet / gas disengagement", activeSetting: "open degassing boundary", value: "open degassing boundary", unit: "", engineeringMeaning: "Represents headspace and foam/gas-disengagement region." },
+      { reactor: unit.id, boundary: "impeller_zone", variable: "MRF / momentum source", type: "horizontal rotating reference frame proxy", activeSetting: `${formatNumber(eng.rpm || 0, 0)} rpm`, value: `${formatNumber(eng.rpm || 0, 0)} rpm; tip speed ${formatNumber(eng.tipSpeed || 0, 2)}`, unit: "rpm / m/s", engineeringMeaning: "Defines horizontal circulation plane, local shear and bulk mixing energy." },
+      { reactor: unit.id, boundary: "cell_uptake", variable: "S_O2 / S_N", type: "volumetric sink", activeSetting: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, value: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, unit: "mmol/L/h / 10^6 cells/mL", engineeringMeaning: "Consumes oxygen and nutrients over time; drives late-batch gradients." },
+      { reactor: unit.id, boundary: "mesh_quality", variable: "cell quality", type: "3D handoff requirement", activeSetting: "browser 18 x 24 axial screen", value: "browser 18 x 24 axial screen; validated case needs 3D mesh refinement", unit: "cells", engineeringMeaning: "Screening contour is not a validated CFD solution until solved externally." },
     ];
   });
 }
@@ -9288,6 +9288,7 @@ function renderCfdBoard() {
               <b>${escapeHtml(row.boundary)}</b>
               <span>${escapeHtml(row.variable)} · ${escapeHtml(row.type)}</span>
               <small>${escapeHtml(row.engineeringMeaning)}</small>
+              <em>Active Axion setting: ${escapeHtml(row.activeSetting || row.value)}</em>
             </p>
           `).join("")}
         </article>

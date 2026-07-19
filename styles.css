@@ -7142,6 +7142,19 @@ dd {
   line-height: 1.36;
 }
 
+.cfd-case-table em {
+  grid-column: 1 / -1;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #0f5a52;
+  background: rgba(216, 232, 228, 0.58);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
 .cfd-residual-panel p {
   display: grid;
   grid-template-columns: 86px minmax(80px, 1fr) 104px;
