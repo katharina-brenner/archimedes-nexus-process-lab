@@ -4468,6 +4468,166 @@ function templateExampleRows() {
   }));
 }
 
+function attachedSourceModelPackRows() {
+  const current = activeTemplate();
+  return [
+    {
+      sourceFile: "SuperPro_PrintedManual_v12.pdf",
+      sourceType: "process simulation manual",
+      axionModule: "Procedure, balance, costing, scheduling, and environmental workbook",
+      implementedObjects: "unit procedures, batch/continuous operation phases, material-energy balance rows, equipment sizing basis, cost rows, environmental inventory, schedule exports",
+      modelUse: "Transforms the active flowsheet into reviewable engineering tables instead of a static drawing.",
+      visibleInTool: "Downloads > Procedure workbook, balances, costs, LCA, schedule, databank, exchange workbook",
+      validationNeed: "Replace screening assumptions with project measurements, vendor quotes, site factors, and approved recipes before regulated use.",
+      copyStatus: "Implemented as original Axion data structures; no third-party example files or manual text copied.",
+    },
+    {
+      sourceFile: "Siemens-SW-Tecnomatix-Plant-Simulation-Fact-Sheet-1.pdf",
+      sourceType: "plant simulation fact sheet",
+      axionModule: "Object-oriented plant simulation twin",
+      implementedObjects: "factory hierarchy, material flow, resource utilization, buffers, personnel, rooms, logistics, what-if experiments, bottleneck statistics",
+      modelUse: "Lets process engineers review throughput, utilization, WIP, bottlenecks, and reusable resources across the whole plant.",
+      visibleInTool: "Twin OS, Simulation Functions, Downloads > Plant simulation twin and APS planning cockpit",
+      validationNeed: "Connect real MES, historian, ERP, personnel, and equipment-availability data for production scheduling.",
+      copyStatus: "Implemented as original Axion objects and KPIs based on general plant-simulation principles.",
+    },
+    {
+      sourceFile: "b60_Siemens-PLM-Tecnomatix-Plant_Simulation-fs-x7_FromSalesCentre-08-07-12.pdf",
+      sourceType: "plant simulation fact sheet",
+      axionModule: "Factory optimization and experiment manager",
+      implementedObjects: "what-if scenarios, line workload, machine state statistics, WIP, inventory, optimization candidates, dispatch recommendations",
+      modelUse: "Tests alternative routes, campaign sequencing, cleaning windows, staffing, and bottleneck relief before changing the plant.",
+      visibleInTool: "Downloads > Factory state + optimizer, APS planning cockpit, Experiment manager",
+      validationNeed: "Add calibrated breakdown distributions, shift calendars, setup matrices, and dispatching rules from the real site.",
+      copyStatus: "Implemented as original Axion simulation tables; no vendor screenshots or proprietary libraries imported.",
+    },
+    {
+      sourceFile: "Scaling_Cultured_Meat_Challenges_and_Solutions_for.pdf",
+      sourceType: "cultured-meat scale-up review",
+      axionModule: "Cultured-meat scale boundary and COGS screen",
+      implementedObjects: "cell-density, doubling-time, media-cost, bioreactor, scaffold, oxygen-transfer, and manufacturing-scale constraints",
+      modelUse: "Flags the non-linear scale-up pressure that makes lab costs high and industrial costs sensitive to media and reactor performance.",
+      visibleInTool: "Boundaries + AI, Economics, Downloads > Cultured-meat scale model",
+      validationNeed: "Calibrate to the chosen cell line, medium formulation, scaffold, perfusion strategy, and food-grade quality target.",
+      copyStatus: "Implemented as source-backed screening assumptions and editable parameters.",
+    },
+    {
+      sourceFile: "Decoding_cultured_meat_manufacturing_a_full_proces.pdf",
+      sourceType: "cultured-meat full-process model paper",
+      axionModule: "Cultured meat flagship process template",
+      implementedObjects: "media preparation, sterile filtration, storage, seed expansion, production STR, harvest transfer, wash, extrusion, packaging, CIP/SIP, waste streams",
+      modelUse: "Adds complete upstream, downstream, cleaning, storage, and export structure for cultured-meat process design.",
+      visibleInTool: "Process Builder, Equipment Register, Stream Table, Downloads > Source model pack",
+      validationNeed: "Replace artificial medium, yields, cell densities, transfer rates, and utility factors with project-specific data.",
+      copyStatus: "Implemented as original Axion process objects and numeric reference rows where usable.",
+    },
+    {
+      sourceFile: "Crossing_the_Valley_of_Scale.docx",
+      sourceType: "cultured-meat scale economics and constraints review",
+      axionModule: "Scale-risk, medium-cost, and circularity boundaries",
+      implementedObjects: "20 m3 animal-cell bioreactor boundary, medium cost share, oxygen and CO2 constraints, metabolic overflow, circular waste/reuse levers",
+      modelUse: "Makes high lab-scale cost, non-linear scale-up, medium burden, and metabolic boundaries explicit inside the model.",
+      visibleInTool: "Boundaries + AI, Economics, Recommendations, Downloads > Cultured-meat scale model",
+      validationNeed: "Confirm with measured OUR/CER, medium spend, lactate/ammonia data, cell viability, and downstream yield.",
+      copyStatus: "Implemented as model assumptions and review prompts.",
+    },
+    {
+      sourceFile: "factory-stream-s-broth-2026-07-05T14-49-54.html",
+      sourceType: "customer-owned Axion stream export",
+      axionModule: "S-145 broth stream reference",
+      implementedObjects: "BR-102 production STR, PM-103 broth transfer pump, S-145 broth mass split, oxygen and CO2 reference, transfer pressure and rate",
+      modelUse: "Adds a concrete stream-balance calibration row for cultured-meat broth handoff.",
+      visibleInTool: "Stream Table, Mass balances, Downloads > Cultured-meat scale model",
+      validationNeed: "Confirm whether this stream belongs to the active project and whether the values are final, experimental, or illustrative.",
+      copyStatus: "Treated as user-provided local export and converted into editable Axion reference rows.",
+    },
+    {
+      sourceFile: "MT_mft-202004-0011.pdf",
+      sourceType: "manufacturing digital-twin article",
+      axionModule: "Twin OS and model-vs-plant comparison",
+      implementedObjects: "production lines, logistics, warehouse, intermediate storage, output buffers, simulated resource statistics, bottleneck improvement loop",
+      modelUse: "Connects the process model to factory-state monitoring and improvement recommendations.",
+      visibleInTool: "Twin OS, Simulation Functions, Recommendations, Downloads > Plant simulation functions",
+      validationNeed: "Connect real plant states, event histories, and sensor tags to close the loop.",
+      copyStatus: "Implemented as original Axion twin objects and readiness checks.",
+    },
+    {
+      sourceFile: "Current active model",
+      sourceType: "Axion project state",
+      axionModule: "Active clean process model",
+      implementedObjects: `${current.label}: ${state.units.length} equipment objects, ${state.streams.length} streams, ${processParameters.length} parameters`,
+      modelUse: "Binds all attached-source assumptions to the currently selected product and scale.",
+      visibleInTool: "All authenticated workspace pages",
+      validationNeed: "Run peer review before using as a design, investor, regulatory, or procurement basis.",
+      copyStatus: "Generated inside Axion.",
+    },
+  ];
+}
+
+function culturedMeatSourceScaleRows() {
+  const data = metrics();
+  const cellCulture = isCellCultureTemplate();
+  const selectedVolume = state.batchSize;
+  const mediumCostShare = state.template === "culturedMeat" ? "50-95" : "project-specific";
+  return [
+    { parameter: "Animal-cell stirred-tank practical boundary", value: 20000, unit: "L", appliesTo: "cultured meat, mAbs, vaccines, cell therapy", currentModelValue: selectedVolume, status: cellCulture && selectedVolume > 20000 ? "exceeds screening boundary" : "within screening boundary", modelAction: "Use scale-out, perfusion, intensified seed train, or alternate reactor architecture above this boundary.", sourceBasis: "Crossing_the_Valley_of_Scale.docx and cultured-meat scale-up review" },
+    { parameter: "STR maximum working volume", value: 80, unit: "% of vessel", appliesTo: "stirred-tank bioreactors", currentModelValue: state.params.workingVolume || 65, status: (state.params.workingVolume || 65) > 80 ? "too full" : "screening ok", modelAction: "Keep headspace, foam control, gas disengagement, and probe coverage visible in CFD and equipment sizing.", sourceBasis: "Decoding cultured meat manufacturing process model" },
+    { parameter: "Wave bioreactor maximum working volume", value: 50, unit: "% of bag", appliesTo: "wave seed expansion", currentModelValue: 50, status: "reference limit", modelAction: "Use wave bags for expansion stages, not as hidden full-volume STRs.", sourceBasis: "Decoding cultured meat manufacturing process model" },
+    { parameter: "Pilot smart bioreactor reference", value: 10000, unit: "L", appliesTo: "cultured-meat pilot scale", currentModelValue: selectedVolume, status: selectedVolume >= 10000 ? "pilot/commercial screen" : "below pilot screen", modelAction: "Add supply-chain, CIP, media, oxygen-transfer, and room-level scheduling before scale claim.", sourceBasis: "Scaling cultured meat challenges review" },
+    { parameter: "Production STR reference", value: 20000, unit: "L", appliesTo: "BR-102-style production reactor", currentModelValue: selectedVolume, status: "reference case", modelAction: "Use as an upper reference, not as a default recommendation for all cells.", sourceBasis: "factory-stream HTML and cultured-meat process paper" },
+    { parameter: "Medium demand reference", value: 19907.59, unit: "kg per 20000 L demand", appliesTo: "culture medium", currentModelValue: data.productPerBatchKg, status: "reference row", modelAction: "Convert to component-level medium recipe when formulation is known.", sourceBasis: "Decoding cultured meat manufacturing process model" },
+    { parameter: "Culture broth stream S-145", value: 18920, unit: "kg", appliesTo: "BR-102 outlet to transfer pump", currentModelValue: "", status: "reference stream", modelAction: "Use as a balance check for broth transfer, not as universal mass output.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Biomass in S-145", value: 1990, unit: "kg", appliesTo: "culture broth pseudo-component", currentModelValue: "", status: "reference component", modelAction: "Map to harvested wet cell mass or biomass pseudo-component in LCA/TEA exports.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Depleted medium in S-145", value: 15930, unit: "kg", appliesTo: "spent/depleted medium", currentModelValue: "", status: "reference component", modelAction: "Route to harvest, recycle screen, wastewater treatment, or circular feedstock evaluation.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Impurities in S-145", value: 1000, unit: "kg", appliesTo: "broth impurities", currentModelValue: "", status: "reference component", modelAction: "Split into soluble impurities, debris, HCP-like proxies, lactate/ammonia, salts, and residual nutrients.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Cell density reference", value: 50000000, unit: "cells/mL", appliesTo: "production culture", currentModelValue: state.params.cellDensity || "", status: "reference target", modelAction: "Tie to oxygen transfer, nutrient feed, lactate/ammonia, viscosity, and harvest load.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Culture duration reference", value: 120, unit: "h", appliesTo: "production culture", currentModelValue: data.batchDuration, status: "reference duration", modelAction: "Use dynamic batch profile for time-dependent metabolites and oxygen/nutrient gradients.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Culture temperature", value: 37, unit: "C", appliesTo: "mammalian cell culture", currentModelValue: state.params.temperature || "", status: "reference setpoint", modelAction: "Use in property package, heat duty, growth rate, and boundary monitoring.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Broth transfer rate", value: 4000, unit: "L/h", appliesTo: "BR-102 outlet transfer", currentModelValue: "", status: "reference logistics rate", modelAction: "Schedule pump/line occupancy and hold-time risk.", sourceBasis: "Decoding cultured meat manufacturing process model" },
+    { parameter: "Pump pressure increase", value: 1, unit: "bar", appliesTo: "broth transfer pump", currentModelValue: "", status: "reference equipment duty", modelAction: "Use for pump energy, shear screen, line pressure, and equipment spec review.", sourceBasis: "Decoding cultured meat manufacturing process model" },
+    { parameter: "Oxygen reference demand", value: 995, unit: "kg", appliesTo: "production culture", currentModelValue: "", status: "reference mass", modelAction: "Use only as screening input until OUR and kLa are measured.", sourceBasis: "factory-stream HTML" },
+    { parameter: "CO2 reference generation", value: 1990, unit: "kg", appliesTo: "production culture", currentModelValue: "", status: "reference mass", modelAction: "Tie to off-gas, pH control, headspace, and gas transfer limitations.", sourceBasis: "factory-stream HTML" },
+    { parameter: "Serum-free medium variable-cost share", value: mediumCostShare, unit: "% of variable cost", appliesTo: "cultured meat and cell-culture processes", currentModelValue: data.scale?.materialIntensity ? `$${formatNumber(data.scale.materialIntensity / Math.max(1, data.annualKg), 0)}/kg` : "", status: "dominant cost driver", modelAction: "Prioritize media optimization, food-grade inputs, recycling, and supplier quote replacement.", sourceBasis: "Crossing_the_Valley_of_Scale.docx" },
+    { parameter: "Near-term cultured-meat cost floor", value: "25-70", unit: "USD/kg", appliesTo: "screening economics", currentModelValue: `$${formatNumber(data.directCost, 0)}/kg`, status: state.template === "culturedMeat" ? "compare active model" : "context only", modelAction: "Show gap to target and break down media, CAPEX, utilization, yield, and energy contributions.", sourceBasis: "Crossing_the_Valley_of_Scale.docx" },
+    { parameter: "Main scale-up constraints", value: "O2 transfer, CO2, lactate, ammonia, metabolic overflow", unit: "qualitative", appliesTo: "cell culture", currentModelValue: `${evaluatePhysicalBoundaries().filter((item) => item.severity !== "ok").length} active boundary flags`, status: "implemented boundary checks", modelAction: "Keep metabolite, gas, shear, heat, and feed limits visible during optimization.", sourceBasis: "Crossing_the_Valley_of_Scale.docx and boundary literature" },
+    { parameter: "Circularity levers", value: "spent medium, lactate, ammonia, heat reuse, wastewater recovery", unit: "qualitative", appliesTo: "LCA/TEA and sustainability", currentModelValue: "", status: "implemented as review levers", modelAction: "Route waste streams to recovery, treatment, or by-product scenarios in LCA/TEA exports.", sourceBasis: "Crossing_the_Valley_of_Scale.docx" },
+  ];
+}
+
+function plantSimulationFunctionRows() {
+  const schedule = campaignSchedule();
+  return [
+    { functionArea: "Object library", implementedFunction: "Equipment, streams, buffers, rooms, personnel, utilities, and states are model objects", dataNeeded: "resource class, capacity, location, allowed routes, setup and cleaning rules", axionOutput: "Plant simulation object CSV and Twin OS cards", status: "implemented scaffold" },
+    { functionArea: "Hierarchical model", implementedFunction: "Enterprise > site > suite > line > equipment > transfer > resource-state hierarchy", dataNeeded: "site structure, cleanroom zoning, suites, warehouse, line ownership", axionOutput: "Plant simulation hierarchy and factory-room exports", status: "implemented" },
+    { functionArea: "Material flow", implementedFunction: "Input, internal, output, utility, waste, QC/data, and recycle streams move through finite-capacity resources", dataNeeded: "flow rates, hold limits, pumps, line occupancy, tank volumes", axionOutput: "Stream table, moving batches, transfer schedule", status: "implemented" },
+    { functionArea: "Resource utilization", implementedFunction: "Equipment, rooms, stream lines, operators, CIP/SIP, and QC release get occupancy rows", dataNeeded: "operation durations, parallel units, availability calendar, shift model", axionOutput: "Utilization matrix, equipment occupancy chart, room occupancy", status: "implemented" },
+    { functionArea: "Buffers and WIP", implementedFunction: "Inventory and WIP levels are estimated for media, consumables, product pool, waste, and release queues", dataNeeded: "min/max inventory, shelf-life, cold-chain, safety stock, supplier lead time", axionOutput: "Inventory/WIP export and APS cockpit", status: "implemented scaffold" },
+    { functionArea: "Personnel", implementedFunction: "Operator, QA/QC, cleaning, maintenance, and logistics staffing are represented as finite resources", dataNeeded: "crew calendars, skills, qualification matrix, task staffing demand", axionOutput: "Personnel plan CSV and factory state monitor", status: "implemented scaffold" },
+    { functionArea: "Machine state statistics", implementedFunction: "Each equipment object moves across setup, running, transfer, cleaning, idle, blocked, and maintenance states", dataNeeded: "failure distributions, repair times, planned downtime, calibration windows", axionOutput: "Equipment state machine CSV", status: "implemented scaffold" },
+    { functionArea: "Gantt and scheduling", implementedFunction: "Operations, transfers, cleaning, release and repeated equipment cycles are exported as Gantt/MS Project compatible rows", dataNeeded: "validated cycle times, precedence, reusable equipment pools, batch calendar", axionOutput: "Schedule CSV, Gantt SVG, MS Project CSV, JSON package", status: "implemented" },
+    { functionArea: "What-if experiments", implementedFunction: "Scenario rows evaluate bottleneck parallelization, CIP reduction, heat reuse, media cost, staffing, and route changes", dataNeeded: "objective weights, constraints, risk tolerances, cost ranges", axionOutput: "Experiment manager and route optimizer", status: "implemented scaffold" },
+    { functionArea: "Statistical analysis", implementedFunction: "Readiness and risk rows expose utilization, boundary flags, bottlenecks, costs, and source confidence", dataNeeded: "replicate runs, stochastic failure data, uncertainty distributions", axionOutput: "Recommendations, reports, optimizer tables", status: "screening implemented; stochastic backend missing" },
+    { functionArea: "3D/factory visualization", implementedFunction: "SVG and cockpit views show factory rooms, production path, support systems, and live batch tokens", dataNeeded: "CAD/JT/IFC model, room dimensions, equipment coordinates", axionOutput: "Plant SVG, Twin OS, canvas visualizations", status: "2D/2.5D implemented; real CAD connector planned" },
+    { functionArea: "Supply chain", implementedFunction: "Materials, media, consumables, WFI/CIP chemicals, gases, resin, and QC supplies are tracked as cost and inventory drivers", dataNeeded: "supplier prices, lead times, MOQ, shelf life, region, inflation", axionOutput: "Resource inventory, TEA, LCA, APS inventory", status: "implemented scaffold" },
+    { functionArea: "Optimization", implementedFunction: "Deterministic optimization candidates identify highest-value schedule, capacity, CIP, staffing, and WIP changes", dataNeeded: "objective function, constraints, feasibility rules, cost of delay", axionOutput: "Factory optimizer CSV and recommendation cards", status: "implemented scaffold" },
+    { functionArea: "Live digital twin", implementedFunction: "Model-vs-live-state interface prepared for historian, OPC UA, MQTT, LIMS, and MES feeds", dataNeeded: "tag map, sample frequency, units, data quality, alarm rules", axionOutput: "Factory live state, dispatch recommendations, connector registry", status: "planned connector with UI scaffold" },
+    { functionArea: "Current active schedule", implementedFunction: `${schedule.operations.length} operations, ${schedule.resourceRows.length} resources, ${schedule.batchReleases.length} batch-release rows`, dataNeeded: "project-specific campaign assumptions", axionOutput: `${schedule.feasibleAnnualBatches} feasible annual batches vs ${state.batchCount} target`, status: schedule.warnings.length ? "needs review" : "screening ok" },
+  ];
+}
+
+function sourceIngestionReadinessRows() {
+  return attachedSourceModelPackRows().map((row, index) => ({
+    sourceId: `SRC-${String(index + 1).padStart(2, "0")}`,
+    sourceFile: row.sourceFile,
+    sourceType: row.sourceType,
+    implementedInAxion: row.axionModule,
+    currentStatus: row.copyStatus,
+    visibleInTool: row.visibleInTool,
+    nextValidationStep: row.validationNeed,
+    ownerAction: index === 0 ? "Compare against user-owned model exports rather than recreating proprietary examples." : "Review and replace screening assumptions with project-owned data.",
+  }));
+}
+
 function operationSequenceForUnit(unitItem) {
   const cls = unitItem.cls;
   const text = `${unitItem.type} ${unitItem.name}`.toLowerCase();
@@ -7794,14 +7954,34 @@ function renderSources() {
   const groups = [...new Set(scientificSources.map((item) => item.group))];
   const propertyCategories = [...new Set(propertyRows().map((item) => item.category))];
   const previewProperties = propertyRows().slice(0, 12);
+  const attachedRows = attachedSourceModelPackRows();
   els.sourcesBoard.innerHTML = `
     <section class="source-hero">
       <div>
         <p>Scientific data layer</p>
-        <h3>Vendor, regulatory, standards, and property references</h3>
-        <span>These cards document where benchmark assumptions and property-package estimates come from. They are starting points for model calibration, not validated limits for every product or facility.</span>
+        <h3>Vendor, regulatory, standards, property, and attached-source references</h3>
+        <span>These cards document where benchmark assumptions, property estimates, and uploaded source-driven model extensions come from. They are starting points for calibration, not validated limits for every product or facility.</span>
       </div>
-      <strong>${scientificSources.length} sources · ${propertyRows().length} properties</strong>
+      <strong>${scientificSources.length} sources · ${propertyRows().length} properties · ${attachedRows.length} attached-source mappings</strong>
+    </section>
+    <section class="simulation-group">
+      <h3>Attached-source implementation pack</h3>
+      <div class="simulation-cards">
+        ${attachedRows.map((item) => `
+          <article class="simulation-card">
+            <div>
+              <span>${item.sourceType}</span>
+              <h4>${item.axionModule}</h4>
+            </div>
+            <dl>
+              <dt>File</dt><dd>${item.sourceFile}</dd>
+              <dt>Visible in</dt><dd>${item.visibleInTool}</dd>
+              <dt>Status</dt><dd>${item.copyStatus}</dd>
+            </dl>
+            <p>${item.validationNeed}</p>
+          </article>
+        `).join("")}
+      </div>
     </section>
     <section class="source-summary-grid">
       ${groups.map((group) => `
@@ -10036,6 +10216,10 @@ function comprehensiveReport() {
     debottleneckWorkbook: debottleneckWorkbookRows(),
     databankWorkbook: databankWorkbookRows(),
     exchangeWorkbook: exchangeWorkbookRows(),
+    attachedSourceModelPack: attachedSourceModelPackRows(),
+    culturedMeatSourceScale: culturedMeatSourceScaleRows(),
+    plantSimulationFunctions: plantSimulationFunctionRows(),
+    sourceIngestionReadiness: sourceIngestionReadinessRows(),
     advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
@@ -10074,20 +10258,23 @@ function renderReportsBoard() {
       <article><span>Resource inventory</span><strong>${report.resourceInventory.length}</strong><p>Equipment, materials, utilities, cleaning agents, schedule resources, occupancy, cost basis, sizing basis, and specification-review needs.</p><button data-download-report="resource-inventory-csv" type="button">Download CSV</button></article>
       <article><span>Emissions workbook</span><strong>${report.emissionsWorkbook.length}</strong><p>Off-gas, vent, solvent-loss, cleaning-wastewater, waste-treatment, abatement, monitoring, and missing-data review table.</p><button data-download-report="emissions-workbook-csv" type="button">Download CSV</button></article>
       <article><span>Debottlenecking workbook</span><strong>${report.debottleneckWorkbook.length}</strong><p>Equipment-time, size, heat, power, occupancy, cleaning, transfer-line, and scale-up review actions for capacity planning.</p><button data-download-report="debottleneck-workbook-csv" type="button">Download CSV</button></article>
-      <article><span>Databank workbook</span><strong>${report.databankWorkbook.length}</strong><p>Original Axion equipment, component, mixture, property, parameter, cost, and CIP/SIP template libraries for project calibration.</p><button data-download-report="databank-workbook-csv" type="button">Download CSV</button></article>
-      <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
-      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
-      <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
+	      <article><span>Databank workbook</span><strong>${report.databankWorkbook.length}</strong><p>Original Axion equipment, component, mixture, property, parameter, cost, and CIP/SIP template libraries for project calibration.</p><button data-download-report="databank-workbook-csv" type="button">Download CSV</button></article>
+	      <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
+	      <article><span>Attached source model pack</span><strong>${report.attachedSourceModelPack.length}</strong><p>Clean Axion implementation map for the attached manual, plant-simulation fact sheets, cultured-meat papers, local stream export, digital-twin paper, and scale-up document.</p><button data-download-report="source-model-pack-csv" type="button">Source pack CSV</button><button data-download-report="source-readiness-csv" type="button">Readiness CSV</button></article>
+	      <article><span>Cultured-meat scale model</span><strong>${report.culturedMeatSourceScale.length}</strong><p>Source-backed scale limits, 20 m3 animal-cell boundary, STR/wave working volumes, broth S-145 reference, medium cost pressure, oxygen/CO2 and circularity levers.</p><button data-download-report="cultured-meat-scale-csv" type="button">Scale model CSV</button></article>
+	      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
+	      <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
       <article><span>Plant utilization suite</span><strong>${formatNumber(dataUtilizationFromSchedule(report.schedule), 0)}%</strong><p>Equipment occupancy chart, room/suite load, time buckets, utility demand peaks, cleaning windows, bottleneck ladder, and finite-capacity What-if scenarios for whole-plant utilization modelling.</p><button data-download-report="schedule-buckets-csv" type="button">Buckets CSV</button><button data-download-report="schedule-equipment-occupancy-csv" type="button">Equipment CSV</button><button data-download-report="schedule-room-occupancy-csv" type="button">Rooms CSV</button><button data-download-report="schedule-utility-demand-csv" type="button">Utilities CSV</button><button data-download-report="schedule-scenarios-csv" type="button">Scenarios CSV</button><button data-download-report="schedule-bottlenecks-csv" type="button">Bottlenecks CSV</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
       <article><span>Editable recipe</span><strong>${report.recipe.filter((item) => item.edited).length}/${report.recipe.length}</strong><p>Generated and manually overridden recipe assumptions for active/skip state, route branch, predecessor dependency, process time, setup time, cleaning time, and parallel equipment pools.</p><button data-download-report="recipe-csv" type="button">Download CSV</button></article>
       <article><span>Route comparison</span><strong>${report.routeComparison.length}</strong><p>Primary, intensified, and lean route comparison with scheduled steps, capacity, make-span, release pitch, bottleneck, occupancy, and warnings.</p><button data-download-report="routes-csv" type="button">Download CSV</button></article>
       <article><span>Route topology</span><strong>${report.routeTopology.reduce((sum, item) => sum + item.totalSteps, 0)}</strong><p>Visual branch/merge model with shared steps, route-specific steps, merge point, entry node, and predecessor edges.</p><button data-download-report="route-topology-csv" type="button">Download CSV</button></article>
       <article><span>Route optimizer</span><strong>${report.routeOptimization[0]?.label || "n/a"}</strong><p>Screening optimizer ranking every route by capacity, bottleneck, schedule warnings, estimated direct cost, GMP readiness, and sustainability.</p><button data-download-report="route-optimizer-csv" type="button">Download CSV</button></article>
-      <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, rooms, moving batches, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="factory-rooms-csv" type="button">Rooms CSV</button><button data-download-report="moving-batches-csv" type="button">Batches CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
-      <article><span>Factory state + optimizer</span><strong>${report.factoryOptimization[0]?.objectiveScore ? formatNumber(report.factoryOptimization[0].objectiveScore, 0) : "n/a"}</strong><p>Personnel loads, inventory levels, live equipment states, dispatch actions, time buckets, and deterministic factory optimization candidates for schedule, capacity, CIP, staffing, and WIP tradeoffs.</p><button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button><button data-download-report="inventory-levels-csv" type="button">Inventory CSV</button><button data-download-report="equipment-state-machine-csv" type="button">States CSV</button><button data-download-report="factory-live-state-csv" type="button">Live CSV</button><button data-download-report="factory-timeline-csv" type="button">Timeline CSV</button><button data-download-report="factory-dispatch-csv" type="button">Dispatch CSV</button><button data-download-report="factory-optimizer-csv" type="button">Optimizer CSV</button></article>
-      <article><span>Experiment manager</span><strong>${report.plantSimulationExperiments.length}</strong><p>Optimization-ready scenarios for bottleneck parallelization, CIP reduction, heat reuse, media cost, automation, release pitch, CO2e, and risk constraints.</p><button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button></article>
-      <article><span>Integration matrix</span><strong>${report.plantSimulationInterfaces.length}</strong><p>Concrete connector registry for JSON, CSV, CAD/JT, MQTT, OPC UA, SQL/ODBC, REST, Python SDK, optimizer, and scheduling/MES handoff.</p><button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button></article>
+	      <article><span>Plant simulation twin</span><strong>${report.plantSimulation.objects.totalObjects}</strong><p>Object-oriented factory hierarchy, rooms, moving batches, reusable equipment states, logistics buffers, resource occupancy, value-stream timing, Sankey flow shares, and 3D-style layout preview.</p><button data-download-report="plant-simulation-objects-csv" type="button">Objects CSV</button><button data-download-report="factory-rooms-csv" type="button">Rooms CSV</button><button data-download-report="moving-batches-csv" type="button">Batches CSV</button><button data-download-report="plant-simulation-svg" type="button">Plant SVG</button></article>
+	      <article><span>Factory state + optimizer</span><strong>${report.factoryOptimization[0]?.objectiveScore ? formatNumber(report.factoryOptimization[0].objectiveScore, 0) : "n/a"}</strong><p>Personnel loads, inventory levels, live equipment states, dispatch actions, time buckets, and deterministic factory optimization candidates for schedule, capacity, CIP, staffing, and WIP tradeoffs.</p><button data-download-report="personnel-plan-csv" type="button">Personnel CSV</button><button data-download-report="inventory-levels-csv" type="button">Inventory CSV</button><button data-download-report="equipment-state-machine-csv" type="button">States CSV</button><button data-download-report="factory-live-state-csv" type="button">Live CSV</button><button data-download-report="factory-timeline-csv" type="button">Timeline CSV</button><button data-download-report="factory-dispatch-csv" type="button">Dispatch CSV</button><button data-download-report="factory-optimizer-csv" type="button">Optimizer CSV</button></article>
+	      <article><span>Experiment manager</span><strong>${report.plantSimulationExperiments.length}</strong><p>Optimization-ready scenarios for bottleneck parallelization, CIP reduction, heat reuse, media cost, automation, release pitch, CO2e, and risk constraints.</p><button data-download-report="plant-simulation-experiments-csv" type="button">Experiments CSV</button></article>
+	      <article><span>Plant simulation functions</span><strong>${report.plantSimulationFunctions.length}</strong><p>Hierarchical factory model, object libraries, material flow, buffers, resource statistics, personnel, machine states, supply chain, live-twin connectors, and optimization readiness.</p><button data-download-report="plant-simulation-functions-csv" type="button">Functions CSV</button></article>
+	      <article><span>Integration matrix</span><strong>${report.plantSimulationInterfaces.length}</strong><p>Concrete connector registry for JSON, CSV, CAD/JT, MQTT, OPC UA, SQL/ODBC, REST, Python SDK, optimizer, and scheduling/MES handoff.</p><button data-download-report="plant-simulation-interfaces-csv" type="button">Interfaces CSV</button></article>
       <article><span>Original example library</span><strong>${templateExampleRows().length}</strong><p>Download Axion's own example model library for antibodies, penicillin, cultured meat, fermentation, vaccines, plasmids, cell therapy, utilities, and emissions without using copied third-party files.</p><button data-download-report="examples-csv" type="button">Examples CSV</button><button data-download-report="examples-json" type="button">Examples JSON</button></article>
     </section>
   `;
@@ -10678,6 +10865,12 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-databank-workbook.csv`, databankWorkbookRows(), "Databank workbook");
   } else if (type === "exchange-workbook-csv") {
     downloadCsv(`${state.template}-exchange-workbook.csv`, exchangeWorkbookRows(), "Exchange and connector workbook");
+  } else if (type === "source-model-pack-csv") {
+    downloadCsv(`${state.template}-attached-source-model-pack.csv`, attachedSourceModelPackRows(), "Attached source model pack");
+  } else if (type === "source-readiness-csv") {
+    downloadCsv(`${state.template}-source-ingestion-readiness.csv`, sourceIngestionReadinessRows(), "Source ingestion readiness");
+  } else if (type === "cultured-meat-scale-csv") {
+    downloadCsv(`${state.template}-cultured-meat-scale-model.csv`, culturedMeatSourceScaleRows(), "Cultured-meat scale model");
   } else if (type === "schedule-csv") {
     downloadCsv(`${state.template}-campaign-schedule.csv`, scheduleOperationRows(), "Campaign schedule operations");
   } else if (type === "schedule-gantt-csv") {
@@ -10786,6 +10979,8 @@ function handleReportDownload(type) {
   } else if (type === "plant-simulation-experiments-csv") {
     const plantSim = plantSimulationModel();
     downloadCsv(`${state.template}-plant-simulation-experiments.csv`, plantSimulationExperimentRows(plantSim), "Plant simulation experiment manager");
+  } else if (type === "plant-simulation-functions-csv") {
+    downloadCsv(`${state.template}-plant-simulation-functions.csv`, plantSimulationFunctionRows(), "Plant simulation function pack");
   } else if (type === "plant-simulation-interfaces-csv") {
     downloadCsv(`${state.template}-plant-simulation-interfaces.csv`, plantSimulationInterfaceRows(), "Plant simulation integration matrix");
   } else if (type === "plant-simulation-svg") {
