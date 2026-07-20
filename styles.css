@@ -16847,3 +16847,59 @@ body.locked .public-page:not(.active-public-page) {
     min-height: 190px;
   }
 }
+
+/* Final polish: keep the builder helper panels soft and product-like. */
+.quick-add-panel,
+.canvas-focus,
+.flow-detail-panel,
+.flow-legend,
+.role-legend {
+  border-radius: 26px !important;
+  border-color: rgba(49, 82, 92, 0.14) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 249, 248, 0.76)) !important;
+  box-shadow:
+    0 18px 44px rgba(8, 27, 40, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+.quick-add-panel strong,
+.canvas-focus strong,
+.flow-detail-panel strong,
+.flow-legend strong,
+.role-legend strong {
+  color: #415261 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.quick-add-button {
+  min-height: 42px !important;
+  padding: 6px 12px 6px 7px !important;
+  border-radius: 999px !important;
+  border-color: rgba(29, 58, 72, 0.16) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  box-shadow: 0 10px 24px rgba(10, 31, 45, 0.06) !important;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease !important;
+}
+
+.quick-add-button:hover,
+.quick-add-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(24, 123, 103, 0.28) !important;
+  background: rgba(242, 252, 249, 0.94) !important;
+  box-shadow: 0 16px 34px rgba(10, 31, 45, 0.11) !important;
+}
+
+.quick-add-button span {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #1f6f65, #6eb9ad) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.quick-add-button b {
+  color: #0c1824 !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+}
