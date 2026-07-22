@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -11,6 +12,8 @@ const dbPath = join(dataDir, "axion-licensing.json");
 const modelsDir = join(dataDir, "models");
 const projectsDir = join(modelsDir, "projects");
 const archiveDir = join(modelsDir, "archive");
+const runsDir = join(modelsDir, "runs");
+const pythonModelScript = join(rootDir, "python_models", "bioprocess_model.py");
 
 function loadLocalEnv() {
   const envPath = join(rootDir, ".env");
@@ -50,6 +53,8 @@ const config = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePriceId: process.env.STRIPE_PRICE_ID || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  pythonExecutable: process.env.AXION_PYTHON || "python3",
+  pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
 
 const staticTypes = new Map([
@@ -72,6 +77,8 @@ const defaultDb = {
   projectVersions: [],
   invites: [],
   projectBriefs: [],
+  datasets: [],
+  simulationRuns: [],
   audit: [],
 };
 
@@ -89,6 +96,9 @@ function backendFeatures() {
     "Username/email invitations for collaboration",
     "External integration registry for modelling and data tools",
     "REST API and JSON model handoff architecture",
+    "Python modelling runtime for dynamic bioprocess screening",
+    "Academic source library for model assumptions",
+    "Dataset registry for uploaded experimental, historian, TEA and LCA data",
     "Python SDK and webhook-ready integration targets",
     "Cloud run, parameter sweep, Monte Carlo and scenario-run roadmap",
     "Live-data, historian, LIMS, ERP and vendor-quote connector registry",
@@ -122,6 +132,14 @@ function publicConfig() {
       stripeEnabled: Boolean(config.stripeSecretKey),
       automaticActivation: Boolean(config.stripeSecretKey),
     },
+    backend: {
+      currentStorage: "local JSON files in .data/models",
+      recommendedProductionDataApp: "Supabase Postgres + Supabase Storage, or managed Postgres on Render/Fly/Railway plus S3-compatible object storage",
+      pythonRuntime: config.pythonExecutable,
+      modellingEndpoint: "/api/model-runs/python",
+      academicSourcesEndpoint: "/api/sources/academic",
+      dataArchitectureEndpoint: "/api/data/architecture",
+    },
   };
 }
 
@@ -129,6 +147,7 @@ async function loadDb() {
   await mkdir(dataDir, { recursive: true });
   await mkdir(projectsDir, { recursive: true });
   await mkdir(archiveDir, { recursive: true });
+  await mkdir(runsDir, { recursive: true });
   if (!existsSync(dbPath)) {
     const seeded = ensureDbShape(structuredClone(defaultDb));
     await writeFile(dbPath, JSON.stringify(seeded, null, 2));
@@ -141,6 +160,7 @@ async function saveDb(db) {
   await mkdir(dataDir, { recursive: true });
   await mkdir(projectsDir, { recursive: true });
   await mkdir(archiveDir, { recursive: true });
+  await mkdir(runsDir, { recursive: true });
   await writeFile(dbPath, `${JSON.stringify(db, null, 2)}\n`);
 }
 
@@ -332,6 +352,10 @@ function versionFilePath(projectId, versionId) {
   return join(archiveDir, `${projectId}-${versionId}.json`);
 }
 
+function runFilePath(runId) {
+  return join(runsDir, `${runId}.json`);
+}
+
 function canAccessProject(session, project) {
   if (!session || !project) return false;
   if (session.role === "admin") return true;
@@ -376,6 +400,11 @@ async function writeProjectModel(projectId, payload) {
 async function writeArchivedVersion(projectId, versionId, payload) {
   await mkdir(archiveDir, { recursive: true });
   await writeFile(versionFilePath(projectId, versionId), `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+async function writeSimulationRun(runId, payload) {
+  await mkdir(runsDir, { recursive: true });
+  await writeFile(runFilePath(runId), `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function sanitizeOrder(order) {
@@ -534,9 +563,143 @@ function ensureDbShape(db) {
   db.projectVersions ||= [];
   db.invites ||= [];
   db.projectBriefs ||= [];
+  db.datasets ||= [];
+  db.simulationRuns ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
+}
+
+function academicSourceLibrary() {
+  return [
+    {
+      id: "src-cho-ammonia-lactate",
+      area: "Cell-culture metabolic boundaries",
+      citation: "Schneider, Marison and von Stockar, ammonia and mammalian cell culture work; plus CHO glutamine/lactate/ammonium metabolism literature.",
+      url: "https://doi.org/10.1016/0168-1656(96)01564-2",
+      modelUse: "Sets ammonium/ammonia, glutamine burden, lactate overflow, bleed/perfusion and soft-sensor warning logic.",
+      axionModules: ["Boundaries + AI", "Dynamic profile", "Python bioprocess model"],
+      requiredData: "glutamine, glutamate, ammonium, lactate, viable cell density, feed profile, pH, osmolality",
+      status: "implemented as screening boundary; needs process-specific calibration",
+    },
+    {
+      id: "src-animal-cell-scale-up",
+      area: "Large-scale animal-cell reactor engineering",
+      citation: "Nienow and related animal-cell bioreactor scale-up literature on mixing, kLa, shear, sparging and large STR operation.",
+      url: "https://doi.org/10.1007/s10616-006-9005-8",
+      modelUse: "Supports working-volume, oxygen-transfer, impeller, shear, sparger, and scale-out guardrails.",
+      axionModules: ["Bioreactor CFD", "Equipment Register", "Physical boundaries"],
+      requiredData: "vessel volume, working volume, impeller type, tip speed, gas flow, kLa, OUR, viscosity, antifoam, sparger geometry",
+      status: "implemented as geometry and boundary-condition package; rigorous CFD solver still external",
+    },
+    {
+      id: "src-kla-oxygen-transfer",
+      area: "Oxygen transfer and bioreactor scale-up",
+      citation: "Garcia-Ochoa and Gomez, bioreactor scale-up and oxygen transfer rate review.",
+      url: "https://doi.org/10.1016/S1369-703X(09)70033-8",
+      modelUse: "Informs kLa, OTR, OUR, power input, gas flow, mixing-time and scale-up calculations.",
+      axionModules: ["Python bioprocess model", "CFD boundary conditions", "Mass + energy balances"],
+      requiredData: "kLa, DO setpoint, OUR, gas composition, vessel geometry, power input per volume",
+      status: "implemented as OTR/OUR screening equation",
+    },
+    {
+      id: "src-cultured-meat-process",
+      area: "Cultured-meat full-process design",
+      citation: "Full cultured-meat manufacturing process model and TEA/LCA workflow from attached process paper.",
+      url: "local:/Users/katharinajuliabrenner/Downloads/Decoding_cultured_meat_manufacturing_a_full_proces.pdf",
+      modelUse: "Defines media preparation, seed train, production STR, harvest, washing, extrusion, packaging, CIP and stream-reference structure.",
+      axionModules: ["Process Builder", "Stream Table", "Downloads", "Cultured-meat scale model"],
+      requiredData: "medium composition, cell density, viable fraction, harvest yield, transfer rate, CIP scheme, downstream losses",
+      status: "implemented as original Axion template and downloadable source model pack",
+    },
+    {
+      id: "src-cultured-meat-scale",
+      area: "Cultured-meat scale economics",
+      citation: "Cultured meat scale-up, medium cost, bioreactor and cell-line challenge reviews, including attached scale-up documents.",
+      url: "local:/Users/katharinajuliabrenner/Downloads/Scaling_Cultured_Meat_Challenges_and_Solutions_for.pdf",
+      modelUse: "Models non-linear scale-up, high lab cost burden, medium-dominated OPEX, 20 m3 animal-cell boundary and circularity levers.",
+      axionModules: ["Economics", "Recommendations", "Cultured-meat scale model"],
+      requiredData: "medium price, growth-factor replacement, food-grade inputs, titer/biomass productivity, utilization, facility CAPEX, energy and water",
+      status: "implemented as screening rows; quote-backed economics still missing",
+    },
+    {
+      id: "src-digital-twin-manufacturing",
+      area: "Factory simulation and digital twin",
+      citation: "Manufacturing digital twin and production-system simulation literature, including attached MT_mft-202004-0011.pdf.",
+      url: "local:/Users/katharinajuliabrenner/Downloads/MT_mft-202004-0011.pdf",
+      modelUse: "Structures model-vs-plant comparison, production lines, logistics, buffers, resource statistics and bottleneck recommendations.",
+      axionModules: ["Twin OS", "Scheduling", "Factory optimizer", "Live state"],
+      requiredData: "line states, buffer levels, warehouse data, equipment status, personnel availability, batch events",
+      status: "implemented as object-oriented factory simulation scaffold",
+    },
+    {
+      id: "src-plant-simulation-functions",
+      area: "Discrete-event production planning",
+      citation: "Plant simulation and discrete-event modelling fact sheets attached by user, mapped into Axion-owned scheduling objects.",
+      url: "local:/Users/katharinajuliabrenner/Downloads/Siemens-SW-Tecnomatix-Plant-Simulation-Fact-Sheet-1.pdf",
+      modelUse: "Informs resource utilization, what-if scenarios, buffers, WIP, personnel, machine state and bottleneck views.",
+      axionModules: ["Scheduling", "APS cockpit", "Plant simulation functions"],
+      requiredData: "order list, routing, setup/cleaning times, calendars, machine states, failures, WIP and inventory rules",
+      status: "implemented as original Axion tables; no vendor libraries copied",
+    },
+    {
+      id: "src-openfoam-bioreactor-cfd",
+      area: "Open-source CFD handoff",
+      citation: "OpenFOAM and stirred-tank CFD academic workflows for multiphase flow, MRF zones, spargers, baffles and scalar transport.",
+      url: "https://www.openfoam.com/",
+      modelUse: "Defines exportable boundary-condition and geometry package for rigorous external CFD.",
+      axionModules: ["CFD boundary conditions", "CFD geometry export", "OpenFOAM case setup"],
+      requiredData: "mesh, liquid/gas properties, impeller MRF zone, gas inlet, feed inlet, wall/baffle no-slip, headspace pressure outlet, cell uptake sink",
+      status: "browser screening implemented; rigorous CFD solve should run in OpenFOAM/COMSOL/STAR-CCM+",
+    },
+    {
+      id: "src-equation-oriented-modelling",
+      area: "Dynamic equation-oriented modelling",
+      citation: "Equation-oriented dynamic process modelling literature and gPROMS-style workflows for parameter estimation, optimization and soft sensors.",
+      url: "https://doi.org/10.1016/B978-0-444-53227-5.00006-6",
+      modelUse: "Supports PDE/DAE handoff, convective-dispersive transport, parameter estimation, uncertainty and MPC roadmap.",
+      axionModules: ["gPROMS-style algorithm", "Python model run", "API connector registry"],
+      requiredData: "state variables, algebraic constraints, boundary conditions, measurements, parameter priors, event schedule",
+      status: "implemented as algorithm/export scaffold",
+    },
+  ];
+}
+
+function dataArchitectureBlueprint() {
+  return {
+    localNow: {
+      storage: ".data/axion-licensing.json plus .data/models JSON files",
+      purpose: "single-machine prototype, private local testing, quick project save/restore",
+      limitation: "not enough for paid multi-customer SaaS, audit-grade validation, large uploaded files or concurrent users",
+    },
+    recommendedProductionStack: {
+      primaryChoice: "Supabase",
+      database: "Postgres with Row Level Security for users, projects, runs, sources, datasets and collaboration",
+      objectStorage: "Supabase Storage or S3-compatible storage for uploaded CSV/XLSX/PDF/raw historian exports",
+      auth: "Supabase Auth or custom JWT with Google OAuth and Stripe customer mapping",
+      pythonCompute: "FastAPI/Celery worker on Render, Fly.io, Railway, Modal or AWS ECS for model runs",
+      queue: "Postgres job table initially; Redis/Celery or managed queue when runs become long",
+      reason: "fastest credible path from local prototype to real SaaS with data ownership, RLS and Python jobs",
+    },
+    coreTables: [
+      { table: "users", keyFields: "id, email, username, role, payment_exempt, stripe_customer_id", purpose: "identity and billing mapping" },
+      { table: "projects", keyFields: "id, owner_id, name, template, scale, current_version_id", purpose: "user-owned process models" },
+      { table: "project_versions", keyFields: "id, project_id, model_json, summary_json, created_by", purpose: "old model archive, restore and later branching/diff" },
+      { table: "project_collaborators", keyFields: "project_id, user_id/email, role, status", purpose: "invite and shared editing permissions" },
+      { table: "datasets", keyFields: "id, project_id, kind, file_url, schema_json, source_id", purpose: "uploaded experimental, LCA, TEA, supplier and historian data" },
+      { table: "simulation_runs", keyFields: "id, project_id, run_type, inputs_json, outputs_json, status, created_by", purpose: "Python model, sweeps, Monte Carlo, CFD handoff and optimization history" },
+      { table: "academic_sources", keyFields: "id, citation, url, model_use, required_data", purpose: "source-backed model governance" },
+      { table: "audit_events", keyFields: "id, actor_id, event_type, entity_id, payload_json", purpose: "enterprise traceability" },
+    ],
+    apiRoadmap: [
+      "Keep the current Node backend as API gateway and static app server.",
+      "Move persistent records from JSON files into Postgres.",
+      "Keep project model JSON as a versioned canonical payload, then normalize streams/equipment/runs for analytics.",
+      "Run Python models in a separate worker process/service and persist every input/output package.",
+      "Add dataset upload parsing for CSV/XLSX first, then PDF/document extraction as assisted evidence only.",
+      "Expose a Python SDK that calls the same REST endpoints used by the frontend.",
+    ],
+  };
 }
 
 function inferHelpGuide(prompt, context = {}) {
@@ -622,6 +785,240 @@ async function help(req, res) {
   json(res, 200, { guide: inferHelpGuide(body.prompt, body.context || {}) });
 }
 
+async function dataArchitecture(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  json(res, 200, dataArchitectureBlueprint());
+}
+
+async function listAcademicSources(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  json(res, 200, {
+    sources: academicSourceLibrary(),
+    note: "These sources define the model design basis. They do not make the screening model validated for a regulated or investment-critical decision without project-specific data.",
+  });
+}
+
+function compactModelInput(body = {}, projectModel = null) {
+  const modelState = body.modelState || projectModel?.modelState || {};
+  const parameters = body.parameters || modelState.params || {};
+  return {
+    template: String(body.template || modelState.template || projectModel?.project?.template || "culturedMeat"),
+    scale: String(body.scale || modelState.scale || projectModel?.project?.scale || "pilot"),
+    batchVolumeL: Number(body.batchVolumeL || modelState.batchSize || 20000),
+    annualBatches: Number(body.annualBatches || modelState.batchCount || 180),
+    titerGL: Number(body.titerGL || modelState.titer || parameters.titer || 4),
+    recoveryPct: Number(body.recoveryPct || modelState.recovery || parameters.recovery || 72),
+    durationH: Number(body.durationH || parameters.cultureDuration || parameters.batchDuration || 120),
+    klaH: Number(body.klaH || parameters.kLa || parameters.kla || 12),
+    ourMolLh: Number(body.ourMolLh || parameters.ourMolLh || 0.006),
+    workingVolumePct: Number(body.workingVolumePct || parameters.workingVolume || 65),
+    viableCellDensityMillionMl: Number(body.viableCellDensityMillionMl || parameters.cellDensity || 50),
+    glucoseGL: Number(body.glucoseGL || parameters.glucose || 6),
+    glutamineMm: Number(body.glutamineMm || parameters.glutamine || 4),
+    lactateMm: Number(body.lactateMm || parameters.lactate || 0),
+    ammoniumMm: Number(body.ammoniumMm || parameters.ammonium || parameters.ammonia || 0.4),
+    feedStrategy: String(body.feedStrategy || parameters.feedStrategy || "fed-batch"),
+    temperatureC: Number(body.temperatureC || parameters.temperature || 37),
+    ph: Number(body.ph || parameters.ph || 7.1),
+    modelStateSummary: {
+      units: Array.isArray(modelState.units) ? modelState.units.length : 0,
+      streams: Array.isArray(modelState.streams) ? modelState.streams.length : 0,
+    },
+  };
+}
+
+function runPythonModel(input) {
+  return new Promise((resolveRun, rejectRun) => {
+    if (!existsSync(pythonModelScript)) {
+      rejectRun(new Error("Python model script is missing."));
+      return;
+    }
+    const child = spawn(config.pythonExecutable, [pythonModelScript], {
+      cwd: rootDir,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      rejectRun(new Error(`Python model timed out after ${config.pythonRunTimeoutMs} ms`));
+    }, config.pythonRunTimeoutMs);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+      if (stdout.length > 2_000_000) child.kill("SIGKILL");
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      rejectRun(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        rejectRun(new Error(stderr || `Python model exited with code ${code}`));
+        return;
+      }
+      try {
+        resolveRun(JSON.parse(stdout));
+      } catch {
+        rejectRun(new Error("Python model returned invalid JSON."));
+      }
+    });
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
+async function createPythonModelRun(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "").trim();
+  let project = null;
+  let projectModel = null;
+  if (projectId) {
+    project = db.projects.find((item) => item.id === projectId);
+    if (!project || !canAccessProject(session, project)) {
+      json(res, 404, { error: "Project not found" });
+      return;
+    }
+    projectModel = await readProjectModel(projectId);
+  }
+  const runId = randomUUID();
+  const now = new Date().toISOString();
+  const input = compactModelInput(body, projectModel);
+  const sourceIds = academicSourceLibrary()
+    .filter((source) => source.axionModules.some((moduleName) => /python|boundary|cfd|dynamic|economic|cultured/i.test(moduleName)))
+    .map((source) => source.id);
+  const record = {
+    id: runId,
+    projectId,
+    projectName: project?.name || "",
+    runType: "python-bioprocess-screening",
+    status: "running",
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    input,
+    sourceIds,
+  };
+  db.simulationRuns.unshift(record);
+  db.audit.unshift({ at: now, type: "simulation.run.started", runId, projectId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  try {
+    const output = await runPythonModel(input);
+    record.status = "completed";
+    record.completedAt = new Date().toISOString();
+    record.output = output;
+    db.audit.unshift({ at: record.completedAt, type: "simulation.run.completed", runId, projectId, by: sessionPrincipal(session) });
+    await writeSimulationRun(runId, record);
+    await saveDb(db);
+    json(res, 201, { run: record, sources: academicSourceLibrary().filter((source) => sourceIds.includes(source.id)) });
+  } catch (error) {
+    record.status = "failed";
+    record.completedAt = new Date().toISOString();
+    record.error = error.message;
+    db.audit.unshift({ at: record.completedAt, type: "simulation.run.failed", runId, projectId, error: error.message, by: sessionPrincipal(session) });
+    await writeSimulationRun(runId, record);
+    await saveDb(db);
+    json(res, 500, { error: error.message, run: record });
+  }
+}
+
+async function listModelRuns(req, res, query = new URLSearchParams()) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(query.get("projectId") || "").trim();
+  const accessibleProjectIds = new Set(db.projects.filter((project) => canAccessProject(session, project)).map((project) => project.id));
+  const runs = db.simulationRuns
+    .filter((run) => {
+      if (projectId && run.projectId !== projectId) return false;
+      if (!run.projectId) return session.role === "admin" || run.createdBy === sessionPrincipal(session);
+      return accessibleProjectIds.has(run.projectId);
+    })
+    .slice(0, 100);
+  json(res, 200, { runs });
+}
+
+async function listDatasets(req, res, query = new URLSearchParams()) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(query.get("projectId") || "").trim();
+  const accessibleProjectIds = new Set(db.projects.filter((project) => canAccessProject(session, project)).map((project) => project.id));
+  const datasets = db.datasets
+    .filter((dataset) => {
+      if (projectId && dataset.projectId !== projectId) return false;
+      if (!dataset.projectId) return session.role === "admin" || dataset.createdBy === sessionPrincipal(session);
+      return accessibleProjectIds.has(dataset.projectId);
+    })
+    .slice(0, 200);
+  json(res, 200, { datasets });
+}
+
+async function createDataset(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "").trim();
+  let project = null;
+  if (projectId) {
+    project = db.projects.find((item) => item.id === projectId);
+    if (!project || !canAccessProject(session, project)) {
+      json(res, 404, { error: "Project not found" });
+      return;
+    }
+  }
+  const now = new Date().toISOString();
+  const dataset = {
+    id: randomUUID(),
+    projectId,
+    projectName: project?.name || "",
+    name: String(body.name || "Axion dataset").trim().slice(0, 160),
+    kind: String(body.kind || "experimental").trim().slice(0, 80),
+    sourceId: String(body.sourceId || "").trim().slice(0, 120),
+    fileName: String(body.fileName || "").trim().slice(0, 220),
+    mimeType: String(body.mimeType || "").trim().slice(0, 120),
+    size: Number(body.size || 0),
+    schema: body.schema && typeof body.schema === "object" ? body.schema : {},
+    columns: Array.isArray(body.columns) ? body.columns.map(String).slice(0, 80) : [],
+    previewRows: Array.isArray(body.previewRows) ? body.previewRows.slice(0, 10) : [],
+    quality: String(body.quality || "unvalidated").trim().slice(0, 80),
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    storage: "metadata-only-local-json",
+    nextStep: "Move file bytes to Supabase Storage or S3, then parse into typed Postgres rows for simulation calibration.",
+  };
+  db.datasets.unshift(dataset);
+  db.audit.unshift({ at: now, type: "dataset.created", datasetId: dataset.id, projectId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 201, { dataset });
+}
+
 function integrationRegistry() {
   return [
     {
@@ -646,10 +1043,10 @@ function integrationRegistry() {
       key: "python-sdk",
       name: "Python SDK",
       category: "Automation",
-      status: "SDK planned",
+      status: "backend runtime implemented",
       direction: "Run sweeps, fit parameters, export reports",
       auth: "token",
-      description: "Prepared for notebooks, parameter sweeps, Monte Carlo, Sobol-style sensitivity analysis, and calibration scripts.",
+      description: "Backend now exposes /api/model-runs/python for dynamic bioprocess screening; SDK wrapper, sweeps and calibration scripts are next.",
     },
     {
       key: "webhooks",
@@ -664,10 +1061,19 @@ function integrationRegistry() {
       key: "cloud-runs",
       name: "Cloud batch runs",
       category: "Scenario compute",
-      status: "run queue planned",
+      status: "local run history implemented",
       direction: "Execute parameter sweeps and Monte Carlo cases",
       auth: "workspace token",
-      description: "Prepared for browser-native scenario runs without Excel add-ins or desktop automation.",
+      description: "Simulation run records are persisted; long-running queue workers and Monte Carlo are next.",
+    },
+    {
+      key: "supabase-postgres",
+      name: "Supabase Postgres + Storage",
+      category: "Backend data layer",
+      status: "recommended production stack",
+      direction: "Persist users, projects, datasets, sources, runs and uploaded files",
+      auth: "RLS / service role",
+      description: "Best next backend app for Axion: Postgres row-level security, object storage for uploads, auth, and a clean path to Python workers.",
     },
     {
       key: "aspen",
@@ -1267,7 +1673,7 @@ async function stripeWebhook(req, res) {
   json(res, 200, { received: true });
 }
 
-async function routeApi(req, res, pathname) {
+async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   if (req.method === "GET" && pathname === "/api/product") {
     json(res, 200, publicConfig());
     return;
@@ -1338,6 +1744,30 @@ async function routeApi(req, res, pathname) {
     await listIntegrations(req, res);
     return;
   }
+  if (req.method === "GET" && pathname === "/api/data/architecture") {
+    await dataArchitecture(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/sources/academic") {
+    await listAcademicSources(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/model-runs") {
+    await listModelRuns(req, res, query);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/model-runs/python") {
+    await createPythonModelRun(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/datasets") {
+    await listDatasets(req, res, query);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/datasets") {
+    await createDataset(req, res);
+    return;
+  }
   if (req.method === "POST" && pathname === "/api/help") {
     await help(req, res);
     return;
@@ -1383,7 +1813,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (url.pathname.startsWith("/api/")) {
-      await routeApi(req, res, url.pathname);
+      await routeApi(req, res, url.pathname, url.searchParams);
       return;
     }
     serveStatic(req, res, url.pathname);

@@ -107,10 +107,22 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `POST /api/projects/:id/invites` invites a collaborator by username or email
 - `POST /api/projects/:id/versions/:versionId/restore` restores an archived model version
 - `GET /api/integrations` lists prepared API connector targets
+- `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
+- `GET /api/sources/academic` returns the source-backed model design library for boundaries, CFD, TEA/LCA, scheduling, digital twin and Python modelling
+- `GET /api/datasets` lists registered project datasets and uploaded-data metadata
+- `POST /api/datasets` registers a project dataset, schema, source, preview rows and validation status
+- `GET /api/model-runs` lists saved Python/backend model runs
+- `POST /api/model-runs/python` runs the local Python bioprocess screening model and saves the full input/output package
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
 - `GET /api/admin/orders` lists orders and licenses for admins
 - `POST /api/admin/orders/:id-or-reference/mark-paid` activates a paid order and creates a license key
+
+## Backend Data + Python Modelling
+
+The local prototype stores users, projects, datasets, simulation runs and model versions in `.data/*.json`. For a real SaaS backend, use Supabase Postgres with Row Level Security, Supabase Storage or S3-compatible object storage for uploads, and a separate Python worker service for longer model runs. The current `server.mjs` already exposes the API contract for that migration.
+
+Python modelling starts with `python_models/bioprocess_model.py`, a dependency-free dynamic screening model for batch/cell-culture behaviour. It returns time series, product, oxygen-transfer, glucose/glutamine, lactate, ammonium, heat/energy and boundary warnings. It is a screening model, not validated CFD or GMP-grade process validation.
 
 ## What is included
 
