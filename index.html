@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260720-quick-add-round-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260722-paywall-ux-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -920,8 +920,25 @@
 
           <section id="loginPanel" class="public-section public-login public-page" data-public-page="login">
             <div class="section-heading access-heading">
-              <p>Private workspace</p>
-              <h2>One clean entry point for modelling and access.</h2>
+              <p>Secure access</p>
+              <h2>Sign in if you already have access. Activate a license if you do not.</h2>
+            </div>
+            <div class="paywall-status" aria-label="Axion paywall status">
+              <article>
+                <span>01</span>
+                <strong>Internal users</strong>
+                <p>KBrenner and MAhmed keep direct payment-exempt access.</p>
+              </article>
+              <article>
+                <span>02</span>
+                <strong>New users</strong>
+                <p>Checkout creates a license and unlocks the workspace after payment.</p>
+              </article>
+              <article>
+                <span>03</span>
+                <strong>Workspace</strong>
+                <p>Projects, datasets, Python runs, reports and collaborators stay behind login.</p>
+              </article>
             </div>
             <div class="access-panel">
               <form id="loginForm" class="login-card access-card access-primary-card">
@@ -954,14 +971,18 @@
               </form>
               <form id="checkoutForm" class="access-card checkout-card">
                 <div class="checkout-header">
-                  <p>Need access?</p>
-                  <h3>Activate Axion Pro</h3>
+                  <p>Paywall</p>
+                  <h3>Activate licensed access</h3>
                 </div>
-                <p class="access-copy">New users can activate a secure license through hosted checkout. After successful payment, the workspace unlocks automatically.</p>
+                <p class="access-copy">New users unlock Axion through hosted checkout. The backend records the order, activates the license after successful payment, and then allows login.</p>
                 <div class="checkout-summary">
                   <strong>Axion Pro · Professional Individual</strong>
-                  <span>Secure checkout for professional workspace access. Team, partner, and enterprise plans are handled through managed onboarding.</span>
+                  <span>Annual SaaS access for the private modelling workspace. Team, partner, and enterprise plans use managed onboarding.</span>
                 </div>
+                <label>
+                  <span>Name</span>
+                  <input id="checkoutName" autocomplete="name" placeholder="Customer name" />
+                </label>
                 <label>
                   <span>Email</span>
                   <input id="checkoutEmail" type="email" autocomplete="email" placeholder="billing@company.com" />
@@ -972,7 +993,7 @@
                 </label>
                 <button class="login-button checkout-button" type="submit">Activate access</button>
                 <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
-                <small>Payments are handled by Stripe Checkout when backend payment credentials are configured.</small>
+                <small>Payments are handled by Stripe Checkout. Without Stripe credentials, the backend shows setup instructions instead of silently failing.</small>
               </form>
             </div>
           </section>
@@ -1292,6 +1313,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260720-quick-add-round-v1"></script>
+    <script type="module" src="./app.js?v=20260722-paywall-ux-v1"></script>
   </body>
 </html>

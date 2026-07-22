@@ -11033,6 +11033,10 @@ const staticAuth = {
 };
 let staticAccessMode = false;
 
+function isLocalDevelopmentHost() {
+  return ["localhost", "127.0.0.1", ""].includes(window.location.hostname) || window.location.protocol === "file:";
+}
+
 async function sha256Hex(value) {
   const encoded = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
@@ -11199,6 +11203,12 @@ function renderProfileMenu() {
 function renderProductConfig(config) {
   state.productConfig = config || null;
   staticAccessMode = false;
+  document.body.classList.remove("backend-required");
+  if (els.loginForm) {
+    els.loginForm.querySelectorAll("input, button").forEach((item) => {
+      item.disabled = false;
+    });
+  }
   if (els.loginOrigin) {
     els.loginOrigin.textContent = config?.productName
       ? "Backend online. Private process workspace ready."
@@ -11208,14 +11218,24 @@ function renderProductConfig(config) {
 }
 
 function renderStaticAccessMode() {
-  staticAccessMode = true;
+  staticAccessMode = isLocalDevelopmentHost();
   state.productConfig = null;
+  document.body.classList.toggle("backend-required", !staticAccessMode);
   if (els.loginOrigin) {
-    els.loginOrigin.textContent = "Online static mode. Enter the workspace password to unlock Axion.";
+    els.loginOrigin.textContent = staticAccessMode
+      ? "Local static mode. Internal password access is available for development."
+      : "Backend required. Paid access cannot be verified from a static website.";
   }
   if (els.googleLoginFallback) els.googleLoginFallback.disabled = true;
+  if (els.loginForm) {
+    els.loginForm.querySelectorAll("input, button").forEach((item) => {
+      item.disabled = !staticAccessMode;
+    });
+  }
   if (els.googleLoginStatus) {
-    els.googleLoginStatus.textContent = "Password login is available now. Google SSO can be enabled by the workspace administrator.";
+    els.googleLoginStatus.textContent = staticAccessMode
+      ? "Password login is available locally. Google SSO can be enabled by the workspace administrator."
+      : "Deploy the Node backend to enable login, checkout, license verification, projects, datasets, and Python runs.";
   }
   renderProfileMenu();
 }
@@ -11270,6 +11290,15 @@ async function createCheckoutOrder() {
   const customerName = els.checkoutName?.value.trim() || "";
   const customerEmail = els.checkoutEmail?.value.trim() || "";
   const company = els.checkoutCompany?.value.trim() || "";
+  if (!customerName || !customerEmail.includes("@")) {
+    els.checkoutResult.innerHTML = `
+      <strong>Complete billing details</strong>
+      <p>Enter a customer name and a valid billing email. The license will be attached to that email after payment.</p>
+    `;
+    if (!customerName) els.checkoutName?.focus();
+    else els.checkoutEmail?.focus();
+    return;
+  }
   els.checkoutResult.innerHTML = "<p>Preparing secure checkout...</p>";
   try {
     const payload = await apiRequest("/api/checkout", {
@@ -11642,14 +11671,14 @@ function renderPublicDetail(key = "mab-overview", { scroll = true } = {}) {
 }
 
 function openPublicDetail(key = "mab-overview", { scroll = true } = {}) {
-  showPublicPage("platform", { scroll: false });
+  showPublicPage("platform", { scroll: false, defaultDetail: false });
   window.setTimeout(() => {
     renderPublicDetail(key);
     if (scroll) document.querySelector("#publicDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 80);
 }
 
-function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {}) {
+function showPublicPage(page = "home", { scroll = true, focusLogin = false, defaultDetail = true } = {}) {
   const targetPage = page || "home";
   document.querySelectorAll(".public-page").forEach((section) => {
     section.classList.toggle("active-public-page", section.dataset.publicPage === targetPage);
@@ -11666,7 +11695,7 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false } = {
     els.loginUser?.focus({ preventScroll: true });
     window.setTimeout(() => els.loginUser?.focus(), 260);
   }
-  if (targetPage === "platform") window.setTimeout(() => renderPublicDetail("mab-overview", { scroll: false }), 80);
+  if (targetPage === "platform" && defaultDetail) window.setTimeout(() => renderPublicDetail("mab-overview", { scroll: false }), 80);
 }
 
 function scrollPublicTarget(targetId, focusLogin = false) {
@@ -11682,6 +11711,32 @@ function scrollPublicTarget(targetId, focusLogin = false) {
     els.loginUser?.focus({ preventScroll: true });
     window.setTimeout(() => els.loginUser?.focus(), 420);
   }
+}
+
+function routePublicAction(target = "", { focusLogin = false } = {}) {
+  if (!target) return;
+  if (target === "login" || target === "workspace" || target === "paywall") {
+    scrollPublicTarget("loginPanel", true);
+    return;
+  }
+  if (target === "pricing") {
+    scrollPublicTarget("publicPricing");
+    return;
+  }
+  if (publicDetailStories[target]) {
+    openPublicDetail(target);
+    return;
+  }
+  if (publicPageTargets[target]) {
+    scrollPublicTarget(target, focusLogin || target === "loginPanel");
+    return;
+  }
+  const targetElement = document.getElementById(target);
+  if (targetElement) {
+    targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  scrollPublicTarget("loginPanel", true);
 }
 
 function showPublicHome() {
@@ -12385,13 +12440,13 @@ function bindAuth() {
 
   document.querySelectorAll("[data-public-target]").forEach((button) => {
     button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       if (button.dataset.publicDetail) {
-        event.preventDefault();
-        event.stopPropagation();
         openPublicDetail(button.dataset.publicDetail);
         return;
       }
-      scrollPublicTarget(button.dataset.publicTarget, button.dataset.publicTarget === "loginPanel");
+      routePublicAction(button.dataset.publicTarget, { focusLogin: button.dataset.publicTarget === "loginPanel" });
     });
   });
 
@@ -12403,7 +12458,7 @@ function bindAuth() {
       if (publicButton.dataset.publicDetail) {
         openPublicDetail(publicButton.dataset.publicDetail);
       } else {
-        scrollPublicTarget(target, target === "loginPanel");
+        routePublicAction(target, { focusLogin: target === "loginPanel" });
       }
       return;
     }
@@ -12420,13 +12475,7 @@ function bindAuth() {
       event.preventDefault();
       event.stopPropagation();
       const target = nextButton.dataset.publicDetailNext;
-      if (target === "login") {
-        scrollPublicTarget("loginPanel", true);
-      } else if (target === "pricing") {
-        scrollPublicTarget("publicPricing");
-      } else {
-        openPublicDetail(target);
-      }
+      routePublicAction(target);
       return;
     }
     const detailButton = event.target.closest("[data-public-detail]");

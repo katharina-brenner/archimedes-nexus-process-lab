@@ -16903,3 +16903,91 @@ body.locked .public-page:not(.active-public-page) {
   font-size: 12px !important;
   letter-spacing: 0 !important;
 }
+
+/* Final paywall/access polish. */
+.paywall-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: min(1120px, 100%);
+}
+
+.paywall-status article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid rgba(155, 231, 221, 0.16);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(16, 43, 62, 0.78), rgba(8, 26, 43, 0.82)),
+    rgba(6, 20, 33, 0.9);
+  box-shadow: 0 18px 44px rgba(0, 10, 20, 0.18);
+}
+
+.paywall-status article span {
+  grid-row: span 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  color: #061421;
+  background: linear-gradient(135deg, #dff8f4, #76d5ca);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.paywall-status article strong,
+.paywall-status article p {
+  min-width: 0;
+  margin: 0;
+}
+
+.paywall-status article strong {
+  color: #eef8f7;
+  font-size: 14px;
+}
+
+.paywall-status article p {
+  color: rgba(226, 238, 242, 0.72);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.access-card,
+.checkout-card,
+.access-card input,
+.login-button,
+.google-login-fallback,
+.checkout-summary,
+.checkout-result {
+  border-radius: 22px !important;
+}
+
+.access-card {
+  background:
+    linear-gradient(180deg, rgba(15, 39, 58, 0.94), rgba(7, 24, 39, 0.98)),
+    #071827 !important;
+  box-shadow: 0 24px 70px rgba(0, 12, 24, 0.24) !important;
+}
+
+.access-card input,
+.google-login-fallback {
+  border-radius: 999px !important;
+}
+
+.login-button {
+  border-radius: 999px !important;
+}
+
+.checkout-result {
+  background: rgba(210, 244, 239, 0.08) !important;
+}
+
+@media (max-width: 900px) {
+  .paywall-status {
+    grid-template-columns: 1fr;
+  }
+}
