@@ -8969,49 +8969,243 @@ function cfdBatchPhase(timeH) {
   return { phase: "Late batch / harvest approach", demand: 0.72, feed: 0.62, gas: 0.78, viscosity: 1.22 };
 }
 
-function cfdScore(unit, xIndex, yIndex, gridW = 18, gridH = 24, timeH = state.cfdTimeH) {
+function cfdClamp(value, min = 0, max = 1) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function cfdGaussian(x, center, width) {
+  const safeWidth = Math.max(0.001, width);
+  return Math.exp(-((x - center) ** 2) / (2 * safeWidth ** 2));
+}
+
+function cfdSimulationSetup(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH) {
   const p = state.params;
-  const volume = estimatedBioreactorVolumeL(unit);
   const bounds = cfdTimeBounds();
-  const now = state.cfdTimeH === null || state.cfdTimeH === undefined ? bounds.suggestedH : Number(timeH) || 0;
-  const phase = cfdBatchPhase(now);
-  const x = gridW <= 1 ? 0.5 : xIndex / (gridW - 1);
-  const y = gridH <= 1 ? 0.5 : yIndex / (gridH - 1);
-  const radial = Math.abs(x - 0.5) / 0.5;
-  const height = 1 - y;
-  const wallPenalty = Math.min(1, radial * 1.08);
-  const bottomDeadZone = y > 0.76 ? (y - 0.76) / 0.24 : 0;
-  const topFoamZone = y < 0.17 ? (0.17 - y) / 0.17 : 0;
-  const impellerBand = Math.min(
-    Math.abs(yIndex - gridH * 0.36),
-    Math.abs(yIndex - gridH * 0.6),
-  );
-  const timeWave = Math.sin((now / Math.max(1, bounds.maxH)) * Math.PI * 4 + x * 3.2 - y * 2.4) * 0.06;
-  const circulationBoost = Math.max(0, 1 - impellerBand / (gridH * 0.18)) * (1 - wallPenalty * 0.36);
-  const oxygenSource = Math.max(0, 1 - cfdInletDistance(x, y, state.cfdOxygenInlet) / 0.48);
-  const nutrientSource = Math.max(0, 1 - cfdInletDistance(x, y, state.cfdNutrientInlet) / 0.45);
-  const mixingPower = Math.max(0.05, (p.agitation * 0.36 + p.aeration * 0.62 + p.kla / 165) / phase.viscosity);
-  const scalePenalty = Math.max(0, Math.log10(Math.max(100, volume) / 2000)) * 0.22;
-  const oxygenDemand = Math.max(0.6, phase.demand * (p.our || 1) / 1.15);
-  const oxygen = Math.max(0, Math.min(1, (p.kla * p.doSetpoint * phase.gas / Math.max(1, oxygenDemand * 98)) + oxygenSource * 0.26 + circulationBoost * 0.18 - wallPenalty * 0.17 - bottomDeadZone * 0.22 - topFoamZone * 0.06 - scalePenalty + timeWave));
-  const nutrient = Math.max(0, Math.min(1, mixingPower + nutrientSource * 0.33 * phase.feed + circulationBoost * 0.24 - wallPenalty * 0.16 - bottomDeadZone * 0.25 - scalePenalty * 0.72 - Math.max(0, phase.demand - 1) * 0.12 - timeWave * 0.4));
-  const velocity = Math.max(0, Math.min(1, mixingPower * 0.58 + circulationBoost * 0.42 + oxygenSource * 0.08 - wallPenalty * 0.12 - bottomDeadZone * 0.16));
-  const shear = Math.max(0, Math.min(1, p.agitation / (isCellCultureTemplate() ? 5.4 : 9.8) + circulationBoost * 0.26 + velocity * 0.12 - wallPenalty * 0.06 + height * 0.03));
-  const risk = Math.max(0, Math.min(1, (1 - oxygen) * 0.46 + (1 - nutrient) * 0.34 + shear * (isCellCultureTemplate() ? 0.28 : 0.12)));
-  return { xIndex, yIndex, x, y, oxygen, nutrient, velocity, shear, risk, phase: phase.phase };
+  const volumeL = estimatedBioreactorVolumeL(unit);
+  const volumeM3 = Math.max(0.05, volumeL / 1000);
+  const eng = cfdEngineeringMetrics(unit, [{ oxygen: 1, nutrient: 1, shear: 0, risk: 0 }]);
+  const phase = cfdBatchPhase(Number.isFinite(Number(timeH)) ? Number(timeH) : bounds.suggestedH);
+  const dx = 1 / Math.max(1, gridW - 1);
+  const dy = 1 / Math.max(1, gridH - 1);
+  const mixing = Math.max(0.08, (p.agitation * 0.16 + p.aeration * 0.28 + p.kla / 360) / phase.viscosity);
+  const scalePenalty = Math.max(0, Math.log10(Math.max(100, volumeL) / 2000)) * 0.16;
+  const eddyDiffusion = cfdClamp(0.035 + mixing * 0.05 + p.aeration * 0.012 - scalePenalty * 0.02, 0.018, 0.11);
+  const impellerVelocity = cfdClamp(0.18 + mixing * 0.72 + Math.min(1.2, eng.tipSpeed / 2.5) * 0.22, 0.16, 1.45);
+  const gasSource = cfdClamp(0.28 + p.aeration * 0.42 + (p.kla / 240) * 0.36, 0.1, 1.1) * phase.gas;
+  const feedSource = cfdClamp(0.18 + (p.feedConcentration || 1) * 0.24, 0.08, 0.85) * phase.feed;
+  const uptake = cfdClamp(0.055 + (p.our || 1.1) * 0.045 + (p.vcd || 12) * 0.004, 0.035, 0.34) * phase.demand;
+  const nutrientUptake = uptake * (isCellCultureTemplate() ? 0.66 : 0.52);
+  const cflSpeed = impellerVelocity + p.aeration * 0.18;
+  const dt = cfdClamp(0.012 / Math.max(0.25, cflSpeed), 0.004, 0.026);
+  const elapsed = state.cfdSolverStarted ? cfdClamp((Number(timeH) || 0) / Math.max(1, bounds.maxH), 0, 1) : 0;
+  const steps = state.cfdSolverStarted ? Math.max(18, Math.min(120, Math.round(22 + elapsed * 90 + (state.cfdIteration || 0) * 2))) : 0;
+  return {
+    gridW,
+    gridH,
+    bounds,
+    phase,
+    volumeL,
+    volumeM3,
+    eng,
+    dx,
+    dy,
+    dt,
+    steps,
+    elapsed,
+    mixing,
+    eddyDiffusion,
+    impellerVelocity,
+    gasSource,
+    feedSource,
+    uptake,
+    nutrientUptake,
+    scalePenalty,
+    courant: Math.max(cflSpeed * dt / Math.min(dx, dy), eddyDiffusion * dt / Math.min(dx, dy) ** 2),
+    workingVolumePct: eng.workingVolumePct,
+  };
+}
+
+function cfdVelocityAt(x, y, setup) {
+  const radial = x - 0.5;
+  const wallDistance = Math.min(x, 1 - x);
+  const nearWall = cfdClamp((0.12 - wallDistance) / 0.12, 0, 1);
+  const nearBottom = cfdClamp((y - 0.84) / 0.16, 0, 1);
+  const nearSurface = cfdClamp((0.12 - y) / 0.12, 0, 1);
+  const upperImpeller = cfdGaussian(y, 0.39, 0.052);
+  const lowerImpeller = cfdGaussian(y, 0.64, 0.057);
+  const impellerBand = Math.max(upperImpeller, lowerImpeller);
+  const baffleLoss = Math.max(cfdGaussian(x, 0.14, 0.024), cfdGaussian(x, 0.86, 0.024)) * (0.5 + impellerBand * 0.34);
+  const jet = setup.impellerVelocity * impellerBand * Math.sign(radial || 0.001) * (0.55 + Math.abs(radial) * 0.9);
+  const wallUp = nearWall * (0.18 + setup.impellerVelocity * 0.34) * (1 - nearSurface * 0.45);
+  const centerDown = cfdGaussian(x, 0.5, 0.22) * (0.14 + setup.impellerVelocity * 0.28);
+  const gasLift = cfdGaussian(x, 0.5, state.cfdOxygenInlet === "side-sparger" ? 0.28 : 0.18) * (0.08 + setup.gasSource * 0.12) * (1 - nearSurface * 0.55);
+  let ux = jet - radial * 0.12 * (1 - impellerBand);
+  let uy = wallUp + gasLift - centerDown;
+  const damping = cfdClamp(1 - nearWall * 0.76 - nearBottom * 0.58 - nearSurface * 0.28 - baffleLoss * 0.36, 0.08, 1);
+  ux *= damping;
+  uy *= damping;
+  const speed = Math.hypot(ux, uy);
+  const shear = cfdClamp(impellerBand * (0.32 + setup.impellerVelocity * 0.28) + baffleLoss * 0.24 + speed * 0.2, 0, 1.25);
+  return { ux, uy, speed, shear, impellerBand, nearWall, nearBottom, nearSurface, baffleLoss };
+}
+
+function cfdBoundarySource(x, y, setup, kind) {
+  if (kind === "oxygen") {
+    if (state.cfdOxygenInlet === "center-lance") return cfdGaussian(x, 0.5, 0.055) * cfdGaussian(y, 0.8, 0.11);
+    if (state.cfdOxygenInlet === "side-sparger") {
+      return Math.max(cfdGaussian(x, 0.26, 0.065), cfdGaussian(x, 0.74, 0.065)) * cfdGaussian(y, 0.82, 0.1);
+    }
+    return Math.max(cfdGaussian(x, 0.35, 0.055), cfdGaussian(x, 0.5, 0.06), cfdGaussian(x, 0.65, 0.055)) * cfdGaussian(y, 0.86, 0.08);
+  }
+  if (state.cfdNutrientInlet === "subsurface-feed") return cfdGaussian(x, 0.7, 0.055) * cfdGaussian(y, 0.42, 0.09);
+  if (state.cfdNutrientInlet === "feed-ring") {
+    return Math.max(cfdGaussian(x, 0.34, 0.055), cfdGaussian(x, 0.5, 0.06), cfdGaussian(x, 0.66, 0.055)) * cfdGaussian(y, 0.35, 0.07);
+  }
+  return cfdGaussian(x, 0.72, 0.06) * cfdGaussian(y, 0.18, 0.08);
+}
+
+function cfdInitialScalar(kind, x, y, setup) {
+  const phaseDrop = setup.elapsed * (kind === "oxygen" ? 0.2 : 0.14);
+  const bottomPenalty = cfdClamp((y - 0.72) / 0.28, 0, 1) * (kind === "oxygen" ? 0.12 : 0.16);
+  const wallPenalty = cfdClamp((Math.abs(x - 0.5) - 0.38) / 0.12, 0, 1) * 0.08;
+  const source = cfdBoundarySource(x, y, setup, kind);
+  const base = kind === "oxygen"
+    ? cfdClamp((state.params.doSetpoint || 45) / 100 + setup.gasSource * 0.16 - setup.uptake * 0.32 - phaseDrop, 0.18, 0.96)
+    : cfdClamp(0.72 + setup.feedSource * 0.16 - setup.nutrientUptake * 0.24 - phaseDrop * 0.55, 0.22, 0.98);
+  return cfdClamp(base + source * 0.18 - bottomPenalty - wallPenalty - setup.scalePenalty * 0.34, 0.02, 1);
+}
+
+function cfdNeighbor(array, x, y, gridW, gridH) {
+  const xi = Math.max(0, Math.min(gridW - 1, x));
+  const yi = Math.max(0, Math.min(gridH - 1, y));
+  return array[yi * gridW + xi];
+}
+
+function cfdRunTransient(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH) {
+  const setup = cfdSimulationSetup(unit, gridW, gridH, timeH);
+  const count = gridW * gridH;
+  let oxygen = new Array(count);
+  let nutrient = new Array(count);
+  const fields = Array.from({ length: count }, (_, index) => {
+    const xIndex = index % gridW;
+    const yIndex = Math.floor(index / gridW);
+    const x = gridW <= 1 ? 0.5 : xIndex / (gridW - 1);
+    const y = gridH <= 1 ? 0.5 : yIndex / (gridH - 1);
+    const velocity = cfdVelocityAt(x, y, setup);
+    const oxygenSource = cfdBoundarySource(x, y, setup, "oxygen");
+    const nutrientSource = cfdBoundarySource(x, y, setup, "nutrient");
+    const biomass = cfdClamp(0.74 + setup.elapsed * 0.36 - velocity.nearWall * 0.12 - velocity.nearBottom * 0.1, 0.3, 1.25);
+    oxygen[index] = cfdInitialScalar("oxygen", x, y, setup);
+    nutrient[index] = cfdInitialScalar("nutrient", x, y, setup);
+    return { xIndex, yIndex, x, y, ...velocity, oxygenSource, nutrientSource, biomass };
+  });
+  let oxygenResidual = 0;
+  let nutrientResidual = 0;
+  for (let step = 0; step < setup.steps; step += 1) {
+    const nextOxygen = new Array(count);
+    const nextNutrient = new Array(count);
+    oxygenResidual = 0;
+    nutrientResidual = 0;
+    for (let index = 0; index < count; index += 1) {
+      const cell = fields[index];
+      const { xIndex, yIndex, ux, uy } = cell;
+      const oC = oxygen[index];
+      const nC = nutrient[index];
+      const oL = cfdNeighbor(oxygen, xIndex - 1, yIndex, gridW, gridH);
+      const oR = cfdNeighbor(oxygen, xIndex + 1, yIndex, gridW, gridH);
+      const oU = cfdNeighbor(oxygen, xIndex, yIndex - 1, gridW, gridH);
+      const oD = cfdNeighbor(oxygen, xIndex, yIndex + 1, gridW, gridH);
+      const nL = cfdNeighbor(nutrient, xIndex - 1, yIndex, gridW, gridH);
+      const nR = cfdNeighbor(nutrient, xIndex + 1, yIndex, gridW, gridH);
+      const nU = cfdNeighbor(nutrient, xIndex, yIndex - 1, gridW, gridH);
+      const nD = cfdNeighbor(nutrient, xIndex, yIndex + 1, gridW, gridH);
+      const gradOX = ux >= 0 ? oC - oL : oR - oC;
+      const gradOY = uy >= 0 ? oC - oU : oD - oC;
+      const gradNX = ux >= 0 ? nC - nL : nR - nC;
+      const gradNY = uy >= 0 ? nC - nU : nD - nC;
+      const lapO = oL + oR + oU + oD - 4 * oC;
+      const lapN = nL + nR + nU + nD - 4 * nC;
+      const oSource = setup.gasSource * cell.oxygenSource * (1 - oC) * 0.42;
+      const nSource = setup.feedSource * cell.nutrientSource * (1 - nC) * 0.34;
+      const oSink = setup.uptake * cell.biomass * (0.36 + setup.elapsed * 0.24) * (0.72 + oC * 0.28);
+      const nSink = setup.nutrientUptake * cell.biomass * (0.3 + setup.elapsed * 0.2) * (0.72 + nC * 0.28);
+      const noSlipLoss = (cell.nearWall * 0.018 + cell.nearBottom * 0.014) * setup.phase.viscosity;
+      const oNext = cfdClamp(oC + setup.dt * (-ux * gradOX / setup.dx - uy * gradOY / setup.dy + setup.eddyDiffusion * lapO / (setup.dx * setup.dy) + oSource - oSink - noSlipLoss), 0.01, 1);
+      const nNext = cfdClamp(nC + setup.dt * (-ux * gradNX / setup.dx - uy * gradNY / setup.dy + setup.eddyDiffusion * lapN / (setup.dx * setup.dy) + nSource - nSink - noSlipLoss * 0.7), 0.01, 1);
+      nextOxygen[index] = oNext;
+      nextNutrient[index] = nNext;
+      oxygenResidual += Math.abs(oNext - oC);
+      nutrientResidual += Math.abs(nNext - nC);
+    }
+    oxygen = nextOxygen;
+    nutrient = nextNutrient;
+  }
+  const cells = fields.map((cell, index) => {
+    const oxygenValue = oxygen[index];
+    const nutrientValue = nutrient[index];
+    const velocity = cfdClamp(cell.speed / 1.25, 0, 1);
+    const shear = cfdClamp(cell.shear / (isCellCultureTemplate() ? 1.08 : 1.28), 0, 1);
+    const gasHoldUp = cfdClamp(cell.oxygenSource * setup.gasSource * 0.2 + cell.speed * 0.06, 0, 0.28);
+    const risk = cfdClamp((1 - oxygenValue) * 0.42 + (1 - nutrientValue) * 0.3 + shear * (isCellCultureTemplate() ? 0.22 : 0.1) + cell.nearBottom * 0.08 + cell.nearWall * 0.06, 0, 1);
+    return {
+      xIndex: cell.xIndex,
+      yIndex: cell.yIndex,
+      x: cell.x,
+      y: cell.y,
+      oxygen: oxygenValue,
+      nutrient: nutrientValue,
+      velocity,
+      shear,
+      risk,
+      ux: cell.ux,
+      uy: cell.uy,
+      gasHoldUp,
+      oxygenSource: cell.oxygenSource * setup.gasSource,
+      nutrientSource: cell.nutrientSource * setup.feedSource,
+      cellUptake: setup.uptake * cell.biomass,
+      impellerZone: cell.impellerBand,
+      bafflePenalty: cell.baffleLoss,
+      wallPenalty: cell.nearWall,
+      phase: setup.phase.phase,
+    };
+  });
+  return {
+    cells,
+    diagnostics: {
+      solver: "2D transient finite-volume screening",
+      equation: "dC/dt + U grad(C) = Deff laplacian(C) + source - uptake",
+      steps: setup.steps,
+      dtSeconds: setup.dt * 3600,
+      courant: setup.courant,
+      oxygenResidual: oxygenResidual / Math.max(1, count),
+      nutrientResidual: nutrientResidual / Math.max(1, count),
+      eddyDiffusion: setup.eddyDiffusion,
+      impellerVelocity: setup.impellerVelocity,
+      gasSource: setup.gasSource,
+      feedSource: setup.feedSource,
+      uptake: setup.uptake,
+      phase: setup.phase.phase,
+      note: "Browser screening model. Export the case setup for validated 3D OpenFOAM/BiRD, COMSOL, STAR-CCM+, or similar CFD.",
+    },
+  };
+}
+
+function cfdScore(unit, xIndex, yIndex, gridW = 18, gridH = 24, timeH = state.cfdTimeH) {
+  return cfdRunTransient(unit, gridW, gridH, timeH).cells.find((cell) => cell.xIndex === xIndex && cell.yIndex === yIndex);
 }
 
 function cfdReport() {
   const units = cfdBioreactors();
-  const gridW = 18;
-  const gridH = 24;
+  const gridW = 24;
+  const gridH = 32;
   const bounds = cfdTimeBounds();
   const requestedTime = state.cfdTimeH === null || state.cfdTimeH === undefined ? NaN : Number(state.cfdTimeH);
   state.cfdTimeH = state.cfdSolverStarted
     ? Math.max(bounds.minH, Math.min(bounds.maxH, Number.isFinite(requestedTime) ? requestedTime : bounds.suggestedH))
     : 0;
   return units.map((unit) => {
-    const cells = Array.from({ length: gridW * gridH }, (_, index) => cfdScore(unit, index % gridW, Math.floor(index / gridW), gridW, gridH, state.cfdTimeH));
+    const solved = cfdRunTransient(unit, gridW, gridH, state.cfdTimeH);
+    const cells = solved.cells;
     const engineering = cfdEngineeringMetrics(unit, cells);
     const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
     const lowOxygen = cells.filter((item) => item.oxygen < 0.45).length;
@@ -9037,6 +9231,7 @@ function cfdReport() {
       oxygenInlet: state.cfdOxygenInlet,
       nutrientInlet: state.cfdNutrientInlet,
       engineering,
+      diagnostics: solved.diagnostics,
       recommendation: risk > 0.62
         ? "High CFD screening risk: increase kLa or aeration, review impeller layout, reduce working volume, add feed distribution points, or split into parallel reactors."
         : risk > 0.38
@@ -9090,9 +9285,7 @@ function cfdTimeSeriesRows(unit) {
   const savedTime = state.cfdTimeH;
   const rows = Array.from({ length: steps }, (_, index) => {
     const timeH = bounds.maxH * index / Math.max(1, steps - 1);
-    const gridW = 18;
-    const gridH = 24;
-    const cells = Array.from({ length: gridW * gridH }, (_, cellIndex) => cfdScore(unit, cellIndex % gridW, Math.floor(cellIndex / gridW), gridW, gridH, timeH));
+    const { cells, diagnostics } = cfdRunTransient(unit, 18, 24, timeH);
     const avg = (key) => cells.reduce((sum, item) => sum + item[key], 0) / cells.length;
     return {
       reactor: unit.id,
@@ -9106,6 +9299,10 @@ function cfdTimeSeriesRows(unit) {
       lowOxygenCells: cells.filter((item) => item.oxygen < 0.45).length,
       lowNutrientCells: cells.filter((item) => item.nutrient < 0.45).length,
       highShearCells: cells.filter((item) => item.shear > 0.72).length,
+      solverSteps: diagnostics.steps,
+      courant: diagnostics.courant,
+      oxygenResidual: diagnostics.oxygenResidual,
+      nutrientResidual: diagnostics.nutrientResidual,
     };
   });
   state.cfdTimeH = savedTime;
@@ -9126,7 +9323,22 @@ function cfdFieldCsvRows() {
     oxygen: cell.oxygen,
     nutrient: cell.nutrient,
     velocity: cell.velocity,
+    ux: cell.ux,
+    uy: cell.uy,
     shear: cell.shear,
+    gasHoldUp: cell.gasHoldUp,
+    oxygenSource: cell.oxygenSource,
+    nutrientSource: cell.nutrientSource,
+    cellUptake: cell.cellUptake,
+    impellerZone: cell.impellerZone,
+    bafflePenalty: cell.bafflePenalty,
+    wallPenalty: cell.wallPenalty,
+    solver: unit.diagnostics?.solver,
+    solverSteps: unit.diagnostics?.steps,
+    dtSeconds: unit.diagnostics?.dtSeconds,
+    courant: unit.diagnostics?.courant,
+    oxygenResidual: unit.diagnostics?.oxygenResidual,
+    nutrientResidual: unit.diagnostics?.nutrientResidual,
     risk: cell.risk,
   })));
 }
