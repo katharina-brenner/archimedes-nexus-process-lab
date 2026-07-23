@@ -224,7 +224,7 @@ function formBody(params) {
 
 async function stripeRequest(pathname, params = {}, method = "POST") {
   if (!config.stripeSecretKey) {
-    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY and optionally STRIPE_PRICE_ID on the backend.");
+    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY on the backend; add STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and APP_BASE_URL for automatic SaaS checkout.");
   }
   const response = await fetch(`https://api.stripe.com${pathname}`, {
     method,

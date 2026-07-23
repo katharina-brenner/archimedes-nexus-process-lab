@@ -5699,13 +5699,41 @@ function plantSimulationExperimentRows(model = plantSimulationModel()) {
 }
 
 function plantSimulationSvg() {
-  const width = 1280;
-  const height = 720;
-  const maxX = Math.max(1, ...state.units.map((item) => item.x + unitWidth(item)));
-  const maxY = Math.max(1, ...state.units.map((item) => item.y + unitHeight(item)));
-  const scale = Math.min((width - 170) / maxX, (height - 170) / maxY);
-  const offsetX = 84;
-  const offsetY = 108;
+  const visibleUnits = state.units.filter((item) => !["Sensor/Data", "Personnel"].includes(item.cls));
+  const mainPriority = new Set(["Preparation", "Bioreactor", "Hold", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging", "Sterilization"]);
+  const mainUnits = visibleUnits
+    .filter((item) => mainPriority.has(item.cls) && !["clean-in-place", "sip-sterilization"].includes(item.type))
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y))
+    .slice(0, 24);
+  const supportUnits = visibleUnits
+    .filter((item) => !mainUnits.some((unitItem) => unitItem.id === item.id) && unitLayer(item) !== "main")
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y))
+    .slice(0, 22);
+  const width = 1680;
+  const nodeW = 132;
+  const nodeH = 62;
+  const gapX = 34;
+  const mainCols = 8;
+  const supportCols = 11;
+  const mainRows = Math.max(1, Math.ceil(mainUnits.length / mainCols));
+  const supportRows = Math.max(1, Math.ceil(supportUnits.length / supportCols));
+  const height = 244 + mainRows * 128 + supportRows * 108 + 190;
+  const titleY = 64;
+  const mainTop = 150;
+  const supportTop = mainTop + mainRows * 128 + 70;
+  const layout = new Map();
+  mainUnits.forEach((item, index) => {
+    const row = Math.floor(index / mainCols);
+    const col = index % mainCols;
+    layout.set(item.id, { x: 78 + col * (nodeW + gapX), y: mainTop + row * 128, w: nodeW, h: nodeH, lane: "main" });
+  });
+  supportUnits.forEach((item, index) => {
+    const row = Math.floor(index / supportCols);
+    const col = index % supportCols;
+    layout.set(item.id, { x: 78 + col * (nodeW + 16), y: supportTop + row * 108, w: nodeW, h: nodeH, lane: "support" });
+  });
+  const orderedIds = [...layout.keys()];
+  const indexById = Object.fromEntries(orderedIds.map((id, index) => [id, index]));
   const colorForLayer = (layer) => ({
     main: "#0f5a52",
     support: "#5d707b",
@@ -5714,59 +5742,112 @@ function plantSimulationSvg() {
     waste: "#596a64",
     data: "#d9b96f",
   }[layer] || "#526271");
-  const streams = state.streams.slice(0, 90).map((item) => {
+  const iconForUnit = (item, x, y, color) => {
+    const cx = x + 32;
+    const cy = y + 31;
+    if (item.cls === "Bioreactor") {
+      return `<path d="M${cx - 17} ${cy - 20} C${cx - 8} ${cy - 28} ${cx + 8} ${cy - 28} ${cx + 17} ${cy - 20} L${cx + 17} ${cy + 18} C${cx + 10} ${cy + 27} ${cx - 10} ${cy + 27} ${cx - 17} ${cy + 18} Z" fill="#f7fbfa" stroke="${color}" stroke-width="2"/><path d="M${cx} ${cy - 23} V${cy + 18} M${cx - 13} ${cy - 1} H${cx + 13} M${cx - 12} ${cy + 12} H${cx + 12}" stroke="${color}" stroke-width="2.4" stroke-linecap="round"/>`;
+    }
+    if (item.cls === "Filtration") {
+      return `<rect x="${cx - 18}" y="${cy - 18}" width="36" height="36" rx="8" fill="#f7fbfa" stroke="${color}" stroke-width="2"/><path d="M${cx - 12} ${cy - 9} H${cx + 12} M${cx - 12} ${cy} H${cx + 12} M${cx - 12} ${cy + 9} H${cx + 12}" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`;
+    }
+    if (["Purification", "Concentration"].includes(item.cls)) {
+      return `<path d="M${cx - 15} ${cy - 21} H${cx + 15} V${cy + 21} H${cx - 15} Z" fill="#f7fbfa" stroke="${color}" stroke-width="2"/><path d="M${cx - 15} ${cy - 7} H${cx + 15} M${cx - 15} ${cy + 7} H${cx + 15}" stroke="${color}" stroke-width="2"/>`;
+    }
+    if (["Utilities", "Cleaning"].includes(unitLayer(item))) {
+      return `<circle cx="${cx}" cy="${cy}" r="20" fill="#f7fbfa" stroke="${color}" stroke-width="2"/><path d="M${cx - 10} ${cy} H${cx + 10} M${cx} ${cy - 10} V${cy + 10}" stroke="${color}" stroke-width="2.4" stroke-linecap="round"/>`;
+    }
+    return `<rect x="${cx - 20}" y="${cy - 18}" width="40" height="36" rx="11" fill="#f7fbfa" stroke="${color}" stroke-width="2"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="${color}" font-family="Arial, sans-serif" font-size="13" font-weight="800">${svgEscape(item.icon || item.cls.slice(0, 2))}</text>`;
+  };
+  const labelLines = (value, max = 18) => {
+    const words = String(value || "").split(/\s+/).filter(Boolean);
+    const lines = [];
+    words.forEach((word) => {
+      const current = lines.at(-1) || "";
+      if (!current || `${current} ${word}`.length > max) lines.push(word);
+      else lines[lines.length - 1] = `${current} ${word}`;
+    });
+    return lines.slice(0, 2);
+  };
+  const unitNode = (item) => {
+    const box = layout.get(item.id);
+    if (!box) return "";
+    const layer = unitLayer(item);
+    const color = colorForLayer(layer);
+    const lines = labelLines(item.name, 20);
+    return `
+      <g id="${svgEscape(item.id)}">
+        <rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="16" fill="#fbfdfc" stroke="${color}" stroke-width="2"/>
+        <rect x="${box.x + 10}" y="${box.y + 10}" width="44" height="42" rx="14" fill="#eef5f3" stroke="rgba(16,32,51,0.1)"/>
+        ${iconForUnit(item, box.x, box.y, color)}
+        <text x="${box.x + 64}" y="${box.y + 23}" fill="#102033" font-family="Arial, sans-serif" font-size="14" font-weight="800">${svgEscape(item.id)}</text>
+        ${lines.map((line, index) => `<text x="${box.x + 64}" y="${box.y + 41 + index * 14}" fill="#4c5d6c" font-family="Arial, sans-serif" font-size="11">${svgEscape(line)}</text>`).join("")}
+      </g>`;
+  };
+  const routePath = (fromBox, toBox, layer, index) => {
+    const x1 = fromBox.x + fromBox.w;
+    const y1 = fromBox.y + fromBox.h / 2;
+    const x2 = toBox.x;
+    const y2 = toBox.y + toBox.h / 2;
+    const sameLane = fromBox.lane === toBox.lane;
+    const laneBend = sameLane ? Math.max(x1 + 18, Math.min(x2 - 18, (x1 + x2) / 2)) : Math.max(x1 + 20, Math.min(width - 110, x1 + 52 + (index % 4) * 14));
+    if (x2 > x1 + 28) return `M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} H${formatNumber(laneBend, 1)} V${formatNumber(y2, 1)} H${formatNumber(x2, 1)}`;
+    const escapeX = width - 82 - (index % 5) * 14;
+    const top = Math.min(y1, y2) - 34 - (index % 3) * 12;
+    return `M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} H${formatNumber(escapeX, 1)} V${formatNumber(top, 1)} H${formatNumber(toBox.x - 20, 1)} V${formatNumber(y2, 1)} H${formatNumber(x2, 1)}`;
+  };
+  const visibleStreamRows = state.streams
+    .filter((item) => layout.has(item.from) && layout.has(item.to))
+    .sort((a, b) => (indexById[a.from] - indexById[b.from]) || (indexById[a.to] - indexById[b.to]))
+    .slice(0, 80);
+  const streams = visibleStreamRows.map((item, index) => {
     const from = state.units.find((unitItem) => unitItem.id === item.from);
     const to = state.units.find((unitItem) => unitItem.id === item.to);
     if (!from || !to) return "";
+    const fromBox = layout.get(from.id);
+    const toBox = layout.get(to.id);
+    if (!fromBox || !toBox) return "";
     const layer = streamKind(item, from, to);
-    const x1 = offsetX + (from.x + unitWidth(from)) * scale;
-    const y1 = offsetY + unitMidline(from) * scale;
-    const x2 = offsetX + to.x * scale;
-    const y2 = offsetY + unitMidline(to) * scale;
     const color = layer === "waste" ? "#596a64" : layer === "utility" ? "#6f8794" : layer === "qc" ? "#d9b96f" : "#95c7bd";
-    return `<path d="M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} L${formatNumber(x2, 1)} ${formatNumber(y2, 1)}" fill="none" stroke="${color}" stroke-width="${layer === "main" ? 4 : 2.4}" opacity="0.72" marker-end="url(#arrow)"/>`;
+    const widthStroke = layer === "main" ? 3.4 : 2.2;
+    return `<path d="${routePath(fromBox, toBox, layer, index)}" fill="none" stroke="${color}" stroke-width="${widthStroke}" opacity="${layer === "main" ? 0.95 : 0.7}" marker-end="url(#arrow${layer === "main" ? "Main" : ""})"/><text x="${formatNumber((fromBox.x + fromBox.w + toBox.x) / 2, 1)}" y="${formatNumber(Math.min(fromBox.y, toBox.y) + 54, 1)}" fill="#5a6875" font-family="Arial, sans-serif" font-size="8">${svgEscape(item.id)}</text>`;
   }).join("");
-  const units = state.units.slice(0, 90).map((item) => {
-    const layer = unitLayer(item);
-    const x = offsetX + item.x * scale;
-    const y = offsetY + item.y * scale;
-    const w = unitWidth(item) * scale;
-    const h = unitHeight(item) * scale;
-    const color = colorForLayer(layer);
-    return `
-      <g>
-        <rect x="${formatNumber(x, 1)}" y="${formatNumber(y, 1)}" width="${formatNumber(w, 1)}" height="${formatNumber(h, 1)}" rx="18" fill="#f7faf9" stroke="${color}" stroke-width="2"/>
-        <rect x="${formatNumber(x + 12, 1)}" y="${formatNumber(y + 14, 1)}" width="${formatNumber(Math.min(48, w * 0.22), 1)}" height="${formatNumber(Math.min(48, h * 0.48), 1)}" rx="14" fill="${color}"/>
-        <text x="${formatNumber(x + Math.min(74, w * 0.32), 1)}" y="${formatNumber(y + 32, 1)}" fill="#102033" font-family="Manrope, Arial, sans-serif" font-size="16" font-weight="800">${svgEscape(item.id)}</text>
-        <text x="${formatNumber(x + Math.min(74, w * 0.32), 1)}" y="${formatNumber(y + 52, 1)}" fill="#526271" font-family="Manrope, Arial, sans-serif" font-size="11">${svgEscape(item.name).slice(0, 28)}</text>
-      </g>`;
-  }).join("");
+  const units = [...mainUnits, ...supportUnits].map(unitNode).join("");
   const model = plantSimulationModel();
+  const template = activeTemplate();
   return `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Axion plant simulation layout">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Axion plant simulation PFD layout">
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
       <path d="M0,0 L8,4 L0,8 z" fill="#95c7bd"/>
     </marker>
-    <linearGradient id="bg" x1="0" x2="1">
-      <stop offset="0" stop-color="#071a31"/>
-      <stop offset="1" stop-color="#173452"/>
-    </linearGradient>
+    <marker id="arrowMain" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#0f5a52"/>
+    </marker>
   </defs>
-  <rect width="${width}" height="${height}" fill="url(#bg)"/>
-  <path d="M70 94 H1210 M70 626 H1210 M70 94 V626 M1210 94 V626" fill="none" stroke="#5d707b" stroke-width="1" opacity="0.25"/>
-  <g opacity="0.22">${Array.from({ length: 17 }, (_, index) => `<path d="M${70 + index * 70} 94 V626" stroke="#e7f1ef" stroke-width="1"/>`).join("")}${Array.from({ length: 8 }, (_, index) => `<path d="M70 ${136 + index * 58} H1210" stroke="#e7f1ef" stroke-width="1"/>`).join("")}</g>
-  <text x="72" y="52" fill="#f4fbfa" font-family="Manrope, Arial, sans-serif" font-size="24" font-weight="900">Axion Process OS · ${svgEscape(activeTemplate().label)} plant simulation</text>
-  <text x="72" y="78" fill="#b9c8cf" font-family="Manrope, Arial, sans-serif" font-size="13">${svgEscape(model.modelTier)} · ${model.objects.totalObjects} objects · ${formatNumber(model.kpis.throughputKgH, 2)} kg/h · ${svgEscape(exportDateIso().slice(0, 10))}</text>
+  <rect width="${width}" height="${height}" fill="#f4f7f6"/>
+  <rect x="42" y="34" width="${width - 84}" height="${height - 72}" rx="24" fill="#ffffff" stroke="#bdc9cf"/>
+  <text x="74" y="${titleY}" fill="#0b1828" font-family="Arial, sans-serif" font-size="25" font-weight="800">Axion Process OS - ${svgEscape(template.label)} process flow diagram</text>
+  <text x="74" y="${titleY + 28}" fill="#586977" font-family="Arial, sans-serif" font-size="13">${svgEscape(model.modelTier)} | ${model.objects.totalObjects} objects | ${formatNumber(model.kpis.throughputKgH, 2)} kg/h | ${svgEscape(exportDateIso().slice(0, 10))}</text>
+  <rect x="${width - 424}" y="42" width="352" height="72" rx="16" fill="#f7faf9" stroke="#bdc9cf"/>
+  <text x="${width - 400}" y="68" fill="#102033" font-family="Arial, sans-serif" font-size="12" font-weight="800">DRAWING</text>
+  <text x="${width - 400}" y="91" fill="#526271" font-family="Arial, sans-serif" font-size="12">PFD-SCREEN-${svgEscape(state.template.toUpperCase())}</text>
+  <text x="${width - 210}" y="68" fill="#102033" font-family="Arial, sans-serif" font-size="12" font-weight="800">REV</text>
+  <text x="${width - 210}" y="91" fill="#526271" font-family="Arial, sans-serif" font-size="12">A · screening export</text>
+  <rect x="60" y="${mainTop - 44}" width="${width - 120}" height="${mainRows * 128 + 24}" rx="18" fill="#f9fbfa" stroke="#d6dee1"/>
+  <text x="78" y="${mainTop - 18}" fill="#102033" font-family="Arial, sans-serif" font-size="14" font-weight="800">MAIN PROCESS TRAIN</text>
+  <rect x="60" y="${supportTop - 44}" width="${width - 120}" height="${supportRows * 108 + 24}" rx="18" fill="#f9fbfa" stroke="#d6dee1"/>
+  <text x="78" y="${supportTop - 18}" fill="#102033" font-family="Arial, sans-serif" font-size="14" font-weight="800">SUPPORT SYSTEMS, CIP/SIP, UTILITIES, WASTE, RECYCLE, QC</text>
   <g>${streams}</g>
   <g>${units}</g>
-  <g font-family="Manrope, Arial, sans-serif" font-size="12" fill="#dbe8eb">
-    <rect x="72" y="656" width="20" height="10" rx="5" fill="#0f5a52"/><text x="100" y="665">Main process</text>
-    <rect x="210" y="656" width="20" height="10" rx="5" fill="#5d707b"/><text x="238" y="665">Support/logistics</text>
-    <rect x="370" y="656" width="20" height="10" rx="5" fill="#275f6b"/><text x="398" y="665">Utilities</text>
-    <rect x="488" y="656" width="20" height="10" rx="5" fill="#95c7bd"/><text x="516" y="665">CIP/SIP</text>
-    <rect x="594" y="656" width="20" height="10" rx="5" fill="#596a64"/><text x="622" y="665">Waste/recycle</text>
-    <rect x="738" y="656" width="20" height="10" rx="5" fill="#d9b96f"/><text x="766" y="665">Data/QC</text>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#344652">
+    <rect x="74" y="${height - 92}" width="22" height="10" rx="5" fill="#0f5a52"/><text x="106" y="${height - 83}">Main process stream</text>
+    <rect x="256" y="${height - 92}" width="22" height="10" rx="5" fill="#5d707b"/><text x="288" y="${height - 83}">Support/logistics</text>
+    <rect x="424" y="${height - 92}" width="22" height="10" rx="5" fill="#275f6b"/><text x="456" y="${height - 83}">Utilities</text>
+    <rect x="544" y="${height - 92}" width="22" height="10" rx="5" fill="#95c7bd"/><text x="576" y="${height - 83}">CIP/SIP</text>
+    <rect x="646" y="${height - 92}" width="22" height="10" rx="5" fill="#596a64"/><text x="678" y="${height - 83}">Waste/recycle</text>
+    <rect x="792" y="${height - 92}" width="22" height="10" rx="5" fill="#d9b96f"/><text x="824" y="${height - 83}">Data/QC</text>
+    <text x="${width - 500}" y="${height - 83}" fill="#6b7b86">Original Axion screening diagram. Validate detailed design with P&ID, mass balance, schedule and CFD package.</text>
   </g>
 </svg>`.trim();
 }
@@ -9359,11 +9440,11 @@ function cfdOpenFoamCaseRows(report = cfdReport()) {
       {
         reactor: unit.id,
         modelBlock: "Solver",
-        setting: "Multiphase CFD",
-        value: "birdmultiphaseEulerFoam / OpenFOAM-9 style",
+        setting: "Transient transport screening",
+        value: unit.diagnostics?.equation || "dC/dt + U grad(C) = Deff laplacian(C) + source - uptake",
         unit: "",
-        implementation: "Euler-Euler gas/liquid concept with scalar transport and uptake sinks",
-        sourceBasis: "BiRD framework structure, represented as Axion screening logic",
+        implementation: "In-browser finite-volume style axial slice for oxygen and nutrient transport with velocity, shear, gas-source and cell-uptake terms",
+        sourceBasis: "OpenFOAM/BiRD-style stirred/sparged bioreactor setup, reduced to an interactive Axion screening model",
       },
       {
         reactor: unit.id,
@@ -9382,6 +9463,15 @@ function cfdOpenFoamCaseRows(report = cfdReport()) {
         unit: "",
         implementation: "Sparger boundary sets gas source, bubble plume, local hold-up and OTR proxy",
         sourceBasis: "Gas-liquid mass-transfer case setup",
+      },
+      {
+        reactor: unit.id,
+        modelBlock: "Numerics",
+        setting: "Time step and stability",
+        value: `dt ${formatNumber(unit.diagnostics?.dtSeconds || 0, 1)} s; Courant ${formatNumber(unit.diagnostics?.courant || 0, 2)}`,
+        unit: "",
+        implementation: "Explicit upwind advection, eddy-dispersion diffusion, local source and uptake terms; exported residuals show screening convergence only",
+        sourceBasis: "Finite-volume transport equation pattern used before validated 3D CFD handoff",
       },
       {
         reactor: unit.id,
@@ -9425,7 +9515,7 @@ function cfdBoundaryConditionRows(report = cfdReport()) {
       { reactor: unit.id, boundary: "top_headspace", variable: "p_rgh / alpha.gas", type: "pressure outlet / gas disengagement", activeSetting: "open degassing boundary", value: "open degassing boundary", unit: "", engineeringMeaning: "Represents headspace and foam/gas-disengagement region." },
       { reactor: unit.id, boundary: "impeller_zone", variable: "MRF / momentum source", type: "horizontal rotating reference frame proxy", activeSetting: `${formatNumber(eng.rpm || 0, 0)} rpm`, value: `${formatNumber(eng.rpm || 0, 0)} rpm; tip speed ${formatNumber(eng.tipSpeed || 0, 2)}`, unit: "rpm / m/s", engineeringMeaning: "Defines horizontal circulation plane, local shear and bulk mixing energy." },
       { reactor: unit.id, boundary: "cell_uptake", variable: "S_O2 / S_N", type: "volumetric sink", activeSetting: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, value: `OUR ${formatNumber(p.our || 1.1, 2)}; VCD ${formatNumber(p.vcd || 12, 1)}`, unit: "mmol/L/h / 10^6 cells/mL", engineeringMeaning: "Consumes oxygen and nutrients over time; drives late-batch gradients." },
-      { reactor: unit.id, boundary: "mesh_quality", variable: "cell quality", type: "3D handoff requirement", activeSetting: "browser 18 x 24 axial screen", value: "browser 18 x 24 axial screen; validated case needs 3D mesh refinement", unit: "cells", engineeringMeaning: "Screening contour is not a validated CFD solution until solved externally." },
+      { reactor: unit.id, boundary: "mesh_quality", variable: "cell quality", type: "3D handoff requirement", activeSetting: `browser ${unit.gridW} x ${unit.gridH} axial screen`, value: `browser ${unit.gridW} x ${unit.gridH} axial screen; validated case needs 3D mesh refinement`, unit: "cells", engineeringMeaning: "Screening contour is not a validated CFD solution until solved externally." },
     ];
   });
 }
@@ -9433,12 +9523,13 @@ function cfdBoundaryConditionRows(report = cfdReport()) {
 function cfdResidualRows(report = cfdReport()) {
   return report.flatMap((unit) => {
     const risk = Math.max(0.02, unit.riskIndex || 0.2);
+    const diagnostics = unit.diagnostics || {};
     const residuals = [
       ["p_rgh", 1.2e-3 * (1 + risk), 1.0e-4, risk < 0.45 ? "near target" : "requires tighter convergence"],
       ["U.liquid", 2.6e-4 * (1 + risk * 1.8), 5.0e-5, "check impeller-zone refinement"],
       ["alpha.gas", 7.8e-4 * (1 + (1 - unit.oxygenIndex)), 1.0e-4, "sensitive to sparger boundary"],
-      ["C_O2", 9.5e-4 * (1 + unit.lowOxygenCells / Math.max(1, unit.cells.length)), 1.0e-4, "oxygen scalar should converge before scale decisions"],
-      ["C_N", 8.8e-4 * (1 + unit.lowNutrientCells / Math.max(1, unit.cells.length)), 1.0e-4, "feed scalar should converge before feed-point recommendation"],
+      ["C_O2", Math.max(3e-5, diagnostics.oxygenResidual || 9.5e-4 * (1 + unit.lowOxygenCells / Math.max(1, unit.cells.length))), 1.0e-4, "oxygen scalar should converge before scale decisions"],
+      ["C_N", Math.max(3e-5, diagnostics.nutrientResidual || 8.8e-4 * (1 + unit.lowNutrientCells / Math.max(1, unit.cells.length))), 1.0e-4, "feed scalar should converge before feed-point recommendation"],
       ["k / epsilon", 4.2e-4 * (1 + unit.shearIndex), 1.0e-4, "turbulence closure must be validated against mixing-time data"],
     ];
     return residuals.map(([equation, currentResidual, targetResidual, note], index) => ({
@@ -9594,6 +9685,10 @@ function renderCfdBoard() {
   const contourBands = selected.cells
     .filter((cell) => cell.xIndex % 3 === 1 && cell.yIndex % 3 === 1)
     .slice(0, 48);
+  const vectorCells = selected.cells
+    .filter((cell) => cell.xIndex % 4 === 1 && cell.yIndex % 4 === 1)
+    .slice(0, 48);
+  const diagnostics = selected.diagnostics || {};
   const isoLines = [
     { label: "upper circulation loop", top: 31, width: 54, intensity: selected.velocityIndex },
     { label: "lower gas dispersion loop", top: 56, width: 58, intensity: selected.oxygenIndex },
@@ -9809,6 +9904,15 @@ function renderCfdBoard() {
           <div class="cfd-feed-line inlet-${state.cfdNutrientInlet}"></div>
           <div class="cfd-feed-zone inlet-${state.cfdNutrientInlet}"></div>
           <div class="cfd-sparger inlet-${state.cfdOxygenInlet}"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="cfd-map ${solverStarted ? "active" : ""}" style="--grid-x:${selected.gridW};" aria-label="Calculated finite-volume cell field">
+            ${solverStarted ? selected.cells.map((cell) => `<span style="--cell:${cfdCellColor(cell)};" title="cell ${cell.xIndex},${cell.yIndex}: O2 ${formatNumber(cell.oxygen * 100, 0)}%, nutrient ${formatNumber(cell.nutrient * 100, 0)}%, ux ${formatNumber(cell.ux, 2)}, uy ${formatNumber(cell.uy, 2)}"></span>`).join("") : ""}
+          </div>
+          <div class="cfd-vector-field ${solverStarted ? "active" : ""}" aria-label="Calculated liquid velocity vectors">
+            ${solverStarted ? vectorCells.map((cell) => {
+              const angle = Math.atan2(cell.uy, cell.ux) * 180 / Math.PI;
+              return `<i style="--x:${cell.x * 100}%; --y:${cell.y * 100}%; --speed:${Math.max(0.08, Math.min(1, cell.velocity))}; --angle:${formatNumber(angle, 1)}deg;" title="U liquid: ux ${formatNumber(cell.ux, 2)}, uy ${formatNumber(cell.uy, 2)}, speed ${formatNumber(cell.velocity * 100, 0)}%"></i>`;
+            }).join("") : ""}
+          </div>
           <div class="cfd-zone-label zone-top">foam / gas disengagement</div>
           <div class="cfd-zone-label zone-mid">bulk mixing</div>
           <div class="cfd-zone-label zone-bottom">sparger + dead-zone watch</div>
@@ -9838,8 +9942,8 @@ function renderCfdBoard() {
           <strong>${formatNumber(transferScore, 0)}%</strong>
           <p>${selected.recommendation}</p>
         </div>
-        <div class="cfd-metric-grid">
-          <article><span>O2</span><strong>${formatNumber(selected.oxygenIndex * 100, 0)}%</strong><small>${selected.lowOxygenCells} low-O2 cells</small></article>
+	        <div class="cfd-metric-grid">
+	          <article><span>O2</span><strong>${formatNumber(selected.oxygenIndex * 100, 0)}%</strong><small>${selected.lowOxygenCells} low-O2 cells</small></article>
           <article><span>Nutrient</span><strong>${formatNumber(selected.nutrientIndex * 100, 0)}%</strong><small>${selected.lowNutrientCells} weak-feed cells</small></article>
           <article><span>Velocity</span><strong>${formatNumber(selected.velocityIndex * 100, 0)}%</strong><small>circulation strength</small></article>
           <article><span>Shear</span><strong>${formatNumber(selected.shearIndex * 100, 0)}%</strong><small>${selected.highShearCells} high-shear cells</small></article>
@@ -9848,9 +9952,21 @@ function renderCfdBoard() {
           <article><span>Tip speed</span><strong>${formatNumber(eng.tipSpeed, 2)}</strong><small>m/s, ${formatNumber(eng.rpm, 0)} rpm</small></article>
           <article><span>OTR margin</span><strong>${formatNumber(eng.otrMargin, 2)}x</strong><small>${formatNumber(eng.otrMmolLh, 2)} mmol/L/h proxy</small></article>
           <article><span>Gas hold-up</span><strong>${formatNumber(eng.gasHoldUpPct, 1)}%</strong><small>sparger/aeration proxy</small></article>
-          <article><span>Working volume</span><strong>${formatNumber(eng.workingVolumePct, 0)}%</strong><small>of vessel volume, max 80% screen</small></article>
-        </div>
-        <div class="cfd-spec-grid">
+	          <article><span>Working volume</span><strong>${formatNumber(eng.workingVolumePct, 0)}%</strong><small>of vessel volume, max 80% screen</small></article>
+	          <article><span>Courant</span><strong>${formatNumber(diagnostics.courant || 0, 2)}</strong><small>explicit transport stability</small></article>
+	          <article><span>Residual O2/N</span><strong>${formatNumber(diagnostics.oxygenResidual || 0, 4)}</strong><small>${formatNumber(diagnostics.nutrientResidual || 0, 4)} nutrient</small></article>
+	          <article><span>Steps</span><strong>${formatNumber(diagnostics.steps || 0, 0)}</strong><small>${formatNumber(diagnostics.dtSeconds || 0, 1)} s timestep</small></article>
+	        </div>
+	        <div class="cfd-solver-card">
+	          <h4>How the CFD screen works</h4>
+	          <p>Axion solves a small transient axial-slice transport model in the browser after Start CFD is pressed: advection from a stirred-tank velocity field, eddy dispersion, oxygen and nutrient boundary sources, no-slip wall and baffle penalties, headspace gas disengagement, impeller-zone momentum, and volumetric cell uptake.</p>
+	          <dl>
+	            <dt>Equation</dt><dd>${escapeHtml(diagnostics.equation || "dC/dt + U grad(C) = Deff laplacian(C) + source - uptake")}</dd>
+	            <dt>Use</dt><dd>Fast engineering triage for feed location, gas inlet, dead zones, shear and scale-up boundaries.</dd>
+	            <dt>Validation</dt><dd>Export the boundary and case CSVs for full 3D CFD and calibrate against mixing time, kLa, gas hold-up, power draw and probe response.</dd>
+	          </dl>
+	        </div>
+	        <div class="cfd-spec-grid">
           <article>
             <h4>Reactor internals</h4>
             ${geometryRows.slice(0, 8).map((row) => `
@@ -11491,9 +11607,9 @@ function renderCheckoutResult(payload) {
     <dl>
       <dt>Provider</dt><dd>${escapeHtml(payment.provider || state.productConfig?.payments?.provider || "setup_required")}</dd>
       <dt>Required</dt><dd>STRIPE_SECRET_KEY</dd>
-      <dt>Optional</dt><dd>STRIPE_PRICE_ID and STRIPE_WEBHOOK_SECRET</dd>
+      <dt>Recommended</dt><dd>STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET, APP_BASE_URL</dd>
     </dl>
-    <p>${escapeHtml(payload.error || payment.instruction || "Add Stripe credentials on the backend to enable automatic SaaS payment and license activation.")}</p>
+    <p>${escapeHtml(payload.error || payment.instruction || "Set STRIPE_SECRET_KEY on the backend, add STRIPE_PRICE_ID for the hosted annual price, STRIPE_WEBHOOK_SECRET for automatic paid-event verification, and APP_BASE_URL for the correct success/cancel URLs.")}</p>
   `;
 }
 
