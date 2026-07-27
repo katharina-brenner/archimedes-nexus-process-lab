@@ -11,6 +11,8 @@ Do not commit real values. Store them in the backend host secret manager.
 | `AXION_ADMIN_PASSWORD` | Your private owner password | Owner/admin login |
 | `SUPABASE_URL` | Supabase project settings | Production Postgres adapter |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase API settings | Server-only database access |
+| `SUPABASE_STATE_TABLE` | Use `axion_state` unless renamed | Account, order, license, project and collaboration metadata |
+| `SUPABASE_DOCUMENTS_TABLE` | Use `axion_documents` unless renamed | Active models, archived versions, simulation runs and CFD job payloads |
 | `STRIPE_SECRET_KEY` | Stripe Developers/API keys | Creates Checkout sessions |
 | `STRIPE_PRICE_ID` | Stripe product price | Annual Axion SaaS price |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint signing secret | Verifies paid checkout events |

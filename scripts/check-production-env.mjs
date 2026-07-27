@@ -19,7 +19,7 @@ function loadDotEnv() {
 loadDotEnv();
 
 const checks = [
-  ["Supabase/Postgres", ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE"]],
+  ["Supabase/Postgres", ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"]],
   ["Stripe checkout + webhook", ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"]],
   ["Google OAuth", ["GOOGLE_CLIENT_ID", "APP_BASE_URL"]],
   ["Invite email", ["INVITE_EMAIL_FROM", "RESEND_API_KEY"]],

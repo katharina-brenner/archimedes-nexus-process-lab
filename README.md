@@ -11,9 +11,9 @@ npm run backend
 
 Then open `http://127.0.0.1:8899/index.html?v=saas-checkout-v1`.
 
-## Online static access
+## Online access
 
-The app also includes a static hosted access mode for GitHub Pages or Sites deployments. If the backend API is not available, the login screen switches to password-only static mode and unlocks the same frontend workspace after the workspace password is entered. The Node backend remains the recommended mode for stronger production authentication.
+The public frontend can be hosted statically for marketing pages, but the private workspace requires the Node backend. Paid access, Google login, projects, collaboration, exports, Python runs, and CFD jobs are verified server-side.
 
 ## Product-first workflow
 
@@ -101,7 +101,7 @@ curl -sS -X POST http://127.0.0.1:8899/api/admin/orders/ORDER_REFERENCE/mark-pai
 
 The response contains the activated license key. The user can then log in with their email and the license key.
 
-`KBrenner/kbrenner` and `MAhmed/mahmed` are seeded as payment-exempt internal users and do not need payment.
+Workspace users are configured through backend environment variables, activated licenses, Google OAuth, or admin-managed access. No customer-facing default users are embedded in the browser.
 
 ## Public website
 
@@ -144,7 +144,7 @@ The public site presents Axion as a professional process-modelling workspace wit
 
 ## Backend Data + Python Modelling
 
-The local prototype stores users, projects, datasets, simulation runs and model versions in `.data/*.json`. For a real SaaS backend, use Supabase Postgres with Row Level Security, Supabase Storage or S3-compatible object storage for uploads, and a separate Python worker service for longer model runs. The current `server.mjs` already exposes the API contract for that migration.
+The local prototype can store users, projects, datasets, simulation runs and model versions in `.data/*.json`. In production, the backend can use Supabase/Postgres for account/order/project metadata plus versioned model documents. Use Supabase Storage or S3-compatible object storage for uploaded file bytes, and a separate Python/CFD worker service for longer model runs.
 
 ## Supabase/Postgres setup
 
@@ -154,9 +154,14 @@ The backend now supports a production Supabase/Postgres adapter without adding r
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 SUPABASE_STATE_TABLE=axion_state
+SUPABASE_DOCUMENTS_TABLE=axion_documents
 ```
 
 The service-role key must only exist on the backend host. Never expose it in GitHub Pages, frontend code, or browser environment variables.
+
+## CFD worker setup
+
+For rigorous external CFD jobs, use [docs/cfd-worker.md](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/docs/cfd-worker.md). The included [workers/cfd_worker.py](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/workers/cfd_worker.py) implements Axion's `/jobs` contract, writes case payloads, and can be deployed on an OpenFOAM-capable host.
 
 ## Invite email setup
 

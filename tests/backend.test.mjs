@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -75,6 +75,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     const product = await jsonFetch(server.baseUrl, "/api/product");
     assert.equal(product.response.status, 200);
     assert.equal(product.payload.payments.provider, "setup_required");
+    assert.match(product.payload.backend.currentStorage, /local JSON/);
 
     const health = await jsonFetch(server.baseUrl, "/api/health");
     assert.equal(health.response.status, 200);
@@ -95,7 +96,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
 
     const login = await jsonFetch(server.baseUrl, "/api/auth/login", {
       method: "POST",
-      body: { user: "KBrenner", password: "0105" },
+      body: { user: "owner", password: "owner-test-password" },
     });
     assert.equal(login.response.status, 200);
     const token = login.payload.token;
@@ -139,6 +140,11 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(exported.payload.project.id, created.payload.project.id);
     assert.ok(Array.isArray(exported.payload.versions));
     assert.ok(Array.isArray(exported.payload.cfdJobs));
+
+    const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+    assert.match(schema, /create table if not exists public\.axion_state/);
+    assert.match(schema, /create table if not exists public\.axion_documents/);
+    assert.match(schema, /kind in \('project_model', 'project_version', 'simulation_run'\)/);
   } finally {
     await stopServer(server);
   }

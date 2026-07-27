@@ -2052,6 +2052,7 @@ const state = {
   cfdLayer: "oxygen",
   cfdOxygenInlet: "ring-sparger",
   cfdNutrientInlet: "top-feed",
+  cfdTurbulenceModel: "realizable-kepsilon",
   cfdSolverStarted: false,
   cfdSolverRunning: false,
   cfdIteration: 0,
@@ -8311,7 +8312,7 @@ function renderInviteCard(invite) {
 
 function connectorStatusTone(status = "") {
   if (status.includes("ready") || status.includes("active")) return "ready";
-  if (status.includes("scaffold") || status.includes("import")) return "partial";
+  if (status.includes("scaffold") || status.includes("import") || status.includes("map")) return "partial";
   return "planned";
 }
 
@@ -8604,7 +8605,7 @@ function renderProjectsBoard() {
       </div>
       <label>
         <span>Email or username</span>
-        <input id="inviteRecipient" type="text" placeholder="mahmed or person@company.com" ${activeProject ? "" : "disabled"} />
+        <input id="inviteRecipient" type="text" placeholder="person@company.com or username" ${activeProject ? "" : "disabled"} />
       </label>
       <label>
         <span>Role</span>
@@ -8619,7 +8620,7 @@ function renderProjectsBoard() {
     <section class="project-grid">
       <div class="project-column">
         <h3>Invites</h3>
-        ${state.projectInvites.length ? state.projectInvites.slice(0, 10).map(renderInviteCard).join("") : `<article class="project-version-card"><p>No invitations yet. Save a project, then invite MAhmed, KBrenner, or an external email address.</p></article>`}
+        ${state.projectInvites.length ? state.projectInvites.slice(0, 10).map(renderInviteCard).join("") : `<article class="project-version-card"><p>No invitations yet. Save a project, then invite a collaborator by email address or username.</p></article>`}
       </div>
       <div class="project-column connector-column">
         <div class="connector-heading">
@@ -9513,6 +9514,73 @@ function cfdTimeSeriesRows(unit) {
   return rows;
 }
 
+function cfdBiologyKineticsRows(unit) {
+  const profile = dynamicBatchProfile();
+  const rows = profile.points.map((row) => {
+    const timeS = row.timeH * 3600;
+    const biomassGL = Math.max(0.05, row.biomassKg * 1000 / Math.max(1, row.volumeL));
+    const substrateGL = Math.max(0, row.substrateGL);
+    const dissolvedO2Gm3 = 8 + (row.dissolvedOxygenPct / 100) * 2.9;
+    const normalizedO2 = cfdClamp((dissolvedO2Gm3 - 8) / 2.9, 0, 1);
+    const oxygenUptakeSink = Math.max(0.001, (state.params.our || 1.1) * biomassGL / Math.max(1, state.params.cellDensity || 18));
+    return {
+      reactor: unit?.id || "bioreactor",
+      timeS,
+      timeH: row.timeH,
+      phase: row.phase,
+      biomassGL,
+      substrateGL,
+      dissolvedO2Gm3,
+      dissolvedO2Pct: row.dissolvedOxygenPct,
+      oxygenIndexForCFD: normalizedO2,
+      nutrientIndexForCFD: cfdClamp(substrateGL / Math.max(0.1, state.params.glucose || 4), 0, 1),
+      cellUptakeSink: oxygenUptakeSink,
+      lactateGL: row.lactateGL,
+      ammoniumMm: row.ammoniaMm,
+      sourceBasis: "Attached biology_kinetics.png mapped to Axion dynamic batch profile: biomass, substrate and dissolved oxygen drive the CFD scalar source/sink terms.",
+    };
+  });
+  return rows;
+}
+
+function cfdTurbulenceRows(report = cfdReport()) {
+  return report.map((unit) => {
+    const eng = unit.engineering || {};
+    const design = cfdReactorDesign(unit);
+    const densityKgM3 = 1000;
+    const viscosityPaS = Math.max(0.0007, (state.params.viscosity || state.params.brothViscosity || 1.2) / 1000);
+    const rpm = Math.max(1, eng.rpm || 60);
+    const nPerS = rpm / 60;
+    const impellerDiameterM = Math.max(0.05, design.impellerDiameterM || eng.impellerM || 0.5);
+    const reynolds = densityKgM3 * nPerS * impellerDiameterM ** 2 / viscosityPaS;
+    const uTip = Math.max(0.05, eng.tipSpeed || Math.PI * impellerDiameterM * nPerS);
+    const integralLengthM = Math.max(0.03, impellerDiameterM * 0.35);
+    const turbulentKineticEnergy = 1.5 * (0.16 * uTip) ** 2;
+    const cMu = state.cfdTurbulenceModel === "realizable-kepsilon" ? 0.0845 : 0.09;
+    const epsilon = Math.max(1e-6, (cMu ** 0.75) * (turbulentKineticEnergy ** 1.5) / integralLengthM);
+    const turbulentViscosity = cMu * turbulentKineticEnergy ** 2 / epsilon;
+    const kolmogorovLengthM = (viscosityPaS / densityKgM3) ** 0.75 / Math.max(epsilon, 1e-6) ** 0.25;
+    const flowRegime = reynolds > 10000 ? "fully turbulent" : reynolds > 4000 ? "transition/turbulent" : "laminar/transition";
+    return {
+      reactor: unit.id,
+      model: state.cfdTurbulenceModel,
+      flowRegime,
+      reynolds,
+      turbulentKineticEnergy,
+      epsilon,
+      turbulentViscosity,
+      kolmogorovLengthM,
+      integralLengthM,
+      impellerTipSpeedMs: uTip,
+      impellerDiameterM,
+      densityKgM3,
+      viscosityPaS,
+      modelBasis: "RANS Realizable k-epsilon screening based on Reynolds decomposition, turbulent diffusion, k, epsilon, turbulent viscosity and Kolmogorov scale from TurbulenceModel.pdf.",
+      validationNeed: "Full CFD needs 3D geometry, mesh independence, residual convergence, measured mixing time, kLa, power draw and gas hold-up.",
+    };
+  });
+}
+
 function cfdFieldCsvRows() {
   return cfdReport().flatMap((unit) => unit.cells.map((cell) => ({
     reactor: unit.id,
@@ -9777,6 +9845,9 @@ function renderCfdBoard() {
   const residualMax = Math.max(...residualRows.map((row) => row.convergenceRatio), 1);
   const geometryRows = cfdGeometryRows([selected]);
   const flowPathRows = cfdFlowPathRows([selected]);
+  const kineticsRows = selectedUnit ? cfdBiologyKineticsRows(selectedUnit) : [];
+  const turbulenceRows = cfdTurbulenceRows([selected]);
+  const turbulence = turbulenceRows[0] || {};
   const reactorDesign = cfdReactorDesign(selected);
   const layerLabels = {
     oxygen: "Dissolved oxygen",
@@ -9838,12 +9909,6 @@ function renderCfdBoard() {
           <button data-cfd-action="pause" type="button" ${solverStarted ? "" : "disabled"}>Pause</button>
           <button data-cfd-action="reset" type="button" ${solverStarted ? "" : "disabled"}>Reset</button>
           <button data-cfd-action="backend" type="button">Backend CFD job</button>
-          <button data-download-report="cfd-field-csv" type="button">Field CSV</button>
-          <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
-          <button data-download-report="cfd-case-csv" type="button">Case CSV</button>
-          <button data-download-report="cfd-boundary-conditions-csv" type="button">Boundary CSV</button>
-          <button data-download-report="cfd-geometry-csv" type="button">Geometry CSV</button>
-          <button data-download-report="cfd-flow-paths-csv" type="button">Flow paths CSV</button>
         </div>
 	      </div>
 	      <div class="cfd-workflow-panel" aria-label="Recommended CFD workflow">
@@ -9875,6 +9940,49 @@ function renderCfdBoard() {
           </button>
         `).join("")}
       </div>
+      <div class="cfd-download-strip" aria-label="CFD downloads">
+        <button data-download-report="cfd-field-csv" type="button">Field</button>
+        <button data-download-report="cfd-time-series-csv" type="button">Time</button>
+        <button data-download-report="cfd-biology-kinetics-csv" type="button">Kinetics</button>
+        <button data-download-report="cfd-turbulence-csv" type="button">Turbulence</button>
+        <button data-download-report="cfd-case-csv" type="button">Case</button>
+        <button data-download-report="cfd-boundary-conditions-csv" type="button">Boundary</button>
+        <button data-download-report="cfd-geometry-csv" type="button">Geometry</button>
+      </div>
+    </section>
+    <section class="cfd-science-panel" aria-label="CFD biology and turbulence model">
+      <article class="cfd-kinetics-card">
+        <div>
+          <span>Biology kinetics</span>
+          <strong>Biomass, substrate and dissolved oxygen over time</strong>
+          <p>Attached batch-kinetics basis mapped into Axion: biomass growth increases oxygen and nutrient uptake, substrate depletion drives late-batch risk, and DO becomes the scalar field used by the reactor screen.</p>
+        </div>
+        <svg viewBox="0 0 520 150" role="img" aria-label="Biomass substrate and dissolved oxygen kinetics">
+          <path d="${sparklinePath(kineticsRows, "biomassGL", 520, 130)}" fill="none" stroke="#0f5a52" stroke-width="5" />
+          <path d="${sparklinePath(kineticsRows, "substrateGL", 520, 130)}" fill="none" stroke="#536f75" stroke-width="4" opacity="0.82" />
+          <path d="${sparklinePath(kineticsRows, "dissolvedO2Gm3", 520, 130)}" fill="none" stroke="#d0b56d" stroke-width="4" opacity="0.9" />
+        </svg>
+        <div class="cfd-mini-legend">
+          <span><i class="bio"></i>Biomass</span>
+          <span><i class="sub"></i>Substrate</span>
+          <span><i class="oxy"></i>Dissolved O2</span>
+        </div>
+      </article>
+      <article class="cfd-turbulence-card">
+        <div>
+          <span>Turbulence model</span>
+          <strong>RANS Realizable k-epsilon screening</strong>
+          <p>Uses Reynolds decomposition, turbulent diffusion, k, epsilon, turbulent viscosity and Kolmogorov scale as a clean pre-check before a full 3D CFD job.</p>
+        </div>
+        <dl>
+          <dt>Regime</dt><dd>${escapeHtml(turbulence.flowRegime || "screening")}</dd>
+          <dt>Re</dt><dd>${formatNumber(turbulence.reynolds || 0, 0)}</dd>
+          <dt>k</dt><dd>${formatNumber(turbulence.turbulentKineticEnergy || 0, 4)} m2/s2</dd>
+          <dt>epsilon</dt><dd>${formatNumber(turbulence.epsilon || 0, 5)} m2/s3</dd>
+          <dt>nu_t</dt><dd>${formatNumber(turbulence.turbulentViscosity || 0, 5)} m2/s</dd>
+          <dt>eta</dt><dd>${formatNumber((turbulence.kolmogorovLengthM || 0) * 1000, 3)} mm</dd>
+        </dl>
+      </article>
     </section>
     <section class="cfd-openfoam-panel">
       <div class="cfd-openfoam-heading">
@@ -10683,6 +10791,8 @@ function comprehensiveReport() {
     cfdMesh: cfdMeshRows(),
     cfdGeometry: cfdGeometryRows(),
     cfdFlowPaths: cfdFlowPathRows(),
+    cfdBiologyKinetics: cfdBioreactors().flatMap((unit) => cfdBiologyKineticsRows(unit)),
+    cfdTurbulence: cfdTurbulenceRows(),
     gpromsAlgorithm: gpromsAlgorithmRows(),
     pvsdParameters: pvsdParameterRows(),
     procedureWorkbook: procedureOperationWorkbookRows(),
@@ -11324,6 +11434,10 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-cfd-reactor-geometry.csv`, cfdGeometryRows(), "CFD reactor geometry and internals");
   } else if (type === "cfd-flow-paths-csv") {
     downloadCsv(`${state.template}-cfd-flow-paths.csv`, cfdFlowPathRows(), "CFD flow paths and design checks");
+  } else if (type === "cfd-biology-kinetics-csv") {
+    downloadCsv(`${state.template}-cfd-biology-kinetics.csv`, cfdBioreactors().flatMap((unit) => cfdBiologyKineticsRows(unit)), "CFD biology kinetics");
+  } else if (type === "cfd-turbulence-csv") {
+    downloadCsv(`${state.template}-cfd-turbulence-model.csv`, cfdTurbulenceRows(), "CFD turbulence model");
   } else if (type === "gproms-algorithm-csv") {
     downloadCsv(`${state.template}-gproms-pvsd-simulation-algorithm.csv`, gpromsAlgorithmRows(), "Equation-oriented simulation algorithm");
   } else if (type === "pvsd-parameters-csv") {
@@ -11501,10 +11615,7 @@ function lockApp() {
 const legacyAuthKeys = ["axion-auth", "atlas-auth", "aion-auth", "daedalus-auth", "archon-auth", "axioma-auth"];
 const staticAuth = {
   token: "axion-static-session-v1",
-  users: [
-    { user: "kbrenner", name: "KBrenner", role: "admin", passwordHash: "81dc948cd3fa9ec2064515b4267ef9a339993233dbdc0e984ce7b0fde6e1a0a9" },
-    { user: "mahmed", name: "MAhmed", role: "user", passwordHash: "5626696e19ac4b81318bf2bdc4af05efb210da38a29f0cc395eeda1c37d11ede" },
-  ],
+  users: [],
 };
 let staticAccessMode = false;
 
@@ -11512,21 +11623,10 @@ function isLocalDevelopmentHost() {
   return ["localhost", "127.0.0.1", ""].includes(window.location.hostname) || window.location.protocol === "file:";
 }
 
-async function sha256Hex(value) {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function staticPasswordMatches(user, password) {
-  const normalizedUser = user.trim().toLowerCase();
-  const passwordHash = await sha256Hex(password);
-  return staticAuth.users.find((candidate) => candidate.user === normalizedUser && candidate.passwordHash === passwordHash) || null;
-}
-
 function staticAccountForUser(user = "") {
   const normalizedUser = String(user || "").trim().toLowerCase();
   const candidate = staticAuth.users.find((item) => item.user === normalizedUser) || staticAuth.users[0];
+  if (!candidate) return null;
   return {
     role: candidate.role || "static",
     name: candidate.name || candidate.user,
@@ -11534,8 +11634,8 @@ function staticAccountForUser(user = "") {
     principal: candidate.user,
     productName: "Axion Process OS",
     billing: {
-      plan: candidate.role === "admin" ? "Owner workspace" : "Internal private workspace",
-      paymentStatus: "password access, payment exempt",
+      plan: candidate.role === "admin" ? "Owner workspace" : "Private workspace",
+      paymentStatus: "password access",
       amountFormatted: "2.400,00 EUR",
       customerId: candidate.user,
       billingEmail: `${candidate.user}@local.axion`,
@@ -11577,9 +11677,6 @@ function storeSession(token) {
 }
 
 function prettyUsername(value = "") {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "kbrenner") return "KBrenner";
-  if (normalized === "mahmed") return "MAhmed";
   return String(value || "").trim();
 }
 
@@ -11594,7 +11691,7 @@ function accountName() {
 function accountAccessLabel(account = state.account || {}) {
   if (account.role === "admin") return "Owner access";
   if (account.role === "customer") return "Paid workspace";
-  if (account.role === "user") return "Internal user access";
+  if (account.role === "user") return "Workspace access";
   if (account.role === "static") return "Password access";
   return "Workspace access";
 }
@@ -11698,7 +11795,7 @@ function renderStaticAccessMode() {
   document.body.classList.toggle("backend-required", !staticAccessMode);
   if (els.loginOrigin) {
     els.loginOrigin.textContent = staticAccessMode
-      ? "Local static mode. Internal password access is available for development."
+      ? "Local static mode. Start the Axion backend to sign in, use projects, checkout, exports, and Python runs."
       : "Backend required. Paid access cannot be verified from a static website.";
   }
   if (els.googleLoginFallback) els.googleLoginFallback.disabled = true;
@@ -11709,7 +11806,7 @@ function renderStaticAccessMode() {
   }
   if (els.googleLoginStatus) {
     els.googleLoginStatus.textContent = staticAccessMode
-      ? "Password login is available locally. Google SSO can be enabled by the workspace administrator."
+      ? "Static HTML cannot verify private workspace access. Start the backend or deploy the Node service."
       : "Deploy the Node backend to enable login, checkout, license verification, projects, datasets, and Python runs.";
   }
   renderProfileMenu();
@@ -12603,19 +12700,19 @@ function localIntegrations() {
   return [
     { key: "legacy-simulator", name: "Legacy process simulator", category: "Process simulation", status: "import-export scaffold", direction: "Import reports / export Axion model", auth: "file", description: "CSV, equipment, stream, balance, and economic report handoff for legitimate customer-owned simulator workflows." },
     { key: "rest-api", name: "Axion REST API", category: "API-first modelling", status: "schema scaffold", direction: "Read/write JSON process models", auth: "token", description: "Prepared for project, version, equipment, stream, parameter, simulation-run, and report endpoints." },
-    { key: "python-sdk", name: "Python SDK", category: "Automation", status: "SDK planned", direction: "Run sweeps, fit parameters, export reports", auth: "token", description: "Prepared for notebooks, parameter sweeps, Monte Carlo, Sobol-style sensitivity analysis, and calibration scripts." },
-    { key: "webhooks", name: "Webhooks", category: "Automation", status: "event scaffold", direction: "Notify external systems", auth: "signing secret", description: "Prepared for project.created, model.versioned, run.completed, report.ready, invite.created, and license.activated events." },
-    { key: "cloud-runs", name: "Cloud batch runs", category: "Scenario compute", status: "run queue planned", direction: "Execute parameter sweeps and Monte Carlo cases", auth: "workspace token", description: "Prepared for browser-native scenario runs without Excel add-ins or desktop automation." },
-    { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "connector planned", direction: "Export streams, property package, and economics basis", auth: "enterprise API or file", description: "Prepared for stream vectors, component properties, and unit-operation duty transfer." },
-    { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "connector planned", direction: "Export reactor geometry and boundary conditions", auth: "file/API", description: "Prepared for rigorous bioreactor CFD geometry, sparger, impeller, and boundary-condition setup." },
-    { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "connector planned", direction: "Export CFD screening cases", auth: "file/API", description: "Prepared for oxygen, nutrient, shear, gas-liquid, and agitation case handoff." },
-    { key: "gproms", name: "gPROMS / equation-oriented modelling", category: "High-fidelity modelling", status: "handoff planned", direction: "Export equations, parameters, units, and estimation cases", auth: "file/API", description: "Prepared for rigorous dynamic models, parameter estimation, optimization, soft sensors, and model predictive control roadmaps." },
-    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "connector planned", direction: "Read historian tags", auth: "server credentials", description: "Maps live pH, DO, temperature, pressure, flow, and batch-state tags to model parameters." },
-    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "connector planned", direction: "Read batch historian", auth: "enterprise connector", description: "Prepared for batch-profile calibration, deviations, soft sensors, and continued process verification." },
-    { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "connector planned", direction: "Read experiments and assays", auth: "API key/OAuth", description: "Prepared for titer, viability, media, assay, strain, and cell-line metadata transfer." },
-    { key: "limsid", name: "LIMS / ELN generic", category: "Quality data", status: "connector planned", direction: "Read/write assay metadata", auth: "API key", description: "Generic release-test, sterility, HCP, DNA, endotoxin, and bioburden handoff shell." },
-    { key: "erp", name: "ERP / procurement", category: "Economics", status: "connector planned", direction: "Read material prices, inventory, and vendor quote records", auth: "enterprise connector", description: "Prepared for regional costs, supplier quotes, media BOMs, consumables, resin, packaging, and working-capital assumptions." },
-    { key: "powerbi", name: "Power BI / data warehouse", category: "Analytics", status: "export scaffold", direction: "Publish TEA/LCA and portfolio metrics", auth: "workspace token", description: "Prepared for dashboards across projects, scenarios, facilities, emissions, COGS, and readiness gaps." },
+    { key: "python-sdk", name: "Python SDK", category: "Automation", status: "handoff ready", direction: "Run sweeps, fit parameters, export reports", auth: "token", description: "Notebook payload, parameter grid, Monte Carlo, Sobol-style sensitivity and calibration package can be exported now; live execution needs an SDK package/token." },
+    { key: "webhooks", name: "Webhooks", category: "Automation", status: "event scaffold ready", direction: "Notify external systems", auth: "signing secret", description: "Event contract is ready for project.created, model.versioned, run.completed, report.ready, invite.created, and license.activated." },
+    { key: "cloud-runs", name: "Cloud batch runs", category: "Scenario compute", status: "queue scaffold ready", direction: "Execute parameter sweeps and Monte Carlo cases", auth: "workspace token", description: "Run package and queue metadata can be exported now; production execution needs worker deployment." },
+    { key: "aspen", name: "Aspen Plus / Aspen Batch", category: "Process simulation", status: "handoff ready", direction: "Export streams, property package, and economics basis", auth: "enterprise API or file", description: "Stream vectors, component properties, unit-operation duty and economics basis can be packaged for customer-owned external workflows." },
+    { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "handoff ready", direction: "Export reactor geometry and boundary conditions", auth: "file/API", description: "Reactor geometry, sparger, impeller, boundary conditions, kinetics and turbulence assumptions can be packaged for rigorous CFD setup." },
+    { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "handoff ready", direction: "Export CFD screening cases", auth: "file/API", description: "Oxygen, nutrient, shear, gas-liquid, turbulence and agitation case metadata can be exported for external CFD review." },
+    { key: "gproms", name: "gPROMS / equation-oriented modelling", category: "High-fidelity modelling", status: "handoff ready", direction: "Export equations, parameters, units, and estimation cases", auth: "file/API", description: "Dynamic equations, parameters, estimation cases, soft-sensor variables and optimization payloads are packaged for external model work." },
+    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "tag map ready", direction: "Read historian tags", auth: "server credentials", description: "Live pH, DO, temperature, pressure, flow and batch-state tags are mapped to model parameters; live sync needs plant credentials." },
+    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "tag map ready", direction: "Read batch historian", auth: "enterprise connector", description: "Batch-profile calibration, deviation windows, soft-sensor inputs and continued process verification fields are mapped for export." },
+    { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "schema map ready", direction: "Read experiments and assays", auth: "API key/OAuth", description: "Titer, viability, media, assay, strain and cell-line metadata fields are mapped; live sync needs customer API access." },
+    { key: "limsid", name: "LIMS / ELN generic", category: "Quality data", status: "schema map ready", direction: "Read/write assay metadata", auth: "API key", description: "Release-test, sterility, HCP, DNA, endotoxin and bioburden handoff fields are available as export contract." },
+    { key: "erp", name: "ERP / procurement", category: "Economics", status: "schema map ready", direction: "Read material prices, inventory, and vendor quote records", auth: "enterprise connector", description: "Regional costs, supplier quotes, media BOMs, consumables, resin, packaging and working-capital fields are mapped for procurement integration." },
+    { key: "powerbi", name: "Power BI / data warehouse", category: "Analytics", status: "export ready", direction: "Publish TEA/LCA and portfolio metrics", auth: "workspace token", description: "Dashboard-ready TEA, LCA, scenario KPI, portfolio, emissions, COGS and readiness tables can be exported from the workspace." },
   ];
 }
 
@@ -13024,18 +13121,7 @@ function bindAuth() {
     const password = els.loginPassword.value.trim();
     els.loginError.textContent = "";
     if (staticAccessMode) {
-      const staticUser = await staticPasswordMatches(user, password);
-      if (staticUser) {
-        storeSession(staticAuth.token);
-        window.localStorage.setItem("axion-static-user", staticUser.user);
-        state.account = staticAccountForUser(staticUser.user);
-        els.loginPassword.value = "";
-        unlockApp();
-        refreshProjects();
-        showToast(`Workspace unlocked for ${state.account.name}`);
-      } else {
-        els.loginError.textContent = "Access denied. Use the workspace password.";
-      }
+      els.loginError.textContent = "Start the Axion backend to sign in securely.";
       return;
     }
     try {
@@ -13050,18 +13136,7 @@ function bindAuth() {
       refreshProjects();
       showToast(`Logged in as ${accountName()}`);
     } catch (error) {
-      const staticUser = await staticPasswordMatches(user, password);
-      if (staticUser) {
-        storeSession(staticAuth.token);
-        window.localStorage.setItem("axion-static-user", staticUser.user);
-        state.account = staticAccountForUser(staticUser.user);
-        els.loginPassword.value = "";
-        unlockApp();
-        refreshProjects();
-        showToast(`Workspace unlocked for ${state.account.name}`);
-      } else {
-        els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
-      }
+      els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
     }
   });
 

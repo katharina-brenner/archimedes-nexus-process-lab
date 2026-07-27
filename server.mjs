@@ -56,6 +56,7 @@ const config = {
   supabaseUrl: (process.env.SUPABASE_URL || "").replace(/\/+$/, ""),
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   supabaseStateTable: process.env.SUPABASE_STATE_TABLE || "axion_state",
+  supabaseDocumentsTable: process.env.SUPABASE_DOCUMENTS_TABLE || "axion_documents",
   inviteEmailFrom: process.env.INVITE_EMAIL_FROM || "",
   smtpHost: process.env.SMTP_HOST || "",
   smtpPort: Number(process.env.SMTP_PORT || 587),
@@ -146,7 +147,7 @@ function publicConfig() {
       automaticActivation: Boolean(config.stripeSecretKey),
     },
     backend: {
-      currentStorage: supabaseConfigured() ? `Supabase/Postgres table ${config.supabaseStateTable}` : "local JSON files in .data/models",
+      currentStorage: supabaseConfigured() ? `Supabase/Postgres tables ${config.supabaseStateTable} + ${config.supabaseDocumentsTable}` : "local JSON files in .data/models",
       recommendedProductionDataApp: "Supabase Postgres + Supabase Storage, or managed Postgres on Render/Fly/Railway plus S3-compatible object storage",
       pythonRuntime: config.pythonExecutable,
       modellingEndpoint: "/api/model-runs/python",
@@ -168,7 +169,7 @@ function emailConfigured() {
 function productionReadiness() {
   const isHttps = config.appBaseUrl.startsWith("https://");
   const checks = [
-    { key: "postgres", label: "Supabase/Postgres database", ready: supabaseConfigured(), missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].filter((key) => !process.env[key]) },
+    { key: "postgres", label: "Supabase/Postgres database", ready: supabaseConfigured(), missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"].filter((key) => !process.env[key]) },
     { key: "stripe", label: "Stripe Checkout + webhook", ready: Boolean(config.stripeSecretKey && config.stripePriceId && config.stripeWebhookSecret && isHttps), missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]) },
     { key: "google", label: "Google OAuth login", ready: Boolean(config.googleClientId && isHttps), missing: [!config.googleClientId ? "GOOGLE_CLIENT_ID" : "", !isHttps ? "APP_BASE_URL must be https://..." : ""].filter(Boolean) },
     { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"].filter((key) => !process.env[key]) },
@@ -405,27 +406,34 @@ function normalizePrincipal(value) {
 }
 
 function seedUsers(db) {
-  const seeds = [
-    { username: "kbrenner", email: "kbrenner@local.axion", name: "KBrenner", password: "0105", role: "admin", paymentExempt: true },
-    { username: "mahmed", email: "mahmed@local.axion", name: "MAhmed", password: "1402", role: "user", paymentExempt: true },
-  ];
+  const rawSeeds = process.env.AXION_SEED_USERS_JSON || "[]";
+  let seeds = [];
+  try {
+    const parsed = JSON.parse(rawSeeds);
+    seeds = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    seeds = [];
+  }
   seeds.forEach((seed) => {
-    const existing = db.users.find((user) => user.username === seed.username || user.email === seed.email);
+    if (!seed?.username || !seed?.password) return;
+    const username = normalizePrincipal(seed.username);
+    const email = normalizePrincipal(seed.email || `${username}@local.axion`);
+    const existing = db.users.find((user) => normalizePrincipal(user.username) === username || normalizePrincipal(user.email) === email);
     if (existing) return;
     db.users.push({
       id: randomUUID(),
-      username: seed.username,
-      email: seed.email,
-      name: seed.name,
-      role: seed.role,
-      paymentExempt: seed.paymentExempt,
+      username,
+      email,
+      name: seed.name || username,
+      role: seed.role === "admin" ? "admin" : "user",
+      paymentExempt: Boolean(seed.paymentExempt),
       passwordHash: userPasswordHash(seed.password),
       createdAt: new Date().toISOString(),
       status: "active",
     });
   });
   db.users.forEach((user) => {
-    if (["kbrenner", "mahmed"].includes(user.username)) user.paymentExempt = true;
+    user.paymentExempt = Boolean(user.paymentExempt);
   });
 }
 
@@ -467,6 +475,46 @@ function runFilePath(runId) {
   return join(runsDir, `${runId}.json`);
 }
 
+function documentId(kind, { projectId = "", versionId = "", runId = "" } = {}) {
+  if (kind === "project_model") return `project:${projectId}`;
+  if (kind === "project_version") return `project:${projectId}:version:${versionId}`;
+  if (kind === "simulation_run") return `run:${runId}`;
+  return `${kind}:${projectId || versionId || runId || randomUUID()}`;
+}
+
+function encodeQueryValue(value) {
+  return encodeURIComponent(String(value || ""));
+}
+
+async function readSupabaseDocument(kind, { projectId = "", versionId = "", runId = "" } = {}) {
+  if (!supabaseConfigured()) return null;
+  const filters = [`kind=eq.${encodeQueryValue(kind)}`, "select=payload", "limit=1"];
+  if (projectId) filters.push(`project_id=eq.${encodeQueryValue(projectId)}`);
+  if (versionId) filters.push(`version_id=eq.${encodeQueryValue(versionId)}`);
+  if (runId) filters.push(`run_id=eq.${encodeQueryValue(runId)}`);
+  const rows = await supabaseRequest(`${config.supabaseDocumentsTable}?${filters.join("&")}`);
+  return Array.isArray(rows) ? rows[0]?.payload || null : null;
+}
+
+async function writeSupabaseDocument(kind, payload, { projectId = "", versionId = "", runId = "" } = {}) {
+  if (!supabaseConfigured()) return false;
+  const now = new Date().toISOString();
+  await supabaseRequest(config.supabaseDocumentsTable, {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=representation" },
+    body: {
+      id: documentId(kind, { projectId, versionId, runId }),
+      kind,
+      project_id: projectId || null,
+      version_id: versionId || null,
+      run_id: runId || null,
+      payload,
+      updated_at: now,
+    },
+  });
+  return true;
+}
+
 function canAccessProject(session, project) {
   if (!session || !project) return false;
   if (session.role === "admin") return true;
@@ -498,22 +546,68 @@ function sanitizeProject(project) {
 }
 
 async function readProjectModel(projectId) {
+  if (supabaseConfigured()) {
+    try {
+      const payload = await readSupabaseDocument("project_model", { projectId });
+      if (payload) return payload;
+    } catch (error) {
+      console.warn(`Supabase project model read failed, falling back to local file: ${error.message}`);
+    }
+  }
   const filePath = projectFilePath(projectId);
   if (!existsSync(filePath)) return null;
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
 async function writeProjectModel(projectId, payload) {
+  if (supabaseConfigured()) {
+    try {
+      await writeSupabaseDocument("project_model", payload, { projectId });
+      return;
+    } catch (error) {
+      console.warn(`Supabase project model write failed, falling back to local file: ${error.message}`);
+    }
+  }
   await mkdir(projectsDir, { recursive: true });
   await writeFile(projectFilePath(projectId), `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 async function writeArchivedVersion(projectId, versionId, payload) {
+  if (supabaseConfigured()) {
+    try {
+      await writeSupabaseDocument("project_version", payload, { projectId, versionId });
+      return;
+    } catch (error) {
+      console.warn(`Supabase archived version write failed, falling back to local file: ${error.message}`);
+    }
+  }
   await mkdir(archiveDir, { recursive: true });
   await writeFile(versionFilePath(projectId, versionId), `${JSON.stringify(payload, null, 2)}\n`);
 }
 
+async function readArchivedVersion(projectId, versionId) {
+  if (supabaseConfigured()) {
+    try {
+      const payload = await readSupabaseDocument("project_version", { projectId, versionId });
+      if (payload) return payload;
+    } catch (error) {
+      console.warn(`Supabase archived version read failed, falling back to local file: ${error.message}`);
+    }
+  }
+  const filePath = versionFilePath(projectId, versionId);
+  if (!existsSync(filePath)) return null;
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
 async function writeSimulationRun(runId, payload) {
+  if (supabaseConfigured()) {
+    try {
+      await writeSupabaseDocument("simulation_run", payload, { projectId: payload.projectId || "", runId });
+      return;
+    } catch (error) {
+      console.warn(`Supabase simulation run write failed, falling back to local file: ${error.message}`);
+    }
+  }
   await mkdir(runsDir, { recursive: true });
   await writeFile(runFilePath(runId), `${JSON.stringify(payload, null, 2)}\n`);
 }
@@ -590,8 +684,8 @@ function billingProfileForSession(session) {
   const isAdmin = session.role === "admin";
   const isExempt = Boolean(session.paymentExempt);
   return {
-    plan: isAdmin ? "Owner workspace" : isCustomer ? "Professional license" : isExempt ? "Internal free access" : "Private workspace",
-    paymentStatus: isCustomer ? "paid active" : isAdmin ? "payment exempt" : isExempt ? "payment exempt" : "workspace access",
+    plan: isAdmin ? "Owner workspace" : isCustomer ? "Professional license" : isExempt ? "Workspace access" : "Private workspace",
+    paymentStatus: isCustomer ? "paid active" : isAdmin ? "workspace access" : isExempt ? "workspace access" : "workspace access",
     amount,
     amountFormatted,
     currency: config.currency,
@@ -818,13 +912,13 @@ function academicSourceLibrary() {
 function dataArchitectureBlueprint() {
   return {
     localNow: {
-      storage: ".data/axion-licensing.json plus .data/models JSON files",
+      storage: supabaseConfigured() ? `Supabase/Postgres tables ${config.supabaseStateTable} and ${config.supabaseDocumentsTable}` : ".data/axion-licensing.json plus .data/models JSON files",
       purpose: "single-machine prototype, private local testing, quick project save/restore",
-      limitation: "not enough for paid multi-customer SaaS, audit-grade validation, large uploaded files or concurrent users",
+      limitation: supabaseConfigured() ? "production metadata and model JSON are persistent; large uploaded file bytes still need Supabase Storage/S3 parsing pipeline" : "not enough for paid multi-customer SaaS, audit-grade validation, large uploaded files or concurrent users",
     },
     recommendedProductionStack: {
       primaryChoice: "Supabase",
-      database: "Postgres with Row Level Security for users, projects, runs, sources, datasets and collaboration",
+      database: "Postgres with Row Level Security for users, projects, runs, sources, datasets, collaboration and versioned model documents",
       objectStorage: "Supabase Storage or S3-compatible storage for uploaded CSV/XLSX/PDF/raw historian exports",
       auth: "Supabase Auth or custom JWT with Google OAuth and Stripe customer mapping",
       pythonCompute: "FastAPI/Celery worker on Render, Fly.io, Railway, Modal or AWS ECS for model runs",
@@ -834,7 +928,8 @@ function dataArchitectureBlueprint() {
     coreTables: [
       { table: "users", keyFields: "id, email, username, role, payment_exempt, stripe_customer_id", purpose: "identity and billing mapping" },
       { table: "projects", keyFields: "id, owner_id, name, template, scale, current_version_id", purpose: "user-owned process models" },
-      { table: "project_versions", keyFields: "id, project_id, model_json, summary_json, created_by", purpose: "old model archive, restore and later branching/diff" },
+      { table: "project_versions", keyFields: "id, project_id, summary_json, created_by", purpose: "old model archive index, restore and later branching/diff" },
+      { table: "axion_documents", keyFields: "id, kind, project_id, version_id, run_id, payload", purpose: "active project models, archived versions and simulation/CFD job documents" },
       { table: "project_collaborators", keyFields: "project_id, user_id/email, role, status", purpose: "invite and shared editing permissions" },
       { table: "datasets", keyFields: "id, project_id, kind, file_url, schema_json, source_id", purpose: "uploaded experimental, LCA, TEA, supplier and historian data" },
       { table: "simulation_runs", keyFields: "id, project_id, run_type, inputs_json, outputs_json, status, created_by", purpose: "Python model, sweeps, Monte Carlo, CFD handoff and optimization history" },
@@ -1348,91 +1443,91 @@ function integrationRegistry() {
       key: "aspen",
       name: "Aspen Plus / Aspen Batch",
       category: "Process simulation",
-      status: "connector planned",
+      status: "handoff ready",
       direction: "Export streams, property package, and economics basis",
       auth: "enterprise API or file",
-      description: "Prepared for stream/property-package export and future enterprise connector configuration.",
+      description: "Stream vectors, component properties, unit-operation duty and economics basis can be packaged for customer-owned external workflows.",
     },
     {
       key: "comsol",
       name: "COMSOL Multiphysics",
       category: "CFD / multiphysics",
-      status: "connector planned",
+      status: "handoff ready",
       direction: "Export reactor geometry and boundary conditions",
       auth: "file/API",
-      description: "Exports reactor geometry assumptions, kLa targets, feed zones, and sparger/impeller metadata for rigorous CFD setup.",
+      description: "Reactor geometry, sparger, impeller, boundary conditions, kinetics and turbulence assumptions can be packaged for rigorous CFD setup.",
     },
     {
       key: "starccm",
       name: "Simcenter STAR-CCM+",
       category: "CFD",
-      status: "connector planned",
+      status: "handoff ready",
       direction: "Export CFD screening cases",
       auth: "file/API",
-      description: "Prepared for oxygen, nutrient, shear, sparger, and agitation case handoff.",
+      description: "Oxygen, nutrient, shear, gas-liquid, turbulence and agitation case metadata can be exported for external CFD review.",
     },
     {
       key: "gproms",
       name: "gPROMS / equation-oriented modelling",
       category: "High-fidelity modelling",
-      status: "handoff planned",
+      status: "handoff ready",
       direction: "Export equations, parameters, units, and estimation cases",
       auth: "file/API",
-      description: "Prepared for rigorous dynamic models, parameter estimation, optimization, soft sensors, and model predictive control roadmaps.",
+      description: "Dynamic equations, parameters, estimation cases, soft-sensor variables and optimization payloads are packaged for external model work.",
     },
     {
       key: "opcua",
       name: "OPC UA / SCADA",
       category: "Live plant data",
-      status: "connector planned",
+      status: "tag map ready",
       direction: "Read historian tags",
       auth: "server credentials",
-      description: "Maps live pH, DO, temperature, flow, pressure, feed, and batch-state tags to Axion model parameters.",
+      description: "Live pH, DO, temperature, pressure, flow and batch-state tags are mapped to model parameters; live sync needs plant credentials.",
     },
     {
       key: "osisoft-pi",
       name: "AVEVA PI / OSIsoft PI",
       category: "Historian",
-      status: "connector planned",
+      status: "tag map ready",
       direction: "Read batch historian",
       auth: "enterprise connector",
-      description: "Prepared for batch profile calibration, soft sensors, deviations, and continued process verification.",
+      description: "Batch-profile calibration, deviation windows, soft-sensor inputs and continued process verification fields are mapped for export.",
     },
     {
       key: "benchling",
       name: "Benchling",
       category: "ELN/LIMS",
-      status: "connector planned",
+      status: "schema map ready",
       direction: "Read experiments and assays",
       auth: "API key/OAuth",
-      description: "Prepared for titer, viability, media, assay, and strain/cell-line metadata transfer.",
+      description: "Titer, viability, media, assay, strain and cell-line metadata fields are mapped; live sync needs customer API access.",
     },
     {
       key: "limsid",
       name: "LIMS / ELN generic",
       category: "Quality data",
-      status: "connector planned",
+      status: "schema map ready",
       direction: "Read/write assay metadata",
       auth: "API key",
-      description: "Generic connector shell for HCP, DNA, endotoxin, sterility, bioburden, and release-test tables.",
+      description: "Release-test, sterility, HCP, DNA, endotoxin and bioburden handoff fields are available as export contract.",
     },
     {
       key: "erp",
       name: "ERP / procurement",
       category: "Economics",
-      status: "connector planned",
+      status: "schema map ready",
       direction: "Read material prices, inventory, and vendor quote records",
       auth: "enterprise connector",
-      description: "Prepared for regional costs, supplier quotes, media BOMs, consumables, resin, packaging, and working-capital assumptions.",
+      description: "Regional costs, supplier quotes, media BOMs, consumables, resin, packaging and working-capital fields are mapped for procurement integration.",
     },
     {
       key: "powerbi",
       name: "Power BI / data warehouse",
       category: "Analytics",
-      status: "export scaffold",
+      status: "export ready",
       direction: "Publish TEA/LCA and portfolio metrics",
       auth: "workspace token",
-      description: "Prepared for dashboards across projects, scenarios, facilities, emissions, COGS, and readiness gaps.",
+      description: "Dashboard-ready TEA, LCA, scenario KPI, portfolio, emissions, COGS and readiness tables can be exported from the workspace.",
     },
   ];
 }
@@ -1587,9 +1682,11 @@ async function listProjects(req, res) {
     projects,
     invites,
     integrations: integrationRegistry(),
-    folders: {
-      activeModels: projectsDir,
-      archivedModels: archiveDir,
+    storage: {
+      provider: supabaseConfigured() ? "supabase-postgres" : "local-json",
+      activeModels: supabaseConfigured() ? `${config.supabaseDocumentsTable}: kind=project_model` : projectsDir,
+      archivedModels: supabaseConfigured() ? `${config.supabaseDocumentsTable}: kind=project_version` : archiveDir,
+      runDocuments: supabaseConfigured() ? `${config.supabaseDocumentsTable}: kind=simulation_run` : runsDir,
     },
   });
 }
@@ -1778,12 +1875,11 @@ async function restoreVersion(req, res, projectId, versionId) {
     json(res, 404, { error: "Project not found" });
     return;
   }
-  const filePath = versionFilePath(projectId, versionId);
-  if (!existsSync(filePath)) {
+  const archived = await readArchivedVersion(projectId, versionId);
+  if (!archived) {
     json(res, 404, { error: "Archived model version not found" });
     return;
   }
-  const archived = JSON.parse(await readFile(filePath, "utf8"));
   const now = new Date().toISOString();
   await writeProjectModel(projectId, { ...archived, restoredAt: now, restoredBy: sessionPrincipal(session) });
   project.updatedAt = now;
@@ -2015,7 +2111,7 @@ async function login(req, res) {
     return;
   }
 
-  json(res, 402, { error: "Payment required. Use KBrenner/MAhmed internal access, an activated license key, or create a paid order." });
+  json(res, 402, { error: "Payment required. Sign in with a configured workspace account, use an activated license key, or create a paid order." });
 }
 
 async function account(req, res) {
@@ -2126,7 +2222,7 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     json(res, 200, {
       ok: true,
       productName: config.productName,
-      storage: supabaseConfigured() ? "supabase-postgres" : "local-json",
+      storage: supabaseConfigured() ? "supabase-postgres-documents" : "local-json",
       payments: Boolean(config.stripeSecretKey),
       googleLogin: Boolean(config.googleClientId),
       inviteEmail: emailConfigured(),

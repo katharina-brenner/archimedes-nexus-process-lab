@@ -16,8 +16,11 @@ Use provider dashboards and backend-host secret managers.
 4. Copy project URL into `SUPABASE_URL`.
 5. Copy service-role key into `SUPABASE_SERVICE_ROLE_KEY`.
 6. Set `SUPABASE_STATE_TABLE=axion_state`.
+7. Set `SUPABASE_DOCUMENTS_TABLE=axion_documents`.
 
-The current adapter stores the Axion state in a Postgres JSONB row. This is production-persistent and can later be normalized into dedicated tables.
+The current adapter stores account/order/project metadata in `axion_state` and active models, archived versions, simulation runs and CFD job payloads in `axion_documents`. This is production-persistent Postgres storage and can later be normalized into dedicated relational tables when the product needs row-level analytics, branch diffs and large-scale multi-user concurrency.
+
+`SUPABASE_SERVICE_ROLE_KEY` must only exist on the backend host. Never expose it in the browser, GitHub Pages, screenshots, client code or public logs.
 
 ## 2. Stripe
 
@@ -92,6 +95,8 @@ https://your-render-url/api/production-readiness
 8. Point your DNS records to Render.
 9. Update `APP_BASE_URL` to the custom domain.
 
+For a real private SaaS, deploy the Node backend on Render/Fly/Railway/AWS and point the domain there. GitHub Pages can host the public static marketing build, but it cannot safely run Stripe webhooks, Google token checks, Supabase service-role access, invite email, or CFD worker submission by itself.
+
 ## 6. CFD Backend Jobs
 
 Current Axion backend CFD jobs are screening/handoff jobs.
@@ -99,14 +104,15 @@ Current Axion backend CFD jobs are screening/handoff jobs.
 For rigorous external CFD:
 
 1. Deploy an OpenFOAM/BiRD/COMSOL/STAR-CCM+ worker service.
-2. The worker should expose:
+2. Use `workers/cfd_worker.py` as the Axion worker contract or replace its solver section with your validated CFD stack.
+3. The worker should expose:
 
 ```text
 POST /jobs
 Authorization: Bearer CFD_WORKER_TOKEN
 ```
 
-3. Set:
+4. Set:
 
 ```bash
 CFD_WORKER_URL=https://your-cfd-worker
@@ -114,6 +120,8 @@ CFD_WORKER_TOKEN=...
 ```
 
 Axion will submit CFD jobs to the worker and keep the screening result as fallback evidence.
+
+Detailed worker notes are in `docs/cfd-worker.md`.
 
 ## 7. Tests and CI
 
@@ -131,11 +139,45 @@ CI:
 - `.github/workflows/ci.yml` runs syntax checks, backend API tests and build.
 - `.github/workflows/pages.yml` deploys the static GitHub Pages build.
 
-## 8. Internal free users
+## 8. Workspace users
 
-The backend seeds:
+Production access should come from Google OAuth, paid licenses, admin-created accounts, or explicit environment-based seed users for a private deployment. Do not publish default usernames or passwords in the frontend.
 
-- `KBrenner`
-- `MAhmed`
+## 9. GitHub deploy/auth checklist
 
-Both are payment-exempt internal users.
+1. Authenticate locally:
+
+```bash
+gh auth login
+gh auth status
+```
+
+2. Commit and push:
+
+```bash
+git add .
+git commit -m "Prepare Axion production backend"
+git push origin main
+```
+
+3. In GitHub repository settings, enable Pages with GitHub Actions as the source.
+4. Confirm the Pages workflow succeeds.
+5. Use Render or another backend host for the real private app URL.
+
+## 10. Production smoke checks
+
+After deployment and secrets are set:
+
+```bash
+curl https://your-domain/api/health
+curl https://your-domain/api/product
+curl https://your-domain/api/production-readiness
+```
+
+Expected:
+
+- `storage` should be `supabase-postgres-documents`
+- `payments.stripeEnabled` should be `true`
+- `auth.googleEnabled` should be `true`
+- `inviteEmailConfigured` should be `true`
+- production readiness should show Stripe, Google, email and deployment ready
