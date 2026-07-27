@@ -130,6 +130,7 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `GET /api/integrations` lists prepared API connector targets
 - `POST /api/integrations/:key/actions` runs configure, mapping-test, or export actions for a connector and stores an audit record
 - `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
+- `GET /api/backend/processes` returns the production backend process map, including API core, Next.js BFF, datasets, jobs, billing, OAuth, email and CFD worker responsibilities
 - `GET /api/sources/academic` returns the source-backed model design library for boundaries, CFD, TEA/LCA, scheduling, digital twin and Python modelling
 - `GET /api/datasets` lists registered project datasets and uploaded-data metadata
 - `POST /api/datasets` registers a project dataset, schema, source, preview rows and validation status
@@ -146,6 +147,23 @@ The public site presents Axion as a professional process-modelling workspace wit
 ## Backend Data + Python Modelling
 
 Company datasets can be registered from CSV or JSON and classified into kinetics, CFD, TEA, LCA, supplier, QC and scheduling roles. The backend stores dataset metadata, detects column roles, scores data quality, and prepares calibration targets for Python or external modelling jobs.
+
+## Next.js Backend-For-Frontend
+
+`nextjs-bff/` adds an optional Next.js app edge in front of the Axion API core. It follows the Next.js Route Handler / Backend-for-Frontend pattern and uses `output: "standalone"` for production containers. The API core remains `server.mjs`; the BFF proxies `/api/axion/*` and `/api/core/*` to the core so future SSR pages, auth middleware, public-domain routing and app-edge concerns do not get mixed into the process-modelling backend.
+
+Local BFF run:
+
+```bash
+cd nextjs-bff
+AXION_API_BASE_URL=http://127.0.0.1:8899 pnpm install
+AXION_API_BASE_URL=http://127.0.0.1:8899 pnpm dev
+```
+
+Production variables:
+
+- API core: `APP_BASE_URL=https://your-api-core-domain`, `NEXTJS_BFF_URL=https://your-public-app-domain`
+- Next.js BFF: `AXION_API_BASE_URL=https://your-api-core-domain`
 
 The local prototype can store users, projects, datasets, simulation runs and model versions in `.data/*.json`. In production, the backend can use Supabase/Postgres for account/order/project metadata plus versioned model documents. Use Supabase Storage or S3-compatible object storage for uploaded file bytes, and a separate Python/CFD worker service for longer model runs.
 

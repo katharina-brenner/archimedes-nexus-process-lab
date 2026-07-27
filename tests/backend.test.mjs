@@ -86,6 +86,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(readiness.response.status, 200);
     assert.ok(Array.isArray(readiness.payload.checks));
     assert.ok(readiness.payload.checks.some((item) => item.key === "stripe"));
+    assert.ok(readiness.payload.checks.some((item) => item.key === "nextjs-bff"));
 
     const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
@@ -101,6 +102,11 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(login.response.status, 200);
     const token = login.payload.token;
     assert.ok(token);
+
+    const processes = await jsonFetch(server.baseUrl, "/api/backend/processes", { token });
+    assert.equal(processes.response.status, 200);
+    assert.ok(processes.payload.processes.some((item) => item.id === "nextjs-bff"));
+    assert.ok(processes.payload.deploymentOrder.length >= 4);
 
     const created = await jsonFetch(server.baseUrl, "/api/projects", {
       token,

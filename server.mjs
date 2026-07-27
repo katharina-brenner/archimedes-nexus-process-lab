@@ -65,6 +65,7 @@ const config = {
   resendApiKey: process.env.RESEND_API_KEY || "",
   cfdWorkerUrl: (process.env.CFD_WORKER_URL || "").replace(/\/+$/, ""),
   cfdWorkerToken: process.env.CFD_WORKER_TOKEN || "",
+  nextjsBffUrl: (process.env.NEXTJS_BFF_URL || "").replace(/\/+$/, ""),
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
@@ -110,6 +111,7 @@ function backendFeatures() {
     "Username/email invitations for collaboration",
     "External integration registry for modelling and data tools",
     "REST API and JSON model handoff architecture",
+    "Optional Next.js backend-for-frontend adapter for production app-edge deployment",
     "Python modelling runtime for dynamic bioprocess screening",
     "Academic source library for model assumptions",
     "Dataset registry for uploaded experimental, historian, TEA and LCA data",
@@ -154,6 +156,8 @@ function publicConfig() {
       modellingEndpoint: "/api/model-runs/python",
       academicSourcesEndpoint: "/api/sources/academic",
       dataArchitectureEndpoint: "/api/data/architecture",
+      backendProcessesEndpoint: "/api/backend/processes",
+      nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
     },
   };
@@ -175,11 +179,12 @@ function productionReadiness() {
     { key: "google", label: "Google OAuth login", ready: Boolean(config.googleClientId && isHttps), missing: [!config.googleClientId ? "GOOGLE_CLIENT_ID" : "", !isHttps ? "APP_BASE_URL must be https://..." : ""].filter(Boolean) },
     { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"].filter((key) => !process.env[key]) },
     { key: "deployment", label: "Public HTTPS deployment", ready: isHttps && config.host === "0.0.0.0", missing: [!isHttps ? "APP_BASE_URL must be public HTTPS" : "", config.host !== "0.0.0.0" ? "HOST=0.0.0.0 on production host" : ""].filter(Boolean) },
+    { key: "nextjs-bff", label: "Next.js backend-for-frontend adapter", ready: Boolean(config.nextjsBffUrl && config.nextjsBffUrl.startsWith("https://")), missing: [!config.nextjsBffUrl ? "NEXTJS_BFF_URL" : "", config.nextjsBffUrl && !config.nextjsBffUrl.startsWith("https://") ? "NEXTJS_BFF_URL must be https://..." : ""].filter(Boolean) },
     { key: "cfd-worker", label: "External rigorous CFD worker", ready: Boolean(config.cfdWorkerUrl && config.cfdWorkerToken), missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !process.env[key]) },
     { key: "ci", label: "Tests/CI", ready: existsSync(join(rootDir, ".github", "workflows", "ci.yml")), missing: [] },
   ];
   return {
-    ready: checks.every((item) => item.ready || item.key === "cfd-worker"),
+    ready: checks.every((item) => item.ready || item.key === "cfd-worker" || item.key === "nextjs-bff"),
     checks,
     note: "CFD worker is optional for current screening jobs, but required for validated external CFD. Secret values are never returned.",
   };
@@ -948,6 +953,90 @@ function dataArchitectureBlueprint() {
   };
 }
 
+function backendProcessBlueprint() {
+  const readiness = productionReadiness();
+  const processRows = [
+    {
+      id: "nextjs-bff",
+      name: "Next.js backend-for-frontend",
+      status: config.nextjsBffUrl ? "configured" : "adapter scaffold ready",
+      runtime: "Next.js route handlers, standalone output, proxy to Axion API core",
+      owns: "public app edge, SSR-ready auth gate, API path forwarding, deployment health checks",
+      productionNeed: "Deploy the nextjs-bff service and set NEXTJS_BFF_URL plus AXION_API_BASE_URL.",
+    },
+    {
+      id: "api-core",
+      name: "Axion API core",
+      status: "implemented",
+      runtime: "Node HTTP server",
+      owns: "login, licenses, project APIs, datasets, connector registry, Python screening, CFD handoff, exports",
+      productionNeed: "Run behind HTTPS with SESSION_SECRET, APP_BASE_URL, Supabase, Stripe, Google and email secrets.",
+    },
+    {
+      id: "data-store",
+      name: "Project and company data store",
+      status: supabaseConfigured() ? "postgres configured" : "local json fallback",
+      runtime: "Supabase/Postgres adapter plus local development JSON fallback",
+      owns: "users, orders, projects, versions, datasets, runs, CFD jobs and audit records",
+      productionNeed: "Use Supabase tables and object storage for large company uploads.",
+    },
+    {
+      id: "company-data-ingestion",
+      name: "Company data ingestion",
+      status: "implemented",
+      runtime: "CSV/JSON parsing, schema inference, role mapping and quality scoring",
+      owns: "bioreactor runs, historian exports, TEA/LCA data, supplier data, QC and schedule datasets",
+      productionNeed: "Add signed object-upload URLs and async parsers for large XLSX/PDF/historian packages.",
+    },
+    {
+      id: "simulation-queue",
+      name: "Simulation and optimization jobs",
+      status: "screening implemented",
+      runtime: "local Python subprocess with saved run packages",
+      owns: "dynamic bioprocess model runs, parameter sweeps, scenario packages and future Monte Carlo jobs",
+      productionNeed: "Move long jobs to a worker queue with status polling, retry, timeout and audit events.",
+    },
+    {
+      id: "cfd-worker",
+      name: "Rigorous CFD backend worker",
+      status: config.cfdWorkerUrl ? "external worker configured" : "handoff scaffold ready",
+      runtime: "external CFD worker endpoint or local screening fallback",
+      owns: "OpenFOAM/COMSOL/STAR-CCM+ handoff, boundary packages, geometry, residual targets and validated run metadata",
+      productionNeed: "Deploy a token-protected CFD worker/cluster and connect CFD_WORKER_URL.",
+    },
+    {
+      id: "billing-auth",
+      name: "Billing, OAuth and invites",
+      status: readiness.checks.filter((item) => ["stripe", "google", "email"].includes(item.key)).every((item) => item.ready) ? "production ready" : "needs secrets",
+      runtime: "Stripe Checkout/webhook, Google Identity token verification, Resend invite delivery",
+      owns: "paywall, automatic license activation, Google login, collaborator invitations",
+      productionNeed: "Set live Stripe, Google OAuth, email-domain and webhook secrets on the host.",
+    },
+  ];
+  return {
+    generatedAt: new Date().toISOString(),
+    product: config.productName,
+    nextjs: {
+      assumedMeaning: "Next.js, used as a Backend-for-Frontend adapter. If 'NextGS' meant a different product, keep this adapter and add a dedicated connector.",
+      officialPatterns: [
+        "Route Handlers expose HTTP endpoints using the Web Request/Response APIs.",
+        "Backend-for-Frontend keeps browser-facing endpoints close to the app while the Axion API core remains the modelling authority.",
+        "Standalone output is the recommended self-hosting shape for production containers.",
+      ],
+      bffUrl: config.nextjsBffUrl || "",
+    },
+    processes: processRows,
+    readiness,
+    deploymentOrder: [
+      "Deploy Axion API core with Supabase, Stripe, Google, email and SESSION_SECRET.",
+      "Deploy nextjs-bff with AXION_API_BASE_URL pointing to the API core.",
+      "Set NEXTJS_BFF_URL on the API core for readiness checks and product config.",
+      "Point the public domain to the Next.js service; keep /api/core health checks private or admin-only where needed.",
+      "Run CI, smoke-test login, project save, company dataset ingestion, connector registry, CFD job creation, paywall and exports.",
+    ],
+  };
+}
+
 function inferHelpGuide(prompt, context = {}) {
   const lower = String(prompt || "").toLowerCase();
   const steps = [];
@@ -1038,6 +1127,15 @@ async function dataArchitecture(req, res) {
     return;
   }
   json(res, 200, dataArchitectureBlueprint());
+}
+
+async function backendProcesses(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  json(res, 200, backendProcessBlueprint());
 }
 
 async function listAcademicSources(req, res) {
@@ -2515,6 +2613,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/data/architecture") {
     await dataArchitecture(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/backend/processes") {
+    await backendProcesses(req, res);
     return;
   }
   if (req.method === "GET" && pathname === "/api/sources/academic") {

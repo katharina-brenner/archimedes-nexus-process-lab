@@ -2058,6 +2058,8 @@ const state = {
   cfdSolverRunning: false,
   cfdIteration: 0,
   cfdBackendJob: null,
+  commandHistory: [],
+  commandHighlights: [],
 };
 
 const els = {
@@ -2523,6 +2525,7 @@ function exportCurrentModelState() {
     inferredTemplate: state.inferredTemplate,
     activeRoute: state.activeRoute,
     recipeOverrides: clone(state.recipeOverrides),
+    commandHistory: clone(state.commandHistory || []),
   };
 }
 
@@ -2553,6 +2556,8 @@ function importModelState(modelState = {}) {
   state.inferredTemplate = modelState.inferredTemplate || template;
   state.activeRoute = modelState.activeRoute || "primary";
   state.recipeOverrides = modelState.recipeOverrides || {};
+  state.commandHistory = Array.isArray(modelState.commandHistory) ? clone(modelState.commandHistory).slice(0, 20) : [];
+  state.commandHighlights = [];
   syncInputs();
   renderAll();
   window.requestAnimationFrame(() => fitCanvas(true));
@@ -6666,10 +6671,11 @@ function renderCanvas() {
       renderCanvas();
     });
     if (state.selectedId === item.id) line.classList.add("selected");
+    if ((state.commandHighlights || []).includes(item.id)) line.classList.add("command-highlight");
     stage.appendChild(line);
     if (state.flowDetail !== "standard" || state.selectedId === item.id || kind === "main") {
       const label = document.createElement("button");
-      label.className = `stream-label stream-label-${kind}${state.selectedId === item.id ? " selected" : ""}`;
+      label.className = `stream-label stream-label-${kind}${state.selectedId === item.id ? " selected" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
       label.dataset.streamId = item.id;
       label.dataset.tooltip = streamTooltip(item, from, to, kind);
       label.style.left = `${(x1 + x2) / 2}px`;
@@ -6694,7 +6700,7 @@ function renderCanvas() {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const layer = unitLayer(item);
-    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}`;
+    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
     node.style.left = `${item.x}px`;
     node.style.top = `${item.y}px`;
     node.style.borderLeftColor = item.color;
@@ -10100,6 +10106,24 @@ function renderCfdBoard() {
         <button data-download-report="cfd-geometry-csv" type="button">Geometry</button>
       </div>
     </section>
+    <section class="cfd-decision-strip" aria-label="CFD decision summary">
+      <article>
+        <span>Status</span>
+        <strong>${solverStarted ? `${formatNumber(selected.timeH, 1)} h field active` : "Ready to solve"}</strong>
+        <p>${solverStarted ? `${hotspotCells} hotspot cells · ${formatNumber(transferScore, 0)}% transfer readiness` : "Set gas and feed boundaries, then press Start CFD."}</p>
+      </article>
+      <article>
+        <span>Most likely next edit</span>
+        <strong>${selected.lowOxygenCells ? "Oxygen transfer" : selected.lowNutrientCells ? "Feed distribution" : selected.highShearCells ? "Shear reduction" : "Validation evidence"}</strong>
+        <p>${selected.lowOxygenCells ? "Raise kLa/aeration and inspect the oxygen layer." : selected.lowNutrientCells ? "Move nutrient addition to a distributed feed ring." : selected.highShearCells ? "Reduce working volume or agitation stress before scale-up." : "Export geometry, boundary and residual packages for external validation."}</p>
+      </article>
+      <div class="cfd-decision-actions">
+        <button data-cfd-fix="improve oxygen transfer and start CFD" type="button">Improve O2</button>
+        <button data-cfd-fix="set nutrient feed to feed ring and run CFD" type="button">Use feed ring</button>
+        <button data-cfd-fix="reduce working volume because reactor is too full and start CFD" type="button">Reduce volume</button>
+        <button data-cfd-action="backend" type="button">Backend job</button>
+      </div>
+    </section>
     <section class="cfd-science-panel" aria-label="CFD biology and turbulence model">
       <article class="cfd-kinetics-card">
         <div>
@@ -10190,7 +10214,7 @@ function renderCfdBoard() {
         </article>
       </div>
     </section>
-    <section class="cfd-layout ${solverStarted ? "solver-started" : "solver-idle"} ${solverRunning ? "solver-running" : "solver-paused"}">
+    <section class="cfd-layout cfd-field-${state.cfdLayer} ${solverStarted ? "solver-started" : "solver-idle"} ${solverRunning ? "solver-running" : "solver-paused"}">
       <div class="cfd-vessel" aria-label="Bioreactor engineering visualization">
         <div class="cfd-vessel-head">
           <span>${formatNumber(selected.volumeL, 0)} L</span>
@@ -10406,6 +10430,12 @@ function renderCfdBoard() {
             <li>${selected.highShearCells ? "Check impeller tip speed, power density, shear-sensitive cell limits, and whether scale-out is safer than scale-up." : "Shear proxy is acceptable for this screening state."}</li>
             <li>${eng.deadZonePct > 12 ? "Dead-zone proxy is elevated; verify baffle layout, bottom clearance, sparger ring coverage, viscosity, and probe placement." : "Dead-zone proxy is within the current screening envelope."}</li>
           </ul>
+          <div class="cfd-apply-fixes">
+            <button data-cfd-fix="improve oxygen transfer and start CFD" type="button">Apply O2 fix</button>
+            <button data-cfd-fix="set nutrient feed to feed ring and run CFD" type="button">Apply feed-ring fix</button>
+            <button data-cfd-fix="reduce working volume because reactor is too full and start CFD" type="button">Apply volume fix</button>
+            <button data-cfd-fix="reduce ammonium and lactate risk" type="button">Apply metabolite fix</button>
+          </div>
         </div>
         <div class="cfd-reactions">
           <h4>Linked reactions and balances</h4>
@@ -12776,19 +12806,168 @@ function commandEquipmentMatch(lower) {
   return aliases.find(([type, terms]) => palette.some((item) => item.type === type) && terms.some((term) => lower.includes(`add ${term}`) || lower.includes(`insert ${term}`) || lower.includes(`place ${term}`)))?.[0] || null;
 }
 
+function commandSnapshot() {
+  const data = metrics();
+  return {
+    template: state.template,
+    scale: state.scale,
+    batchSize: state.batchSize,
+    batchCount: state.batchCount,
+    titer: state.titer,
+    recovery: state.recovery,
+    directCost: data.directCost,
+    annualKg: data.annualKg,
+    utilization: data.utilization,
+    units: state.units.length,
+    streams: state.streams.length,
+    params: clone(state.params),
+  };
+}
+
+function commandParamMeta(key) {
+  return processParameters.find((item) => item.key === key) || { key, label: key, unit: "", min: -Infinity, max: Infinity };
+}
+
+function commandClampParam(key, value) {
+  const meta = commandParamMeta(key);
+  return Math.max(Number.isFinite(meta.min) ? meta.min : -Infinity, Math.min(Number.isFinite(meta.max) ? meta.max : Infinity, value));
+}
+
+function commandSetParam(key, value, changes, reason = "") {
+  const meta = commandParamMeta(key);
+  const before = Number(state.params[key] ?? meta.value ?? 0);
+  const after = commandClampParam(key, Number(value));
+  if (!Number.isFinite(after) || Math.abs(before - after) < 1e-9) return;
+  state.params[key] = Number(after.toFixed(Math.abs(after) < 10 ? 2 : 1));
+  changes.push({
+    type: "parameter",
+    where: `Parameters · ${meta.label}`,
+    before: `${formatNumber(before, 2)} ${meta.unit || ""}`.trim(),
+    after: `${formatNumber(state.params[key], 2)} ${meta.unit || ""}`.trim(),
+    reason: reason || `${meta.label} adjusted from command.`,
+  });
+}
+
+function commandSetTopLevel(key, value, changes, label, unit = "") {
+  const before = Number(state[key]);
+  const after = Number(value);
+  if (!Number.isFinite(after) || Math.abs(before - after) < 1e-9) return;
+  state[key] = after;
+  changes.push({
+    type: "model",
+    where: label,
+    before: `${formatNumber(before, 2)} ${unit}`.trim(),
+    after: `${formatNumber(after, 2)} ${unit}`.trim(),
+    reason: `${label} adjusted from command.`,
+  });
+}
+
+function commandNumberNear(lower, terms) {
+  const joined = Array.isArray(terms) ? terms.join("|") : terms;
+  const after = lower.match(new RegExp(`(?:${joined})[^0-9]{0,24}([0-9]+(?:[.,][0-9]+)?)`));
+  const before = lower.match(new RegExp(`([0-9]+(?:[.,][0-9]+)?)[^a-z0-9%]{0,16}(?:${joined})`));
+  const raw = after?.[1] || before?.[1];
+  return raw ? Number(raw.replace(",", ".")) : null;
+}
+
+function commandApplyExplicitNumbers(lower, changes) {
+  const mappings = [
+    { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand", "fill level"] },
+    { key: "kla", terms: ["kla", "k la", "oxygen transfer", "sauerstofftransfer"] },
+    { key: "aeration", terms: ["aeration", "vvm", "gas flow", "air flow", "begasung"] },
+    { key: "doSetpoint", terms: ["dissolved oxygen", "do setpoint", "sauerstoff"] },
+    { key: "feedRate", terms: ["feed rate", "feeding", "feed", "zufuhr"] },
+    { key: "perfusionRate", terms: ["perfusion", "bleed"] },
+    { key: "mediaCostPerL", terms: ["media cost", "medium cost", "medium preis"] },
+    { key: "glutamine", terms: ["glutamine", "glutamin"] },
+    { key: "lactate", terms: ["lactate", "laktat"] },
+    { key: "ammonia", terms: ["ammonia", "ammonium", "ammoniak"] },
+    { key: "cellDensity", terms: ["cell density", "zelldichte", "vcd"] },
+  ];
+  mappings.forEach((mapping) => {
+    const value = commandNumberNear(lower, mapping.terms);
+    if (value !== null) commandSetParam(mapping.key, value, changes, "Set from the exact number in the command.");
+  });
+  const batchSize = commandNumberNear(lower, ["batch volume", "batch size", "batch volumen"]);
+  if (batchSize !== null) commandSetTopLevel("batchSize", batchSize, changes, "Batch volume", "L");
+  const batches = commandNumberNear(lower, ["annual batches", "batches per year", "jahresbatches"]);
+  if (batches !== null) commandSetTopLevel("batchCount", Math.round(batches), changes, "Annual batches", "batches/yr");
+  const titer = commandNumberNear(lower, ["titer", "titre"]);
+  if (titer !== null) commandSetTopLevel("titer", titer, changes, "Titer", "g/L");
+  const recovery = commandNumberNear(lower, ["recovery", "yield", "ausbeute"]);
+  if (recovery !== null) commandSetTopLevel("recovery", Math.min(99, Math.max(1, recovery)), changes, "Overall recovery", "%");
+}
+
+function commandAddPresetOnce(preset, changes, reason) {
+  const beforeUnits = state.units.length;
+  addSectionPreset(preset);
+  const added = state.units.slice(beforeUnits);
+  if (!added.length) return [];
+  changes.push({
+    type: "equipment",
+    where: "Process Builder",
+    before: `${beforeUnits} units`,
+    after: `${state.units.length} units`,
+    reason,
+  });
+  return added.map((unit) => unit.id);
+}
+
+function commandAddUnit(type, changes, reason) {
+  const beforeUnits = state.units.length;
+  addUnitFromButton(type);
+  const added = state.units[state.units.length - 1];
+  if (!added || state.units.length === beforeUnits) return [];
+  changes.push({
+    type: "equipment",
+    where: `Process Builder · ${added.id}`,
+    before: `${beforeUnits} units`,
+    after: `${state.units.length} units`,
+    reason,
+  });
+  return [added.id];
+}
+
+function commandRecord(prompt, guide, before) {
+  const after = commandSnapshot();
+  const impacts = new Set(guide.impacts || []);
+  if (Math.abs(before.directCost - after.directCost) > 0.01) impacts.add(`Direct cost $${formatNumber(before.directCost, 0)}/kg -> $${formatNumber(after.directCost, 0)}/kg`);
+  if (Math.abs(before.utilization - after.utilization) > 0.1) impacts.add(`Plant utilization ${formatNumber(before.utilization, 0)}% -> ${formatNumber(after.utilization, 0)}%`);
+  if (before.units !== after.units) impacts.add(`Equipment count ${before.units} -> ${after.units}`);
+  if (before.streams !== after.streams) impacts.add(`Stream count ${before.streams} -> ${after.streams}`);
+  guide.impacts = Array.from(impacts);
+  const entry = {
+    id: `cmd-${Date.now()}`,
+    time: new Date().toISOString(),
+    prompt,
+    title: guide.title,
+    changes: guide.changes || [],
+    impacts: guide.impacts || [],
+    targetView: guide.targetView,
+  };
+  if ((guide.changes || []).length || (guide.applied || []).length) state.commandHistory = [entry, ...(state.commandHistory || [])].slice(0, 12);
+}
+
 function applySystemCommand(prompt) {
   const lower = prompt.toLowerCase();
+  const before = commandSnapshot();
   const applied = [];
   const steps = [];
+  const changes = [];
+  const impacts = new Set();
+  const affectedIds = new Set();
   let targetView = null;
   let needsRender = false;
   let needsFit = false;
+  let startCfd = false;
 
   const templateKey = commandTemplateMatch(lower);
   if (templateKey && state.template !== templateKey) {
     loadTemplate(templateKey, lower.includes("keep scale"));
     applied.push(`Loaded ${templates[templateKey].label} as the active product model.`);
     steps.push("The workspace now uses the selected product model, so labels, streams, equipment and reports follow that process instead of the previous template.");
+    changes.push({ type: "model", where: "Product model", before: templates[before.template]?.label || before.template, after: templates[templateKey].label, reason: "Product family changed from the command." });
+    state.units.slice(0, 8).forEach((unit) => affectedIds.add(unit.id));
     targetView = "overview";
   }
 
@@ -12797,6 +12976,17 @@ function applySystemCommand(prompt) {
     applyScale(scaleKey);
     applied.push(`Changed scale to ${scalePresets[scaleKey].label}.`);
     steps.push("Scale-dependent costs, batch size, annual batches and equipment sizing were recalculated.");
+    changes.push({ type: "scale", where: "Model scale", before: scalePresets[before.scale]?.label || before.scale, after: scalePresets[scaleKey].label, reason: "Scale preset selected from the command." });
+    needsRender = true;
+  }
+
+  commandApplyExplicitNumbers(lower, changes);
+  if (changes.some((item) => item.type === "parameter" || item.type === "model")) {
+    applied.push("Applied numeric model edits from the command.");
+    steps.push("KPIs, balances, CFD screening inputs, economics and exports were recalculated from the edited values.");
+    impacts.add("Parameters");
+    impacts.add("Mass and energy balances");
+    impacts.add("TEA/LCA exports");
     needsRender = true;
   }
 
@@ -12825,8 +13015,10 @@ function applySystemCommand(prompt) {
   }
 
   if (lower.includes("recycle") || lower.includes("heat reuse") || lower.includes("heat recovery")) {
-    state.params.heatRecovery = Math.min(85, Math.max(state.params.heatRecovery || 0, 45));
-    if (!state.units.some((item) => item.name.toLowerCase().includes("heat recovery"))) addSectionPreset("recycle");
+    commandSetParam("heatRecovery", Math.min(85, Math.max(state.params.heatRecovery || 0, 45)), changes, "Heat reuse requested in the command.");
+    if (!state.units.some((item) => item.name.toLowerCase().includes("heat recovery"))) {
+      commandAddPresetOnce("recycle", changes, "Added recycle and heat-reuse support objects.").forEach((id) => affectedIds.add(id));
+    }
     state.canvasFocus = "recycle";
     applied.push("Added or emphasized recycle and heat-reuse logic, with heat recovery raised to at least 45%.");
     targetView = "flowsheet";
@@ -12840,19 +13032,23 @@ function applySystemCommand(prompt) {
   }
 
   if (lower.includes("cip") || lower.includes("sip") || lower.includes("cleaning") || lower.includes("sterilization")) {
-    if (!state.units.some((item) => item.type === "cip")) addSectionPreset("cip");
+    if (!state.units.some((item) => item.type === "cip")) {
+      commandAddPresetOnce("cip", changes, "Added CIP/SIP support equipment and cleaning links.").forEach((id) => affectedIds.add(id));
+    }
     state.canvasFocus = "utilities";
-    state.params.cipTime = Math.max(state.params.cipTime || 0, 2.5);
-    state.params.sipHold = Math.max(state.params.sipHold || 0, 30);
+    commandSetParam("cipTime", Math.max(state.params.cipTime || 0, 2.5), changes, "Cleaning cycle requested in the command.");
+    commandSetParam("sipHold", Math.max(state.params.sipHold || 0, 30), changes, "Sterilization hold requested in the command.");
     applied.push("Added or emphasized CIP/SIP support and cleaning-cycle parameters.");
     targetView = "flowsheet";
     needsRender = true;
   }
 
   if (lower.includes("oxygen") || lower.includes("kla") || lower.includes("do ") || lower.includes("mixing")) {
-    state.params.kla = Math.min(260, Math.max(state.params.kla || 0, Math.round((state.params.kla || 65) * 1.18)));
-    state.params.aeration = Math.min(2.5, Math.max(state.params.aeration || 0.01, Number(((state.params.aeration || 0.35) + 0.08).toFixed(2))));
-    state.params.doSetpoint = Math.max(state.params.doSetpoint || 0, 45);
+    commandSetParam("kla", Math.round((state.params.kla || 65) * 1.18), changes, "Improved oxygen-transfer capacity.");
+    commandSetParam("aeration", Number(((state.params.aeration || 0.35) + 0.08).toFixed(2)), changes, "Raised gas-flow screening assumption.");
+    commandSetParam("doSetpoint", Math.max(state.params.doSetpoint || 0, 45), changes, "Raised minimum DO setpoint for the CFD screen.");
+    state.cfdLayer = "oxygen";
+    cfdBioreactors().forEach((unit) => affectedIds.add(unit.id));
     applied.push("Improved oxygen-transfer assumptions: kLa, aeration and DO setpoint were raised conservatively.");
     steps.push("Open CFD to inspect oxygen, nutrient and shear gradients before accepting the scale-up.");
     targetView = "cfd";
@@ -12860,25 +13056,66 @@ function applySystemCommand(prompt) {
   }
 
   if (lower.includes("ammon") || lower.includes("lactate") || lower.includes("ph boundary")) {
-    state.params.glutamine = Math.max(0, Number(((state.params.glutamine || 3) * 0.82).toFixed(1)));
-    state.params.feedRate = Math.min(80, Math.max(state.params.feedRate || 0, 22));
+    commandSetParam("glutamine", Number(((state.params.glutamine || 3) * 0.82).toFixed(1)), changes, "Reduced glutamine burden to lower ammonium risk.");
+    commandSetParam("feedRate", Math.min(80, Math.max(state.params.feedRate || 0, 22)), changes, "Raised controlled feeding/perfusion lever for metabolite control.");
+    commandSetParam("perfusionRate", Math.min(8, Math.max(state.params.perfusionRate || 0, 1.2)), changes, "Added perfusion/bleed intensity as a mitigation lever.");
+    if (!state.units.some((item) => item.type === "pat")) commandAddUnit("pat", changes, "Added PAT/soft-sensor monitoring for ammonium/lactate boundary tracking.").forEach((id) => affectedIds.add(id));
+    cfdBioreactors().forEach((unit) => affectedIds.add(unit.id));
     applied.push("Adjusted conservative cell-culture boundary assumptions for ammonium/lactate risk review.");
     targetView = "ai";
     needsRender = true;
   }
 
   if (lower.includes("material") || lower.includes("media cost") || lower.includes("medium cost")) {
-    state.params.mediaCostPerL = Math.max(state.params.mediaCostPerL || 0, 60);
-    state.params.feedSupplementCostPerL = Math.max(state.params.feedSupplementCostPerL || 0, 220);
-    state.params.materialLossFactor = Math.max(state.params.materialLossFactor || 0, 22);
-    applied.push("Raised media, feed supplement and material-loss assumptions so materials carry more weight in economics.");
+    if (lower.includes("reduce") || lower.includes("lower") || lower.includes("senk") || lower.includes("optim")) {
+      commandSetParam("mediaCostPerL", Math.max(0.1, (state.params.mediaCostPerL || 42) * 0.82), changes, "Applied a media-price improvement scenario.");
+      commandSetParam("materialLossFactor", Math.max(0, (state.params.materialLossFactor || 18) - 4), changes, "Reduced material-loss assumption for the optimization scenario.");
+      commandSetParam("recycleFraction", Math.min(95, Math.max(state.params.recycleFraction || 0, 45)), changes, "Raised recycle fraction as a media/material mitigation lever.");
+      applied.push("Applied a media/material optimization scenario.");
+    } else {
+      commandSetParam("mediaCostPerL", Math.max(state.params.mediaCostPerL || 0, 60), changes, "Raised media cost so materials dominate the TEA as requested.");
+      commandSetParam("feedSupplementCostPerL", Math.max(state.params.feedSupplementCostPerL || 0, 220), changes, "Raised feed/supplement cost basis.");
+      commandSetParam("materialLossFactor", Math.max(state.params.materialLossFactor || 0, 22), changes, "Raised material-loss factor.");
+      applied.push("Raised media, feed supplement and material-loss assumptions so materials carry more weight in economics.");
+    }
+    targetView = "economics";
+    needsRender = true;
+  }
+
+  if (lower.includes("reduce working volume") || lower.includes("lower working volume") || lower.includes("not completely full") || lower.includes("too full") || lower.includes("weniger voll")) {
+    commandSetParam("workingVolume", Math.min(80, Math.min(state.params.workingVolume || 80, 72)), changes, "Reduced working volume to keep headspace and gas disengagement visible.");
+    cfdBioreactors().forEach((unit) => affectedIds.add(unit.id));
+    applied.push("Reduced reactor working volume and kept the change visible in CFD and equipment sizing.");
+    targetView = "cfd";
+    needsRender = true;
+  }
+
+  if (lower.includes("feed ring") || lower.includes("distributed feed") || lower.includes("feed distribution")) {
+    const beforeFeed = state.cfdNutrientInlet;
+    state.cfdNutrientInlet = "feed-ring";
+    if (beforeFeed !== state.cfdNutrientInlet) {
+      changes.push({ type: "cfd", where: "CFD · nutrient boundary", before: beforeFeed, after: "feed-ring", reason: "Moved nutrient addition to a distributed feed manifold." });
+    }
+    state.cfdLayer = "nutrient";
+    cfdBioreactors().forEach((unit) => affectedIds.add(unit.id));
+    applied.push("Moved nutrient boundary condition to feed ring and opened the nutrient layer.");
+    targetView = "cfd";
+    needsRender = true;
+  }
+
+  if (lower.includes("increase yield") || lower.includes("improve yield") || lower.includes("increase recovery") || lower.includes("improve recovery") || lower.includes("ausbeute")) {
+    commandSetTopLevel("recovery", Math.min(99, (state.recovery || 72) + 4), changes, "Applied a recovery improvement scenario.");
+    commandSetParam("harvestRecovery", Math.min(99, (state.params.harvestRecovery || 88) + 3), changes, "Improved harvest recovery assumption.");
+    commandSetParam("clarificationYield", Math.min(99, (state.params.clarificationYield || 92) + 2), changes, "Improved clarification yield assumption.");
+    commandSetParam("ufdfYield", Math.min(99, (state.params.ufdfYield || 91) + 2), changes, "Improved concentration/buffer-exchange yield assumption.");
+    applied.push("Applied a conservative yield/recovery improvement scenario.");
     targetView = "economics";
     needsRender = true;
   }
 
   const equipmentType = commandEquipmentMatch(lower);
   if (equipmentType) {
-    addUnitFromButton(equipmentType);
+    commandAddUnit(equipmentType, changes, `Added ${palette.find((item) => item.type === equipmentType)?.label || "equipment"} from the command.`).forEach((id) => affectedIds.add(id));
     applied.push(`Added ${palette.find((item) => item.type === equipmentType)?.label || "equipment"} near the current selection.`);
     targetView = "flowsheet";
     needsRender = true;
@@ -12905,6 +13142,12 @@ function applySystemCommand(prompt) {
     targetView = "simulation";
   }
 
+  if (lower.includes("cfd") || lower.includes("fluid") || lower.includes("mixing map")) {
+    applied.push("Opened the CFD workbench.");
+    targetView = "cfd";
+    if (lower.includes("start") || lower.includes("run") || lower.includes("simulate") || lower.includes("solve")) startCfd = true;
+  }
+
   if (lower.includes("download") || lower.includes("export") || lower.includes("csv") || lower.includes("lca") || lower.includes("tea")) {
     applied.push("Opened the Downloads area for LCA, TEA, streams, balances, visuals and schedules.");
     targetView = "reports";
@@ -12914,6 +13157,26 @@ function applySystemCommand(prompt) {
     applied.push("Opened scientific data and source governance.");
     steps.push("Axion uses public or licensed references only, keeps provenance attached, and does not copy proprietary simulator files.");
     targetView = "sources";
+  }
+
+  state.commandHighlights = Array.from(affectedIds);
+  if (startCfd) {
+    state.cfdSolverStarted = true;
+    state.cfdSolverRunning = true;
+    state.cfdIteration = Math.max(1, state.cfdIteration || 0);
+    if (state.cfdTimeH === null || state.cfdTimeH === undefined) state.cfdTimeH = cfdTimeBounds().suggestedH;
+    window.clearInterval(startCfdSolver.timer);
+    startCfdSolver.timer = window.setInterval(() => {
+      if (!state.cfdSolverRunning) return;
+      state.cfdIteration += 1;
+      const bounds = cfdTimeBounds();
+      const nextTime = (Number(state.cfdTimeH) || 0) + Math.max(0.7, bounds.maxH / 180);
+      state.cfdTimeH = nextTime > bounds.maxH ? bounds.minH : nextTime;
+      if (document.body.dataset.activeView === "cfd") renderCfdBoard();
+    }, 2400);
+    applied.push("Started the CFD solver from the command field.");
+    targetView = "cfd";
+    needsRender = true;
   }
 
   if (targetView) setView(targetView);
@@ -12929,9 +13192,11 @@ function applySystemCommand(prompt) {
     if (fallback.targetView) targetView = fallback.targetView;
   }
 
-  return {
+  const guide = {
     title: applied.length ? "Applied to the model" : "Suggested next steps",
     applied,
+    changes,
+    impacts: Array.from(impacts),
     steps: steps.length ? steps : fallback.steps,
     targetView: targetView || fallback.targetView,
     assumptions: [
@@ -12946,18 +13211,39 @@ function applySystemCommand(prompt) {
       "open LCA and TEA downloads",
     ],
   };
+  commandRecord(prompt, guide, before);
+  return guide;
 }
 
 function renderHelpResult(payload) {
   if (!els.helpResult) return;
   const guide = payload.guide || payload;
+  const recent = (state.commandHistory || []).slice(0, 3);
   els.helpResult.innerHTML = `
     <strong>${guide.title || "Recommended next steps"}</strong>
-    ${(guide.applied || []).length ? `<div>${guide.applied.map((item) => `<span class="applied-change">${escapeHtml(item)}</span>`).join("")}</div>` : ""}
-    <ol>${(guide.steps || []).map((step) => `<li>${step}</li>`).join("")}</ol>
-    <div>${(guide.assumptions || []).map((item) => `<span>${item}</span>`).join("")}</div>
+    ${(guide.applied || []).length ? `<div class="command-applied">${guide.applied.map((item) => `<span class="applied-change">${escapeHtml(item)}</span>`).join("")}</div>` : ""}
+    ${(guide.changes || []).length ? `
+      <section class="command-change-list" aria-label="Applied model changes">
+        ${(guide.changes || []).map((change) => `
+          <article>
+            <b>${escapeHtml(change.where || "Model")}</b>
+            <span>${escapeHtml(change.before || "before")} -> ${escapeHtml(change.after || "after")}</span>
+            <small>${escapeHtml(change.reason || "Applied by System Composer.")}</small>
+          </article>
+        `).join("")}
+      </section>
+    ` : ""}
+    ${(guide.impacts || []).length ? `<div class="command-impact-list">${guide.impacts.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
+    <ol>${(guide.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+    <div>${(guide.assumptions || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
     ${guide.targetView ? `<button data-help-jump="${guide.targetView}" type="button">Open ${pageTitle(guide.targetView)}</button>` : ""}
     ${(guide.commands || []).length ? `<div>${guide.commands.map((command) => `<button data-help-command="${escapeAttr(command)}" type="button">${escapeHtml(command)}</button>`).join("")}</div>` : ""}
+    ${recent.length ? `
+      <section class="command-history">
+        <b>Recent changes</b>
+        ${recent.map((entry) => `<button data-help-command="${escapeAttr(entry.prompt)}" type="button">${escapeHtml(entry.prompt)}</button>`).join("")}
+      </section>
+    ` : ""}
   `;
 }
 
@@ -14091,6 +14377,17 @@ function bindEvents() {
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 
   els.cfdBoard.addEventListener("click", (event) => {
+    const fixButton = event.target.closest("[data-cfd-fix]");
+    if (fixButton) {
+      const command = fixButton.dataset.cfdFix || "";
+      const guide = applySystemCommand(command);
+      renderHelpResult(guide);
+      els.helpDock?.classList.add("open");
+      els.helpToggle?.setAttribute("aria-expanded", "true");
+      if (els.helpPrompt) els.helpPrompt.value = command;
+      showToast("CFD edit applied");
+      return;
+    }
     const actionButton = event.target.closest("[data-cfd-action]");
     if (actionButton) {
       const action = actionButton.dataset.cfdAction;

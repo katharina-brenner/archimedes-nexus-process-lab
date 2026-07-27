@@ -24,6 +24,7 @@ const checks = [
   ["Google OAuth", ["GOOGLE_CLIENT_ID", "APP_BASE_URL"]],
   ["Invite email", ["INVITE_EMAIL_FROM", "RESEND_API_KEY"]],
   ["Deployment", ["APP_BASE_URL", "SESSION_SECRET", "AXION_ADMIN_PASSWORD"]],
+  ["Next.js BFF", ["NEXTJS_BFF_URL"]],
   ["External CFD worker", ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"]],
 ];
 
@@ -49,5 +50,11 @@ if (!httpsReady) {
   console.log("      APP_BASE_URL must be an https:// production URL for Stripe, Google OAuth and invite links.");
 }
 
+const nextReady = !process.env.NEXTJS_BFF_URL || String(process.env.NEXTJS_BFF_URL).startsWith("https://");
+if (!nextReady) {
+  console.log("\nTODO  Next.js BFF HTTPS");
+  console.log("      NEXTJS_BFF_URL must be an https:// URL when the BFF is deployed.");
+}
+
 console.log("\nNo secret values were printed.\n");
-process.exit(rows.some((row) => !row.ready && row.area !== "External CFD worker") || !httpsReady ? 1 : 0);
+process.exit(rows.some((row) => !row.ready && row.area !== "External CFD worker" && row.area !== "Next.js BFF") || !httpsReady || !nextReady ? 1 : 0);

@@ -97,6 +97,26 @@ https://your-render-url/api/production-readiness
 
 For a real private SaaS, deploy the Node backend on Render/Fly/Railway/AWS and point the domain there. GitHub Pages can host the public static marketing build, but it cannot safely run Stripe webhooks, Google token checks, Supabase service-role access, invite email, or CFD worker submission by itself.
 
+### Optional Next.js BFF
+
+Use `nextjs-bff/` when you want a Next.js app edge in front of the Axion API core. The BFF handles public app routing and future SSR/auth middleware, while `server.mjs` remains the modelling API core.
+
+API core environment:
+
+```bash
+APP_BASE_URL=https://your-api-core-domain
+NEXTJS_BFF_URL=https://your-public-app-domain
+```
+
+Next.js BFF environment:
+
+```bash
+AXION_API_BASE_URL=https://your-api-core-domain
+PORT=3000
+```
+
+Render can deploy both services from `render.yaml`: `axion-process-os` for the API core and `axion-nextjs-bff` for the app edge. The BFF health check is `/api/health`; proxied core health is `/api/axion/health` or `/api/core/health`.
+
 ## 6. CFD Backend Jobs
 
 Current Axion backend CFD jobs are screening/handoff jobs.
