@@ -2045,6 +2045,7 @@ const state = {
   integrations: [],
   selectedIntegration: "",
   connectorResults: {},
+  productionReadiness: null,
   projectFolders: {},
   factoryTimeH: null,
   cfdTimeH: null,
@@ -8479,6 +8480,49 @@ function renderIntegrationRegistry() {
   }).join("");
 }
 
+function fallbackProductionReadiness() {
+  return {
+    ready: false,
+    checks: [
+      { key: "postgres", label: "Supabase/Postgres database", ready: false, missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] },
+      { key: "stripe", label: "Stripe Checkout + webhook", ready: false, missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL=https://..."] },
+      { key: "google", label: "Google OAuth login", ready: false, missing: ["GOOGLE_CLIENT_ID", "authorized HTTPS domain"] },
+      { key: "email", label: "Invite email delivery", ready: false, missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"] },
+      { key: "deployment", label: "Public HTTPS backend + domain", ready: false, missing: ["Render/Fly/Railway/Vercel backend", "custom domain/DNS"] },
+      { key: "cfd-worker", label: "External rigorous CFD worker", ready: false, missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"] },
+      { key: "ci", label: "Tests/CI", ready: true, missing: [] },
+    ],
+    note: "Static/local fallback: connect the backend to see live readiness.",
+  };
+}
+
+function renderProductionReadinessPanel() {
+  const readiness = state.productionReadiness || fallbackProductionReadiness();
+  const checks = readiness.checks || [];
+  const done = checks.filter((item) => item.ready).length;
+  return `
+    <section class="production-readiness-panel">
+      <div class="production-readiness-head">
+        <div>
+          <p>Production readiness</p>
+          <h3>${done}/${checks.length} systems ready for paid SaaS launch.</h3>
+          <span>${escapeHtml(readiness.note || "Axion checks the secure backend pieces needed for production access, payment, collaboration, deployment and simulation jobs.")}</span>
+        </div>
+        <button data-refresh-projects type="button">Refresh readiness</button>
+      </div>
+      <div class="production-readiness-grid">
+        ${checks.map((item) => `
+          <article class="${item.ready ? "ready" : "missing"}">
+            <span>${item.ready ? "Ready" : "Missing"}</span>
+            <strong>${escapeHtml(item.label || item.key)}</strong>
+            <p>${item.ready ? "Configured and available." : `${(item.missing || []).length ? item.missing.join(", ") : "Configuration required."}`}</p>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderProjectsBoard() {
   if (!els.projectsBoard) return;
   const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
@@ -8514,6 +8558,7 @@ function renderProjectsBoard() {
         <p>Each project has a current model file plus version entries for older process states.</p>
       </article>
     </section>
+    ${renderProductionReadinessPanel()}
     <section class="project-grid">
       <div class="project-column">
         <h3>Open projects</h3>
@@ -12705,17 +12750,22 @@ async function handleIntegrationAction(action, key) {
 
 async function refreshProjects() {
   try {
-    const payload = await apiRequest("/api/projects");
+    const [payload, readiness] = await Promise.all([
+      apiRequest("/api/projects"),
+      apiRequest("/api/production-readiness").catch(() => fallbackProductionReadiness()),
+    ]);
     state.projects = payload.projects || [];
     state.projectInvites = payload.invites || [];
     state.integrations = payload.integrations || [];
     state.projectFolders = payload.folders || {};
+    state.productionReadiness = readiness;
   } catch {
     const store = normalizeLocalProjectOwnership(localProjectStore());
     state.projects = store.projects || [];
     state.projectInvites = store.invites || [];
     state.integrations = localIntegrations();
     state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
+    state.productionReadiness = fallbackProductionReadiness();
   }
   if (!state.currentProjectId && state.projects.length) {
     const latestOpenProject = state.projects.find((project) => !project.archived) || state.projects[0];
