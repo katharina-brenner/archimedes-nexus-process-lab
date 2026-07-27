@@ -2054,6 +2054,7 @@ const state = {
   cfdSolverStarted: false,
   cfdSolverRunning: false,
   cfdIteration: 0,
+  cfdBackendJob: null,
 };
 
 const els = {
@@ -5699,6 +5700,10 @@ function plantSimulationExperimentRows(model = plantSimulationModel()) {
 }
 
 function plantSimulationSvg() {
+  const svgNum = (value, digits = 1) => {
+    const fixed = (Number(value) || 0).toFixed(digits);
+    return fixed.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  };
   const visibleUnits = state.units.filter((item) => !["Sensor/Data", "Personnel"].includes(item.cls));
   const mainPriority = new Set(["Preparation", "Bioreactor", "Hold", "Solid-liquid", "Filtration", "Purification", "Concentration", "Recovery", "Finishing", "Packaging", "Sterilization"]);
   const mainUnits = visibleUnits
@@ -5739,7 +5744,10 @@ function plantSimulationSvg() {
     support: "#5d707b",
     utility: "#275f6b",
     cleaning: "#95c7bd",
+    recycle: "#596a64",
+    heat: "#275f6b",
     waste: "#596a64",
+    quality: "#d9b96f",
     data: "#d9b96f",
   }[layer] || "#526271");
   const iconForUnit = (item, x, y, color) => {
@@ -5791,10 +5799,10 @@ function plantSimulationSvg() {
     const y2 = toBox.y + toBox.h / 2;
     const sameLane = fromBox.lane === toBox.lane;
     const laneBend = sameLane ? Math.max(x1 + 18, Math.min(x2 - 18, (x1 + x2) / 2)) : Math.max(x1 + 20, Math.min(width - 110, x1 + 52 + (index % 4) * 14));
-    if (x2 > x1 + 28) return `M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} H${formatNumber(laneBend, 1)} V${formatNumber(y2, 1)} H${formatNumber(x2, 1)}`;
+    if (x2 > x1 + 28) return `M${svgNum(x1)} ${svgNum(y1)} H${svgNum(laneBend)} V${svgNum(y2)} H${svgNum(x2)}`;
     const escapeX = width - 82 - (index % 5) * 14;
     const top = Math.min(y1, y2) - 34 - (index % 3) * 12;
-    return `M${formatNumber(x1, 1)} ${formatNumber(y1, 1)} H${formatNumber(escapeX, 1)} V${formatNumber(top, 1)} H${formatNumber(toBox.x - 20, 1)} V${formatNumber(y2, 1)} H${formatNumber(x2, 1)}`;
+    return `M${svgNum(x1)} ${svgNum(y1)} H${svgNum(escapeX)} V${svgNum(top)} H${svgNum(toBox.x - 20)} V${svgNum(y2)} H${svgNum(x2)}`;
   };
   const visibleStreamRows = state.streams
     .filter((item) => layout.has(item.from) && layout.has(item.to))
@@ -5810,7 +5818,7 @@ function plantSimulationSvg() {
     const layer = streamKind(item, from, to);
     const color = layer === "waste" ? "#596a64" : layer === "utility" ? "#6f8794" : layer === "qc" ? "#d9b96f" : "#95c7bd";
     const widthStroke = layer === "main" ? 3.4 : 2.2;
-    return `<path d="${routePath(fromBox, toBox, layer, index)}" fill="none" stroke="${color}" stroke-width="${widthStroke}" opacity="${layer === "main" ? 0.95 : 0.7}" marker-end="url(#arrow${layer === "main" ? "Main" : ""})"/><text x="${formatNumber((fromBox.x + fromBox.w + toBox.x) / 2, 1)}" y="${formatNumber(Math.min(fromBox.y, toBox.y) + 54, 1)}" fill="#5a6875" font-family="Arial, sans-serif" font-size="8">${svgEscape(item.id)}</text>`;
+    return `<path d="${routePath(fromBox, toBox, layer, index)}" fill="none" stroke="${color}" stroke-width="${widthStroke}" opacity="${layer === "main" ? 0.95 : 0.7}" marker-end="url(#arrow${layer === "main" ? "Main" : ""})"/><text x="${svgNum((fromBox.x + fromBox.w + toBox.x) / 2)}" y="${svgNum(Math.min(fromBox.y, toBox.y) + 54)}" fill="#5a6875" font-family="Arial, sans-serif" font-size="8">${svgEscape(item.id)}</text>`;
   }).join("");
   const units = [...mainUnits, ...supportUnits].map(unitNode).join("");
   const model = plantSimulationModel();
@@ -9077,7 +9085,11 @@ function cfdSimulationSetup(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH
   const uptake = cfdClamp(0.055 + (p.our || 1.1) * 0.045 + (p.vcd || 12) * 0.004, 0.035, 0.34) * phase.demand;
   const nutrientUptake = uptake * (isCellCultureTemplate() ? 0.66 : 0.52);
   const cflSpeed = impellerVelocity + p.aeration * 0.18;
-  const dt = cfdClamp(0.012 / Math.max(0.25, cflSpeed), 0.004, 0.026);
+  const minCell = Math.min(dx, dy);
+  const dtAdvective = 0.28 * minCell / Math.max(0.05, cflSpeed);
+  const dtDiffusive = 0.16 * minCell ** 2 / Math.max(0.005, eddyDiffusion);
+  const dt = cfdClamp(Math.min(dtAdvective, dtDiffusive, 0.012), 0.0008, 0.012);
+  const diffusionNumber = cfdClamp(eddyDiffusion * dt / minCell ** 2, 0.02, 0.16);
   const elapsed = state.cfdSolverStarted ? cfdClamp((Number(timeH) || 0) / Math.max(1, bounds.maxH), 0, 1) : 0;
   const steps = state.cfdSolverStarted ? Math.max(18, Math.min(120, Math.round(22 + elapsed * 90 + (state.cfdIteration || 0) * 2))) : 0;
   return {
@@ -9101,7 +9113,8 @@ function cfdSimulationSetup(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH
     uptake,
     nutrientUptake,
     scalePenalty,
-    courant: Math.max(cflSpeed * dt / Math.min(dx, dy), eddyDiffusion * dt / Math.min(dx, dy) ** 2),
+    diffusionNumber,
+    courant: Math.max(cflSpeed * dt / minCell, diffusionNumber),
     workingVolumePct: eng.workingVolumePct,
   };
 }
@@ -9206,13 +9219,13 @@ function cfdRunTransient(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH) {
       const gradNY = uy >= 0 ? nC - nU : nD - nC;
       const lapO = oL + oR + oU + oD - 4 * oC;
       const lapN = nL + nR + nU + nD - 4 * nC;
-      const oSource = setup.gasSource * cell.oxygenSource * (1 - oC) * 0.42;
-      const nSource = setup.feedSource * cell.nutrientSource * (1 - nC) * 0.34;
-      const oSink = setup.uptake * cell.biomass * (0.36 + setup.elapsed * 0.24) * (0.72 + oC * 0.28);
-      const nSink = setup.nutrientUptake * cell.biomass * (0.3 + setup.elapsed * 0.2) * (0.72 + nC * 0.28);
+      const oSource = setup.gasSource * cell.oxygenSource * (1 - oC) * 0.16;
+      const nSource = setup.feedSource * cell.nutrientSource * (1 - nC) * 0.13;
+      const oSink = setup.uptake * cell.biomass * (0.16 + setup.elapsed * 0.1) * (0.72 + oC * 0.28);
+      const nSink = setup.nutrientUptake * cell.biomass * (0.13 + setup.elapsed * 0.08) * (0.72 + nC * 0.28);
       const noSlipLoss = (cell.nearWall * 0.018 + cell.nearBottom * 0.014) * setup.phase.viscosity;
-      const oNext = cfdClamp(oC + setup.dt * (-ux * gradOX / setup.dx - uy * gradOY / setup.dy + setup.eddyDiffusion * lapO / (setup.dx * setup.dy) + oSource - oSink - noSlipLoss), 0.01, 1);
-      const nNext = cfdClamp(nC + setup.dt * (-ux * gradNX / setup.dx - uy * gradNY / setup.dy + setup.eddyDiffusion * lapN / (setup.dx * setup.dy) + nSource - nSink - noSlipLoss * 0.7), 0.01, 1);
+      const oNext = cfdClamp(oC - setup.dt * ux * gradOX / setup.dx - setup.dt * uy * gradOY / setup.dy + setup.diffusionNumber * lapO + setup.dt * (oSource - oSink - noSlipLoss), 0.01, 1);
+      const nNext = cfdClamp(nC - setup.dt * ux * gradNX / setup.dx - setup.dt * uy * gradNY / setup.dy + setup.diffusionNumber * lapN + setup.dt * (nSource - nSink - noSlipLoss * 0.7), 0.01, 1);
       nextOxygen[index] = oNext;
       nextNutrient[index] = nNext;
       oxygenResidual += Math.abs(oNext - oC);
@@ -9261,6 +9274,7 @@ function cfdRunTransient(unit, gridW = 24, gridH = 32, timeH = state.cfdTimeH) {
       oxygenResidual: oxygenResidual / Math.max(1, count),
       nutrientResidual: nutrientResidual / Math.max(1, count),
       eddyDiffusion: setup.eddyDiffusion,
+      diffusionNumber: setup.diffusionNumber,
       impellerVelocity: setup.impellerVelocity,
       gasSource: setup.gasSource,
       feedSource: setup.feedSource,
@@ -9358,6 +9372,70 @@ function resetCfdSolver() {
   window.clearInterval(startCfdSolver.timer);
   renderCfdBoard();
   showToast("CFD solver reset");
+}
+
+async function runBackendCfdJob() {
+  const report = cfdReport();
+  const selected = report.find((item) => item.id === state.selectedId) || report[0];
+  if (!selected) {
+    showToast("No bioreactor available for backend CFD");
+    return;
+  }
+  state.cfdBackendJob = {
+    id: "pending",
+    status: "submitting",
+    result: {
+      status: "backend job is being created",
+      kpis: {},
+      boundaryConditions: [],
+    },
+  };
+  renderCfdBoard();
+  const eng = selected.engineering || {};
+  const payload = {
+    projectId: state.currentProjectId || "",
+    unitId: selected.id,
+    solver: "openfoam-handoff",
+    caseInput: {
+      template: state.template,
+      scale: state.scale,
+      batchVolumeL: state.batchSize,
+      volumeL: selected.volumeL || state.batchSize,
+      workingVolumePct: eng.workingVolumePct || state.params.workingVolume || 70,
+      klaH: state.params.kla || state.params.kLa || 12,
+      ourMolLh: (state.params.our || state.params.oxygenUptake || 0.6) / 100,
+      tipSpeed: eng.tipSpeed || 1.1,
+      oxygenInlet: state.cfdOxygenInlet,
+      nutrientInlet: state.cfdNutrientInlet,
+      gridCells: selected.cells?.length || 1536,
+      boundaryConditions: cfdBoundaryConditionRows([selected]),
+      geometry: cfdGeometryRows([selected]),
+      flowPaths: cfdFlowPathRows([selected]),
+    },
+  };
+  try {
+    const response = await apiRequest("/api/cfd/jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    state.cfdBackendJob = response.job;
+    showToast(`Backend CFD job created: ${response.job.id.slice(0, 8)}`);
+  } catch (error) {
+    state.cfdBackendJob = {
+      id: "local-only",
+      status: "backend unavailable",
+      result: {
+        status: error.message || "backend request failed",
+        kpis: {
+          oxygenMarginPct: Math.max(0, Math.min(140, (state.params.kla || 12) / Math.max(0.1, state.params.our || 1) * 12)),
+          mixingTimeMin: eng.mixingTimeMin || 0,
+        },
+        boundaryConditions: cfdBoundaryConditionRows([selected]),
+      },
+    };
+    showToast("Backend CFD unavailable; local case kept visible");
+  }
+  renderCfdBoard();
 }
 
 function cfdTimeSeriesRows(unit) {
@@ -9714,6 +9792,7 @@ function renderCfdBoard() {
           <button class="cfd-run-button ${solverRunning ? "running" : ""}" data-cfd-action="start" type="button">${solverRunning ? "Running" : "Start CFD"}</button>
           <button data-cfd-action="pause" type="button" ${solverStarted ? "" : "disabled"}>Pause</button>
           <button data-cfd-action="reset" type="button" ${solverStarted ? "" : "disabled"}>Reset</button>
+          <button data-cfd-action="backend" type="button">Backend CFD job</button>
           <button data-download-report="cfd-field-csv" type="button">Field CSV</button>
           <button data-download-report="cfd-time-series-csv" type="button">Time series CSV</button>
           <button data-download-report="cfd-case-csv" type="button">Case CSV</button>
@@ -9721,8 +9800,15 @@ function renderCfdBoard() {
           <button data-download-report="cfd-geometry-csv" type="button">Geometry CSV</button>
           <button data-download-report="cfd-flow-paths-csv" type="button">Flow paths CSV</button>
         </div>
-      </div>
-      <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" ${solverStarted ? "" : "disabled"} />
+	      </div>
+	      <div class="cfd-workflow-panel" aria-label="Recommended CFD workflow">
+	        <article class="${selected.id ? "done" : "active"}"><b>1</b><span>Select reactor</span><small>Use the reactor tabs or click a bioreactor in the flowsheet.</small></article>
+	        <article class="${state.cfdOxygenInlet && state.cfdNutrientInlet ? "done" : "active"}"><b>2</b><span>Set boundaries</span><small>Choose gas inlet and nutrient feed point before solving.</small></article>
+	        <article class="${solverStarted ? "done" : "active"}"><b>3</b><span>Start CFD</span><small>The field is calculated only after Start CFD is pressed.</small></article>
+	        <article class="${solverStarted ? "active" : ""}"><b>4</b><span>Inspect fields</span><small>Switch O2, nutrient, velocity, shear and risk layers.</small></article>
+	        <article><b>5</b><span>Export case</span><small>Download field, boundary, geometry and residual CSVs.</small></article>
+	      </div>
+	      <input id="cfdTimeSlider" type="range" min="${timeBounds.minH}" max="${Math.ceil(timeBounds.maxH)}" step="0.5" value="${formatNumber(selected.timeH, 1)}" aria-label="CFD time in hours" ${solverStarted ? "" : "disabled"} />
       <div class="cfd-layer-tabs" aria-label="CFD field layer">
         ${Object.entries(layerLabels).map(([key, label]) => `<button type="button" data-cfd-layer="${key}" class="${state.cfdLayer === key ? "active" : ""}">${label}</button>`).join("")}
       </div>
@@ -9933,11 +10019,16 @@ function renderCfdBoard() {
           </div>
         </div>
       </div>
-      <div class="cfd-detail">
-        <div class="cfd-unit-tabs">
-          ${report.map((item) => `<button class="${item.id === selected.id ? "active" : ""}" data-select-cfd="${item.id}" type="button">${item.id}</button>`).join("")}
-        </div>
-        <div class="cfd-score-card">
+	      <div class="cfd-detail">
+	        <div class="cfd-unit-tabs">
+	          ${report.map((item) => `<button class="${item.id === selected.id ? "active" : ""}" data-select-cfd="${item.id}" type="button">${item.id}</button>`).join("")}
+	        </div>
+	        <div class="cfd-next-card">
+	          <span>What to do now</span>
+	          <strong>${solverStarted ? "Read the field map, then export the case evidence." : "Set the two boundary conditions, then press Start CFD."}</strong>
+	          <p>${solverStarted ? `Current layer: ${escapeHtml(layerLabels[state.cfdLayer] || "field")} at ${formatNumber(selected.timeH, 1)} h. Hotspots are cells where oxygen, nutrient and shear combine into a scale-up risk.` : "Before Start CFD, Axion only shows the reactor geometry and setup. The concentration contours, finite-volume cell map, velocity vectors and residuals appear after the solver starts."}</p>
+	        </div>
+	        <div class="cfd-score-card">
           <span>Transfer readiness</span>
           <strong>${formatNumber(transferScore, 0)}%</strong>
           <p>${selected.recommendation}</p>
@@ -9966,6 +10057,17 @@ function renderCfdBoard() {
 	            <dt>Validation</dt><dd>Export the boundary and case CSVs for full 3D CFD and calibrate against mixing time, kLa, gas hold-up, power draw and probe response.</dd>
 	          </dl>
 	        </div>
+	        ${state.cfdBackendJob ? `
+	          <div class="cfd-solver-card">
+	            <h4>Backend CFD job</h4>
+	            <p>${escapeHtml(state.cfdBackendJob.status || "job prepared")} · ${escapeHtml(state.cfdBackendJob.id || "local job")} · ${escapeHtml(state.cfdBackendJob.result?.status || "screening result")}</p>
+	            <dl>
+	              <dt>O₂ margin</dt><dd>${formatNumber(state.cfdBackendJob.result?.kpis?.oxygenMarginPct || 0, 1)}%</dd>
+	              <dt>Mixing</dt><dd>${formatNumber(state.cfdBackendJob.result?.kpis?.mixingTimeMin || 0, 2)} min</dd>
+	              <dt>Boundaries</dt><dd>${state.cfdBackendJob.result?.boundaryConditions?.length || 0} stored CFD conditions</dd>
+	            </dl>
+	          </div>
+	        ` : ""}
 	        <div class="cfd-spec-grid">
           <article>
             <h4>Reactor internals</h4>
@@ -11398,10 +11500,10 @@ function staticAccountForUser(user = "") {
 
 async function apiRequest(path, options = {}) {
   const session = window.localStorage.getItem("axion-session");
-  if (session === staticAuth.token && path === "/api/account") {
+  if (staticAccessMode && session === staticAuth.token && path === "/api/account") {
     return { account: staticAccountForUser(window.localStorage.getItem("axion-static-user") || "") };
   }
-  if (path === "/api/auth/google-config" && session === staticAuth.token) {
+  if (staticAccessMode && path === "/api/auth/google-config" && session === staticAuth.token) {
     return { enabled: false, clientId: "" };
   }
   const headers = {
@@ -12043,6 +12145,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", reviews: "publicReviews", pricing: "publicPricing", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;
@@ -12057,6 +12160,10 @@ function routePublicAction(target = "", { focusLogin = false } = {}) {
   }
   if (publicPageTargets[target]) {
     scrollPublicTarget(target, focusLogin || target === "loginPanel");
+    return;
+  }
+  if (pageAliases[target]) {
+    scrollPublicTarget(pageAliases[target], focusLogin || target === "login");
     return;
   }
   const targetElement = document.getElementById(target);
@@ -12502,45 +12609,93 @@ function connectorHandoffPayload(item) {
   };
 }
 
-function handleIntegrationAction(action, key) {
+function connectorModelSnapshot() {
+  return {
+    projectId: state.currentProjectId || "",
+    projectName: state.projectName || "Unsaved Axion model",
+    template: state.template,
+    templateLabel: activeTemplate().label,
+    scale: state.scale,
+    units: state.units.length,
+    streams: streamRows().length,
+    equations: equations.length,
+    scheduleRows: scheduleStreamRows().length,
+    equipmentPreview: state.units.slice(0, 16).map((unit) => ({
+      id: unit.id,
+      name: unit.name,
+      type: unit.type,
+      class: unit.cls,
+      role: unit.role,
+      size: unit.size,
+      power: unit.power,
+    })),
+    streamPreview: streamRows().slice(0, 16),
+    summary: currentModelSummary(),
+  };
+}
+
+async function handleIntegrationAction(action, key) {
   const item = connectorRegistryItems().find((candidate) => candidate.key === key);
   if (!item) return;
   state.selectedIntegration = key;
   state.connectorResults = state.connectorResults || {};
-  const checks = connectorMappingChecks(item);
-  const passCount = checks.filter((check) => check.status === "pass").length;
-  const rows = connectorConfigurationRows(item);
-  if (action === "export") {
-    const payload = connectorHandoffPayload(item);
-    downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(payload, null, 2));
-    state.connectorResults[key] = {
-      mode: "Export",
-      title: "Connector handoff downloaded",
-      message: `${payload.payloads.length} payload groups were packaged with equipment, stream, schedule, economics, and model-summary previews.`,
-      rows: [...rows, ["Export timestamp", payload.generatedAt]],
-      checks,
-    };
-    showToast(`${item.name} handoff JSON downloaded`);
-  } else if (action === "test") {
-    state.connectorResults[key] = {
-      mode: "Mapping test",
-      title: `${passCount}/${checks.length} checks passed`,
-      message: passCount === checks.length
-        ? "The current model is ready for a controlled connector export."
-        : "The current model can be exported, but live sync still needs credentials, schema validation, or more complete model data.",
-      rows,
-      checks,
-    };
-    showToast(`${item.name}: ${passCount}/${checks.length} mapping checks passed`);
-  } else {
-    state.connectorResults[key] = {
-      mode: "Configure",
-      title: "Connector configuration opened",
-      message: "Review the data contract, authentication method, payload groups, and mapping readiness before enabling a real integration.",
-      rows,
-      checks,
-    };
-    showToast(`${item.name} connector details opened`);
+  state.connectorResults[key] = {
+    mode: action === "test" ? "Mapping test" : action === "export" ? "Export" : "Configure",
+    title: "Contacting Axion backend",
+    message: "Preparing connector contract, model snapshot, checks, and audit record.",
+    rows: connectorConfigurationRows(item),
+    checks: connectorMappingChecks(item),
+  };
+  renderProjectsBoard();
+  try {
+    const payload = await apiRequest(`/api/integrations/${encodeURIComponent(key)}/actions`, {
+      method: "POST",
+      body: JSON.stringify({ action, modelSnapshot: connectorModelSnapshot() }),
+    });
+    state.connectorResults[key] = payload.result || state.connectorResults[key];
+    if (action === "export") {
+      const exportPayload = payload.handoff || connectorHandoffPayload(item);
+      downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(exportPayload, null, 2));
+      showToast(`${item.name} backend handoff downloaded`);
+    } else {
+      showToast(`${item.name} ${action === "test" ? "mapping test completed" : "configuration opened"}`);
+    }
+  } catch {
+    const checks = connectorMappingChecks(item);
+    const passCount = checks.filter((check) => check.status === "pass").length;
+    const rows = connectorConfigurationRows(item);
+    if (action === "export") {
+      const payload = connectorHandoffPayload(item);
+      downloadText(`${state.template}-${key}-connector-handoff.json`, "application/json", JSON.stringify(payload, null, 2));
+      state.connectorResults[key] = {
+        mode: "Local export",
+        title: "Connector handoff downloaded",
+        message: `${payload.payloads.length} payload groups were packaged locally. Backend audit is unavailable in static mode.`,
+        rows: [...rows, ["Export timestamp", payload.generatedAt]],
+        checks,
+      };
+      showToast(`${item.name} local handoff JSON downloaded`);
+    } else if (action === "test") {
+      state.connectorResults[key] = {
+        mode: "Local mapping test",
+        title: `${passCount}/${checks.length} checks passed`,
+        message: passCount === checks.length
+          ? "The current model is ready for a controlled connector export. Backend audit is unavailable in static mode."
+          : "The current model can be exported, but live sync still needs credentials, schema validation, or more complete model data.",
+        rows,
+        checks,
+      };
+      showToast(`${item.name}: ${passCount}/${checks.length} local checks passed`);
+    } else {
+      state.connectorResults[key] = {
+        mode: "Local configure",
+        title: "Connector configuration opened",
+        message: "Review the data contract, authentication method, payload groups, and mapping readiness before enabling a real integration.",
+        rows,
+        checks,
+      };
+      showToast(`${item.name} connector details opened`);
+    }
   }
   renderProjectsBoard();
   window.requestAnimationFrame(() => {
@@ -12985,6 +13140,26 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
+    const publicNextButton = event.target.closest("[data-public-detail-next]");
+    if (publicNextButton) {
+      event.preventDefault();
+      routePublicAction(publicNextButton.dataset.publicDetailNext);
+      return;
+    }
+    const publicDetailButton = event.target.closest("[data-public-detail]");
+    if (publicDetailButton) {
+      event.preventDefault();
+      openPublicDetail(publicDetailButton.dataset.publicDetail);
+      return;
+    }
+    const publicTargetButton = event.target.closest("[data-public-target]");
+    if (publicTargetButton) {
+      event.preventDefault();
+      const target = publicTargetButton.dataset.publicTarget;
+      if (publicTargetButton.dataset.publicDetail) openPublicDetail(publicTargetButton.dataset.publicDetail);
+      else routePublicAction(target, { focusLogin: target === "loginPanel" });
+      return;
+    }
     const globalJumpButton = event.target.closest("[data-jump-view]");
     if (globalJumpButton) {
       event.preventDefault();
@@ -13433,6 +13608,7 @@ function bindEvents() {
       if (action === "start") startCfdSolver();
       if (action === "pause") pauseCfdSolver();
       if (action === "reset") resetCfdSolver();
+      if (action === "backend") runBackendCfdJob();
       return;
     }
     const downloadButton = event.target.closest("[data-download-report]");

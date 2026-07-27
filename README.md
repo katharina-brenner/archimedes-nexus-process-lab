@@ -41,6 +41,7 @@ export AXION_ADMIN_USER="owner"
 export AXION_ADMIN_PASSWORD="set-a-private-password"
 export SESSION_SECRET="set-a-long-random-secret"
 export APP_BASE_URL="http://127.0.0.1:8899"
+export AXION_DATA_DIR=".data"
 export GOOGLE_CLIENT_ID="your-google-oauth-client-id.apps.googleusercontent.com"
 export GOOGLE_ALLOWED_EMAILS="you@example.com"
 export GOOGLE_ALLOWED_DOMAINS=""
@@ -63,6 +64,23 @@ The paywall is backend-enforced. Do not use a static GitHub Pages deployment for
 9. New paying users open the login page and submit the paid-access form.
 10. The backend creates a Stripe Checkout session and redirects the user to secure payment.
 11. After Stripe confirms payment, the backend creates a license and the frontend logs the user in automatically.
+
+For production Stripe activation on a public HTTPS backend, set:
+
+```bash
+STRIPE_SECRET_KEY=sk_live_or_test_...
+STRIPE_PRICE_ID=price_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+APP_BASE_URL=https://your-public-backend-domain.com
+```
+
+Configure the Stripe webhook endpoint to:
+
+```text
+https://your-public-backend-domain.com/api/stripe/webhook
+```
+
+Listen for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.async_payment_failed`.
 
 For local webhook testing with Stripe CLI:
 
@@ -91,6 +109,8 @@ The public site presents Axion as a professional process-modelling workspace wit
 
 ## Backend API
 
+- `GET /api/health` returns production health, storage, payment, Google, and invite-email readiness
+- `GET /api/production-readiness` returns a secret-safe setup checklist for Supabase, Stripe, Google, email, deployment, CFD worker and CI
 - `GET /api/product` lists product and backend configuration
 - `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR Professional Individual annual licence
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
@@ -102,17 +122,21 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `GET /api/projects` lists projects, invitations, integration definitions, and model folders
 - `POST /api/projects` creates a user-owned project
 - `GET /api/projects/:id` opens a saved model and its old versions
+- `GET /api/projects/:id/export` downloads a full project package with model, versions, datasets, invites, runs, CFD jobs and audit context
 - `POST /api/projects/:id/save` saves the current model and archives the previous one
 - `POST /api/projects/:id/archive` moves a project out of the active list
 - `POST /api/projects/:id/invites` invites a collaborator by username or email
 - `POST /api/projects/:id/versions/:versionId/restore` restores an archived model version
 - `GET /api/integrations` lists prepared API connector targets
+- `POST /api/integrations/:key/actions` runs configure, mapping-test, or export actions for a connector and stores an audit record
 - `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
 - `GET /api/sources/academic` returns the source-backed model design library for boundaries, CFD, TEA/LCA, scheduling, digital twin and Python modelling
 - `GET /api/datasets` lists registered project datasets and uploaded-data metadata
 - `POST /api/datasets` registers a project dataset, schema, source, preview rows and validation status
 - `GET /api/model-runs` lists saved Python/backend model runs
 - `POST /api/model-runs/python` runs the local Python bioprocess screening model and saves the full input/output package
+- `GET /api/cfd/jobs` lists backend CFD screening/handoff jobs
+- `POST /api/cfd/jobs` creates a backend CFD screening job with OpenFOAM-ready boundary-condition metadata
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
 - `GET /api/admin/orders` lists orders and licenses for admins
@@ -121,6 +145,67 @@ The public site presents Axion as a professional process-modelling workspace wit
 ## Backend Data + Python Modelling
 
 The local prototype stores users, projects, datasets, simulation runs and model versions in `.data/*.json`. For a real SaaS backend, use Supabase Postgres with Row Level Security, Supabase Storage or S3-compatible object storage for uploads, and a separate Python worker service for longer model runs. The current `server.mjs` already exposes the API contract for that migration.
+
+## Supabase/Postgres setup
+
+The backend now supports a production Supabase/Postgres adapter without adding runtime dependencies. Run [supabase/schema.sql](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/supabase/schema.sql) once in the Supabase SQL editor, then set:
+
+```bash
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+SUPABASE_STATE_TABLE=axion_state
+```
+
+The service-role key must only exist on the backend host. Never expose it in GitHub Pages, frontend code, or browser environment variables.
+
+## Invite email setup
+
+Invite records work without email. For real email delivery, configure a sender domain and set:
+
+```bash
+INVITE_EMAIL_FROM="Axion Process OS <invites@your-domain.com>"
+RESEND_API_KEY=re_...
+```
+
+When configured, project invites to email addresses are sent automatically and still remain recorded in the backend audit trail.
+
+## Deployment checklist
+
+GitHub Pages can host the static marketing/frontend shell, but paid access, Google login, project storage, email invites, Python runs and CFD jobs require a Node backend on HTTPS.
+
+Recommended production shape:
+
+- Deploy `server.mjs` to a Node host such as Render, Fly.io, Railway, Vercel serverless functions, Google Cloud Run, or AWS.
+- Use [Dockerfile](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/Dockerfile) for container deployment, or [render.yaml](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/render.yaml) for a direct Render Blueprint.
+- Set all backend secrets on that host, not in GitHub Pages.
+- Point `APP_BASE_URL` to the public backend URL.
+- Add the same public backend URL to Stripe webhook configuration.
+- Add the domain to the Google OAuth authorized JavaScript origins and redirect/origin settings.
+- Point the custom domain DNS to the backend host if the full app should run behind one URL.
+
+For Render Blueprint deployment:
+
+1. Push this repository to GitHub.
+2. In Render, create a Blueprint from the repository.
+3. Use `render.yaml`.
+4. Set all `sync: false` secrets in the Render dashboard.
+5. Open `/api/health` on the Render URL.
+6. Set `APP_BASE_URL` to the Render/custom-domain HTTPS URL.
+7. Configure Stripe webhook to `${APP_BASE_URL}/api/stripe/webhook`.
+8. Configure Google OAuth to allow the same origin.
+
+## Tests and CI
+
+Run locally:
+
+```bash
+npm run check
+npm test
+```
+
+GitHub Actions also runs syntax checks, backend API tests, and a static build via `.github/workflows/ci.yml`.
+
+See [docs/setup-production.md](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/docs/setup-production.md) for the exact production setup flow.
 
 Python modelling starts with `python_models/bioprocess_model.py`, a dependency-free dynamic screening model for batch/cell-culture behaviour. It returns time series, product, oxygen-transfer, glucose/glutamine, lactate, ammonium, heat/energy and boundary warnings. It is a screening model, not validated CFD or GMP-grade process validation.
 

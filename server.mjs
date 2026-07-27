@@ -7,7 +7,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
-const dataDir = join(rootDir, ".data");
+const dataDir = process.env.AXION_DATA_DIR ? resolve(process.env.AXION_DATA_DIR) : join(rootDir, ".data");
 const dbPath = join(dataDir, "axion-licensing.json");
 const modelsDir = join(dataDir, "models");
 const projectsDir = join(modelsDir, "projects");
@@ -53,6 +53,17 @@ const config = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePriceId: process.env.STRIPE_PRICE_ID || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  supabaseUrl: (process.env.SUPABASE_URL || "").replace(/\/+$/, ""),
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+  supabaseStateTable: process.env.SUPABASE_STATE_TABLE || "axion_state",
+  inviteEmailFrom: process.env.INVITE_EMAIL_FROM || "",
+  smtpHost: process.env.SMTP_HOST || "",
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPassword: process.env.SMTP_PASSWORD || "",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  cfdWorkerUrl: (process.env.CFD_WORKER_URL || "").replace(/\/+$/, ""),
+  cfdWorkerToken: process.env.CFD_WORKER_TOKEN || "",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
@@ -79,6 +90,8 @@ const defaultDb = {
   projectBriefs: [],
   datasets: [],
   simulationRuns: [],
+  connectorRuns: [],
+  cfdJobs: [],
   audit: [],
 };
 
@@ -133,14 +146,87 @@ function publicConfig() {
       automaticActivation: Boolean(config.stripeSecretKey),
     },
     backend: {
-      currentStorage: "local JSON files in .data/models",
+      currentStorage: supabaseConfigured() ? `Supabase/Postgres table ${config.supabaseStateTable}` : "local JSON files in .data/models",
       recommendedProductionDataApp: "Supabase Postgres + Supabase Storage, or managed Postgres on Render/Fly/Railway plus S3-compatible object storage",
       pythonRuntime: config.pythonExecutable,
       modellingEndpoint: "/api/model-runs/python",
       academicSourcesEndpoint: "/api/sources/academic",
       dataArchitectureEndpoint: "/api/data/architecture",
+      inviteEmailConfigured: emailConfigured(),
     },
   };
+}
+
+function supabaseConfigured() {
+  return Boolean(config.supabaseUrl && config.supabaseServiceRoleKey);
+}
+
+function emailConfigured() {
+  return Boolean(config.resendApiKey && config.inviteEmailFrom) || Boolean(config.smtpHost && config.smtpUser && config.smtpPassword && config.inviteEmailFrom);
+}
+
+function productionReadiness() {
+  const isHttps = config.appBaseUrl.startsWith("https://");
+  const checks = [
+    { key: "postgres", label: "Supabase/Postgres database", ready: supabaseConfigured(), missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].filter((key) => !process.env[key]) },
+    { key: "stripe", label: "Stripe Checkout + webhook", ready: Boolean(config.stripeSecretKey && config.stripePriceId && config.stripeWebhookSecret && isHttps), missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]) },
+    { key: "google", label: "Google OAuth login", ready: Boolean(config.googleClientId && isHttps), missing: [!config.googleClientId ? "GOOGLE_CLIENT_ID" : "", !isHttps ? "APP_BASE_URL must be https://..." : ""].filter(Boolean) },
+    { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"].filter((key) => !process.env[key]) },
+    { key: "deployment", label: "Public HTTPS deployment", ready: isHttps && config.host === "0.0.0.0", missing: [!isHttps ? "APP_BASE_URL must be public HTTPS" : "", config.host !== "0.0.0.0" ? "HOST=0.0.0.0 on production host" : ""].filter(Boolean) },
+    { key: "cfd-worker", label: "External rigorous CFD worker", ready: Boolean(config.cfdWorkerUrl && config.cfdWorkerToken), missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !process.env[key]) },
+    { key: "ci", label: "Tests/CI", ready: existsSync(join(rootDir, ".github", "workflows", "ci.yml")), missing: [] },
+  ];
+  return {
+    ready: checks.every((item) => item.ready || item.key === "cfd-worker"),
+    checks,
+    note: "CFD worker is optional for current screening jobs, but required for validated external CFD. Secret values are never returned.",
+  };
+}
+
+async function supabaseRequest(pathname, { method = "GET", body, headers = {} } = {}) {
+  if (!supabaseConfigured()) {
+    throw new Error("Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  }
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${pathname}`, {
+    method,
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      "content-type": "application/json",
+      prefer: "return=representation",
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || `Supabase request failed with ${response.status}`);
+  }
+  return payload;
+}
+
+async function loadDbFromSupabase() {
+  const rows = await supabaseRequest(`${config.supabaseStateTable}?id=eq.primary&select=payload&limit=1`);
+  if (Array.isArray(rows) && rows[0]?.payload) {
+    return ensureDbShape(rows[0].payload);
+  }
+  const seeded = ensureDbShape(structuredClone(defaultDb));
+  await saveDbToSupabase(seeded);
+  return seeded;
+}
+
+async function saveDbToSupabase(db) {
+  const shaped = ensureDbShape(db);
+  await supabaseRequest(config.supabaseStateTable, {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=representation" },
+    body: {
+      id: "primary",
+      payload: shaped,
+      updated_at: new Date().toISOString(),
+    },
+  });
 }
 
 async function loadDb() {
@@ -148,6 +234,13 @@ async function loadDb() {
   await mkdir(projectsDir, { recursive: true });
   await mkdir(archiveDir, { recursive: true });
   await mkdir(runsDir, { recursive: true });
+  if (supabaseConfigured()) {
+    try {
+      return await loadDbFromSupabase();
+    } catch (error) {
+      console.warn(`Supabase load failed, falling back to local JSON: ${error.message}`);
+    }
+  }
   if (!existsSync(dbPath)) {
     const seeded = ensureDbShape(structuredClone(defaultDb));
     await writeFile(dbPath, JSON.stringify(seeded, null, 2));
@@ -161,6 +254,14 @@ async function saveDb(db) {
   await mkdir(projectsDir, { recursive: true });
   await mkdir(archiveDir, { recursive: true });
   await mkdir(runsDir, { recursive: true });
+  if (supabaseConfigured()) {
+    try {
+      await saveDbToSupabase(db);
+      return;
+    } catch (error) {
+      console.warn(`Supabase save failed, falling back to local JSON: ${error.message}`);
+    }
+  }
   await writeFile(dbPath, `${JSON.stringify(db, null, 2)}\n`);
 }
 
@@ -168,6 +269,16 @@ function json(res, statusCode, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  res.end(body);
+}
+
+function jsonDownload(res, filename, payload) {
+  const body = `${JSON.stringify(payload, null, 2)}\n`;
+  res.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+    "content-disposition": `attachment; filename="${filename.replace(/[^a-z0-9._-]/gi, "-")}"`,
     "cache-control": "no-store",
   });
   res.end(body);
@@ -435,6 +546,43 @@ function sanitizeLicense(license) {
   };
 }
 
+async function sendInviteEmail(invite, project) {
+  if (!emailConfigured() || !invite.recipient.includes("@")) {
+    return { delivered: false, provider: "none", reason: "Email provider is not configured or recipient is not an email address." };
+  }
+  const subject = `Invitation to ${project.name} in Axion Process OS`;
+  const inviteUrl = `${config.appBaseUrl}/?invite=${encodeURIComponent(invite.id)}&project=${encodeURIComponent(project.id)}`;
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#0b1725">
+      <h2 style="margin:0 0 12px">Axion Process OS invitation</h2>
+      <p>You have been invited to collaborate on <strong>${project.name}</strong> as <strong>${invite.role}</strong>.</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;background:#123b35;color:white;padding:12px 18px;border-radius:999px;text-decoration:none">Open Axion workspace</a></p>
+      <p style="color:#5d6875;font-size:13px">If you do not have access yet, use checkout or ask the workspace owner to activate your account.</p>
+    </div>
+  `;
+  const text = `You have been invited to collaborate on ${project.name} in Axion Process OS as ${invite.role}. Open: ${inviteUrl}`;
+  if (config.resendApiKey) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.resendApiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: config.inviteEmailFrom,
+        to: invite.recipient,
+        subject,
+        html,
+        text,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || payload.error || `Resend failed with ${response.status}`);
+    return { delivered: true, provider: "resend", id: payload.id || "" };
+  }
+  return { delivered: false, provider: "smtp", reason: "SMTP credentials are present, but this dependency-free backend currently sends production email through RESEND_API_KEY." };
+}
+
 function billingProfileForSession(session) {
   const amount = config.priceCents / 100;
   const amountFormatted = new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency }).format(amount);
@@ -565,6 +713,8 @@ function ensureDbShape(db) {
   db.projectBriefs ||= [];
   db.datasets ||= [];
   db.simulationRuns ||= [];
+  db.connectorRuns ||= [];
+  db.cfdJobs ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -938,6 +1088,125 @@ async function createPythonModelRun(req, res) {
   }
 }
 
+function cfdScreeningResult(caseInput = {}) {
+  const volumeL = Number(caseInput.volumeL || caseInput.batchVolumeL || 20000);
+  const workingVolumePct = Number(caseInput.workingVolumePct || 70);
+  const tipSpeed = Number(caseInput.tipSpeed || 1.1);
+  const kla = Number(caseInput.klaH || caseInput.kLa || 12);
+  const our = Number(caseInput.ourMolLh || 0.006);
+  const gridCells = Math.max(384, Number(caseInput.gridCells || 1536));
+  const scaleRisk = volumeL > 20000 ? "review" : "ok";
+  const fillRisk = workingVolumePct > 80 ? "review" : "ok";
+  const oxygenMargin = Math.max(0, Math.min(140, (kla * 0.21) / Math.max(0.001, our * 100) * 100));
+  const mixingTimeMin = Math.max(1.2, 18 / Math.max(0.4, tipSpeed) * Math.pow(Math.max(1, volumeL / 20000), 0.22));
+  const hotspots = Math.round(gridCells * (oxygenMargin < 45 ? 0.14 : oxygenMargin < 75 ? 0.06 : 0.018) + (workingVolumePct > 80 ? 18 : 0));
+  return {
+    solver: "Axion backend CFD screening job",
+    status: oxygenMargin < 45 || scaleRisk === "review" || fillRisk === "review" ? "needs-rigorous-cfd" : "screening-ok",
+    mesh: {
+      type: "axisymmetric STR slice plus external OpenFOAM handoff",
+      cells: gridCells,
+      requiredForRigorousRun: ["3D vessel CAD", "impeller geometry", "baffle dimensions", "sparger ring holes", "liquid properties", "gas flow", "probe positions"],
+    },
+    kpis: {
+      oxygenMarginPct: Number(oxygenMargin.toFixed(1)),
+      mixingTimeMin: Number(mixingTimeMin.toFixed(2)),
+      predictedHotspots: hotspots,
+      workingVolumePct,
+      volumeL,
+    },
+    boundaryConditions: [
+      { name: "gas_inlet", type: "alpha.gas / U.gas / C_O2", location: "ring sparger", required: true },
+      { name: "feed_inlet", type: "C_N / glucose / glutamine proxy", location: "top feed", required: true },
+      { name: "walls_baffles", type: "U.liquid noSlip", location: "vessel wall and baffles", required: true },
+      { name: "top_headspace", type: "p_rgh / alpha.gas outlet", location: "headspace", required: true },
+      { name: "impeller_zone", type: "MRF / horizontal momentum source", location: "impeller swept volume", required: true },
+      { name: "cell_uptake", type: "S_O2 / S_N volumetric sink", location: "liquid volume", required: true },
+    ],
+    warnings: [
+      ...(scaleRisk === "review" ? ["Animal-cell stirred tank exceeds 20,000 L screening boundary; use scale-out or validated large-scale CFD."] : []),
+      ...(fillRisk === "review" ? ["Working volume exceeds 80%; headspace, foam and gas-disengagement risk should be reviewed."] : []),
+      ...(oxygenMargin < 75 ? ["Oxygen transfer margin is low; validate kLa, gas flow, sparger and impeller configuration."] : []),
+    ],
+  };
+}
+
+async function runExternalCfdWorker(job) {
+  if (!config.cfdWorkerUrl || !config.cfdWorkerToken) return null;
+  const response = await fetch(`${config.cfdWorkerUrl}/jobs`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.cfdWorkerToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      jobId: job.id,
+      projectId: job.projectId,
+      unitId: job.unitId,
+      solver: job.requestedSolver,
+      caseInput: job.caseInput,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || `CFD worker failed with ${response.status}`);
+  }
+  return payload;
+}
+
+async function createCfdJob(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const now = new Date().toISOString();
+  const job = {
+    id: randomUUID(),
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    projectId: String(body.projectId || ""),
+    unitId: String(body.unitId || body.reactorId || ""),
+    status: config.cfdWorkerUrl ? "submitted-to-worker" : "completed-screening",
+    requestedSolver: String(body.solver || "openfoam-handoff"),
+    caseInput: body.caseInput && typeof body.caseInput === "object" ? body.caseInput : body,
+    result: cfdScreeningResult(body.caseInput || body),
+    nextProductionStep: "Attach this job to an external OpenFOAM/BiRD/COMSOL/STAR-CCM+ worker for validated 3D multiphase CFD.",
+  };
+  if (config.cfdWorkerUrl) {
+    try {
+      job.worker = await runExternalCfdWorker(job);
+      job.status = job.worker?.status || "submitted-to-worker";
+      job.nextProductionStep = "Track the external CFD worker result, residuals, mesh quality and field outputs before engineering sign-off.";
+    } catch (error) {
+      job.status = "worker-submit-failed-screening-kept";
+      job.workerError = error.message;
+    }
+  }
+  const db = ensureDbShape(await loadDb());
+  db.cfdJobs.unshift(job);
+  db.audit.unshift({ at: now, type: "cfd.job.created", jobId: job.id, projectId: job.projectId, unitId: job.unitId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  await writeSimulationRun(job.id, job);
+  json(res, 201, { job });
+}
+
+async function listCfdJobs(req, res, query = new URLSearchParams()) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(query.get("projectId") || "");
+  const jobs = db.cfdJobs
+    .filter((job) => !projectId || job.projectId === projectId)
+    .filter((job) => session.role === "admin" || job.createdBy === sessionPrincipal(session) || !job.projectId)
+    .slice(0, 100);
+  json(res, 200, { jobs });
+}
+
 async function listModelRuns(req, res, query = new URLSearchParams()) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -1168,6 +1437,137 @@ function integrationRegistry() {
   ];
 }
 
+function connectorPayloadGroups(key) {
+  const byKey = {
+    "legacy-simulator": ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
+    "rest-api": ["project JSON", "version records", "unit operations", "stream table", "reports"],
+    "python-sdk": ["model id", "parameter set", "run id", "sweep matrix", "calibration output"],
+    webhooks: ["project.created", "model.versioned", "run.completed", "report.ready", "license.activated"],
+    "cloud-runs": ["scenario queue", "parameter grid", "Monte Carlo package", "run results"],
+    "supabase-postgres": ["users", "projects", "datasets", "simulation runs", "audit events"],
+    aspen: ["component list", "stream vectors", "property assumptions", "unit duty table"],
+    comsol: ["bioreactor geometry", "boundary conditions", "sparger metadata", "impeller zones"],
+    starccm: ["CFD case matrix", "mesh basis", "gas-liquid assumptions", "shear and oxygen targets"],
+    gproms: ["equations", "state variables", "parameters", "estimation case", "optimization objective"],
+    opcua: ["tag map", "sample interval", "parameter binding", "live telemetry stream"],
+    "osisoft-pi": ["historian tags", "time-series calibration data", "deviation windows", "soft-sensor inputs"],
+    benchling: ["experiment metadata", "assay tables", "cell-line records", "media and titer data"],
+    limsid: ["QC assay fields", "release metadata", "sample chain", "batch record handoff"],
+    erp: ["material prices", "inventory levels", "vendor quotes", "consumable BOM"],
+    powerbi: ["TEA tables", "LCA tables", "scenario KPIs", "portfolio dashboards"],
+  };
+  return byKey[key] || ["stream data", "equipment metadata", "parameter set", "report export"];
+}
+
+function connectorMappingChecks(integration, modelSnapshot = {}) {
+  const units = Number(modelSnapshot.units ?? modelSnapshot.unitCount ?? 0);
+  const streams = Number(modelSnapshot.streams ?? modelSnapshot.streamCount ?? 0);
+  const equations = Number(modelSnapshot.equations ?? modelSnapshot.equationCount ?? 0);
+  const scheduleRows = Number(modelSnapshot.scheduleRows ?? modelSnapshot.scheduleCount ?? 0);
+  const payloads = connectorPayloadGroups(integration.key);
+  const needsCredentials = /planned|connector|SDK|queue|handoff/i.test(integration.status || "");
+  return [
+    { label: "Equipment register", value: `${units} units mapped`, status: units >= 12 ? "pass" : "warn" },
+    { label: "Stream table", value: `${streams} streams available`, status: streams >= 10 ? "pass" : "warn" },
+    { label: "Equation layer", value: `${equations} equations available`, status: equations >= 40 ? "pass" : "warn" },
+    { label: "Scheduling handoff", value: `${scheduleRows} transfer slots`, status: scheduleRows > 0 ? "pass" : "warn" },
+    { label: "Payload contract", value: `${payloads.length} payload groups`, status: payloads.length >= 3 ? "pass" : "warn" },
+    { label: "Live credentials", value: needsCredentials ? "Customer credentials required" : "Controlled export ready", status: needsCredentials ? "hold" : "pass" },
+  ];
+}
+
+function connectorConfigurationRows(integration, modelSnapshot = {}) {
+  return [
+    ["Connector mode", integration.status?.includes("planned") ? "Prepared handoff shell" : "Configured handoff scaffold"],
+    ["Authentication", integration.auth || "credential setup"],
+    ["Model source", `${modelSnapshot.projectName || "Current model"} · ${modelSnapshot.template || "active process"}`],
+    ["Data contract", connectorPayloadGroups(integration.key).join(" + ")],
+  ];
+}
+
+function connectorActionResult(action, integration, modelSnapshot = {}) {
+  const checks = connectorMappingChecks(integration, modelSnapshot);
+  const passCount = checks.filter((check) => check.status === "pass").length;
+  const rows = connectorConfigurationRows(integration, modelSnapshot);
+  if (action === "test") {
+    return {
+      mode: "Mapping test",
+      title: `${passCount}/${checks.length} checks passed`,
+      message: passCount === checks.length
+        ? "The model is ready for a controlled connector handoff. Live sync still requires customer-approved credentials."
+        : "The model can be exported as a handoff package, but credentials, schema mapping, or fuller process data are still needed before live sync.",
+      rows,
+      checks,
+    };
+  }
+  if (action === "export") {
+    return {
+      mode: "Export",
+      title: "Backend handoff package prepared",
+      message: "A server-side connector package was prepared with the current model summary, stream/equipment previews, schedule previews, payload contract and validation checks.",
+      rows: [...rows, ["Prepared by", "Axion backend"], ["Prepared at", new Date().toISOString()]],
+      checks,
+    };
+  }
+  return {
+    mode: "Configure",
+    title: "Connector configuration opened",
+    message: "Review authentication, payload groups, mapping checks and data contract before enabling a live third-party integration.",
+    rows,
+    checks,
+  };
+}
+
+async function connectorAction(req, res, integrationKey) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const action = ["configure", "test", "export"].includes(body.action) ? body.action : "configure";
+  const integration = integrationRegistry().find((item) => item.key === integrationKey);
+  if (!integration) {
+    json(res, 404, { error: "Connector not found" });
+    return;
+  }
+  const now = new Date().toISOString();
+  const modelSnapshot = body.modelSnapshot && typeof body.modelSnapshot === "object" ? body.modelSnapshot : {};
+  const result = connectorActionResult(action, integration, modelSnapshot);
+  const handoff = action === "export" ? {
+    product: config.productName,
+    generatedAt: now,
+    generatedBy: sessionPrincipal(session),
+    project: {
+      id: modelSnapshot.projectId || "",
+      name: modelSnapshot.projectName || "",
+      template: modelSnapshot.template || "",
+      scale: modelSnapshot.scale || "",
+    },
+    connector: integration,
+    payloads: connectorPayloadGroups(integration.key),
+    modelSnapshot,
+    checks: result.checks,
+    note: "Live third-party synchronization requires customer credentials, vendor API access, schema mapping and project-specific validation.",
+  } : null;
+  const db = ensureDbShape(await loadDb());
+  const run = {
+    id: randomUUID(),
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    action,
+    connectorKey: integration.key,
+    connectorName: integration.name,
+    projectId: modelSnapshot.projectId || "",
+    result,
+    handoff,
+  };
+  db.connectorRuns.unshift(run);
+  db.audit.unshift({ at: now, type: `connector.${action}`, connectorKey: integration.key, runId: run.id, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { connector: integration, runId: run.id, result, handoff });
+}
+
 async function listProjects(req, res) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -1261,6 +1661,43 @@ async function loadProject(req, res, projectId) {
     versions: db.projectVersions.filter((item) => item.projectId === projectId),
     invites: db.invites.filter((item) => item.projectId === projectId),
   });
+}
+
+async function exportProject(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const model = await readProjectModel(projectId);
+  const projectRuns = db.simulationRuns.filter((item) => item.projectId === projectId);
+  const connectorRuns = db.connectorRuns.filter((item) => item.projectId === projectId);
+  const cfdJobs = db.cfdJobs.filter((item) => item.projectId === projectId);
+  const datasets = db.datasets.filter((item) => item.projectId === projectId);
+  const exportPayload = {
+    product: config.productName,
+    exportedAt: new Date().toISOString(),
+    exportedBy: sessionPrincipal(session),
+    project: sanitizeProject(project),
+    model,
+    versions: db.projectVersions.filter((item) => item.projectId === projectId),
+    invites: db.invites.filter((item) => item.projectId === projectId),
+    datasets,
+    simulationRuns: projectRuns,
+    connectorRuns,
+    cfdJobs,
+    audit: db.audit.filter((item) => item.projectId === projectId || item.entityId === projectId).slice(0, 200),
+    complianceNote: "Engineering export package for review, TEA/LCA handoff, project archive and controlled migration. Validate assumptions before GMP, regulatory, investment or safety-critical decisions.",
+  };
+  db.audit.unshift({ at: exportPayload.exportedAt, type: "project.exported", projectId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  jsonDownload(res, `${project.name || project.id}-axion-export.json`, exportPayload);
 }
 
 async function saveProject(req, res, projectId) {
@@ -1387,8 +1824,19 @@ async function inviteCollaborator(req, res, projectId) {
     createdAt: now,
     invitedBy: sessionPrincipal(session),
     delivery: "recorded",
-    note: "SMTP delivery is not configured; this invite is stored for in-app collaboration.",
+    note: "Invite is stored in Axion. Email delivery depends on backend email configuration.",
   };
+  try {
+    const emailResult = await sendInviteEmail(invite, project);
+    invite.email = emailResult;
+    if (emailResult.delivered) {
+      invite.delivery = "email";
+      invite.note = `Invite email sent via ${emailResult.provider}.`;
+    }
+  } catch (error) {
+    invite.email = { delivered: false, provider: "error", error: error.message };
+    invite.note = `Invite stored, but email sending failed: ${error.message}`;
+  }
   db.invites.unshift(invite);
   if (matchedUser && !project.collaborators?.some((item) => normalizePrincipal(item.principal) === recipient || normalizePrincipal(item.principal) === matchedUser.email)) {
     project.collaborators ||= [];
@@ -1674,6 +2122,22 @@ async function stripeWebhook(req, res) {
 }
 
 async function routeApi(req, res, pathname, query = new URLSearchParams()) {
+  if (req.method === "GET" && pathname === "/api/health") {
+    json(res, 200, {
+      ok: true,
+      productName: config.productName,
+      storage: supabaseConfigured() ? "supabase-postgres" : "local-json",
+      payments: Boolean(config.stripeSecretKey),
+      googleLogin: Boolean(config.googleClientId),
+      inviteEmail: emailConfigured(),
+      at: new Date().toISOString(),
+    });
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/production-readiness") {
+    json(res, 200, productionReadiness());
+    return;
+  }
   if (req.method === "GET" && pathname === "/api/product") {
     json(res, 200, publicConfig());
     return;
@@ -1720,6 +2184,11 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await loadProject(req, res, decodeURIComponent(projectMatch[1]));
     return;
   }
+  const projectExportMatch = pathname.match(/^\/api\/projects\/([^/]+)\/export$/);
+  if (projectExportMatch && req.method === "GET") {
+    await exportProject(req, res, decodeURIComponent(projectExportMatch[1]));
+    return;
+  }
   const projectSaveMatch = pathname.match(/^\/api\/projects\/([^/]+)\/save$/);
   if (projectSaveMatch && req.method === "POST") {
     await saveProject(req, res, decodeURIComponent(projectSaveMatch[1]));
@@ -1744,6 +2213,11 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await listIntegrations(req, res);
     return;
   }
+  const integrationActionMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/actions$/);
+  if (integrationActionMatch && req.method === "POST") {
+    await connectorAction(req, res, decodeURIComponent(integrationActionMatch[1]));
+    return;
+  }
   if (req.method === "GET" && pathname === "/api/data/architecture") {
     await dataArchitecture(req, res);
     return;
@@ -1758,6 +2232,14 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "POST" && pathname === "/api/model-runs/python") {
     await createPythonModelRun(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/cfd/jobs") {
+    await listCfdJobs(req, res, query);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/cfd/jobs") {
+    await createCfdJob(req, res);
     return;
   }
   if (req.method === "GET" && pathname === "/api/datasets") {
