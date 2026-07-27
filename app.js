@@ -10124,6 +10124,23 @@ function renderCfdBoard() {
         <button data-cfd-action="backend" type="button">Backend job</button>
       </div>
     </section>
+    <section class="cfd-command-card" aria-label="CFD command composer">
+      <div>
+        <span>Model command</span>
+        <strong>Change the reactor with words</strong>
+        <p>Use one short instruction. Axion applies the edit, recalculates CFD inputs, highlights the affected reactor or stream, and opens the change log.</p>
+      </div>
+      <div class="cfd-command-row">
+        <input id="cfdCommandPrompt" type="text" value="" placeholder="Example: reduce working volume to 70% and use feed ring" aria-label="CFD model command" />
+        <button data-cfd-command-apply type="button">Apply</button>
+      </div>
+      <div class="cfd-command-examples">
+        <button data-cfd-fix="set kLa to 95 and start CFD" type="button">Set kLa 95</button>
+        <button data-cfd-fix="reduce working volume to 70 and start CFD" type="button">70% working volume</button>
+        <button data-cfd-fix="move nutrient feed to feed ring and show nutrient layer" type="button">Feed ring</button>
+        <button data-cfd-fix="add PAT sensor and reduce glutamine for ammonium boundary" type="button">Metabolite control</button>
+      </div>
+    </section>
     <section class="cfd-science-panel" aria-label="CFD biology and turbulence model">
       <article class="cfd-kinetics-card">
         <div>
@@ -12825,7 +12842,21 @@ function commandSnapshot() {
 }
 
 function commandParamMeta(key) {
-  return processParameters.find((item) => item.key === key) || { key, label: key, unit: "", min: -Infinity, max: Infinity };
+  const special = {
+    workingVolume: { key, label: "Working volume", unit: "%", min: 30, max: 80, value: 72 },
+    doSetpoint: { key, label: "Dissolved oxygen setpoint", unit: "% air saturation", min: 5, max: 80, value: 40 },
+    mediaCostPerL: { key, label: "Media cost", unit: "EUR/L", min: 0, max: 1000, value: 42 },
+    feedSupplementCostPerL: { key, label: "Feed supplement cost", unit: "EUR/L", min: 0, max: 5000, value: 180 },
+    materialLossFactor: { key, label: "Material loss factor", unit: "%", min: 0, max: 80, value: 18 },
+    heatRecovery: { key, label: "Heat recovery", unit: "%", min: 0, max: 95, value: 25 },
+    recycleFraction: { key, label: "Recycle fraction", unit: "%", min: 0, max: 95, value: 20 },
+    cipTime: { key, label: "CIP cycle time", unit: "h", min: 0, max: 24, value: 2 },
+    sipHold: { key, label: "SIP hold", unit: "min", min: 0, max: 180, value: 30 },
+    harvestRecovery: { key, label: "Harvest recovery", unit: "%", min: 0, max: 99, value: 88 },
+    clarificationYield: { key, label: "Clarification yield", unit: "%", min: 0, max: 99, value: 92 },
+    ufdfYield: { key, label: "UF/DF yield", unit: "%", min: 0, max: 99, value: 91 },
+  };
+  return processParameters.find((item) => item.key === key) || special[key] || { key, label: key, unit: "", min: -Infinity, max: Infinity, value: 0 };
 }
 
 function commandClampParam(key, value) {
@@ -13614,9 +13645,20 @@ async function askToolHelp() {
     });
     return;
   }
+  applyCommandFromUi(prompt);
+}
+
+function applyCommandFromUi(prompt, options = {}) {
+  const command = String(prompt || "").trim();
+  if (!command) return null;
   if (els.helpResult) els.helpResult.innerHTML = "<p>Applying changes...</p>";
-  const guide = applySystemCommand(prompt);
+  const guide = applySystemCommand(command);
   renderHelpResult(guide);
+  els.helpDock?.classList.add("open");
+  els.helpToggle?.setAttribute("aria-expanded", "true");
+  if (els.helpPrompt && options.syncHelpPrompt !== false) els.helpPrompt.value = command;
+  if (options.toast !== false) showToast((guide.changes || []).length ? "Model updated" : "Recommendation prepared");
+  return guide;
 }
 
 async function loadProductConfig() {
@@ -13797,7 +13839,7 @@ function bindAuth() {
     const command = event.target.closest("[data-help-command]");
     if (command) {
       if (els.helpPrompt) els.helpPrompt.value = command.dataset.helpCommand;
-      renderHelpResult(applySystemCommand(command.dataset.helpCommand || ""));
+      applyCommandFromUi(command.dataset.helpCommand || "");
       return;
     }
     const button = event.target.closest("[data-help-jump]");
@@ -14377,15 +14419,22 @@ function bindEvents() {
   document.querySelector("#resetScenario").addEventListener("click", () => loadTemplate(state.template));
 
   els.cfdBoard.addEventListener("click", (event) => {
+    const commandApplyButton = event.target.closest("[data-cfd-command-apply]");
+    if (commandApplyButton) {
+      const input = document.querySelector("#cfdCommandPrompt");
+      const command = input?.value.trim() || "";
+      if (!command) {
+        showToast("Describe the CFD change first");
+        input?.focus();
+        return;
+      }
+      applyCommandFromUi(command);
+      return;
+    }
     const fixButton = event.target.closest("[data-cfd-fix]");
     if (fixButton) {
       const command = fixButton.dataset.cfdFix || "";
-      const guide = applySystemCommand(command);
-      renderHelpResult(guide);
-      els.helpDock?.classList.add("open");
-      els.helpToggle?.setAttribute("aria-expanded", "true");
-      if (els.helpPrompt) els.helpPrompt.value = command;
-      showToast("CFD edit applied");
+      applyCommandFromUi(command);
       return;
     }
     const actionButton = event.target.closest("[data-cfd-action]");
@@ -14457,6 +14506,13 @@ function bindEvents() {
     els.cfdBoard.cfdTimeTimer = window.setTimeout(() => {
       renderCfdBoard();
     }, 90);
+  });
+
+  els.cfdBoard.addEventListener("keydown", (event) => {
+    const commandInput = event.target.closest("#cfdCommandPrompt");
+    if (!commandInput || event.key !== "Enter") return;
+    event.preventDefault();
+    applyCommandFromUi(commandInput.value);
   });
 
   els.reportsBoard.addEventListener("click", (event) => {
