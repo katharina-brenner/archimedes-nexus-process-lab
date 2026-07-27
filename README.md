@@ -133,6 +133,7 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `GET /api/sources/academic` returns the source-backed model design library for boundaries, CFD, TEA/LCA, scheduling, digital twin and Python modelling
 - `GET /api/datasets` lists registered project datasets and uploaded-data metadata
 - `POST /api/datasets` registers a project dataset, schema, source, preview rows and validation status
+- `GET /api/datasets/:id/export` downloads a company data package with detected schema, preview rows, model targets, quality checks and calibration hints
 - `GET /api/model-runs` lists saved Python/backend model runs
 - `POST /api/model-runs/python` runs the local Python bioprocess screening model and saves the full input/output package
 - `GET /api/cfd/jobs` lists backend CFD screening/handoff jobs
@@ -143,6 +144,8 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `POST /api/admin/orders/:id-or-reference/mark-paid` activates a paid order and creates a license key
 
 ## Backend Data + Python Modelling
+
+Company datasets can be registered from CSV or JSON and classified into kinetics, CFD, TEA, LCA, supplier, QC and scheduling roles. The backend stores dataset metadata, detects column roles, scores data quality, and prepares calibration targets for Python or external modelling jobs.
 
 The local prototype can store users, projects, datasets, simulation runs and model versions in `.data/*.json`. In production, the backend can use Supabase/Postgres for account/order/project metadata plus versioned model documents. Use Supabase Storage or S3-compatible object storage for uploaded file bytes, and a separate Python/CFD worker service for longer model runs.
 

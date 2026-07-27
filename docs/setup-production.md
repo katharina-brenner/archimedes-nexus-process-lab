@@ -18,7 +18,7 @@ Use provider dashboards and backend-host secret managers.
 6. Set `SUPABASE_STATE_TABLE=axion_state`.
 7. Set `SUPABASE_DOCUMENTS_TABLE=axion_documents`.
 
-The current adapter stores account/order/project metadata in `axion_state` and active models, archived versions, simulation runs and CFD job payloads in `axion_documents`. This is production-persistent Postgres storage and can later be normalized into dedicated relational tables when the product needs row-level analytics, branch diffs and large-scale multi-user concurrency.
+The current adapter stores account/order/project metadata in `axion_state` and active models, archived versions, simulation runs, company dataset metadata and CFD job payloads in `axion_documents`. This is production-persistent Postgres storage and can later be normalized into dedicated relational tables when the product needs row-level analytics, branch diffs, large company uploads and large-scale multi-user concurrency.
 
 `SUPABASE_SERVICE_ROLE_KEY` must only exist on the backend host. Never expose it in the browser, GitHub Pages, screenshots, client code or public logs.
 
@@ -180,4 +180,5 @@ Expected:
 - `payments.stripeEnabled` should be `true`
 - `auth.googleEnabled` should be `true`
 - `inviteEmailConfigured` should be `true`
+- company CSV/JSON datasets should register through `/api/datasets` and export through `/api/datasets/:id/export`
 - production readiness should show Stripe, Google, email and deployment ready

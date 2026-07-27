@@ -113,6 +113,7 @@ function backendFeatures() {
     "Python modelling runtime for dynamic bioprocess screening",
     "Academic source library for model assumptions",
     "Dataset registry for uploaded experimental, historian, TEA and LCA data",
+    "Company data ingestion for CSV and JSON bioreactor, historian, TEA, LCA, supplier, QC and schedule datasets",
     "Python SDK and webhook-ready integration targets",
     "Cloud run, parameter sweep, Monte Carlo and scenario-run roadmap",
     "Live-data, historian, LIMS, ERP and vendor-quote connector registry",
@@ -1340,6 +1341,153 @@ async function listDatasets(req, res, query = new URLSearchParams()) {
   json(res, 200, { datasets });
 }
 
+function splitDelimitedLine(line, delimiter = ",") {
+  const cells = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function detectDelimiter(line = "") {
+  const options = [",", ";", "\t", "|"];
+  return options
+    .map((delimiter) => ({ delimiter, count: splitDelimitedLine(line, delimiter).length }))
+    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
+}
+
+function parseDatasetContent(contentText = "") {
+  const text = String(contentText || "").trim();
+  if (!text) return { format: "empty", columns: [], rows: [], rowCount: 0, issues: ["No raw data was supplied."] };
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed.rows) ? parsed.rows : [parsed];
+      const objectRows = rows.filter((row) => row && typeof row === "object" && !Array.isArray(row));
+      const columns = [...new Set(objectRows.flatMap((row) => Object.keys(row)))];
+      return { format: "json", columns, rows: objectRows.slice(0, 1000), rowCount: objectRows.length, issues: objectRows.length ? [] : ["JSON did not contain object rows."] };
+    } catch (error) {
+      return { format: "json-invalid", columns: [], rows: [], rowCount: 0, issues: [`Invalid JSON: ${error.message}`] };
+    }
+  }
+  const lines = text.split(/\r?\n/).filter((line) => line.trim()).slice(0, 1001);
+  if (!lines.length) return { format: "empty", columns: [], rows: [], rowCount: 0, issues: ["No table rows were found."] };
+  const delimiter = detectDelimiter(lines[0]);
+  const headers = splitDelimitedLine(lines[0], delimiter).map((header, index) => String(header || `column_${index + 1}`).trim());
+  const rows = lines.slice(1).map((line) => {
+    const cells = splitDelimitedLine(line, delimiter);
+    return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""]));
+  });
+  return {
+    format: "csv",
+    delimiter: delimiter === "\t" ? "tab" : delimiter,
+    columns: headers,
+    rows,
+    rowCount: Math.max(0, text.split(/\r?\n/).filter((line) => line.trim()).length - 1),
+    issues: headers.length < 2 ? ["Only one column detected; check delimiter or header row."] : [],
+  };
+}
+
+function numericValues(rows, column) {
+  return rows
+    .map((row) => Number(String(row[column] ?? "").replace(",", ".")))
+    .filter((value) => Number.isFinite(value));
+}
+
+function inferDatasetColumn(column = "", rows = []) {
+  const lower = column.toLowerCase();
+  const values = numericValues(rows, column);
+  const unitMatch = column.match(/\(([^)]+)\)|\[([^\]]+)\]/);
+  let role = "metadata";
+  let modelParameter = "";
+  if (/time|hour|minute|date|timestamp|batch/.test(lower)) {
+    role = "time_or_batch";
+    modelParameter = "dynamic profile / schedule";
+  } else if (/titer|product|concentration/.test(lower)) {
+    role = "productivity";
+    modelParameter = "titerGL, yield, batch profile";
+  } else if (/viab|vcd|cell|biomass|od/.test(lower)) {
+    role = "cell_growth";
+    modelParameter = "viableCellDensityMillionMl, biomass growth";
+  } else if (/glucose|substrate|feed|nutrient|glutamine/.test(lower)) {
+    role = "nutrient";
+    modelParameter = "glucoseGL, glutamineMm, feedStrategy";
+  } else if (/oxygen|do|kla|otr|our/.test(lower)) {
+    role = "oxygen_transfer";
+    modelParameter = "klaH, ourMolLh, DO boundary";
+  } else if (/lactate|ammon|nh4|nh3|ph|osmo/.test(lower)) {
+    role = "metabolite_boundary";
+    modelParameter = "lactateMm, ammoniumMm, pH, osmolality";
+  } else if (/cost|price|eur|usd|capex|opex|media|resin|filter/.test(lower)) {
+    role = "economics";
+    modelParameter = "TEA cost driver";
+  } else if (/energy|steam|water|wfi|electric|cooling|heat|co2|waste/.test(lower)) {
+    role = "lca_utility";
+    modelParameter = "LCA/utility inventory";
+  } else if (/equipment|unit|resource|room|operator|clean|cip|sip|duration|start|finish/.test(lower)) {
+    role = "schedule_resource";
+    modelParameter = "finite-capacity schedule";
+  }
+  return {
+    name: column,
+    role,
+    modelParameter,
+    inferredUnit: unitMatch?.[1] || unitMatch?.[2] || "",
+    numeric: values.length,
+    missing: rows.filter((row) => String(row[column] ?? "").trim() === "").length,
+    min: values.length ? Math.min(...values) : "",
+    max: values.length ? Math.max(...values) : "",
+    mean: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : "",
+  };
+}
+
+function datasetModelTargets(columns = []) {
+  const roles = new Set(columns.map((column) => column.role));
+  const targets = [];
+  if (roles.has("cell_growth") || roles.has("productivity")) targets.push("Fit growth/productivity kinetics and update titer, yield and batch duration.");
+  if (roles.has("oxygen_transfer")) targets.push("Calibrate kLa/OUR and CFD oxygen-transfer boundary conditions.");
+  if (roles.has("nutrient") || roles.has("metabolite_boundary")) targets.push("Update feed strategy, ammonium/lactate/pH/osmolality boundary checks and soft-sensor variables.");
+  if (roles.has("economics")) targets.push("Replace screening TEA assumptions with company-specific material, media, resin, filter, labor or CAPEX data.");
+  if (roles.has("lca_utility")) targets.push("Replace screening LCA inventory with site-specific energy, water, steam, gas, waste and emissions data.");
+  if (roles.has("schedule_resource")) targets.push("Update finite-capacity scheduling, equipment utilization, rooms, cleaning windows and personnel demand.");
+  return targets.length ? targets : ["Store as project evidence and manually map columns to model parameters."];
+}
+
+function datasetQuality(parsed, columnProfiles, kind) {
+  const issues = [...(parsed.issues || [])];
+  if (parsed.rowCount < 3) issues.push("Few rows; useful as evidence, but weak for fitting or validation.");
+  if (!columnProfiles.some((column) => column.role === "time_or_batch")) issues.push("No obvious time/batch column; dynamic calibration may need manual mapping.");
+  if (kind === "historian" && !columnProfiles.some((column) => column.role === "oxygen_transfer" || column.role === "metabolite_boundary")) {
+    issues.push("Historian data should normally include DO, pH, temperature, feed, gas or metabolite tags.");
+  }
+  if (kind === "tea" && !columnProfiles.some((column) => column.role === "economics")) {
+    issues.push("TEA data should include cost, price, CAPEX, OPEX, material, utility or labor columns.");
+  }
+  if (kind === "lca" && !columnProfiles.some((column) => column.role === "lca_utility")) {
+    issues.push("LCA data should include energy, water, material, waste, emissions or utility columns.");
+  }
+  return {
+    score: Math.max(15, Math.min(98, 88 - issues.length * 13 + Math.min(10, parsed.rowCount / 12))),
+    issues,
+    readyFor: datasetModelTargets(columnProfiles),
+  };
+}
+
 async function createDataset(req, res) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -1358,29 +1506,80 @@ async function createDataset(req, res) {
     }
   }
   const now = new Date().toISOString();
+  const parsed = parseDatasetContent(body.contentText || body.rawText || body.csv || "");
+  const columns = parsed.columns.length ? parsed.columns : Array.isArray(body.columns) ? body.columns.map(String).slice(0, 80) : [];
+  const columnProfiles = columns.map((column) => inferDatasetColumn(column, parsed.rows || []));
+  const kind = String(body.kind || "experimental").trim().slice(0, 80);
+  const quality = datasetQuality(parsed, columnProfiles, kind);
   const dataset = {
     id: randomUUID(),
     projectId,
     projectName: project?.name || "",
     name: String(body.name || "Axion dataset").trim().slice(0, 160),
-    kind: String(body.kind || "experimental").trim().slice(0, 80),
+    kind,
     sourceId: String(body.sourceId || "").trim().slice(0, 120),
     fileName: String(body.fileName || "").trim().slice(0, 220),
     mimeType: String(body.mimeType || "").trim().slice(0, 120),
-    size: Number(body.size || 0),
-    schema: body.schema && typeof body.schema === "object" ? body.schema : {},
-    columns: Array.isArray(body.columns) ? body.columns.map(String).slice(0, 80) : [],
-    previewRows: Array.isArray(body.previewRows) ? body.previewRows.slice(0, 10) : [],
-    quality: String(body.quality || "unvalidated").trim().slice(0, 80),
+    size: Number(body.size || String(body.contentText || "").length || 0),
+    schema: {
+      ...(body.schema && typeof body.schema === "object" ? body.schema : {}),
+      format: parsed.format,
+      delimiter: parsed.delimiter || "",
+      columns: columnProfiles,
+    },
+    columns,
+    previewRows: parsed.rows?.length ? parsed.rows.slice(0, 10) : Array.isArray(body.previewRows) ? body.previewRows.slice(0, 10) : [],
+    rowCount: parsed.rowCount || 0,
+    parsedRows: parsed.rows?.slice(0, 250) || [],
+    quality: body.quality ? String(body.quality).trim().slice(0, 80) : quality.score >= 75 ? "model-ready screening data" : "needs mapping review",
+    qualityScore: Number(quality.score.toFixed(1)),
+    qualityIssues: quality.issues,
+    modelTargets: quality.readyFor,
+    calibrationPackage: {
+      parameterTargets: [...new Set(columnProfiles.map((column) => column.modelParameter).filter(Boolean))],
+      columnRoles: columnProfiles.map((column) => ({ name: column.name, role: column.role, modelParameter: column.modelParameter, inferredUnit: column.inferredUnit })),
+      recommendedNextRun: quality.readyFor.join(" "),
+    },
     createdAt: now,
     createdBy: sessionPrincipal(session),
-    storage: "metadata-only-local-json",
-    nextStep: "Move file bytes to Supabase Storage or S3, then parse into typed Postgres rows for simulation calibration.",
+    storage: supabaseConfigured() ? "supabase-postgres-record" : "local-json-record",
+    nextStep: "Review column roles, then run Python screening or update TEA/LCA/schedule parameters from accepted company data.",
   };
   db.datasets.unshift(dataset);
   db.audit.unshift({ at: now, type: "dataset.created", datasetId: dataset.id, projectId, by: sessionPrincipal(session) });
   await saveDb(db);
   json(res, 201, { dataset });
+}
+
+async function exportDataset(req, res, datasetId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const dataset = db.datasets.find((item) => item.id === datasetId);
+  if (!dataset) {
+    json(res, 404, { error: "Dataset not found" });
+    return;
+  }
+  if (dataset.projectId) {
+    const project = db.projects.find((item) => item.id === dataset.projectId);
+    if (!project || !canAccessProject(session, project)) {
+      json(res, 404, { error: "Dataset not found" });
+      return;
+    }
+  } else if (session.role !== "admin" && dataset.createdBy !== sessionPrincipal(session)) {
+    json(res, 404, { error: "Dataset not found" });
+    return;
+  }
+  jsonDownload(res, `${dataset.name || dataset.id}-axion-dataset.json`, {
+    product: config.productName,
+    exportedAt: new Date().toISOString(),
+    exportedBy: sessionPrincipal(session),
+    dataset,
+    note: "Company-supplied data package with detected schema, column roles, quality flags, calibration targets and preview rows. Validate mappings before using for regulated or investment-critical decisions.",
+  });
 }
 
 function integrationRegistry() {
@@ -2340,6 +2539,11 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/datasets") {
     await listDatasets(req, res, query);
+    return;
+  }
+  const datasetExportMatch = pathname.match(/^\/api\/datasets\/([^/]+)\/export$/);
+  if (datasetExportMatch && req.method === "GET") {
+    await exportDataset(req, res, decodeURIComponent(datasetExportMatch[1]));
     return;
   }
   if (req.method === "POST" && pathname === "/api/datasets") {

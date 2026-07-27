@@ -2042,6 +2042,7 @@ const state = {
   projects: [],
   projectVersions: [],
   projectInvites: [],
+  datasets: [],
   integrations: [],
   selectedIntegration: "",
   connectorResults: {},
@@ -8047,13 +8048,14 @@ function renderSources() {
   const previewProperties = propertyRows().slice(0, 12);
   const attachedRows = attachedSourceModelPackRows();
   els.sourcesBoard.innerHTML = `
+    ${renderCompanyDataStudio()}
     <section class="source-hero">
       <div>
-        <p>Scientific data layer</p>
-        <h3>Vendor, regulatory, standards, property, and attached-source references</h3>
-        <span>These cards document where benchmark assumptions, property estimates, and uploaded source-driven model extensions come from. They are starting points for calibration, not validated limits for every product or facility.</span>
+        <p>Data & source layer</p>
+        <h3>Company data, scientific references, supplier assumptions and model governance</h3>
+        <span>These cards document where customer data, benchmark assumptions, property estimates, and uploaded source-driven model extensions come from. They are starting points for calibration, not validated limits for every product or facility.</span>
       </div>
-      <strong>${scientificSources.length} sources · ${propertyRows().length} properties · ${attachedRows.length} attached-source mappings</strong>
+      <strong>${state.datasets.length} company datasets · ${scientificSources.length} sources · ${propertyRows().length} properties · ${attachedRows.length} source mappings</strong>
     </section>
     <section class="simulation-group">
       <h3>Attached-source implementation pack</h3>
@@ -8116,6 +8118,117 @@ function renderSources() {
     </section>
   `;
   renderProfileMenu();
+}
+
+function companyDatasetRows() {
+  return (state.datasets || []).map((dataset) => ({
+    id: dataset.id,
+    projectId: dataset.projectId,
+    projectName: dataset.projectName,
+    name: dataset.name,
+    kind: dataset.kind,
+    sourceId: dataset.sourceId,
+    fileName: dataset.fileName,
+    rowCount: dataset.rowCount || 0,
+    columnCount: (dataset.columns || []).length,
+    columns: (dataset.columns || []).join(" | "),
+    columnRoles: (dataset.schema?.columns || []).map((column) => `${column.name}:${column.role}`).join(" | "),
+    modelTargets: (dataset.modelTargets || []).join(" | "),
+    parameterTargets: (dataset.calibrationPackage?.parameterTargets || []).join(" | "),
+    quality: dataset.quality,
+    qualityScore: dataset.qualityScore,
+    qualityIssues: (dataset.qualityIssues || []).join(" | "),
+    storage: dataset.storage,
+    createdAt: dataset.createdAt,
+    createdBy: dataset.createdBy,
+    nextStep: dataset.nextStep,
+  }));
+}
+
+function localDatasetStore() {
+  return JSON.parse(window.localStorage.getItem("axion-local-datasets") || "[]");
+}
+
+function saveLocalDatasetStore(datasets) {
+  window.localStorage.setItem("axion-local-datasets", JSON.stringify(datasets));
+}
+
+function localDatasetFromForm(payload) {
+  const columns = String(payload.contentText || "").split(/\r?\n/)[0]?.split(/[,;\t|]/).map((item) => item.trim()).filter(Boolean) || [];
+  return {
+    id: `local-dataset-${Date.now()}`,
+    projectId: state.currentProjectId || "",
+    projectName: state.projectName || "",
+    name: payload.name || "Local dataset",
+    kind: payload.kind || "experimental",
+    sourceId: payload.sourceId || "",
+    fileName: payload.fileName || "",
+    mimeType: payload.mimeType || "",
+    size: payload.size || String(payload.contentText || "").length,
+    columns,
+    rowCount: Math.max(0, String(payload.contentText || "").split(/\r?\n/).filter(Boolean).length - 1),
+    previewRows: [],
+    schema: { columns: columns.map((name) => ({ name, role: "pending_backend_mapping", modelParameter: "manual mapping", inferredUnit: "" })) },
+    quality: "local draft",
+    qualityScore: 35,
+    qualityIssues: ["Saved locally only. Start the backend to parse roles, quality and calibration targets."],
+    modelTargets: ["Start the Axion backend to classify this company dataset."],
+    calibrationPackage: { parameterTargets: [], columnRoles: [] },
+    storage: "browser-local-draft",
+    createdAt: new Date().toISOString(),
+    createdBy: accountPrincipal(),
+    nextStep: "Start the backend and register again for model calibration.",
+  };
+}
+
+async function refreshDatasets() {
+  try {
+    const projectQuery = state.currentProjectId ? `?projectId=${encodeURIComponent(state.currentProjectId)}` : "";
+    const payload = await apiRequest(`/api/datasets${projectQuery}`);
+    state.datasets = payload.datasets || [];
+  } catch {
+    state.datasets = localDatasetStore();
+  }
+  renderSources();
+  renderReportsBoard();
+}
+
+async function registerCompanyDataset() {
+  const name = document.querySelector("#companyDataName")?.value.trim() || "Company dataset";
+  const kind = document.querySelector("#companyDataKind")?.value || "experimental";
+  const sourceId = document.querySelector("#companyDataSource")?.value.trim() || "";
+  const text = document.querySelector("#companyDataText")?.value || "";
+  const file = document.querySelector("#companyDataFile")?.files?.[0];
+  if (!text.trim()) {
+    showToast("Add CSV/JSON data first");
+    document.querySelector("#companyDataText")?.focus();
+    return;
+  }
+  const body = {
+    projectId: state.currentProjectId || "",
+    name,
+    kind,
+    sourceId,
+    fileName: file?.name || "",
+    mimeType: file?.type || "",
+    size: file?.size || text.length,
+    contentText: text,
+  };
+  try {
+    const payload = await apiRequest("/api/datasets", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    state.datasets = [payload.dataset, ...(state.datasets || []).filter((dataset) => dataset.id !== payload.dataset.id)];
+    showToast(`${payload.dataset.name} registered`);
+  } catch {
+    const local = localDatasetFromForm(body);
+    state.datasets = [local, ...localDatasetStore()];
+    saveLocalDatasetStore(state.datasets);
+    showToast("Dataset saved locally; backend parsing unavailable");
+  }
+  renderSources();
+  renderReportsBoard();
 }
 
 function templateComplexity(template) {
@@ -8859,6 +8972,14 @@ function showExploreDetails(item) {
     showInviteDetails(inviteById(inviteCardId));
     return;
   }
+  const datasetCardId = item.dataset.datasetCard;
+  if (datasetCardId) {
+    const dataset = state.datasets.find((candidate) => candidate.id === datasetCardId);
+    if (dataset) {
+      showDatasetDetails(dataset);
+      return;
+    }
+  }
   const title = exploreTitle(item);
   const body = exploreBody(item);
   const metrics = exploreMetrics(item);
@@ -8943,6 +9064,35 @@ function showInviteDetails(invite) {
       </dl>
       <div class="detail-actions">
         <button data-detail-jump="projects" type="button">Back to project workspace</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
+function showDatasetDetails(dataset) {
+  if (!els.detailDrawer || !dataset) return;
+  const columns = dataset.schema?.columns || (dataset.columns || []).map((name) => ({ name, role: "unmapped", modelParameter: "" }));
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>${escapeHtml(datasetKindLabel(dataset.kind))}</span>
+      <h3>${escapeHtml(dataset.name || "Company dataset")}</h3>
+      <p>${escapeHtml((dataset.modelTargets || []).join(" ") || "Dataset is stored as company evidence for the current Axion model.")}</p>
+      <dl>
+        <dt>Rows</dt><dd>${formatNumber(dataset.rowCount || 0, 0)}</dd>
+        <dt>Columns</dt><dd>${columns.length}</dd>
+        <dt>Quality</dt><dd>${formatNumber(dataset.qualityScore || 0, 0)}% · ${escapeHtml(dataset.quality || "unvalidated")}</dd>
+        <dt>Storage</dt><dd>${escapeHtml(dataset.storage || "local")}</dd>
+        <dt>Source</dt><dd>${escapeHtml(dataset.sourceId || dataset.fileName || "not specified")}</dd>
+      </dl>
+      <div class="dataset-column-mini">
+        ${columns.slice(0, 10).map((column) => `<b>${escapeHtml(column.name)} <small>${escapeHtml(column.role || "unmapped")}</small></b>`).join("")}
+      </div>
+      ${(dataset.qualityIssues || []).length ? `<div class="detail-next"><small>${escapeHtml(dataset.qualityIssues.join(" "))}</small><button data-detail-jump="sources" type="button">Review data</button></div>` : ""}
+      <div class="detail-actions">
+        <button data-detail-jump="reports" type="button">Download registry</button>
+        <button data-detail-jump="simulation" type="button">Run model</button>
       </div>
     </div>
   `;
@@ -10805,6 +10955,7 @@ function comprehensiveReport() {
     culturedMeatSourceScale: culturedMeatSourceScaleRows(),
     plantSimulationFunctions: plantSimulationFunctionRows(),
     sourceIngestionReadiness: sourceIngestionReadinessRows(),
+    companyDatasets: companyDatasetRows(),
     advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
@@ -10846,6 +10997,7 @@ function renderReportsBoard() {
 	      <article><span>Databank workbook</span><strong>${report.databankWorkbook.length}</strong><p>Original Axion equipment, component, mixture, property, parameter, cost, and CIP/SIP template libraries for project calibration.</p><button data-download-report="databank-workbook-csv" type="button">Download CSV</button></article>
 	      <article><span>Exchange workbook</span><strong>${report.exchangeWorkbook.length}</strong><p>Structured handoff map for spreadsheets, project planning, API model exchange, historian tags, CFD cases, LCA, TEA, and QMS documentation.</p><button data-download-report="exchange-workbook-csv" type="button">Download CSV</button></article>
 	      <article><span>Attached source model pack</span><strong>${report.attachedSourceModelPack.length}</strong><p>Clean Axion implementation map for the attached manual, plant-simulation fact sheets, cultured-meat papers, local stream export, digital-twin paper, and scale-up document.</p><button data-download-report="source-model-pack-csv" type="button">Source pack CSV</button><button data-download-report="source-readiness-csv" type="button">Readiness CSV</button></article>
+	      <article><span>Company data registry</span><strong>${report.companyDatasets.length}</strong><p>Customer-supplied bioreactor, historian, TEA, LCA, supplier, QC and schedule datasets with column roles, quality flags, calibration targets and model-use notes.</p><button data-download-report="company-datasets-csv" type="button">Datasets CSV</button></article>
 	      <article><span>Cultured-meat scale model</span><strong>${report.culturedMeatSourceScale.length}</strong><p>Source-backed scale limits, 20 m3 animal-cell boundary, STR/wave working volumes, broth S-145 reference, medium cost pressure, oxygen/CO2 and circularity levers.</p><button data-download-report="cultured-meat-scale-csv" type="button">Scale model CSV</button></article>
 	      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
 	      <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
@@ -10878,7 +11030,7 @@ function pageTitle(view) {
     cfd: "Bioreactor CFD",
     ai: "Boundaries + AI",
     standards: "Standards",
-    sources: "Scientific Data",
+    sources: "Data & Sources",
     recommendations: "Readiness Roadmap",
     twin: "Twin OS",
     economics: "Economics",
@@ -11458,6 +11610,8 @@ function handleReportDownload(type) {
     downloadCsv(`${state.template}-attached-source-model-pack.csv`, attachedSourceModelPackRows(), "Attached source model pack");
   } else if (type === "source-readiness-csv") {
     downloadCsv(`${state.template}-source-ingestion-readiness.csv`, sourceIngestionReadinessRows(), "Source ingestion readiness");
+  } else if (type === "company-datasets-csv") {
+    downloadCsv(`${state.template}-company-data-registry.csv`, companyDatasetRows(), "Company data registry");
   } else if (type === "cultured-meat-scale-csv") {
     downloadCsv(`${state.template}-cultured-meat-scale-model.csv`, culturedMeatSourceScaleRows(), "Cultured-meat scale model");
   } else if (type === "schedule-csv") {
@@ -11727,6 +11881,144 @@ function versionById(versionId) {
 
 function inviteById(inviteId) {
   return state.projectInvites.find((invite) => invite.id === inviteId);
+}
+
+function datasetExamples() {
+  return {
+    bioreactor: `time_h,batch_id,vcd_million_ml,viability_pct,titer_g_l,glucose_g_l,lactate_mM,ammonium_mM,do_pct,pH,kLa_h,OUR_mmol_l_h
+0,B-001,0.8,96,0.00,6.2,1.0,0.2,62,7.12,16,1.8
+24,B-001,2.4,95,0.15,4.8,4.2,0.6,58,7.08,16,3.1
+48,B-001,6.8,93,0.85,2.7,9.8,1.2,51,7.02,15,5.8
+72,B-001,13.5,90,2.10,1.4,14.9,1.8,45,6.98,14,8.4
+96,B-001,18.2,87,3.80,0.6,18.4,2.3,39,6.94,14,10.1`,
+    tea: `item,category,annual_quantity,unit,unit_cost_eur,total_cost_eur,source_quality
+Basal media,raw material,920000,L,18.50,17020000,supplier quote
+Feed supplement,raw material,84000,L,142.00,11928000,supplier quote
+Protein A resin,consumable,42,L,11800,495600,budget quote
+Depth filters,consumable,580,m2,71,41180,internal purchase history
+Clean steam,utility,1450000,kWh,0.085,123250,site tariff
+WFI,utility,380000,L,0.032,12160,site tariff`,
+    lca: `flow,activity_type,direction,annual_quantity,unit,co2e_factor_kg_unit,water_factor_l_unit,data_quality
+Electricity,energy,input,560000,kWh,0.38,1.2,regional grid
+Clean steam,energy,input,410000,kWh,0.21,0.8,site boiler
+WFI,water,input,380000,L,0.00035,1,site estimate
+Single-use bags,consumable,input,1420,kg,8.5,22,supplier estimate
+Biowaste,waste,output,92000,kg,0.42,0.4,waste contractor`,
+    schedule: `operation,equipment,room,start_h,duration_h,cleaning_h,operators,state,batch_id
+Media charge,T-101,Media Prep,0,4,1,2,process,B-001
+Seed expansion,BR-101,Seed Suite,4,48,2,1,process,B-001
+Production culture,BR-201,Production Hall,52,120,4,2,process,B-001
+Harvest,CF-301,Harvest,172,7,1.5,2,process,B-001
+DSP capture,CH-401,DSP,180,12,3,2,process,B-001`,
+  };
+}
+
+function datasetKindLabel(kind = "") {
+  return {
+    bioreactor: "Bioreactor run",
+    experimental: "Experimental data",
+    historian: "Historian / PAT",
+    tea: "TEA cost data",
+    lca: "LCA inventory",
+    schedule: "Schedule / MES",
+    supplier: "Supplier quote",
+    qc: "QC / release",
+  }[kind] || prettyUsername(kind || "Dataset");
+}
+
+function renderDatasetCard(dataset) {
+  const columns = dataset.columns || dataset.schema?.columns?.map((item) => item.name) || [];
+  const roles = dataset.schema?.columns?.map((item) => item.role).filter(Boolean) || [];
+  return `
+    <article class="company-dataset-card clickable-surface" data-dataset-card="${escapeAttr(dataset.id)}">
+      <div>
+        <span>${escapeHtml(datasetKindLabel(dataset.kind))}</span>
+        <strong>${escapeHtml(dataset.name || "Company dataset")}</strong>
+      </div>
+      <dl>
+        <dt>Rows</dt><dd>${formatNumber(dataset.rowCount || dataset.previewRows?.length || 0, 0)}</dd>
+        <dt>Columns</dt><dd>${columns.length}</dd>
+        <dt>Quality</dt><dd>${formatNumber(dataset.qualityScore || 0, 0)}%</dd>
+        <dt>Storage</dt><dd>${escapeHtml(dataset.storage || "local")}</dd>
+      </dl>
+      <p>${escapeHtml((dataset.modelTargets || []).slice(0, 2).join(" ") || "Stored as project evidence and ready for manual mapping.")}</p>
+      <div>${[...new Set(roles)].slice(0, 5).map((role) => `<b>${escapeHtml(role.replaceAll("_", " "))}</b>`).join("")}</div>
+    </article>
+  `;
+}
+
+function renderCompanyDataStudio() {
+  const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
+  const datasets = state.datasets || [];
+  return `
+    <section class="company-data-studio">
+      <div class="company-data-head">
+        <div>
+          <p>Company Data Studio</p>
+          <h3>Bring customer data into the model, without breaking the clean workspace.</h3>
+          <span>Paste CSV/JSON or load a CSV file. Axion detects columns, units, row quality, model targets and the next calibration path for kinetics, CFD, TEA, LCA, scheduling or QC.</span>
+        </div>
+        <button class="action-button primary" data-company-data-register type="button">Register dataset</button>
+      </div>
+      <div class="company-data-layout">
+        <form class="company-data-form" id="companyDataForm">
+          <label>
+            <span>Dataset name</span>
+            <input id="companyDataName" type="text" placeholder="Pilot run B-001 oxygen and metabolites" value="${escapeAttr(activeProject?.name ? `${activeProject.name} dataset` : "")}" />
+          </label>
+          <label>
+            <span>Data type</span>
+            <select id="companyDataKind">
+              <option value="bioreactor">Bioreactor run</option>
+              <option value="historian">Historian / PAT</option>
+              <option value="tea">TEA cost data</option>
+              <option value="lca">LCA inventory</option>
+              <option value="schedule">Schedule / MES</option>
+              <option value="supplier">Supplier quote</option>
+              <option value="qc">QC / release</option>
+              <option value="experimental">Experimental data</option>
+            </select>
+          </label>
+          <label>
+            <span>Source / system</span>
+            <input id="companyDataSource" type="text" placeholder="CSV export, PI historian, LIMS, supplier quote, ERP" />
+          </label>
+          <label class="company-file-label">
+            <span>CSV file</span>
+            <input id="companyDataFile" type="file" accept=".csv,.tsv,.txt,.json,text/csv,application/json" />
+          </label>
+          <label class="company-data-text">
+            <span>CSV or JSON data</span>
+            <textarea id="companyDataText" rows="8" spellcheck="false" placeholder="time_h,batch_id,vcd_million_ml,glucose_g_l,lactate_mM,ammonium_mM,do_pct..."></textarea>
+          </label>
+          <div class="company-data-actions">
+            ${Object.keys(datasetExamples()).map((key) => `<button type="button" data-company-data-example="${key}">${escapeHtml(datasetKindLabel(key))}</button>`).join("")}
+          </div>
+        </form>
+        <aside class="company-data-guide">
+          <article><span>Model fit</span><strong>Kinetics + boundaries</strong><p>VCD, titer, glucose, glutamine, DO, kLa, OUR, lactate and ammonium update dynamic profiles and CFD source/sink terms.</p></article>
+          <article><span>Economics</span><strong>TEA/LCA override</strong><p>Material, media, resin, filter, energy, water, waste and supplier data replace screening factors in export-ready tables.</p></article>
+          <article><span>Operations</span><strong>Scheduling data</strong><p>Equipment, room, operator, duration, cleaning and batch rows calibrate utilization and finite-capacity scheduling.</p></article>
+        </aside>
+      </div>
+      <div class="company-dataset-strip">
+        <div>
+          <span>Registered datasets</span>
+          <strong>${datasets.length}</strong>
+        </div>
+        <button data-company-data-refresh type="button">Refresh datasets</button>
+        <button data-download-report="company-datasets-csv" type="button">Download registry</button>
+      </div>
+      <div class="company-dataset-grid">
+        ${datasets.length ? datasets.map(renderDatasetCard).join("") : `
+          <article class="company-dataset-empty">
+            <strong>No company data registered yet.</strong>
+            <p>Add one representative CSV first. The best first dataset is usually a bioreactor run with time, VCD, viability, glucose, lactate, ammonium, DO, pH and titer.</p>
+          </article>
+        `}
+      </div>
+    </section>
+  `;
 }
 
 function renderProfileMenu() {
@@ -12541,6 +12833,12 @@ function applySystemCommand(prompt) {
     needsRender = true;
   }
 
+  if (lower.includes("company data") || lower.includes("upload data") || lower.includes("csv") || lower.includes("dataset") || lower.includes("own data")) {
+    applied.push("Opened the company-data studio so uploaded CSV/JSON data can be registered, classified and used for modelling.");
+    steps.push("Use the dataset form to add bioreactor kinetics, historian, TEA, LCA, supplier, QC or schedule data; Axion detects columns and recommends which model layer should consume the data.");
+    targetView = "sources";
+  }
+
   if (lower.includes("cip") || lower.includes("sip") || lower.includes("cleaning") || lower.includes("sterilization")) {
     if (!state.units.some((item) => item.type === "cip")) addSectionPreset("cip");
     state.canvasFocus = "utilities";
@@ -12847,19 +13145,22 @@ async function handleIntegrationAction(action, key) {
 
 async function refreshProjects() {
   try {
-    const [payload, readiness] = await Promise.all([
+    const [payload, datasetsPayload, readiness] = await Promise.all([
       apiRequest("/api/projects"),
+      apiRequest(`/api/datasets${state.currentProjectId ? `?projectId=${encodeURIComponent(state.currentProjectId)}` : ""}`).catch(() => ({ datasets: [] })),
       apiRequest("/api/production-readiness").catch(() => fallbackProductionReadiness()),
     ]);
     state.projects = payload.projects || [];
     state.projectInvites = payload.invites || [];
     state.integrations = payload.integrations || [];
     state.projectFolders = payload.folders || {};
+    state.datasets = datasetsPayload.datasets || [];
     state.productionReadiness = readiness;
   } catch {
     const store = normalizeLocalProjectOwnership(localProjectStore());
     state.projects = store.projects || [];
     state.projectInvites = store.invites || [];
+    state.datasets = localDatasetStore();
     state.integrations = localIntegrations();
     state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
     state.productionReadiness = fallbackProductionReadiness();
@@ -12870,6 +13171,8 @@ async function refreshProjects() {
     state.projectName = latestOpenProject.name || state.projectName;
   }
   renderProjectsBoard();
+  renderSources();
+  renderReportsBoard();
   renderProfileMenu();
 }
 
@@ -12929,6 +13232,7 @@ async function loadProject(projectId) {
     state.projectVersions = payload.versions || [];
     state.projectInvites = payload.invites || state.projectInvites;
     importModelState(payload.model?.modelState || {});
+    await refreshDatasets();
     setView("overview");
     showToast(`${payload.project.name} loaded`);
   } catch {
@@ -12938,7 +13242,9 @@ async function loadProject(projectId) {
     state.currentProjectId = project.id;
     state.projectName = project.name;
     state.projectVersions = store.versions.filter((item) => item.projectId === projectId);
+    state.datasets = localDatasetStore().filter((dataset) => !dataset.projectId || dataset.projectId === projectId);
     importModelState(project.modelState || {});
+    renderSources();
     setView("overview");
     showToast(`${project.name} loaded`);
   }
@@ -13424,6 +13730,64 @@ function bindEvents() {
       else loadProject(projectCard.dataset.projectCard);
       event.stopPropagation();
     }
+  });
+
+  els.sourcesBoard?.addEventListener("click", (event) => {
+    const exampleButton = event.target.closest("[data-company-data-example]");
+    if (exampleButton) {
+      event.stopPropagation();
+      const key = exampleButton.dataset.companyDataExample;
+      const textArea = document.querySelector("#companyDataText");
+      const kindSelect = document.querySelector("#companyDataKind");
+      const nameInput = document.querySelector("#companyDataName");
+      if (kindSelect) kindSelect.value = key;
+      if (nameInput) nameInput.value = `${datasetKindLabel(key)} calibration dataset`;
+      if (textArea) {
+        textArea.value = datasetExamples()[key] || "";
+        textArea.focus();
+      }
+      showToast(`${datasetKindLabel(key)} example loaded`);
+      return;
+    }
+    const registerButton = event.target.closest("[data-company-data-register]");
+    if (registerButton) {
+      event.stopPropagation();
+      registerCompanyDataset();
+      return;
+    }
+    const refreshButton = event.target.closest("[data-company-data-refresh]");
+    if (refreshButton) {
+      event.stopPropagation();
+      refreshDatasets();
+      showToast("Company datasets refreshed");
+      return;
+    }
+    const downloadButton = event.target.closest("[data-download-report]");
+    if (downloadButton) {
+      event.stopPropagation();
+      handleReportDownload(downloadButton.dataset.downloadReport);
+      return;
+    }
+    const datasetCard = event.target.closest("[data-dataset-card]");
+    if (datasetCard) {
+      event.stopPropagation();
+      const dataset = state.datasets.find((item) => item.id === datasetCard.dataset.datasetCard);
+      if (dataset) showDatasetDetails(dataset);
+    }
+  });
+
+  els.sourcesBoard?.addEventListener("change", async (event) => {
+    const fileInput = event.target.closest("#companyDataFile");
+    if (!fileInput?.files?.[0]) return;
+    const file = fileInput.files[0];
+    const text = await file.text();
+    const textArea = document.querySelector("#companyDataText");
+    const nameInput = document.querySelector("#companyDataName");
+    const sourceInput = document.querySelector("#companyDataSource");
+    if (textArea) textArea.value = text.slice(0, 900000);
+    if (nameInput && !nameInput.value.trim()) nameInput.value = file.name.replace(/\.[^.]+$/, "");
+    if (sourceInput && !sourceInput.value.trim()) sourceInput.value = file.name;
+    showToast(`${file.name} loaded`);
   });
 
   els.scaleList.addEventListener("click", (event) => {

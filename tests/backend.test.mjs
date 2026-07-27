@@ -114,6 +114,35 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(created.response.status, 201);
     assert.ok(created.payload.project.id);
 
+    const dataset = await jsonFetch(server.baseUrl, "/api/datasets", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        name: "Pilot bioreactor run",
+        kind: "bioreactor",
+        sourceId: "test csv",
+        contentText: [
+          "time_h,batch_id,vcd_million_ml,glucose_g_l,lactate_mM,ammonium_mM,do_pct,kLa_h,cost_eur",
+          "0,B-001,0.8,6.1,1.2,0.2,64,16,120",
+          "24,B-001,2.5,4.8,4.9,0.7,58,16,140",
+          "48,B-001,7.1,2.4,10.2,1.3,49,15,180",
+        ].join("\n"),
+      },
+    });
+    assert.equal(dataset.response.status, 201);
+    assert.equal(dataset.payload.dataset.rowCount, 3);
+    assert.ok(dataset.payload.dataset.schema.columns.some((column) => column.role === "oxygen_transfer"));
+    assert.ok(dataset.payload.dataset.modelTargets.some((target) => /CFD|kLa|OUR/.test(target)));
+
+    const datasetList = await jsonFetch(server.baseUrl, `/api/datasets?projectId=${created.payload.project.id}`, { token });
+    assert.equal(datasetList.response.status, 200);
+    assert.equal(datasetList.payload.datasets.length, 1);
+
+    const datasetExport = await jsonFetch(server.baseUrl, `/api/datasets/${dataset.payload.dataset.id}/export`, { token });
+    assert.equal(datasetExport.response.status, 200);
+    assert.equal(datasetExport.payload.dataset.id, dataset.payload.dataset.id);
+
     const connector = await jsonFetch(server.baseUrl, "/api/integrations/rest-api/actions", {
       token,
       method: "POST",
