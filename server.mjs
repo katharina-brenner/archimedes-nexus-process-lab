@@ -7,15 +7,19 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
-const dataDir = process.env.AXION_DATA_DIR ? resolve(process.env.AXION_DATA_DIR) : join(rootDir, ".data");
-const dbPath = join(dataDir, "axion-licensing.json");
-const modelsDir = join(dataDir, "models");
-const projectsDir = join(modelsDir, "projects");
-const archiveDir = join(modelsDir, "archive");
-const runsDir = join(modelsDir, "runs");
-const pythonModelScript = join(rootDir, "python_models", "bioprocess_model.py");
+const runtimeEnvPath = join(rootDir, ".axion-runtime-env.json");
 
 function loadLocalEnv() {
+  if (existsSync(runtimeEnvPath)) {
+    try {
+      const runtimeEnv = JSON.parse(readFileSync(runtimeEnvPath, "utf8"));
+      Object.entries(runtimeEnv).forEach(([key, value]) => {
+        if (!process.env[key] && typeof value === "string") process.env[key] = value;
+      });
+    } catch (error) {
+      console.warn(`Runtime environment file could not be loaded: ${error.message}`);
+    }
+  }
   [".env", ".env.local"].forEach((filename) => {
     const envPath = join(rootDir, filename);
     if (!existsSync(envPath)) return;
@@ -31,6 +35,14 @@ function loadLocalEnv() {
 }
 
 loadLocalEnv();
+
+const dataDir = process.env.AXION_DATA_DIR ? resolve(process.env.AXION_DATA_DIR) : join(rootDir, ".data");
+const dbPath = join(dataDir, "axion-licensing.json");
+const modelsDir = join(dataDir, "models");
+const projectsDir = join(modelsDir, "projects");
+const archiveDir = join(modelsDir, "archive");
+const runsDir = join(modelsDir, "runs");
+const pythonModelScript = join(rootDir, "python_models", "bioprocess_model.py");
 
 const defaultHost = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
 
@@ -3554,6 +3566,11 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
 
 function serveStatic(req, res, pathname) {
   const requested = pathname === "/" ? "/index.html" : pathname;
+  if (requested === "/.axion-runtime-env.json" || requested.startsWith("/.data/")) {
+    res.writeHead(404);
+    res.end("Not found");
+    return;
+  }
   const clean = normalize(decodeURIComponent(requested)).replace(/^(\.\.[/\\])+/, "");
   const filePath = resolve(staticRootDir, `.${clean}`);
   if (!filePath.startsWith(staticRootDir)) {

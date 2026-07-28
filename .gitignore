@@ -8,3 +8,4 @@ nextjs-bff/.next/
 .cfd-jobs/
 .env
 .env.local
+.axion-runtime-env.json

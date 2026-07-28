@@ -11,7 +11,7 @@
     "backend": "node server.mjs",
     "start": "node server.mjs",
     "start:hostinger": "NODE_ENV=production node server.mjs",
-    "build": "vite build && node scripts/prepare-sites-build.mjs",
+    "build": "node scripts/materialize-runtime-env.mjs && vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "bff:install": "pnpm --dir nextjs-bff install",
     "bff:dev": "pnpm --dir nextjs-bff dev",
