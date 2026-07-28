@@ -89,12 +89,15 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(Array.isArray(readiness.payload.checks));
     assert.ok(readiness.payload.checks.some((item) => item.key === "stripe"));
     assert.ok(readiness.payload.checks.some((item) => item.key === "nextjs-bff"));
+    assert.ok(readiness.payload.checks.some((item) => item.key === "stripe" && item.requiresPaymentApproval));
+    assert.ok(readiness.payload.approvalSummary.paymentApprovalRequiredFor.includes("stripe"));
 
     const professionalReadiness = await jsonFetch(server.baseUrl, "/api/professional-readiness");
     assert.equal(professionalReadiness.response.status, 200);
     assert.equal(professionalReadiness.payload.productName, "Axion Process OS");
     assert.ok(professionalReadiness.payload.alreadyImplemented.some((item) => item.area === "Backend API"));
     assert.ok(professionalReadiness.payload.stillMissingBeforeProfessionalSaaS.some((item) => item.area === "Deployment and domain"));
+    assert.ok(professionalReadiness.payload.stillMissingBeforeProfessionalSaaS.some((item) => item.requiresPaymentApproval));
 
     const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
@@ -126,6 +129,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(services.payload.services.some((item) => item.key === "openai"));
     assert.ok(services.payload.services.some((item) => item.key === "stripe"));
     assert.ok(Array.isArray(services.payload.nextActions));
+    assert.ok(services.payload.nextActions.some((item) => item.requiresOwnerAction && item.ownerAction));
 
     const missingProbe = await jsonFetch(server.baseUrl, "/api/services/stripe/probe", { token, method: "POST" });
     assert.equal(missingProbe.response.status, 200);

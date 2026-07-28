@@ -8604,14 +8604,18 @@ function fallbackProductionReadiness() {
   return {
     ready: false,
     checks: [
-      { key: "postgres", label: "Supabase/Postgres database", ready: false, missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] },
-      { key: "stripe", label: "Stripe Checkout + webhook", ready: false, missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL=https://..."] },
-      { key: "google", label: "Google OAuth login", ready: false, missing: ["GOOGLE_CLIENT_ID", "authorized HTTPS domain"] },
-      { key: "email", label: "Invite email delivery", ready: false, missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"] },
-      { key: "deployment", label: "Public HTTPS backend + domain", ready: false, missing: ["Render/Fly/Railway/Vercel backend", "custom domain/DNS"] },
-      { key: "cfd-worker", label: "External rigorous CFD worker", ready: false, missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"] },
-      { key: "ci", label: "Tests/CI", ready: true, missing: [] },
+      { key: "postgres", label: "Supabase/Postgres database", ready: false, missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "stripe", label: "Stripe Checkout + webhook", ready: false, missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL=https://..."], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "google", label: "Google OAuth login", ready: false, missing: ["GOOGLE_CLIENT_ID", "authorized HTTPS domain"], requiresOwnerAction: true, requiresPaymentApproval: false },
+      { key: "email", label: "Invite email delivery", ready: false, missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "deployment", label: "Public HTTPS backend + domain", ready: false, missing: ["Render/Fly/Railway/Vercel backend", "custom domain/DNS"], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "cfd-worker", label: "External rigorous CFD worker", ready: false, missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "ci", label: "Tests/CI", ready: true, missing: [], requiresOwnerAction: true, requiresPaymentApproval: false },
     ],
+    approvalSummary: {
+      paymentApprovalRequiredFor: ["postgres", "stripe", "email", "deployment", "cfd-worker"],
+      ownerActionRequiredFor: ["postgres", "stripe", "google", "email", "deployment", "cfd-worker"],
+    },
     note: "Static/local fallback: connect the backend to see live readiness.",
   };
 }
@@ -8633,9 +8637,14 @@ function renderProductionReadinessPanel() {
       <div class="production-readiness-grid">
         ${checks.map((item) => `
           <article class="${item.ready ? "ready" : "missing"}">
-            <span>${item.ready ? "Ready" : "Missing"}</span>
+            <div class="readiness-card-kicker">
+              <span>${item.ready ? "Ready" : "Missing"}</span>
+              ${item.requiresPaymentApproval && !item.ready ? `<em>Paid provider</em>` : ""}
+              ${item.requiresOwnerAction && !item.ready ? `<em>Owner action</em>` : ""}
+            </div>
             <strong>${escapeHtml(item.label || item.key)}</strong>
             <p>${item.ready ? "Configured and available." : `${(item.missing || []).length ? item.missing.join(", ") : "Configuration required."}`}</p>
+            ${item.ownerAction && !item.ready ? `<small>${escapeHtml(item.ownerAction)}</small>` : ""}
           </article>
         `).join("")}
       </div>

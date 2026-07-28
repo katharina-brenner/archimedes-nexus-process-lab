@@ -109,6 +109,8 @@ The public site presents Axion as a professional process-modelling workspace wit
 
 The `Readiness` page explains the difference between the current working prototype and a production SaaS web app: product features are available locally, while real professional operation still depends on hosted infrastructure, persistent database setup, provider secrets, OAuth, payments, email delivery, monitoring, deployment, and validated CFD compute.
 
+The backend readiness payload now marks which missing systems require account-owner action and which require payment approval, so users can distinguish code work from provider setup.
+
 ## Backend API
 
 - `GET /api/health` returns production health, storage, payment, Google, and invite-email readiness

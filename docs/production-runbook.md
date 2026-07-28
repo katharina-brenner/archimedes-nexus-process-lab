@@ -23,6 +23,29 @@ git push origin main
 - Or install/reconnect the GitHub app for this repository with contents write
   permission.
 
+Codex can verify repository metadata through the GitHub connector, but the local
+HTTPS credential and the connector ref-write permission are separate. Production
+publishing needs one working write path: local `git push`, GitHub CLI, a
+fine-grained token, or an installed app with contents write access.
+
+## 1.5 Where Payment Approval Is Required
+
+The codebase can prepare manifests, APIs, tests and readiness probes. Account
+owners must approve paid or money-moving provider setup:
+
+| Area | Payment or owner approval | Why |
+| --- | --- | --- |
+| OpenAI billing/quota | Yes | The command planner needs a billed Platform project or active credits. |
+| Supabase/Postgres | Usually yes | Production persistence, storage and backups may require a paid plan. |
+| Stripe live payments | Yes | Live payments, webhooks, payouts and tax/legal settings are account-owner actions. |
+| Email sending | Usually yes | A verified sending domain and provider quota are required for invites. |
+| Public host/domain | Yes | Backend hosting, DNS/domain purchase and TLS setup are provider-side. |
+| CFD worker/cluster | Yes | Validated CFD requires real compute and often paid solver/cluster capacity. |
+| Google OAuth | Owner action, usually no payment | A Google Cloud OAuth client and allowed domain must be created by the account owner. |
+
+Do not share personal passwords or live secret values in chat. Store secrets only
+in the backend host secret manager.
+
 ## 2. OpenAI Billing And Quota
 
 The backend reads `OPENAI_API_KEY` and calls the Responses API for command

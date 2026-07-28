@@ -30,6 +30,8 @@ const checks = [
     area: "Supabase/Postgres",
     ready: has("SUPABASE_URL") && has("SUPABASE_SERVICE_ROLE_KEY") && has("SUPABASE_STATE_TABLE") && has("SUPABASE_DOCUMENTS_TABLE"),
     missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"].filter((key) => !has(key)),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "Stripe checkout + webhook",
@@ -37,21 +39,29 @@ const checks = [
     missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"].filter((key) => !has(key))
       .concat(has("STRIPE_SECRET_KEY") && !/^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") ? ["STRIPE_SECRET_KEY must look like sk_live_... or sk_test_..."] : [])
       .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "Google OAuth",
     ready: has("GOOGLE_CLIENT_ID") && isHttps,
     missing: [!has("GOOGLE_CLIENT_ID") ? "GOOGLE_CLIENT_ID" : "", isHttps ? "" : "APP_BASE_URL must be https://..."].filter(Boolean),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: false,
   },
   {
     area: "Invite email",
     ready: resendReady || smtpReady,
     missing: (!has("INVITE_EMAIL_FROM") ? ["INVITE_EMAIL_FROM"] : []).concat(resendReady || smtpReady ? [] : ["RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD"]),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "OpenAI command planner",
     ready: has("OPENAI_API_KEY") && /^sk-/.test(process.env.OPENAI_API_KEY || ""),
     missing: (!has("OPENAI_API_KEY") ? ["OPENAI_API_KEY"] : []).concat(has("OPENAI_API_KEY") && !/^sk-/.test(process.env.OPENAI_API_KEY || "") ? ["OPENAI_API_KEY must look like sk-..."] : []),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "Deployment",
@@ -60,18 +70,24 @@ const checks = [
       .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."])
       .concat(String(process.env.SESSION_SECRET || "").length >= 32 ? [] : ["SESSION_SECRET must be at least 32 characters"])
       .concat(String(process.env.AXION_ADMIN_PASSWORD || "").length >= 12 ? [] : ["AXION_ADMIN_PASSWORD must be at least 12 characters"]),
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "Next.js BFF",
     ready: has("NEXTJS_BFF_URL") && String(process.env.NEXTJS_BFF_URL || "").startsWith("https://"),
     missing: !has("NEXTJS_BFF_URL") ? ["NEXTJS_BFF_URL"] : String(process.env.NEXTJS_BFF_URL || "").startsWith("https://") ? [] : ["NEXTJS_BFF_URL must be https://..."],
     optional: true,
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
   {
     area: "External CFD worker",
     ready: has("CFD_WORKER_URL") && has("CFD_WORKER_TOKEN"),
     missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !has(key)),
     optional: true,
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
   },
 ];
 
@@ -82,6 +98,8 @@ for (const row of rows) {
   const marker = row.ready ? "OK " : row.optional ? "SKIP" : "TODO";
   console.log(`${marker}  ${row.area}`);
   if (row.missing.length) console.log(`      missing: ${row.missing.join(", ")}`);
+  if (!row.ready && row.requiresPaymentApproval) console.log("      approval: payment/account-owner approval required");
+  else if (!row.ready && row.requiresOwnerAction) console.log("      approval: account-owner setup required");
 }
 
 const nextReady = !process.env.NEXTJS_BFF_URL || String(process.env.NEXTJS_BFF_URL).startsWith("https://");
@@ -91,4 +109,8 @@ if (!nextReady) {
 }
 
 console.log("\nNo secret values were printed.\n");
+const paymentRows = rows.filter((row) => !row.ready && row.requiresPaymentApproval).map((row) => row.area);
+if (paymentRows.length) {
+  console.log(`Payment approval is still needed for: ${paymentRows.join(", ")}.\n`);
+}
 process.exit(rows.some((row) => !row.ready && !row.optional) || !nextReady ? 1 : 0);
