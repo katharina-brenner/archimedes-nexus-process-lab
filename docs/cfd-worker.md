@@ -29,6 +29,24 @@ CFD_WORKER_URL=http://127.0.0.1:8787
 CFD_WORKER_TOKEN=replace-with-worker-token
 ```
 
+Containerized worker:
+
+```bash
+docker build -f Dockerfile.cfd-worker -t axion-cfd-worker .
+docker run --rm -p 8787:8787 \
+  -e CFD_WORKER_TOKEN=replace-with-worker-token \
+  -e AXION_CFD_DRY_RUN=true \
+  axion-cfd-worker
+```
+
+For real OpenFOAM execution, build the same Dockerfile on top of a validated
+OpenFOAM-capable base image and set:
+
+```bash
+AXION_CFD_DRY_RUN=false
+OPENFOAM_SOLVER=interFoam
+```
+
 ## Production mode
 
 The default worker is a safe dry run. It authenticates Axion, writes the case package, records required boundary conditions and returns a prepared job.

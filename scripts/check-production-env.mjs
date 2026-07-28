@@ -5,49 +5,83 @@ import { join } from "node:path";
 const rootDir = new URL("..", import.meta.url).pathname;
 
 function loadDotEnv() {
-  const envPath = join(rootDir, ".env");
-  if (!existsSync(envPath)) return;
-  const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-    const [key, ...parts] = trimmed.split("=");
-    if (!process.env[key]) process.env[key] = parts.join("=").replace(/^["']|["']$/g, "");
+  for (const filename of [".env", ".env.local"]) {
+    const envPath = join(rootDir, filename);
+    if (!existsSync(envPath)) continue;
+    const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const [key, ...parts] = trimmed.split("=");
+      if (!process.env[key]) process.env[key] = parts.join("=").replace(/^["']|["']$/g, "");
+    }
   }
 }
 
 loadDotEnv();
 
+const has = (key) => Boolean(process.env[key]);
+const isHttps = String(process.env.APP_BASE_URL || "").startsWith("https://");
+const resendReady = has("INVITE_EMAIL_FROM") && has("RESEND_API_KEY");
+const smtpReady = has("INVITE_EMAIL_FROM") && has("SMTP_HOST") && has("SMTP_USER") && has("SMTP_PASSWORD");
+
 const checks = [
-  ["Supabase/Postgres", ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"]],
-  ["Stripe checkout + webhook", ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"]],
-  ["Google OAuth", ["GOOGLE_CLIENT_ID", "APP_BASE_URL"]],
-  ["Invite email", ["INVITE_EMAIL_FROM", "RESEND_API_KEY"]],
-  ["Deployment", ["APP_BASE_URL", "SESSION_SECRET", "AXION_ADMIN_PASSWORD"]],
-  ["Next.js BFF", ["NEXTJS_BFF_URL"]],
-  ["External CFD worker", ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"]],
+  {
+    area: "Supabase/Postgres",
+    ready: has("SUPABASE_URL") && has("SUPABASE_SERVICE_ROLE_KEY") && has("SUPABASE_STATE_TABLE") && has("SUPABASE_DOCUMENTS_TABLE"),
+    missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"].filter((key) => !has(key)),
+  },
+  {
+    area: "Stripe checkout + webhook",
+    ready: has("STRIPE_SECRET_KEY") && /^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") && has("STRIPE_PRICE_ID") && has("STRIPE_WEBHOOK_SECRET") && isHttps,
+    missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"].filter((key) => !has(key))
+      .concat(has("STRIPE_SECRET_KEY") && !/^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") ? ["STRIPE_SECRET_KEY must look like sk_live_... or sk_test_..."] : [])
+      .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]),
+  },
+  {
+    area: "Google OAuth",
+    ready: has("GOOGLE_CLIENT_ID") && isHttps,
+    missing: [!has("GOOGLE_CLIENT_ID") ? "GOOGLE_CLIENT_ID" : "", isHttps ? "" : "APP_BASE_URL must be https://..."].filter(Boolean),
+  },
+  {
+    area: "Invite email",
+    ready: resendReady || smtpReady,
+    missing: (!has("INVITE_EMAIL_FROM") ? ["INVITE_EMAIL_FROM"] : []).concat(resendReady || smtpReady ? [] : ["RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD"]),
+  },
+  {
+    area: "OpenAI command planner",
+    ready: has("OPENAI_API_KEY") && /^sk-/.test(process.env.OPENAI_API_KEY || ""),
+    missing: (!has("OPENAI_API_KEY") ? ["OPENAI_API_KEY"] : []).concat(has("OPENAI_API_KEY") && !/^sk-/.test(process.env.OPENAI_API_KEY || "") ? ["OPENAI_API_KEY must look like sk-..."] : []),
+  },
+  {
+    area: "Deployment",
+    ready: has("APP_BASE_URL") && isHttps && has("SESSION_SECRET") && String(process.env.SESSION_SECRET || "").length >= 32 && has("AXION_ADMIN_PASSWORD") && String(process.env.AXION_ADMIN_PASSWORD || "").length >= 12,
+    missing: ["APP_BASE_URL", "SESSION_SECRET", "AXION_ADMIN_PASSWORD"].filter((key) => !has(key))
+      .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."])
+      .concat(String(process.env.SESSION_SECRET || "").length >= 32 ? [] : ["SESSION_SECRET must be at least 32 characters"])
+      .concat(String(process.env.AXION_ADMIN_PASSWORD || "").length >= 12 ? [] : ["AXION_ADMIN_PASSWORD must be at least 12 characters"]),
+  },
+  {
+    area: "Next.js BFF",
+    ready: has("NEXTJS_BFF_URL") && String(process.env.NEXTJS_BFF_URL || "").startsWith("https://"),
+    missing: !has("NEXTJS_BFF_URL") ? ["NEXTJS_BFF_URL"] : String(process.env.NEXTJS_BFF_URL || "").startsWith("https://") ? [] : ["NEXTJS_BFF_URL must be https://..."],
+    optional: true,
+  },
+  {
+    area: "External CFD worker",
+    ready: has("CFD_WORKER_URL") && has("CFD_WORKER_TOKEN"),
+    missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !has(key)),
+    optional: true,
+  },
 ];
 
-const rows = checks.map(([area, keys]) => {
-  const missing = keys.filter((key) => !process.env[key]);
-  return {
-    area,
-    ready: missing.length === 0,
-    missing,
-  };
-});
+const rows = checks;
 
 console.log("\nAxion production readiness\n");
 for (const row of rows) {
-  const marker = row.ready ? "OK " : "TODO";
+  const marker = row.ready ? "OK " : row.optional ? "SKIP" : "TODO";
   console.log(`${marker}  ${row.area}`);
   if (row.missing.length) console.log(`      missing: ${row.missing.join(", ")}`);
-}
-
-const httpsReady = String(process.env.APP_BASE_URL || "").startsWith("https://");
-if (!httpsReady) {
-  console.log("\nTODO  Public HTTPS");
-  console.log("      APP_BASE_URL must be an https:// production URL for Stripe, Google OAuth and invite links.");
 }
 
 const nextReady = !process.env.NEXTJS_BFF_URL || String(process.env.NEXTJS_BFF_URL).startsWith("https://");
@@ -57,4 +91,4 @@ if (!nextReady) {
 }
 
 console.log("\nNo secret values were printed.\n");
-process.exit(rows.some((row) => !row.ready && row.area !== "External CFD worker" && row.area !== "Next.js BFF") || !httpsReady || !nextReady ? 1 : 0);
+process.exit(rows.some((row) => !row.ready && !row.optional) || !nextReady ? 1 : 0);

@@ -1,8 +1,11 @@
 .DS_Store
 .data
+.cfd-jobs
 .env
+.env.local
 dist
 node_modules
+nextjs-bff/.next
 *.log
 .git
 Downloads

@@ -158,6 +158,8 @@ The side composer works like a controlled engineering command system. The fronte
 
 Set `OPENAI_API_KEY` and optionally `OPENAI_MODEL` on the backend for LLM planning. If OpenAI is disabled or unavailable, Axion falls back to a deterministic safe planner so the command field still works.
 
+The key must belong to an OpenAI project with active billing/quota. When quota is exhausted, the backend keeps the command system available through the deterministic planner and reports the provider error without exposing the key.
+
 ## Next.js Backend-For-Frontend
 
 `nextjs-bff/` adds an optional Next.js app edge in front of the Axion API core. It follows the Next.js Route Handler / Backend-for-Frontend pattern and uses `output: "standalone"` for production containers. The API core remains `server.mjs`; the BFF proxies `/api/axion/*` and `/api/core/*` to the core so future SSR pages, auth middleware, public-domain routing and app-edge concerns do not get mixed into the process-modelling backend.
@@ -172,7 +174,7 @@ AXION_API_BASE_URL=http://127.0.0.1:8899 pnpm dev
 
 Production variables:
 
-- API core: `APP_BASE_URL=https://your-api-core-domain`, `NEXTJS_BFF_URL=https://your-public-app-domain`
+- API core: `APP_BASE_URL=https://your-api-core-domain`, `NEXTJS_BFF_URL=https://your-public-app-domain`, `AXION_REQUIRE_PRODUCTION_CONFIG=true`
 - Next.js BFF: `AXION_API_BASE_URL=https://your-api-core-domain`
 
 The local prototype can store users, projects, datasets, simulation runs and model versions in `.data/*.json`. In production, the backend can use Supabase/Postgres for account/order/project metadata plus versioned model documents. Use Supabase Storage or S3-compatible object storage for uploaded file bytes, and a separate Python/CFD worker service for longer model runs.
@@ -186,21 +188,32 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 SUPABASE_STATE_TABLE=axion_state
 SUPABASE_DOCUMENTS_TABLE=axion_documents
+SUPABASE_STORAGE_BUCKET=axion-model-data
 ```
 
 The service-role key must only exist on the backend host. Never expose it in GitHub Pages, frontend code, or browser environment variables.
 
 ## CFD worker setup
 
-For rigorous external CFD jobs, use [docs/cfd-worker.md](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/docs/cfd-worker.md). The included [workers/cfd_worker.py](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/workers/cfd_worker.py) implements Axion's `/jobs` contract, writes case payloads, and can be deployed on an OpenFOAM-capable host.
+For rigorous external CFD jobs, use [docs/cfd-worker.md](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/docs/cfd-worker.md). The included [workers/cfd_worker.py](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/workers/cfd_worker.py) implements Axion's `/jobs` contract, writes case payloads, and can be deployed on an OpenFOAM-capable host. [Dockerfile.cfd-worker](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/Dockerfile.cfd-worker) packages the worker; build it on an OpenFOAM-capable base image and set `AXION_CFD_DRY_RUN=false` for real solver execution.
 
 ## Invite email setup
 
-Invite records work without email. For real email delivery, configure a sender domain and set:
+Invite records work without email. For real email delivery, configure a sender domain and set either Resend:
 
 ```bash
 INVITE_EMAIL_FROM="Axion Process OS <invites@your-domain.com>"
 RESEND_API_KEY=re_...
+```
+
+or SMTP:
+
+```bash
+INVITE_EMAIL_FROM="Axion Process OS <invites@your-domain.com>"
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASSWORD=...
 ```
 
 When configured, project invites to email addresses are sent automatically and still remain recorded in the backend audit trail.
@@ -214,6 +227,7 @@ Recommended production shape:
 - Deploy `server.mjs` to a Node host such as Render, Fly.io, Railway, Vercel serverless functions, Google Cloud Run, or AWS.
 - Use [Dockerfile](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/Dockerfile) for container deployment, or [render.yaml](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/render.yaml) for a direct Render Blueprint.
 - Set all backend secrets on that host, not in GitHub Pages.
+- Set `AXION_REQUIRE_PRODUCTION_CONFIG=true` after the host secrets are complete, so the backend refuses to start with local-only defaults.
 - Point `APP_BASE_URL` to the public backend URL.
 - Add the same public backend URL to Stripe webhook configuration.
 - Add the domain to the Google OAuth authorized JavaScript origins and redirect/origin settings.
@@ -229,6 +243,9 @@ For Render Blueprint deployment:
 6. Set `APP_BASE_URL` to the Render/custom-domain HTTPS URL.
 7. Configure Stripe webhook to `${APP_BASE_URL}/api/stripe/webhook`.
 8. Configure Google OAuth to allow the same origin.
+9. Open `/api/production-readiness`; every required row should be `ready`.
+
+For provider-side account actions and domain/DNS setup, use [docs/production-runbook.md](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/docs/production-runbook.md).
 
 ## Tests and CI
 
@@ -237,6 +254,8 @@ Run locally:
 ```bash
 npm run check
 npm test
+npm run doctor
+npm run smoke:production
 ```
 
 GitHub Actions also runs syntax checks, backend API tests, and a static build via `.github/workflows/ci.yml`.

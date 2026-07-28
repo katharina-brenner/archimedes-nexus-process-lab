@@ -31,6 +31,19 @@ Do not commit real values. Store them in the backend host secret manager.
 | --- | --- | --- |
 | `INVITE_EMAIL_FROM` | Verified sender/domain | From address for collaboration invites |
 | `RESEND_API_KEY` | Resend API key | Sends invite email |
+| `SMTP_HOST` | SMTP provider | Alternative invite email transport |
+| `SMTP_PORT` | SMTP provider | Alternative invite email transport |
+| `SMTP_USER` | SMTP provider | Alternative invite email transport |
+| `SMTP_PASSWORD` | SMTP provider | Alternative invite email transport |
+
+Use either Resend or SMTP. Resend is simpler for a first SaaS deployment; SMTP is now supported when all SMTP variables are present.
+
+## Required for AI command changes
+
+| Secret | Where to get it | Used for |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | OpenAI Platform project | Cursor-style command planner |
+| `OPENAI_MODEL` | OpenAI Platform model name | Model selection |
 
 ## Required for future rigorous CFD workers
 

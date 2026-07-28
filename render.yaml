@@ -13,6 +13,8 @@ services:
         value: Axion Process OS
       - key: APP_BASE_URL
         sync: false
+      - key: AXION_REQUIRE_PRODUCTION_CONFIG
+        value: "true"
       - key: SESSION_SECRET
         generateValue: true
       - key: AXION_ADMIN_USER
@@ -47,6 +49,18 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
       - key: CFD_WORKER_URL
         sync: false
       - key: CFD_WORKER_TOKEN
@@ -65,3 +79,23 @@ services:
         value: 3000
       - key: AXION_API_BASE_URL
         sync: false
+
+  - type: web
+    name: axion-cfd-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile.cfd-worker
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8787
+      - key: CFD_WORKER_TOKEN
+        sync: false
+      - key: CFD_JOBS_DIR
+        value: /data/cfd-jobs
+      - key: OPENFOAM_SOLVER
+        value: interFoam
+      - key: AXION_CFD_DRY_RUN
+        value: "true"

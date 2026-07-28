@@ -1,0 +1,18 @@
+ARG BASE_IMAGE=python:3.12-slim
+FROM ${BASE_IMAGE}
+
+WORKDIR /worker
+
+COPY workers/cfd_worker.py ./cfd_worker.py
+
+ENV HOST=0.0.0.0
+ENV PORT=8787
+ENV CFD_JOBS_DIR=/data/cfd-jobs
+ENV OPENFOAM_SOLVER=interFoam
+ENV AXION_CFD_DRY_RUN=true
+
+RUN mkdir -p /data/cfd-jobs
+
+EXPOSE 8787
+
+CMD ["python3", "/worker/cfd_worker.py"]

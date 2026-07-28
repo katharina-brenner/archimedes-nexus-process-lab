@@ -208,7 +208,9 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
     assert.match(schema, /create table if not exists public\.axion_state/);
     assert.match(schema, /create table if not exists public\.axion_documents/);
-    assert.match(schema, /kind in \('project_model', 'project_version', 'simulation_run'\)/);
+    for (const kind of ["project_model", "project_version", "simulation_run", "dataset", "connector_run", "cfd_job", "command_plan"]) {
+      assert.match(schema, new RegExp(`'${kind}'`));
+    }
   } finally {
     await stopServer(server);
   }

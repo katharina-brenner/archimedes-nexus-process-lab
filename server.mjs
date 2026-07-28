@@ -70,6 +70,7 @@ const config = {
   nextjsBffUrl: (process.env.NEXTJS_BFF_URL || "").replace(/\/+$/, ""),
   openaiApiKey: process.env.AXION_DISABLE_OPENAI === "true" ? "" : process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+  requireProductionConfig: process.env.AXION_REQUIRE_PRODUCTION_CONFIG === "true",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
@@ -183,14 +184,25 @@ function emailConfigured() {
 
 function productionReadiness() {
   const isHttps = config.appBaseUrl.startsWith("https://");
+  const sessionSecretReady = Boolean(config.sessionSecret && config.sessionSecret !== "axion-local-dev-secret" && config.sessionSecret.length >= 32);
+  const adminPasswordReady = Boolean(config.adminPassword && config.adminPassword !== "owner-local-password" && config.adminPassword.length >= 12);
+  const openAiReady = Boolean(config.openaiApiKey && /^sk-/.test(config.openaiApiKey));
+  const stripeReady = Boolean(config.stripeSecretKey && /^sk_(live|test)_/.test(config.stripeSecretKey) && config.stripePriceId && config.stripeWebhookSecret && isHttps);
+  const emailMissing = [];
+  if (!config.inviteEmailFrom) emailMissing.push("INVITE_EMAIL_FROM");
+  if (!config.resendApiKey && !(config.smtpHost && config.smtpUser && config.smtpPassword)) {
+    emailMissing.push("RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD");
+  }
   const checks = [
     { key: "postgres", label: "Supabase/Postgres database", ready: supabaseConfigured(), missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"].filter((key) => !process.env[key]) },
-    { key: "stripe", label: "Stripe Checkout + webhook", ready: Boolean(config.stripeSecretKey && config.stripePriceId && config.stripeWebhookSecret && isHttps), missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]) },
+    { key: "stripe", label: "Stripe Checkout + webhook", ready: stripeReady, missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]).concat(config.stripeSecretKey && !/^sk_(live|test)_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must look like a Stripe secret key"] : []) },
     { key: "google", label: "Google OAuth login", ready: Boolean(config.googleClientId && isHttps), missing: [!config.googleClientId ? "GOOGLE_CLIENT_ID" : "", !isHttps ? "APP_BASE_URL must be https://..." : ""].filter(Boolean) },
-    { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"].filter((key) => !process.env[key]) },
+    { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: emailMissing },
     { key: "deployment", label: "Public HTTPS deployment", ready: isHttps && config.host === "0.0.0.0", missing: [!isHttps ? "APP_BASE_URL must be public HTTPS" : "", config.host !== "0.0.0.0" ? "HOST=0.0.0.0 on production host" : ""].filter(Boolean) },
+    { key: "session-secret", label: "Private session signing secret", ready: sessionSecretReady, missing: sessionSecretReady ? [] : ["SESSION_SECRET must be private and at least 32 characters"] },
+    { key: "admin-password", label: "Private owner/admin password", ready: adminPasswordReady, missing: adminPasswordReady ? [] : ["AXION_ADMIN_PASSWORD must be private and at least 12 characters"] },
     { key: "nextjs-bff", label: "Next.js backend-for-frontend adapter", ready: Boolean(config.nextjsBffUrl && config.nextjsBffUrl.startsWith("https://")), missing: [!config.nextjsBffUrl ? "NEXTJS_BFF_URL" : "", config.nextjsBffUrl && !config.nextjsBffUrl.startsWith("https://") ? "NEXTJS_BFF_URL must be https://..." : ""].filter(Boolean) },
-    { key: "ai-command-planner", label: "OpenAI command planner", ready: Boolean(config.openaiApiKey), missing: ["OPENAI_API_KEY"].filter((key) => !process.env[key]) },
+    { key: "ai-command-planner", label: "OpenAI command planner", ready: openAiReady, missing: ["OPENAI_API_KEY"].filter((key) => !process.env[key]).concat(config.openaiApiKey && !/^sk-/.test(config.openaiApiKey) ? ["OPENAI_API_KEY must look like an OpenAI project/API key"] : []) },
     { key: "cfd-worker", label: "External rigorous CFD worker", ready: Boolean(config.cfdWorkerUrl && config.cfdWorkerToken), missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !process.env[key]) },
     { key: "ci", label: "Tests/CI", ready: existsSync(join(rootDir, ".github", "workflows", "ci.yml")), missing: [] },
   ];
@@ -199,6 +211,15 @@ function productionReadiness() {
     checks,
     note: "CFD worker is optional for current screening jobs, but required for validated external CFD. Secret values are never returned.",
   };
+}
+
+function assertProductionConfig() {
+  if (!config.requireProductionConfig) return;
+  const readiness = productionReadiness();
+  const blocking = readiness.checks.filter((item) => !item.ready && !["cfd-worker", "nextjs-bff"].includes(item.key));
+  if (!blocking.length) return;
+  const details = blocking.map((item) => `${item.label}: ${item.missing.join(", ") || "not ready"}`).join("; ");
+  throw new Error(`AXION_REQUIRE_PRODUCTION_CONFIG=true but production configuration is incomplete. ${details}`);
 }
 
 async function supabaseRequest(pathname, { method = "GET", body, headers = {} } = {}) {
@@ -691,7 +712,27 @@ async function sendInviteEmail(invite, project) {
     if (!response.ok) throw new Error(payload.message || payload.error || `Resend failed with ${response.status}`);
     return { delivered: true, provider: "resend", id: payload.id || "" };
   }
-  return { delivered: false, provider: "smtp", reason: "SMTP credentials are present, but this dependency-free backend currently sends production email through RESEND_API_KEY." };
+  if (config.smtpHost && config.smtpUser && config.smtpPassword) {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      secure: config.smtpPort === 465,
+      auth: {
+        user: config.smtpUser,
+        pass: config.smtpPassword,
+      },
+    });
+    const result = await transporter.sendMail({
+      from: config.inviteEmailFrom,
+      to: invite.recipient,
+      subject,
+      html,
+      text,
+    });
+    return { delivered: true, provider: "smtp", id: result.messageId || "" };
+  }
+  return { delivered: false, provider: "none", reason: "No production email provider is configured." };
 }
 
 function billingProfileForSession(session) {
@@ -3104,6 +3145,8 @@ const server = createServer(async (req, res) => {
     json(res, 500, { error: error.message || "Internal server error" });
   }
 });
+
+assertProductionConfig();
 
 server.listen(config.port, config.host, () => {
   console.log(`${config.productName} backend running at http://${config.host}:${config.port}`);

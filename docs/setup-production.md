@@ -59,14 +59,23 @@ https://your-domain
 
 ## 4. Invite Email
 
-1. Create a Resend account.
-2. Verify a sender domain, for example `your-domain`.
-3. Create an API key.
-4. Set:
+Use Resend or SMTP.
+
+Resend:
 
 ```bash
 INVITE_EMAIL_FROM="Axion Process OS <invites@your-domain>"
 RESEND_API_KEY=re_...
+```
+
+SMTP:
+
+```bash
+INVITE_EMAIL_FROM="Axion Process OS <invites@your-domain>"
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASSWORD=...
 ```
 
 Project invites to email addresses will then be sent automatically and recorded in the backend.
@@ -106,6 +115,7 @@ API core environment:
 ```bash
 APP_BASE_URL=https://your-api-core-domain
 NEXTJS_BFF_URL=https://your-public-app-domain
+AXION_REQUIRE_PRODUCTION_CONFIG=true
 ```
 
 Next.js BFF environment:
@@ -116,6 +126,8 @@ PORT=3000
 ```
 
 Render can deploy both services from `render.yaml`: `axion-process-os` for the API core and `axion-nextjs-bff` for the app edge. The BFF health check is `/api/health`; proxied core health is `/api/axion/health` or `/api/core/health`.
+
+The Render Blueprint also contains `axion-cfd-worker`, a separate CFD worker service. Keep it in dry-run mode until the worker image is built on a validated OpenFOAM-capable base image.
 
 ## 6. CFD Backend Jobs
 
@@ -142,6 +154,10 @@ CFD_WORKER_TOKEN=...
 Axion will submit CFD jobs to the worker and keep the screening result as fallback evidence.
 
 Detailed worker notes are in `docs/cfd-worker.md`.
+
+## 6.5 OpenAI command planner
+
+Set `OPENAI_API_KEY` on the backend host. The key must belong to an OpenAI project with active billing/quota. If the key is valid but the project has no quota, Axion automatically falls back to deterministic safe edits and reports the planner error without exposing the key.
 
 ## 7. Tests and CI
 
@@ -202,3 +218,5 @@ Expected:
 - `inviteEmailConfigured` should be `true`
 - company CSV/JSON datasets should register through `/api/datasets` and export through `/api/datasets/:id/export`
 - production readiness should show Stripe, Google, email and deployment ready
+
+See `docs/production-runbook.md` for the provider-side account actions and DNS steps.
