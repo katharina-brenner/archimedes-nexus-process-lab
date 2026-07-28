@@ -21,6 +21,7 @@ async function startServer() {
       AXION_DATA_DIR: dataHome,
       SESSION_SECRET: "test-session-secret-with-enough-length",
       AXION_ADMIN_PASSWORD: "owner-test-password",
+      AXION_DISABLE_OPENAI: "true",
       STRIPE_SECRET_KEY: "",
       GOOGLE_CLIENT_ID: "",
       SUPABASE_URL: "",
@@ -108,6 +109,18 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(processes.payload.processes.some((item) => item.id === "nextjs-bff"));
     assert.ok(processes.payload.deploymentOrder.length >= 4);
 
+    const commandPlan = await jsonFetch(server.baseUrl, "/api/commands/plan", {
+      token,
+      method: "POST",
+      body: {
+        prompt: "reduce working volume to 70 and move nutrient feed to feed ring and start CFD",
+        context: { template: "culturedMeat", scale: "pilot", selectedId: "BR-101" },
+      },
+    });
+    assert.equal(commandPlan.response.status, 201);
+    assert.equal(commandPlan.payload.commandPlan.status, "planned");
+    assert.ok(commandPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "setParam" && operation.key === "workingVolume"));
+
     const created = await jsonFetch(server.baseUrl, "/api/projects", {
       token,
       method: "POST",
@@ -119,6 +132,18 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     });
     assert.equal(created.response.status, 201);
     assert.ok(created.payload.project.id);
+
+    const commandApply = await jsonFetch(server.baseUrl, `/api/commands/${commandPlan.payload.commandPlan.id}/apply`, {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        modelStateAfter: { template: "culturedMeat", scale: "pilot", params: { workingVolume: 70 }, units: [{ id: "BR-101" }], streams: [] },
+        summary: { units: 1, streams: 0, command: "working volume 70" },
+      },
+    });
+    assert.equal(commandApply.response.status, 200);
+    assert.ok(commandApply.payload.versionId);
 
     const dataset = await jsonFetch(server.baseUrl, "/api/datasets", {
       token,
@@ -169,6 +194,10 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(cfd.response.status, 201);
     assert.equal(cfd.payload.job.status, "completed-screening");
     assert.ok(cfd.payload.job.result.boundaryConditions.length >= 6);
+
+    const cfdStatus = await jsonFetch(server.baseUrl, `/api/cfd/jobs/${cfd.payload.job.id}`, { token });
+    assert.equal(cfdStatus.response.status, 200);
+    assert.equal(cfdStatus.payload.job.id, cfd.payload.job.id);
 
     const exported = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/export`, { token });
     assert.equal(exported.response.status, 200);

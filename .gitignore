@@ -6,3 +6,4 @@ nextjs-bff/.next/
 *.log
 .data/
 .env
+.env.local

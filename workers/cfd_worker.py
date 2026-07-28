@@ -134,6 +134,27 @@ class Handler(BaseHTTPRequestHandler):
                 "solverAvailable": bool(shutil.which(OPENFOAM_SOLVER)),
             })
             return
+        if self.path.startswith("/jobs/"):
+            if not authorized(self):
+                json_response(self, 401, {"error": "Not authenticated"})
+                return
+            job_id = self.path.rsplit("/", 1)[-1].strip()
+            case_dir = JOBS_DIR / job_id
+            manifest_path = case_dir / "axion-case.json"
+            result_path = case_dir / "worker-result.json"
+            if not manifest_path.exists():
+                json_response(self, 404, {"error": "Job not found"})
+                return
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            result = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {"status": "prepared"}
+            json_response(self, 200, {
+                "jobId": job_id,
+                "status": result.get("status", "prepared"),
+                "caseDir": str(case_dir),
+                "manifest": manifest,
+                "solver": result,
+            })
+            return
         json_response(self, 404, {"error": "Route not found"})
 
     def do_POST(self) -> None:

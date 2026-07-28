@@ -131,6 +131,9 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `POST /api/integrations/:key/actions` runs configure, mapping-test, or export actions for a connector and stores an audit record
 - `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
 - `GET /api/backend/processes` returns the production backend process map, including API core, Next.js BFF, datasets, jobs, billing, OAuth, email and CFD worker responsibilities
+- `POST /api/commands/plan` creates a safe AI/deterministic model-edit plan for Cursor-style process commands
+- `POST /api/commands/:planId/apply` records an applied command as a project version and audit event
+- `POST /api/commands/undo` restores the archived model version behind the last applied command
 - `GET /api/sources/academic` returns the source-backed model design library for boundaries, CFD, TEA/LCA, scheduling, digital twin and Python modelling
 - `GET /api/datasets` lists registered project datasets and uploaded-data metadata
 - `POST /api/datasets` registers a project dataset, schema, source, preview rows and validation status
@@ -139,6 +142,7 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `POST /api/model-runs/python` runs the local Python bioprocess screening model and saves the full input/output package
 - `GET /api/cfd/jobs` lists backend CFD screening/handoff jobs
 - `POST /api/cfd/jobs` creates a backend CFD screening job with OpenFOAM-ready boundary-condition metadata
+- `GET /api/cfd/jobs/:id` returns the stored CFD job and, when configured, the external CFD worker status
 - `POST /api/project/brief` stores the natural-language product brief and uploaded data previews
 - `POST /api/help` returns contextual tool guidance for the current process, scale, and selected unit
 - `GET /api/admin/orders` lists orders and licenses for admins
@@ -147,6 +151,12 @@ The public site presents Axion as a professional process-modelling workspace wit
 ## Backend Data + Python Modelling
 
 Company datasets can be registered from CSV or JSON and classified into kinetics, CFD, TEA, LCA, supplier, QC and scheduling roles. The backend stores dataset metadata, detects column roles, scores data quality, and prepares calibration targets for Python or external modelling jobs.
+
+## AI Command Planner
+
+The side composer works like a controlled engineering command system. The frontend sends the user command plus a compact model summary to `POST /api/commands/plan`; the backend returns only bounded operations such as `setParam`, `setCfd`, `addUnit`, `addPreset`, `fitCanvas`, and `startCfd`. The browser applies those operations, shows before/after impact, and then calls `POST /api/commands/:planId/apply` to archive the previous project model as a version. `POST /api/commands/undo` restores that archived version.
+
+Set `OPENAI_API_KEY` and optionally `OPENAI_MODEL` on the backend for LLM planning. If OpenAI is disabled or unavailable, Axion falls back to a deterministic safe planner so the command field still works.
 
 ## Next.js Backend-For-Frontend
 

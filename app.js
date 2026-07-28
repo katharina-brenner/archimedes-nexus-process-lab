@@ -9621,6 +9621,12 @@ async function runBackendCfdJob() {
       body: JSON.stringify(payload),
     });
     state.cfdBackendJob = response.job;
+    try {
+      const status = await apiRequest(`/api/cfd/jobs/${encodeURIComponent(response.job.id)}`);
+      state.cfdBackendJob = status.job || response.job;
+    } catch {
+      state.cfdBackendJob = response.job;
+    }
     showToast(`Backend CFD job created: ${response.job.id.slice(0, 8)}`);
   } catch (error) {
     state.cfdBackendJob = {
@@ -10409,6 +10415,8 @@ function renderCfdBoard() {
 	              <dt>O₂ margin</dt><dd>${formatNumber(state.cfdBackendJob.result?.kpis?.oxygenMarginPct || 0, 1)}%</dd>
 	              <dt>Mixing</dt><dd>${formatNumber(state.cfdBackendJob.result?.kpis?.mixingTimeMin || 0, 2)} min</dd>
 	              <dt>Boundaries</dt><dd>${state.cfdBackendJob.result?.boundaryConditions?.length || 0} stored CFD conditions</dd>
+	              <dt>Worker</dt><dd>${escapeHtml(state.cfdBackendJob.worker?.status || state.cfdBackendJob.worker?.solver?.status || "local screening / handoff")}</dd>
+	              <dt>Next</dt><dd>${escapeHtml(state.cfdBackendJob.nextProductionStep || "Use a token-protected OpenFOAM/COMSOL/STAR-CCM+ worker for validated 3D CFD.")}</dd>
 	            </dl>
 	          </div>
 	        ` : ""}
@@ -13268,6 +13276,7 @@ function renderHelpResult(payload) {
     <ol>${(guide.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
     <div>${(guide.assumptions || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
     ${guide.targetView ? `<button data-help-jump="${guide.targetView}" type="button">Open ${pageTitle(guide.targetView)}</button>` : ""}
+    ${guide.commandPlanId && state.currentProjectId ? `<button data-help-undo="${escapeAttr(guide.commandPlanId)}" type="button">Undo this command</button>` : ""}
     ${(guide.commands || []).length ? `<div>${guide.commands.map((command) => `<button data-help-command="${escapeAttr(command)}" type="button">${escapeHtml(command)}</button>`).join("")}</div>` : ""}
     ${recent.length ? `
       <section class="command-history">
@@ -13634,6 +13643,176 @@ async function restoreProjectVersion(versionId) {
   }
 }
 
+function commandModelSummary() {
+  const data = metrics();
+  return {
+    projectName: state.projectName,
+    template: state.template,
+    scale: state.scale,
+    selectedId: state.selectedId,
+    units: state.units.length,
+    streams: state.streams.length,
+    directCost: data.directCost,
+    annualKg: data.annualKg,
+    utilization: data.utilization,
+  };
+}
+
+function startCfdFromCommand() {
+  state.cfdSolverStarted = true;
+  state.cfdSolverRunning = true;
+  state.cfdIteration = Math.max(1, state.cfdIteration || 0);
+  if (state.cfdTimeH === null || state.cfdTimeH === undefined) state.cfdTimeH = cfdTimeBounds().suggestedH;
+  window.clearInterval(startCfdSolver.timer);
+  startCfdSolver.timer = window.setInterval(() => {
+    if (!state.cfdSolverRunning) return;
+    state.cfdIteration += 1;
+    const bounds = cfdTimeBounds();
+    const nextTime = (Number(state.cfdTimeH) || 0) + Math.max(0.7, bounds.maxH / 180);
+    state.cfdTimeH = nextTime > bounds.maxH ? bounds.minH : nextTime;
+    if (document.body.dataset.activeView === "cfd") renderCfdBoard();
+  }, 2400);
+}
+
+function applyCommandPlanOperations(prompt, commandPlan) {
+  const plan = commandPlan.plan || commandPlan;
+  const before = commandSnapshot();
+  const applied = [];
+  const changes = [];
+  const impacts = new Set(plan.expectedImpacts || []);
+  const affectedIds = new Set();
+  let targetView = plan.targetView || null;
+  let needsRender = false;
+  let needsFit = false;
+  let solverStarted = false;
+
+  (plan.operations || []).forEach((operation) => {
+    const op = operation.op;
+    if (op === "setParam") {
+      commandSetParam(operation.key, Number(operation.value), changes, operation.reason);
+      needsRender = true;
+      impacts.add("Parameters");
+      impacts.add("Mass and energy balances");
+    }
+    if (op === "setTopLevel") {
+      const labels = {
+        batchSize: ["Batch volume", "L"],
+        batchCount: ["Annual batches", "batches/yr"],
+        titer: ["Titer", "g/L"],
+        recovery: ["Overall recovery", "%"],
+      };
+      const [label, unit] = labels[operation.key] || [operation.key, ""];
+      commandSetTopLevel(operation.key, Number(operation.value), changes, label, unit);
+      needsRender = true;
+    }
+    if (op === "setCfd") {
+      const allowed = new Set(["cfdLayer", "cfdOxygenInlet", "cfdNutrientInlet", "cfdTurbulenceModel"]);
+      if (allowed.has(operation.key)) {
+        const beforeValue = state[operation.key];
+        state[operation.key] = operation.value;
+        if (beforeValue !== state[operation.key]) {
+          changes.push({ type: "cfd", where: `CFD · ${operation.key}`, before: beforeValue, after: state[operation.key], reason: operation.reason });
+        }
+        cfdBioreactors().forEach((unitItem) => affectedIds.add(unitItem.id));
+        targetView = targetView || "cfd";
+        needsRender = true;
+      }
+    }
+    if (op === "addUnit") {
+      commandAddUnit(String(operation.value || operation.key), changes, operation.reason).forEach((id) => affectedIds.add(id));
+      targetView = targetView || "flowsheet";
+      needsRender = true;
+    }
+    if (op === "addPreset") {
+      commandAddPresetOnce(String(operation.value || operation.key), changes, operation.reason).forEach((id) => affectedIds.add(id));
+      targetView = targetView || "flowsheet";
+      needsRender = true;
+    }
+    if (op === "setCanvas") {
+      if (operation.key === "flowDetail") state.flowDetail = String(operation.value || "full");
+      if (operation.key === "canvasFocus") state.canvasFocus = String(operation.value || "all");
+      changes.push({ type: "view", where: `Canvas · ${operation.key}`, before: "previous", after: String(operation.value || ""), reason: operation.reason });
+      targetView = "flowsheet";
+      needsRender = true;
+    }
+    if (op === "setView") targetView = String(operation.value || operation.key || targetView || "overview");
+    if (op === "fitCanvas") {
+      targetView = "flowsheet";
+      needsFit = true;
+    }
+    if (op === "startCfd") {
+      startCfdFromCommand();
+      solverStarted = true;
+      targetView = "cfd";
+      needsRender = true;
+    }
+    if (op === "openDownloads") targetView = "reports";
+  });
+
+  if ((plan.operations || []).length) applied.push(plan.summary || "Applied AI-planned safe model operations.");
+  if (solverStarted) applied.push("Started the CFD solver from the AI command plan.");
+  state.commandHighlights = Array.from(affectedIds);
+  if (targetView) setView(targetView);
+  if (needsRender) {
+    syncInputs();
+    renderAll();
+  }
+  if (needsFit) window.requestAnimationFrame(() => fitCanvas(true));
+  const guide = {
+    title: plan.title || "AI command applied",
+    applied,
+    changes,
+    impacts: Array.from(impacts),
+    steps: (plan.reviewNotes || []).length ? plan.reviewNotes : ["Review the highlighted model changes and export the relevant reports if this is used for engineering review."],
+    targetView,
+    assumptions: [
+      `Planner: ${commandPlan.planner || plan.planner || "Axion"}`,
+      `Risk level: ${plan.riskLevel || "low"}`,
+      `Operations: ${(plan.operations || []).length}`,
+    ],
+    commands: ["undo last command", "show full PFD and fit canvas", "improve oxygen transfer", "open LCA and TEA downloads"],
+    commandPlanId: commandPlan.id,
+  };
+  commandRecord(prompt, guide, before);
+  return guide;
+}
+
+async function saveAppliedCommandPlan(commandPlanId, summary = commandModelSummary()) {
+  if (!commandPlanId) return null;
+  try {
+    return await apiRequest(`/api/commands/${encodeURIComponent(commandPlanId)}/apply`, {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: state.currentProjectId || "",
+        modelStateAfter: exportCurrentModelState(),
+        summary,
+      }),
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function undoLastCommand() {
+  if (!state.currentProjectId) {
+    showToast("Save or load a project before using backend undo");
+    return null;
+  }
+  try {
+    const payload = await apiRequest("/api/commands/undo", {
+      method: "POST",
+      body: JSON.stringify({ projectId: state.currentProjectId }),
+    });
+    importModelState(payload.model?.modelState || {});
+    renderAll();
+    showToast("Last backend command undone");
+    return payload;
+  } catch (error) {
+    showToast(error.message || "Undo unavailable");
+    return null;
+  }
+}
+
 async function askToolHelp() {
   const prompt = els.helpPrompt?.value.trim() || "";
   if (prompt.length < 5) {
@@ -13645,14 +13824,34 @@ async function askToolHelp() {
     });
     return;
   }
-  applyCommandFromUi(prompt);
+  await applyCommandFromUi(prompt);
 }
 
-function applyCommandFromUi(prompt, options = {}) {
+async function applyCommandFromUi(prompt, options = {}) {
   const command = String(prompt || "").trim();
   if (!command) return null;
+  if (/^undo\b|undo last|rückgängig/i.test(command)) {
+    await undoLastCommand();
+    return null;
+  }
   if (els.helpResult) els.helpResult.innerHTML = "<p>Applying changes...</p>";
-  const guide = applySystemCommand(command);
+  let guide = null;
+  try {
+    const payload = await apiRequest("/api/commands/plan", {
+      method: "POST",
+      body: JSON.stringify({
+        prompt: command,
+        projectId: state.currentProjectId || "",
+        context: commandModelSummary(),
+        modelState: exportCurrentModelState(),
+      }),
+    });
+    guide = applyCommandPlanOperations(command, payload.commandPlan);
+    const applied = await saveAppliedCommandPlan(payload.commandPlan.id, commandModelSummary());
+    if (applied?.versionId) guide.assumptions = [...(guide.assumptions || []), `Saved version: ${applied.versionId}`];
+  } catch {
+    guide = applySystemCommand(command);
+  }
   renderHelpResult(guide);
   els.helpDock?.classList.add("open");
   els.helpToggle?.setAttribute("aria-expanded", "true");
@@ -13836,6 +14035,11 @@ function bindAuth() {
   });
 
   els.helpResult?.addEventListener("click", (event) => {
+    const undoButton = event.target.closest("[data-help-undo]");
+    if (undoButton) {
+      undoLastCommand();
+      return;
+    }
     const command = event.target.closest("[data-help-command]");
     if (command) {
       if (els.helpPrompt) els.helpPrompt.value = command.dataset.helpCommand;

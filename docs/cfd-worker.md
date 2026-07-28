@@ -15,6 +15,13 @@ Health check:
 curl http://127.0.0.1:8787/health
 ```
 
+Job status:
+
+```bash
+curl -H "Authorization: Bearer $CFD_WORKER_TOKEN" \
+  http://127.0.0.1:8787/jobs/<job-id>
+```
+
 Backend connection:
 
 ```bash
@@ -48,4 +55,4 @@ The solver host must provide:
 - turbulence model selection and mesh-independence checks
 - measured kLa, mixing time and power draw for validation
 
-Axion stores the submitted job and the worker response. The browser remains the design and review interface; the worker is the compute boundary for validated CFD.
+Axion stores the submitted job and the worker response. The browser remains the design and review interface; the worker is the compute boundary for validated CFD. The core backend exposes stored status through `GET /api/cfd/jobs/:id` and refreshes the external worker status when `CFD_WORKER_URL` and `CFD_WORKER_TOKEN` are configured.

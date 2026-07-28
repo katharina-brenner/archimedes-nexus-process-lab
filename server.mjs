@@ -16,15 +16,17 @@ const runsDir = join(modelsDir, "runs");
 const pythonModelScript = join(rootDir, "python_models", "bioprocess_model.py");
 
 function loadLocalEnv() {
-  const envPath = join(rootDir, ".env");
-  if (!existsSync(envPath)) return;
-  const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) return;
-    const [key, ...valueParts] = trimmed.split("=");
-    if (process.env[key]) return;
-    process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
+  [".env", ".env.local"].forEach((filename) => {
+    const envPath = join(rootDir, filename);
+    if (!existsSync(envPath)) return;
+    const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) return;
+      const [key, ...valueParts] = trimmed.split("=");
+      if (process.env[key]) return;
+      process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
+    });
   });
 }
 
@@ -66,6 +68,8 @@ const config = {
   cfdWorkerUrl: (process.env.CFD_WORKER_URL || "").replace(/\/+$/, ""),
   cfdWorkerToken: process.env.CFD_WORKER_TOKEN || "",
   nextjsBffUrl: (process.env.NEXTJS_BFF_URL || "").replace(/\/+$/, ""),
+  openaiApiKey: process.env.AXION_DISABLE_OPENAI === "true" ? "" : process.env.OPENAI_API_KEY || "",
+  openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
@@ -94,6 +98,7 @@ const defaultDb = {
   simulationRuns: [],
   connectorRuns: [],
   cfdJobs: [],
+  commandPlans: [],
   audit: [],
 };
 
@@ -120,6 +125,7 @@ function backendFeatures() {
     "Cloud run, parameter sweep, Monte Carlo and scenario-run roadmap",
     "Live-data, historian, LIMS, ERP and vendor-quote connector registry",
     "Versioned process models with project archives and collaboration roles",
+    "AI command planning with safe model operations, project versions and undo-ready audit trail",
     "Admin order and license listing",
     "Static app hosting from the same backend",
     "Google OAuth configuration via environment variables",
@@ -157,8 +163,12 @@ function publicConfig() {
       academicSourcesEndpoint: "/api/sources/academic",
       dataArchitectureEndpoint: "/api/data/architecture",
       backendProcessesEndpoint: "/api/backend/processes",
+      commandPlanEndpoint: "/api/commands/plan",
+      commandApplyEndpoint: "/api/commands/{planId}/apply",
+      commandUndoEndpoint: "/api/commands/undo",
       nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
+      aiCommandPlanner: Boolean(config.openaiApiKey),
     },
   };
 }
@@ -180,6 +190,7 @@ function productionReadiness() {
     { key: "email", label: "Invite email delivery", ready: emailConfigured(), missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"].filter((key) => !process.env[key]) },
     { key: "deployment", label: "Public HTTPS deployment", ready: isHttps && config.host === "0.0.0.0", missing: [!isHttps ? "APP_BASE_URL must be public HTTPS" : "", config.host !== "0.0.0.0" ? "HOST=0.0.0.0 on production host" : ""].filter(Boolean) },
     { key: "nextjs-bff", label: "Next.js backend-for-frontend adapter", ready: Boolean(config.nextjsBffUrl && config.nextjsBffUrl.startsWith("https://")), missing: [!config.nextjsBffUrl ? "NEXTJS_BFF_URL" : "", config.nextjsBffUrl && !config.nextjsBffUrl.startsWith("https://") ? "NEXTJS_BFF_URL must be https://..." : ""].filter(Boolean) },
+    { key: "ai-command-planner", label: "OpenAI command planner", ready: Boolean(config.openaiApiKey), missing: ["OPENAI_API_KEY"].filter((key) => !process.env[key]) },
     { key: "cfd-worker", label: "External rigorous CFD worker", ready: Boolean(config.cfdWorkerUrl && config.cfdWorkerToken), missing: ["CFD_WORKER_URL", "CFD_WORKER_TOKEN"].filter((key) => !process.env[key]) },
     { key: "ci", label: "Tests/CI", ready: existsSync(join(rootDir, ".github", "workflows", "ci.yml")), missing: [] },
   ];
@@ -815,6 +826,7 @@ function ensureDbShape(db) {
   db.simulationRuns ||= [];
   db.connectorRuns ||= [];
   db.cfdJobs ||= [];
+  db.commandPlans ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -1120,6 +1132,332 @@ async function help(req, res) {
   json(res, 200, { guide: inferHelpGuide(body.prompt, body.context || {}) });
 }
 
+function commandPlanSchema() {
+  return {
+    title: "string",
+    summary: "string",
+    targetView: "overview|flowsheet|cfd|simulation|economics|reports|sources|ai",
+    riskLevel: "low|medium|high",
+    operations: [
+      { op: "setParam", key: "workingVolume", value: 70, reason: "why" },
+      { op: "setCfd", key: "cfdNutrientInlet", value: "feed-ring", reason: "why" },
+      { op: "startCfd", reason: "why" },
+    ],
+    expectedImpacts: ["short impact"],
+    reviewNotes: ["short note"],
+  };
+}
+
+function normalizeOperation(operation = {}) {
+  const op = String(operation.op || "").trim();
+  const allowed = new Set(["setParam", "setTopLevel", "setCfd", "addUnit", "addPreset", "setCanvas", "setView", "fitCanvas", "startCfd", "openDownloads", "saveVersion"]);
+  if (!allowed.has(op)) return null;
+  const normalized = {
+    op,
+    key: String(operation.key || "").slice(0, 80),
+    value: operation.value,
+    reason: String(operation.reason || "Planned by Axion command planner.").slice(0, 500),
+  };
+  if (typeof normalized.value === "string") normalized.value = normalized.value.slice(0, 200);
+  if (typeof normalized.value === "number" && !Number.isFinite(normalized.value)) return null;
+  return normalized;
+}
+
+function deterministicCommandPlan(prompt, context = {}) {
+  const lower = String(prompt || "").toLowerCase();
+  const operations = [];
+  const notes = [];
+  let targetView = "flowsheet";
+  const numberNear = (terms) => {
+    const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const match = lower.match(new RegExp(`(?:${escaped})[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)|([0-9]+(?:[.,][0-9]+)?)[^a-z0-9]{0,12}(?:${escaped})`, "i"));
+    const raw = match?.[1] || match?.[2] || "";
+    return raw ? Number(raw.replace(",", ".")) : null;
+  };
+  const add = (op) => {
+    const normalized = normalizeOperation(op);
+    if (normalized) operations.push(normalized);
+  };
+  const workingVolume = numberNear(["working volume", "arbeitsvolumen", "füllstand", "fill level"]);
+  if (workingVolume !== null) {
+    add({ op: "setParam", key: "workingVolume", value: Math.max(30, Math.min(80, workingVolume)), reason: "Working volume was explicitly requested; Axion keeps STR screening below the 80% headspace boundary." });
+    targetView = "cfd";
+  } else if (lower.includes("too full") || lower.includes("weniger voll") || lower.includes("not completely full")) {
+    add({ op: "setParam", key: "workingVolume", value: 72, reason: "Reduced fill level to preserve headspace, foam control and gas disengagement." });
+    targetView = "cfd";
+  }
+  const kla = numberNear(["kla", "k la", "oxygen transfer", "sauerstofftransfer"]);
+  if (kla !== null) add({ op: "setParam", key: "kla", value: kla, reason: "kLa was explicitly requested for oxygen-transfer screening." });
+  if (lower.includes("oxygen") || lower.includes("sauerstoff") || lower.includes("kla")) {
+    add({ op: "setParam", key: "doSetpoint", value: 45, reason: "Maintains a conservative minimum DO target for oxygen-transfer review." });
+    add({ op: "setCfd", key: "cfdLayer", value: "oxygen", reason: "Show dissolved oxygen field after the change." });
+    targetView = "cfd";
+  }
+  if (lower.includes("feed ring") || lower.includes("distributed feed") || lower.includes("nutrient feed") || lower.includes("nährstoff")) {
+    add({ op: "setCfd", key: "cfdNutrientInlet", value: "feed-ring", reason: "Distributed feed reduces local nutrient gradients and feed-point risk." });
+    add({ op: "setCfd", key: "cfdLayer", value: "nutrient", reason: "Show nutrient field after the feed-boundary edit." });
+    targetView = "cfd";
+  }
+  if (lower.includes("ammon") || lower.includes("lactate") || lower.includes("laktat")) {
+    add({ op: "setParam", key: "glutamine", value: 2.5, reason: "Lower glutamine burden reduces ammonium formation risk." });
+    add({ op: "setParam", key: "perfusionRate", value: 1.2, reason: "Perfusion or bleed gives a mitigation lever for ammonium/lactate accumulation." });
+    add({ op: "addUnit", value: "pat", reason: "PAT soft-sensor supports metabolite boundary tracking." });
+    targetView = "ai";
+  }
+  if (lower.includes("cip") || lower.includes("cleaning") || lower.includes("sip")) {
+    add({ op: "addPreset", value: "cip", reason: "Adds cleaning, sterilization and support loop logic." });
+    add({ op: "setParam", key: "cipTime", value: 2.5, reason: "Adds a realistic short cleaning-cycle assumption." });
+    targetView = "flowsheet";
+  }
+  if (lower.includes("full pfd") || lower.includes("whole process") || lower.includes("show streams") || lower.includes("fit canvas")) {
+    add({ op: "setCanvas", key: "flowDetail", value: "full", reason: "Shows all stream labels and support flows." });
+    add({ op: "setCanvas", key: "canvasFocus", value: "all", reason: "Shows full plant instead of one subsystem." });
+    add({ op: "fitCanvas", reason: "Fits the whole process into view." });
+    targetView = "flowsheet";
+  }
+  if (lower.includes("start") || lower.includes("run") || lower.includes("solve") || lower.includes("simulate")) {
+    add({ op: "startCfd", reason: "User asked to run or solve the CFD screen." });
+    targetView = lower.includes("cfd") || targetView === "cfd" ? "cfd" : targetView;
+  }
+  if (lower.includes("download") || lower.includes("export") || lower.includes("lca") || lower.includes("tea")) {
+    add({ op: "openDownloads", reason: "User asked for export/download handoff." });
+    targetView = "reports";
+  }
+  if (!operations.length) {
+    notes.push("The planner did not find a directly applicable safe operation; it returns navigation and review guidance only.");
+  }
+  return {
+    title: operations.length ? "Safe model edit plan" : "Review-only plan",
+    summary: operations.length ? "Axion prepared bounded operations that can be applied to the current process model." : "Axion prepared guidance; no model write will be applied.",
+    targetView,
+    riskLevel: operations.some((operation) => operation.op === "addUnit" || operation.op === "addPreset") ? "medium" : "low",
+    operations,
+    expectedImpacts: [
+      ...(operations.some((operation) => operation.op === "setParam") ? ["Parameters, KPIs, balances and TEA/LCA exports will recalculate."] : []),
+      ...(targetView === "cfd" ? ["CFD screening inputs and selected field layer will update."] : []),
+      ...(operations.some((operation) => operation.op === "addUnit" || operation.op === "addPreset") ? ["Equipment count, streams and scheduling assumptions may change."] : []),
+    ],
+    reviewNotes: notes.concat(["Review model changes before GMP, safety-critical, investment or regulated decisions."]),
+    planner: "deterministic",
+  };
+}
+
+function extractOpenAiJson(payload) {
+  const chunks = [];
+  const collect = (value) => {
+    if (!value) return;
+    if (typeof value === "string") chunks.push(value);
+    if (Array.isArray(value)) value.forEach(collect);
+    if (typeof value === "object") {
+      if (value.type === "output_text" && value.text) chunks.push(value.text);
+      if (value.text && typeof value.text === "string") chunks.push(value.text);
+      if (value.content) collect(value.content);
+      if (value.output) collect(value.output);
+    }
+  };
+  collect(payload.output_text || payload.output || payload.choices);
+  const text = chunks.join("\n").trim();
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("AI planner returned no JSON object.");
+  return JSON.parse(match[0]);
+}
+
+async function aiCommandPlan(prompt, context = {}) {
+  if (!config.openaiApiKey) return deterministicCommandPlan(prompt, context);
+  const fallback = deterministicCommandPlan(prompt, context);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.openaiApiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.openaiModel,
+      input: [
+        {
+          role: "system",
+          content: "You are Axion Process OS command planner. Return only valid JSON. Never return code. Only use safe operations from this list: setParam, setTopLevel, setCfd, addUnit, addPreset, setCanvas, setView, fitCanvas, startCfd, openDownloads. Bound numeric bioprocess edits to plausible screening ranges. Do not invent proprietary simulator content.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            task: "Create a safe command plan for a browser bioprocess model.",
+            prompt,
+            context: {
+              template: context.template,
+              scale: context.scale,
+              selectedId: context.selectedId,
+              summary: context.summary,
+            },
+            schema: commandPlanSchema(),
+          }),
+        },
+      ],
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error?.message || `OpenAI planner failed with ${response.status}`);
+  const raw = extractOpenAiJson(payload);
+  const operations = Array.isArray(raw.operations) ? raw.operations.map(normalizeOperation).filter(Boolean).slice(0, 12) : fallback.operations;
+  return {
+    title: String(raw.title || fallback.title).slice(0, 120),
+    summary: String(raw.summary || fallback.summary).slice(0, 800),
+    targetView: String(raw.targetView || fallback.targetView),
+    riskLevel: ["low", "medium", "high"].includes(raw.riskLevel) ? raw.riskLevel : fallback.riskLevel,
+    operations,
+    expectedImpacts: Array.isArray(raw.expectedImpacts) ? raw.expectedImpacts.map(String).slice(0, 8) : fallback.expectedImpacts,
+    reviewNotes: Array.isArray(raw.reviewNotes) ? raw.reviewNotes.map(String).slice(0, 8) : fallback.reviewNotes,
+    planner: "openai",
+    fallbackOperations: fallback.operations,
+  };
+}
+
+async function createCommandPlan(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const prompt = String(body.prompt || "").trim();
+  if (prompt.length < 3) {
+    json(res, 400, { error: "Command prompt is too short" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "");
+  if (projectId) {
+    const project = db.projects.find((item) => item.id === projectId);
+    if (!project || !canAccessProject(session, project)) {
+      json(res, 404, { error: "Project not found" });
+      return;
+    }
+  }
+  let plan;
+  let plannerError = "";
+  try {
+    plan = await aiCommandPlan(prompt, body.context || body.modelState || {});
+  } catch (error) {
+    plannerError = error.message;
+    plan = deterministicCommandPlan(prompt, body.context || body.modelState || {});
+  }
+  const now = new Date().toISOString();
+  const record = {
+    id: randomUUID(),
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    projectId,
+    prompt,
+    status: "planned",
+    planner: plan.planner,
+    plannerError,
+    plan,
+    contextSummary: body.context?.summary || body.summary || {},
+  };
+  db.commandPlans.unshift(record);
+  db.audit.unshift({ at: now, type: "command.plan.created", planId: record.id, projectId, by: sessionPrincipal(session), planner: plan.planner });
+  await saveDb(db);
+  json(res, 201, { commandPlan: record, aiConfigured: Boolean(config.openaiApiKey) });
+}
+
+async function applyCommandPlan(req, res, planId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const record = db.commandPlans.find((item) => item.id === planId);
+  if (!record) {
+    json(res, 404, { error: "Command plan not found" });
+    return;
+  }
+  if (record.createdBy !== sessionPrincipal(session) && session.role !== "admin") {
+    json(res, 403, { error: "Command plan is not accessible" });
+    return;
+  }
+  const now = new Date().toISOString();
+  let versionId = "";
+  const projectId = String(record.projectId || body.projectId || "");
+  if (projectId && body.modelStateAfter) {
+    const project = db.projects.find((item) => item.id === projectId);
+    if (!project || !canAccessProject(session, project)) {
+      json(res, 404, { error: "Project not found" });
+      return;
+    }
+    const previous = await readProjectModel(projectId);
+    versionId = randomUUID();
+    if (previous) await writeArchivedVersion(projectId, versionId, previous);
+    project.updatedAt = now;
+    project.currentVersionId = versionId;
+    project.versionCount = (project.versionCount || 0) + 1;
+    const payload = {
+      project: sanitizeProject(project),
+      savedAt: now,
+      savedBy: sessionPrincipal(session),
+      summary: body.summary || {},
+      modelState: body.modelStateAfter || {},
+      commandPlanId: planId,
+      commandPrompt: record.prompt,
+    };
+    await writeProjectModel(projectId, payload);
+    db.projectVersions.unshift({
+      id: versionId,
+      projectId,
+      createdAt: now,
+      createdBy: sessionPrincipal(session),
+      label: `AI command: ${record.prompt}`.slice(0, 120),
+      summary: body.summary || {},
+      commandPlanId: planId,
+    });
+  }
+  record.status = "applied";
+  record.appliedAt = now;
+  record.appliedBy = sessionPrincipal(session);
+  record.projectId = projectId;
+  record.resultSummary = body.summary || {};
+  record.versionId = versionId;
+  db.audit.unshift({ at: now, type: "command.plan.applied", planId, projectId, versionId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { commandPlan: record, versionId });
+}
+
+async function undoCommandPlan(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "");
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const applied = db.commandPlans.find((item) => item.projectId === projectId && item.status === "applied" && (!body.planId || item.id === body.planId));
+  if (!applied?.versionId) {
+    json(res, 404, { error: "No applied command version is available to undo" });
+    return;
+  }
+  const archived = await readArchivedVersion(projectId, applied.versionId);
+  if (!archived) {
+    json(res, 404, { error: "Undo archive not found" });
+    return;
+  }
+  const now = new Date().toISOString();
+  await writeProjectModel(projectId, { ...archived, restoredAt: now, restoredBy: sessionPrincipal(session), undoOfCommandPlanId: applied.id });
+  project.updatedAt = now;
+  applied.status = "undone";
+  applied.undoneAt = now;
+  applied.undoneBy = sessionPrincipal(session);
+  db.audit.unshift({ at: now, type: "command.plan.undone", planId: applied.id, projectId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { commandPlan: applied, model: archived, project: sanitizeProject(project) });
+}
+
 async function dataArchitecture(req, res) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -1348,6 +1686,16 @@ async function runExternalCfdWorker(job) {
   return payload;
 }
 
+async function fetchExternalCfdWorkerJob(jobId) {
+  if (!config.cfdWorkerUrl || !config.cfdWorkerToken) return null;
+  const response = await fetch(`${config.cfdWorkerUrl}/jobs/${encodeURIComponent(jobId)}`, {
+    headers: { authorization: `Bearer ${config.cfdWorkerToken}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || payload.message || `CFD worker status failed with ${response.status}`);
+  return payload;
+}
+
 async function createCfdJob(req, res) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -1384,6 +1732,39 @@ async function createCfdJob(req, res) {
   await saveDb(db);
   await writeSimulationRun(job.id, job);
   json(res, 201, { job });
+}
+
+async function getCfdJob(req, res, jobId) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const job = db.cfdJobs.find((item) => item.id === jobId);
+  if (!job) {
+    json(res, 404, { error: "CFD job not found" });
+    return;
+  }
+  if (session.role !== "admin" && job.createdBy !== sessionPrincipal(session)) {
+    json(res, 403, { error: "CFD job is not accessible" });
+    return;
+  }
+  let worker = null;
+  let workerError = "";
+  try {
+    worker = await fetchExternalCfdWorkerJob(job.id);
+    if (worker?.status) {
+      job.worker = worker;
+      job.status = worker.status;
+      job.updatedAt = new Date().toISOString();
+      await saveDb(db);
+      await writeSimulationRun(job.id, job);
+    }
+  } catch (error) {
+    workerError = error.message;
+  }
+  json(res, 200, { job, worker, workerError });
 }
 
 async function listCfdJobs(req, res, query = new URLSearchParams()) {
@@ -2619,6 +3000,19 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await backendProcesses(req, res);
     return;
   }
+  if (req.method === "POST" && pathname === "/api/commands/plan") {
+    await createCommandPlan(req, res);
+    return;
+  }
+  const commandApplyMatch = pathname.match(/^\/api\/commands\/([^/]+)\/apply$/);
+  if (commandApplyMatch && req.method === "POST") {
+    await applyCommandPlan(req, res, decodeURIComponent(commandApplyMatch[1]));
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/commands/undo") {
+    await undoCommandPlan(req, res);
+    return;
+  }
   if (req.method === "GET" && pathname === "/api/sources/academic") {
     await listAcademicSources(req, res);
     return;
@@ -2637,6 +3031,11 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "POST" && pathname === "/api/cfd/jobs") {
     await createCfdJob(req, res);
+    return;
+  }
+  const cfdJobMatch = pathname.match(/^\/api\/cfd\/jobs\/([^/]+)$/);
+  if (cfdJobMatch && req.method === "GET") {
+    await getCfdJob(req, res, decodeURIComponent(cfdJobMatch[1]));
     return;
   }
   if (req.method === "GET" && pathname === "/api/datasets") {
