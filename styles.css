@@ -10287,10 +10287,18 @@ th {
 
 .schedule-bucket-lanes {
   display: grid;
-  grid-template-columns: repeat(12, minmax(32px, 1fr));
-  gap: 8px;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 42px;
+  gap: 6px;
   align-items: end;
   min-height: 264px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 2px 8px;
+  scroll-snap-type: x proximity;
+  scrollbar-color: rgba(34, 89, 84, 0.42) rgba(220, 231, 229, 0.7);
 }
 
 .schedule-bucket-lanes button {
@@ -10307,6 +10315,7 @@ th {
   background: linear-gradient(180deg, rgba(245, 249, 248, 0.96), rgba(230, 238, 237, 0.92));
   color: #142339;
   cursor: pointer;
+  scroll-snap-align: start;
 }
 
 .schedule-bucket-lanes button:hover {
@@ -17332,7 +17341,8 @@ body.locked .public-page:not(.active-public-page) {
   }
 
   .schedule-bucket-lanes {
-    grid-template-columns: repeat(8, minmax(34px, 1fr));
+    grid-template-columns: none;
+    grid-auto-columns: 42px;
   }
 }
 
@@ -17358,7 +17368,8 @@ body.locked .public-page:not(.active-public-page) {
   }
 
   .schedule-bucket-lanes {
-    grid-template-columns: repeat(6, minmax(30px, 1fr));
+    grid-template-columns: none;
+    grid-auto-columns: 40px;
     min-height: 220px;
   }
 

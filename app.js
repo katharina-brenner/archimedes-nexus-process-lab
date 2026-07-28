@@ -2198,6 +2198,12 @@ function formatNumber(value, digits = 0) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value);
 }
 
+function formatScheduleDuration(hours) {
+  const safeHours = Math.max(0, Number(hours) || 0);
+  if (safeHours < 48) return `${formatNumber(safeHours, 1)} h`;
+  return `${formatNumber(safeHours / 24, 1)} d`;
+}
+
 function formatMass(kg) {
   if (kg >= 1000000) return `${formatNumber(kg / 1000000, 2)} kt`;
   if (kg >= 1000) return `${formatNumber(kg / 1000, 2)} t`;
@@ -7063,7 +7069,7 @@ function renderSimulationBoard() {
     <section class="simulation-summary">
       <article><span>Campaign scheduler</span><strong>${schedule.simulatedBatches} batches</strong></article>
       <article><span>Feasible annual batches</span><strong class="${schedule.feasibleAnnualBatches < state.batchCount ? "risk" : "ok"}">${schedule.feasibleAnnualBatches}/${state.batchCount}</strong></article>
-      <article><span>Release pitch</span><strong>${formatNumber(schedule.releasePitchH, 1)} h</strong></article>
+      <article><span>Release interval</span><strong>${formatScheduleDuration(schedule.releasePitchH)}</strong><small>${formatScheduleDuration(schedule.plannedPitchH)} target interval</small></article>
       <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
       <article><span>Stream slots</span><strong>${streamScheduleRows.length}</strong></article>
       <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
@@ -7109,13 +7115,13 @@ function renderSimulationBoard() {
         </article>
         <article class="schedule-flow-card">
           <header>
-            <div><span>Batch flow lanes</span><h4>Main process vs support load</h4></div>
-            <strong>${formatNumber(schedule.releasePitchH, 1)} h pitch</strong>
+            <div><span>Campaign load by elapsed day</span><h4>Main process, support, and cleaning load</h4></div>
+            <strong>${formatScheduleDuration(schedule.releasePitchH)} actual · ${formatScheduleDuration(schedule.plannedPitchH)} target</strong>
           </header>
-          <div class="schedule-bucket-lanes">
+          <div class="schedule-bucket-lanes" role="list" aria-label="Campaign load over elapsed time">
             ${scheduleBuckets.map((bucket) => `
-              <button type="button" data-factory-time="${formatNumber((bucket.startH + bucket.finishH) / 2, 2)}" title="${escapeAttr(`${bucket.bucketLabel}: ${bucket.activeBatches} batches, ${bucket.processOperations} process, ${bucket.cleaningOperations} cleaning, ${formatNumber(bucket.utilityLoadPct, 0)}% utility load`) }">
-                <span>${escapeHtml(bucket.bucketLabel)}</span>
+              <button type="button" role="listitem" data-factory-time="${formatNumber((bucket.startH + bucket.finishH) / 2, 2)}" aria-label="${escapeAttr(`Day ${formatNumber(bucket.startH / 24, 0)}: ${bucket.activeBatches} active batches`)}" title="${escapeAttr(`${bucket.bucketLabel}, day ${formatNumber(bucket.startH / 24, 1)}-${formatNumber(bucket.finishH / 24, 1)}: ${bucket.activeBatches} batches, ${bucket.processOperations} process, ${bucket.supportOperations} support, ${bucket.cleaningOperations} cleaning, ${formatNumber(bucket.utilityLoadPct, 0)}% utility load`) }">
+                <span>D${formatNumber(bucket.startH / 24, 0)}</span>
                 <i class="main" style="--h:${scheduleLaneHeight(bucket.mainOperations)}%;"></i>
                 <i class="support" style="--h:${scheduleLaneHeight(bucket.supportOperations)}%;"></i>
                 <i class="clean" style="--h:${scheduleLaneHeight(bucket.cleaningOperations)}%;"></i>
