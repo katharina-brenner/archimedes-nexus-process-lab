@@ -592,7 +592,7 @@ function parseBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > 12_000_000) {
         rejectBody(new Error("Payload too large"));
         req.destroy();
       }
@@ -2414,6 +2414,168 @@ function datasetQuality(parsed, columnProfiles, kind) {
   };
 }
 
+function datasetNumericValues(dataset, pattern) {
+  const rows = Array.isArray(dataset?.parsedRows) ? dataset.parsedRows : [];
+  const column = (dataset?.columns || []).find((name) => pattern.test(String(name).toLowerCase()));
+  if (!column) return { column: "", values: [] };
+  return {
+    column,
+    values: rows
+      .map((row) => Number(String(row?.[column] ?? "").replace(",", ".")))
+      .filter(Number.isFinite),
+  };
+}
+
+function percentile(values = [], fraction = 0.5) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.max(0, Math.min(sorted.length - 1, Math.round((sorted.length - 1) * fraction)));
+  return sorted[index];
+}
+
+function boundedPlantValue(value, min, max, digits = 2) {
+  if (!Number.isFinite(value)) return null;
+  const bounded = Math.max(min, Math.min(max, value));
+  return Number(bounded.toFixed(digits));
+}
+
+function aggregateDatasetMeasure(datasets, pattern) {
+  const matches = datasets.map((dataset) => {
+    const measure = datasetNumericValues(dataset, pattern);
+    return { ...measure, dataset };
+  }).filter((item) => item.values.length);
+  return {
+    values: matches.flatMap((item) => item.values),
+    columns: [...new Set(matches.map((item) => item.column))],
+    datasetIds: [...new Set(matches.map((item) => item.dataset.id))],
+    datasetNames: [...new Set(matches.map((item) => item.dataset.name))],
+  };
+}
+
+function plantDataModelChanges(datasets = [], modelState = {}) {
+  const changes = [];
+  const params = { ...(modelState.params || {}) };
+  const addParam = (key, label, pattern, reducer, min, max, unit, convert = (value) => value) => {
+    const measure = aggregateDatasetMeasure(datasets, pattern);
+    if (!measure.values.length) return;
+    const raw = reducer(measure.values);
+    const value = boundedPlantValue(convert(raw, measure.columns), min, max);
+    if (value === null || value === Number(params[key])) return;
+    changes.push({
+      scope: "parameter",
+      key,
+      label,
+      from: Number(params[key]),
+      to: value,
+      unit,
+      sourceColumns: measure.columns,
+      datasetIds: measure.datasetIds,
+      datasetNames: measure.datasetNames,
+      basis: `Derived from ${measure.values.length} numeric plant records.`,
+      confidence: measure.values.length >= 20 ? "high" : measure.values.length >= 5 ? "medium" : "screening",
+    });
+  };
+  const addModelValue = (key, label, pattern, reducer, min, max, unit) => {
+    const measure = aggregateDatasetMeasure(datasets, pattern);
+    if (!measure.values.length) return;
+    const value = boundedPlantValue(reducer(measure.values), min, max);
+    if (value === null || value === Number(modelState[key])) return;
+    changes.push({
+      scope: "model",
+      key,
+      label,
+      from: Number(modelState[key]),
+      to: value,
+      unit,
+      sourceColumns: measure.columns,
+      datasetIds: measure.datasetIds,
+      datasetNames: measure.datasetNames,
+      basis: `Derived from ${measure.values.length} numeric plant records.`,
+      confidence: measure.values.length >= 20 ? "high" : measure.values.length >= 5 ? "medium" : "screening",
+    });
+  };
+
+  addParam("viability", "Viability", /(^|_)viab(ility)?(_|$)|viable_pct/, (values) => percentile(values, 0.5), 45, 99, "%");
+  addParam("cellDensity", "Peak cell density", /vcd|viable_cell|cell_density|biomass/, (values) => Math.max(...values), 0.2, 120, "M cells/mL");
+  addParam("glucose", "Glucose setpoint", /glucose|substrate(_g_l)?/, (values) => percentile(values, 0.5), 0.2, 12, "g/L");
+  addParam("glutamine", "Glutamine", /glutamine|gln/, (values) => percentile(values, 0.5), 0, 8, "mM");
+  addParam(
+    "lactate",
+    "Lactate limit",
+    /lactate|lac(_|$)/,
+    (values) => Math.max(...values),
+    0.2,
+    8,
+    "g/L",
+    (value, columns) => columns.some((column) => /mmol|_mm|mm$/i.test(column)) ? value * 0.09008 : value,
+  );
+  addParam("ammonia", "Ammonium / ammonia limit", /ammon|nh4|nh3/, (values) => Math.max(...values), 0.2, 8, "mM");
+  addParam("ph", "pH", /(^|_)ph($|_)/, (values) => percentile(values, 0.5), 5.5, 8.2, "");
+  addParam("temperature", "Temperature", /temp|temperature/, (values) => percentile(values, 0.5), 20, 39, "C");
+  addParam("doSetpoint", "Dissolved oxygen", /dissolved_oxygen|do_pct|oxygen_pct/, (values) => percentile(values, 0.5), 10, 80, "% air sat.");
+  addParam("kla", "kLa", /(^|_)kla($|_)|k_la/, (values) => percentile(values, 0.5), 2, 260, "1/h");
+  addParam("our", "OUR", /(^|_)our($|_)|oxygen_uptake/, (values) => percentile(values, 0.5), 0.2, 18, "mmol/L/h");
+  addParam("aeration", "Aeration", /aeration|gas_flow_vvm|airflow_vvm/, (values) => percentile(values, 0.5), 0.01, 2.5, "vvm");
+  addParam("feedRate", "Feed rate", /feed_rate|feed_pct|feed_percent/, (values) => percentile(values, 0.5), 0, 80, "% vol/day");
+  addParam("cipTime", "CIP cycle time", /cleaning_h|cip_time|cip_duration/, (values) => percentile(values, 0.5), 0.2, 16, "h");
+  addParam("equipmentUptime", "Equipment uptime", /equipment_uptime|uptime_pct|availability_pct/, (values) => percentile(values, 0.5), 50, 99.9, "%");
+  addParam("mediaCostPerL", "Media cost", /media_cost_per_l|media_price_per_l/, (values) => percentile(values, 0.5), 0.1, 500, "currency/L");
+  addParam("resinCostPerL", "Resin cost", /resin_cost_per_l|resin_price_per_l/, (values) => percentile(values, 0.5), 50, 25000, "currency/L resin");
+  addModelValue("titer", "Process titer", /titer|product_concentration/, (values) => Math.max(...values), 0.01, 500, "g/L");
+  addModelValue("recovery", "Overall recovery", /overall_recovery|recovery_pct|total_yield_pct/, (values) => percentile(values, 0.5), 1, 99, "%");
+  addModelValue("batchSize", "Batch / working volume", /batch_volume_l|working_volume_l|volume_l/, (values) => percentile(values, 0.5), 1, 2_000_000, "L");
+  addModelValue("batchCount", "Annual batch count", /annual_batches|batches_per_year/, (values) => percentile(values, 0.5), 1, 2000, "batches/year");
+
+  datasets.filter((dataset) => dataset.kind === "tea").forEach((dataset) => {
+    const rows = Array.isArray(dataset.parsedRows) ? dataset.parsedRows : [];
+    rows.forEach((row) => {
+      const itemEntry = Object.entries(row).find(([key]) => /item|material|description|name/i.test(key));
+      const costEntry = Object.entries(row).find(([key]) => /unit_cost|unit_price|price_per/i.test(key));
+      if (!itemEntry || !costEntry) return;
+      const item = String(itemEntry[1] || "").toLowerCase();
+      const rawCost = Number(String(costEntry[1] ?? "").replace(",", "."));
+      if (!Number.isFinite(rawCost)) return;
+      const target = item.includes("basal media") || item === "media"
+        ? ["mediaCostPerL", "Media cost", 0.1, 500, "currency/L"]
+        : item.includes("feed") || item.includes("supplement")
+          ? ["feedSupplementCostPerL", "Feed / supplement cost", 0, 1200, "currency/L"]
+          : item.includes("buffer")
+            ? ["bufferCostPerL", "Buffer cost", 0.05, 80, "currency/L"]
+            : item.includes("resin")
+              ? ["resinCostPerL", "Resin cost", 50, 25000, "currency/L resin"]
+              : null;
+      if (!target) return;
+      const [key, label, min, max, unit] = target;
+      const value = boundedPlantValue(rawCost, min, max);
+      const existing = changes.find((change) => change.scope === "parameter" && change.key === key);
+      if (existing) {
+        existing.to = value;
+        existing.datasetIds = [...new Set([...existing.datasetIds, dataset.id])];
+        existing.datasetNames = [...new Set([...existing.datasetNames, dataset.name])];
+        existing.sourceColumns = [...new Set([...existing.sourceColumns, costEntry[0]])];
+        existing.basis = `Mapped from the company TEA line item "${itemEntry[1]}".`;
+        return;
+      }
+      if (value !== Number(params[key])) {
+        changes.push({
+          scope: "parameter",
+          key,
+          label,
+          from: Number(params[key]),
+          to: value,
+          unit,
+          sourceColumns: [costEntry[0]],
+          datasetIds: [dataset.id],
+          datasetNames: [dataset.name],
+          basis: `Mapped from the company TEA line item "${itemEntry[1]}".`,
+          confidence: "high",
+        });
+      }
+    });
+  });
+  return changes;
+}
+
 async function createDataset(req, res) {
   const session = verifySession(getBearer(req));
   if (!session) {
@@ -2466,6 +2628,13 @@ async function createDataset(req, res) {
       columnRoles: columnProfiles.map((column) => ({ name: column.name, role: column.role, modelParameter: column.modelParameter, inferredUnit: column.inferredUnit })),
       recommendedNextRun: quality.readyFor.join(" "),
     },
+    modelPatchPreview: plantDataModelChanges([{
+      id: "preview",
+      name: String(body.name || "Axion dataset").trim().slice(0, 160),
+      kind,
+      columns,
+      parsedRows: parsed.rows?.slice(0, 250) || [],
+    }], body.modelState || {}),
     createdAt: now,
     createdBy: sessionPrincipal(session),
     storage: supabaseConfigured() ? "supabase-postgres-record" : "local-json-record",
@@ -2475,6 +2644,136 @@ async function createDataset(req, res) {
   db.audit.unshift({ at: now, type: "dataset.created", datasetId: dataset.id, projectId, by: sessionPrincipal(session) });
   await saveDb(db);
   json(res, 201, { dataset });
+}
+
+async function applyDatasetsToModel(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const body = await parseBody(req);
+  const projectId = String(body.projectId || "").trim();
+  const datasetIds = [...new Set((Array.isArray(body.datasetIds) ? body.datasetIds : []).map(String))];
+  if (!projectId || !datasetIds.length) {
+    json(res, 400, { error: "A saved project and at least one dataset are required" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) {
+    json(res, 404, { error: "Project not found" });
+    return;
+  }
+  const datasets = db.datasets.filter((dataset) => datasetIds.includes(dataset.id) && dataset.projectId === projectId);
+  if (datasets.length !== datasetIds.length) {
+    json(res, 404, { error: "One or more datasets are not accessible in this project" });
+    return;
+  }
+  const currentPayload = await readProjectModel(projectId);
+  const currentModelState = body.modelState && typeof body.modelState === "object"
+    ? body.modelState
+    : currentPayload?.modelState || {};
+  const changes = plantDataModelChanges(datasets, currentModelState);
+  const now = new Date().toISOString();
+  const modelStateAfter = {
+    ...currentModelState,
+    params: { ...(currentModelState.params || {}) },
+    plantDataBindings: [
+      ...(Array.isArray(currentModelState.plantDataBindings) ? currentModelState.plantDataBindings : []),
+      ...datasets.map((dataset) => ({
+        datasetId: dataset.id,
+        name: dataset.name,
+        kind: dataset.kind,
+        sourceId: dataset.sourceId,
+        fileName: dataset.fileName,
+        rowCount: dataset.rowCount,
+        qualityScore: dataset.qualityScore,
+        appliedAt: now,
+      })),
+    ].slice(-100),
+    dataApplicationHistory: [
+      {
+        appliedAt: now,
+        appliedBy: sessionPrincipal(session),
+        datasetIds,
+        changeCount: changes.length,
+        changes,
+      },
+      ...(Array.isArray(currentModelState.dataApplicationHistory) ? currentModelState.dataApplicationHistory : []),
+    ].slice(0, 30),
+  };
+  changes.forEach((change) => {
+    if (change.scope === "parameter") modelStateAfter.params[change.key] = change.to;
+    else modelStateAfter[change.key] = change.to;
+  });
+
+  const versionId = randomUUID();
+  if (currentPayload) await writeArchivedVersion(projectId, versionId, currentPayload);
+  project.updatedAt = now;
+  project.currentVersionId = versionId;
+  project.versionCount = (project.versionCount || 0) + 1;
+  project.template = String(modelStateAfter.template || project.template || "");
+  project.scale = String(modelStateAfter.scale || project.scale || "");
+  const summary = {
+    ...(body.summary || currentPayload?.summary || {}),
+    plantDatasetsApplied: datasets.length,
+    plantRowsRegistered: datasets.reduce((sum, dataset) => sum + (dataset.rowCount || 0), 0),
+    plantRowsAnalyzed: datasets.reduce((sum, dataset) => sum + (dataset.parsedRows?.length || 0), 0),
+    updatedParameters: changes.length,
+  };
+  await writeProjectModel(projectId, {
+    project: sanitizeProject(project),
+    savedAt: now,
+    savedBy: sessionPrincipal(session),
+    summary,
+    modelState: modelStateAfter,
+    dataApplication: { datasetIds, changes },
+  });
+  db.projectVersions.unshift({
+    id: versionId,
+    projectId,
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    label: `Plant data import: ${datasets.length} dataset${datasets.length === 1 ? "" : "s"}`,
+    summary,
+  });
+  datasets.forEach((dataset) => {
+    dataset.appliedAt = now;
+    dataset.appliedBy = sessionPrincipal(session);
+    dataset.appliedVersionId = versionId;
+    dataset.appliedChanges = changes.filter((change) => change.datasetIds.includes(dataset.id));
+    dataset.nextStep = changes.length
+      ? "Review the applied model diff, run mass/energy balances, scheduling and CFD screening, then validate against a held-out batch."
+      : "No unit-compatible parameter was changed. Review column mapping and units manually.";
+  });
+  db.audit.unshift({
+    at: now,
+    type: "datasets.applied",
+    projectId,
+    datasetIds,
+    versionId,
+    changeCount: changes.length,
+    by: sessionPrincipal(session),
+  });
+  await saveDb(db);
+  json(res, 200, {
+    project: sanitizeProject(project),
+    versionId,
+    modelState: modelStateAfter,
+    changes,
+    appliedDatasets: datasets.map((dataset) => ({
+      id: dataset.id,
+      name: dataset.name,
+      rowCount: dataset.rowCount,
+      qualityScore: dataset.qualityScore,
+    })),
+    rowsRegistered: datasets.reduce((sum, dataset) => sum + (dataset.rowCount || 0), 0),
+    rowsAnalyzed: datasets.reduce((sum, dataset) => sum + (dataset.parsedRows?.length || 0), 0),
+    untouchedColumns: datasets.flatMap((dataset) => (dataset.schema?.columns || [])
+      .filter((column) => column.role === "metadata")
+      .map((column) => `${dataset.name}: ${column.name}`)).slice(0, 80),
+  });
 }
 
 async function exportDataset(req, res, datasetId) {
@@ -3529,6 +3828,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/datasets") {
     await listDatasets(req, res, query);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/datasets/apply") {
+    await applyDatasetsToModel(req, res);
     return;
   }
   const datasetExportMatch = pathname.match(/^\/api\/datasets\/([^/]+)\/export$/);

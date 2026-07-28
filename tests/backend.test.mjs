@@ -211,10 +211,66 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(dataset.payload.dataset.rowCount, 3);
     assert.ok(dataset.payload.dataset.schema.columns.some((column) => column.role === "oxygen_transfer"));
     assert.ok(dataset.payload.dataset.modelTargets.some((target) => /CFD|kLa|OUR/.test(target)));
+    assert.ok(dataset.payload.dataset.modelPatchPreview.some((change) => change.key === "doSetpoint"));
+
+    const teaDataset = await jsonFetch(server.baseUrl, "/api/datasets", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        name: "Site material prices",
+        kind: "tea",
+        sourceId: "ERP export",
+        contentText: [
+          "item,unit_cost_eur,unit",
+          "Basal media,18.50,L",
+          "Feed supplement,142.00,L",
+          "Protein A resin,11800,L",
+        ].join("\n"),
+      },
+    });
+    assert.equal(teaDataset.response.status, 201);
+
+    const datasetApply = await jsonFetch(server.baseUrl, "/api/datasets/apply", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        datasetIds: [dataset.payload.dataset.id, teaDataset.payload.dataset.id],
+        modelState: {
+          template: "culturedMeat",
+          scale: "pilot",
+          batchSize: 1000,
+          titer: 8,
+          recovery: 68,
+          params: {
+            glucose: 4,
+            lactate: 2,
+            ammonia: 2,
+            doSetpoint: 40,
+            kla: 65,
+            mediaCostPerL: 42,
+            feedSupplementCostPerL: 160,
+            resinCostPerL: 9500,
+          },
+          units: [{ id: "BR-101" }],
+          streams: [],
+        },
+      },
+    });
+    assert.equal(datasetApply.response.status, 200);
+    assert.ok(datasetApply.payload.versionId);
+    assert.equal(datasetApply.payload.rowsRegistered, 6);
+    assert.equal(datasetApply.payload.appliedDatasets.length, 2);
+    assert.ok(datasetApply.payload.changes.some((change) => change.key === "doSetpoint"));
+    assert.ok(datasetApply.payload.modelState.plantDataBindings.some((binding) => binding.datasetId === dataset.payload.dataset.id));
+    assert.equal(datasetApply.payload.modelState.params.doSetpoint, 58);
+    assert.equal(datasetApply.payload.modelState.params.mediaCostPerL, 18.5);
 
     const datasetList = await jsonFetch(server.baseUrl, `/api/datasets?projectId=${created.payload.project.id}`, { token });
     assert.equal(datasetList.response.status, 200);
-    assert.equal(datasetList.payload.datasets.length, 1);
+    assert.equal(datasetList.payload.datasets.length, 2);
+    assert.ok(datasetList.payload.datasets.every((item) => item.appliedVersionId));
 
     const datasetExport = await jsonFetch(server.baseUrl, `/api/datasets/${dataset.payload.dataset.id}/export`, { token });
     assert.equal(datasetExport.response.status, 200);

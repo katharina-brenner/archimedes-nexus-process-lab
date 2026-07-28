@@ -2043,6 +2043,11 @@ const state = {
   projectVersions: [],
   projectInvites: [],
   datasets: [],
+  datasetImportQueue: [],
+  datasetImportRunning: false,
+  lastDataApplication: null,
+  plantDataBindings: [],
+  dataApplicationHistory: [],
   integrations: [],
   selectedIntegration: "",
   connectorResults: {},
@@ -2531,6 +2536,8 @@ function exportCurrentModelState() {
     inferredTemplate: state.inferredTemplate,
     activeRoute: state.activeRoute,
     recipeOverrides: clone(state.recipeOverrides),
+    plantDataBindings: clone(state.plantDataBindings || []),
+    dataApplicationHistory: clone(state.dataApplicationHistory || []),
     commandHistory: clone(state.commandHistory || []),
   };
 }
@@ -2562,6 +2569,8 @@ function importModelState(modelState = {}) {
   state.inferredTemplate = modelState.inferredTemplate || template;
   state.activeRoute = modelState.activeRoute || "primary";
   state.recipeOverrides = modelState.recipeOverrides || {};
+  state.plantDataBindings = Array.isArray(modelState.plantDataBindings) ? clone(modelState.plantDataBindings) : [];
+  state.dataApplicationHistory = Array.isArray(modelState.dataApplicationHistory) ? clone(modelState.dataApplicationHistory) : [];
   state.commandHistory = Array.isArray(modelState.commandHistory) ? clone(modelState.commandHistory).slice(0, 20) : [];
   state.commandHighlights = [];
   syncInputs();
@@ -8218,41 +8227,126 @@ async function refreshDatasets() {
 }
 
 async function registerCompanyDataset() {
-  const name = document.querySelector("#companyDataName")?.value.trim() || "Company dataset";
-  const kind = document.querySelector("#companyDataKind")?.value || "experimental";
+  if (state.datasetImportRunning) return;
+  const baseName = document.querySelector("#companyDataName")?.value.trim() || "Plant dataset";
+  const selectedKind = document.querySelector("#companyDataKind")?.value || "experimental";
   const sourceId = document.querySelector("#companyDataSource")?.value.trim() || "";
   const text = document.querySelector("#companyDataText")?.value || "";
-  const file = document.querySelector("#companyDataFile")?.files?.[0];
-  if (!text.trim()) {
-    showToast("Add CSV/JSON data first");
-    document.querySelector("#companyDataText")?.focus();
+  const queue = [...(state.datasetImportQueue || [])];
+  const payloads = queue.length
+    ? queue.map((item) => ({
+      name: queue.length === 1 && baseName ? baseName : item.name.replace(/\.[^.]+$/, ""),
+      kind: item.kind,
+      sourceId: sourceId || item.name,
+      fileName: item.name,
+      mimeType: item.type,
+      size: item.size,
+      contentText: item.contentText,
+      queueId: item.id,
+    }))
+    : text.trim()
+      ? [{
+        name: baseName,
+        kind: selectedKind,
+        sourceId,
+        fileName: "",
+        mimeType: "text/plain",
+        size: text.length,
+        contentText: text,
+        queueId: "",
+      }]
+      : [];
+  if (!payloads.length) {
+    showToast("Add plant CSV, TSV or JSON data first");
+    document.querySelector("#companyDataFile")?.focus();
     return;
   }
-  const body = {
-    projectId: state.currentProjectId || "",
-    name,
-    kind,
-    sourceId,
-    fileName: file?.name || "",
-    mimeType: file?.type || "",
-    size: file?.size || text.length,
-    contentText: text,
-  };
+  state.datasetImportRunning = true;
+  renderSources();
+  if (!state.currentProjectId) await saveCurrentProject();
+  const registered = [];
+  const failures = [];
   try {
-    const payload = await apiRequest("/api/datasets", {
+    for (const item of payloads) {
+      const queued = state.datasetImportQueue.find((entry) => entry.id === item.queueId);
+      if (queued) queued.status = "importing";
+      renderSources();
+      try {
+        const payload = await apiRequest("/api/datasets", {
+          method: "POST",
+          body: JSON.stringify({
+            ...item,
+            projectId: state.currentProjectId || "",
+            modelState: exportCurrentModelState(),
+          }),
+        });
+        registered.push(payload.dataset);
+        if (queued) queued.status = "mapped";
+      } catch (error) {
+        failures.push(`${item.fileName || item.name}: ${error.message}`);
+        if (queued) queued.status = "failed";
+      }
+    }
+    if (!registered.length) throw new Error(failures[0] || "No dataset could be imported");
+    const applied = await apiRequest("/api/datasets/apply", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        projectId: state.currentProjectId,
+        datasetIds: registered.map((dataset) => dataset.id),
+        modelState: exportCurrentModelState(),
+        summary: currentModelSummary(),
+      }),
     });
-    state.datasets = [payload.dataset, ...(state.datasets || []).filter((dataset) => dataset.id !== payload.dataset.id)];
-    showToast(`${payload.dataset.name} registered`);
-  } catch {
-    const local = localDatasetFromForm(body);
-    state.datasets = [local, ...localDatasetStore()];
-    saveLocalDatasetStore(state.datasets);
-    showToast("Dataset saved locally; backend parsing unavailable");
+    state.lastDataApplication = applied;
+    state.datasetImportQueue = [];
+    importModelState(applied.modelState || {});
+    await refreshProjects();
+    await refreshDatasets();
+    showToast(`${registered.length} plant dataset${registered.length === 1 ? "" : "s"} applied to the model`);
+  } catch (error) {
+    if (!registered.length && payloads.length === 1) {
+      const local = localDatasetFromForm({ ...payloads[0], projectId: state.currentProjectId || "" });
+      state.datasets = [local, ...localDatasetStore()];
+      saveLocalDatasetStore(state.datasets);
+    }
+    showToast(error.message || "Plant data import failed");
+  } finally {
+    state.datasetImportRunning = false;
   }
   renderSources();
   renderReportsBoard();
+}
+
+async function queuePlantDataFiles(fileList) {
+  const files = Array.from(fileList || []).slice(0, 40);
+  if (!files.length) return;
+  const accepted = files.filter((file) => /\.(csv|tsv|txt|json)$/i.test(file.name));
+  if (!accepted.length) {
+    showToast("Use CSV, TSV, TXT or JSON plant exports");
+    return;
+  }
+  const totalSize = accepted.reduce((sum, file) => sum + file.size, 0);
+  if (totalSize > 60 * 1024 * 1024) {
+    showToast("Select up to 60 MB per import batch");
+    return;
+  }
+  const entries = await Promise.all(accepted.map(async (file, index) => {
+    const contentText = await file.text();
+    const trimmedText = contentText.slice(0, 8_000_000);
+    return {
+      id: `plant-file-${Date.now()}-${index}`,
+      name: file.name,
+      type: file.type || "text/plain",
+      size: file.size,
+      contentText: trimmedText,
+      estimatedRows: Math.max(0, trimmedText.split(/\r?\n/).filter(Boolean).length - 1),
+      kind: inferDatasetKindFromFile(file.name, trimmedText),
+      status: contentText.length > trimmedText.length ? "sampled to 8 MB" : "ready",
+    };
+  }));
+  state.datasetImportQueue = [...(state.datasetImportQueue || []), ...entries].slice(0, 40);
+  renderSources();
+  showToast(`${entries.length} plant file${entries.length === 1 ? "" : "s"} ready for mapping`);
 }
 
 function templateComplexity(template) {
@@ -9122,6 +9216,14 @@ function showDatasetDetails(dataset) {
       <div class="dataset-column-mini">
         ${columns.slice(0, 10).map((column) => `<b>${escapeHtml(column.name)} <small>${escapeHtml(column.role || "unmapped")}</small></b>`).join("")}
       </div>
+      ${(dataset.appliedChanges || []).length ? `
+        <div class="dataset-applied-diff">
+          <strong>Applied model changes</strong>
+          ${dataset.appliedChanges.slice(0, 10).map((change) => `
+            <span>${escapeHtml(change.label)}: ${formatNumber(change.from, 2)} → <b>${formatNumber(change.to, 2)} ${escapeHtml(change.unit || "")}</b></span>
+          `).join("")}
+        </div>
+      ` : ""}
       ${(dataset.qualityIssues || []).length ? `<div class="detail-next"><small>${escapeHtml(dataset.qualityIssues.join(" "))}</small><button data-detail-jump="sources" type="button">Review data</button></div>` : ""}
       <div class="detail-actions">
         <button data-detail-jump="reports" type="button">Download registry</button>
@@ -12025,7 +12127,85 @@ function renderDatasetCard(dataset) {
       </dl>
       <p>${escapeHtml((dataset.modelTargets || []).slice(0, 2).join(" ") || "Stored as project evidence and ready for manual mapping.")}</p>
       <div>${[...new Set(roles)].slice(0, 5).map((role) => `<b>${escapeHtml(role.replaceAll("_", " "))}</b>`).join("")}</div>
+      ${dataset.appliedAt ? `<small class="dataset-applied-state">Applied to model · ${new Date(dataset.appliedAt).toLocaleString()}</small>` : ""}
     </article>
+  `;
+}
+
+function formatFileSize(size = 0) {
+  const bytes = Math.max(0, Number(size) || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${formatNumber(bytes / 1024, 1)} KB`;
+  return `${formatNumber(bytes / (1024 * 1024), 1)} MB`;
+}
+
+function inferDatasetKindFromFile(name = "", text = "") {
+  const signal = `${name}\n${String(text).slice(0, 4000)}`.toLowerCase();
+  if (/capex|opex|unit[_ ]?cost|supplier[_ ]?quote|material[_ ]?price|cost_eur|cost_usd/.test(signal)) return "tea";
+  if (/co2e|carbon|emission|waste|water[_ ]?factor|lca/.test(signal)) return "lca";
+  if (/equipment|operation|start_h|duration_h|cleaning_h|batch[_ ]?schedule|mes/.test(signal)) return "schedule";
+  if (/lims|release|assay|bioburden|endotoxin|sterility|qc/.test(signal)) return "qc";
+  if (/timestamp|tag|historian|scada|opc|sensor|pat/.test(signal)) return "historian";
+  if (/vcd|viability|titer|glucose|lactate|ammon|kla|our|bioreactor/.test(signal)) return "bioreactor";
+  return "experimental";
+}
+
+function renderDatasetImportQueue() {
+  const queue = state.datasetImportQueue || [];
+  if (!queue.length) return `
+    <div class="plant-upload-empty">
+      <strong>Drop plant exports here</strong>
+      <span>CSV, TSV or JSON · up to 40 files · historian, MES, LIMS, TEA, LCA and batch records</span>
+      <button data-open-plant-files type="button">Choose files</button>
+    </div>
+  `;
+  const totalRows = queue.reduce((sum, item) => sum + (item.estimatedRows || 0), 0);
+  return `
+    <div class="plant-upload-summary">
+      <strong>${queue.length} file${queue.length === 1 ? "" : "s"} ready</strong>
+      <span>${formatNumber(totalRows, 0)} estimated rows · ${formatFileSize(queue.reduce((sum, item) => sum + item.size, 0))}</span>
+      <button data-open-plant-files type="button">Add files</button>
+      <button data-clear-data-queue type="button">Clear</button>
+    </div>
+    <div class="plant-upload-files">
+      ${queue.map((item) => `
+        <article data-queue-status="${escapeAttr(item.status || "ready")}">
+          <span>${escapeHtml(datasetKindLabel(item.kind))}</span>
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${formatFileSize(item.size)} · ${formatNumber(item.estimatedRows || 0, 0)} rows</small>
+          <b>${escapeHtml(item.status || "ready")}</b>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderDataApplicationResult() {
+  const result = state.lastDataApplication;
+  if (!result) return "";
+  const changes = result.changes || [];
+  return `
+    <section class="plant-data-result" aria-live="polite">
+      <div>
+        <span>Model updated</span>
+        <strong>${result.appliedDatasets?.length || 0} datasets · ${formatNumber(result.rowsRegistered || 0, 0)} rows registered · ${changes.length} parameter changes</strong>
+        <p>A restorable model version was created before the plant data was applied.</p>
+      </div>
+      <div class="plant-data-diff">
+        ${changes.length ? changes.slice(0, 12).map((change) => `
+          <article>
+            <span>${escapeHtml(change.label)}</span>
+            <small>${formatNumber(change.from, 2)} → <b>${formatNumber(change.to, 2)} ${escapeHtml(change.unit || "")}</b></small>
+            <em>${escapeHtml(change.confidence)} confidence · ${escapeHtml((change.sourceColumns || []).join(", "))}</em>
+          </article>
+        `).join("") : `<p>No unit-compatible parameter was changed. The datasets remain attached for manual mapping.</p>`}
+      </div>
+      <div class="plant-data-result-actions">
+        <button data-jump-view="overview" type="button">Review model</button>
+        <button data-jump-view="simulation" type="button">Run simulation</button>
+        <button data-jump-view="projects" type="button">Open version history</button>
+      </div>
+    </section>
   `;
 }
 
@@ -12036,12 +12216,13 @@ function renderCompanyDataStudio() {
     <section class="company-data-studio">
       <div class="company-data-head">
         <div>
-          <p>Company Data Studio</p>
-          <h3>Bring customer data into the model, without breaking the clean workspace.</h3>
-          <span>Paste CSV/JSON or load a CSV file. Axion detects columns, units, row quality, model targets and the next calibration path for kinetics, CFD, TEA, LCA, scheduling or QC.</span>
+          <p>Plant Data Studio</p>
+          <h3>Turn real production records into a calibrated process model.</h3>
+          <span>Upload many plant exports at once. Axion identifies data types, maps compatible columns, checks quality, creates a rollback version, and applies accepted values to kinetics, CFD, economics, LCA and scheduling.</span>
         </div>
-        <button class="action-button primary" data-company-data-register type="button">Register dataset</button>
+        <button class="action-button primary" data-company-data-register type="button" ${state.datasetImportRunning ? "disabled" : ""}>${state.datasetImportRunning ? "Mapping plant data…" : "Import & apply"}</button>
       </div>
+      ${renderDataApplicationResult()}
       <div class="company-data-layout">
         <form class="company-data-form" id="companyDataForm">
           <label>
@@ -12066,11 +12247,14 @@ function renderCompanyDataStudio() {
             <input id="companyDataSource" type="text" placeholder="CSV export, PI historian, LIMS, supplier quote, ERP" />
           </label>
           <label class="company-file-label">
-            <span>CSV file</span>
-            <input id="companyDataFile" type="file" accept=".csv,.tsv,.txt,.json,text/csv,application/json" />
+            <span>Plant data files</span>
+            <input id="companyDataFile" type="file" multiple accept=".csv,.tsv,.txt,.json,text/csv,text/tab-separated-values,application/json" />
           </label>
+          <div class="plant-upload-zone" data-plant-drop-zone>
+            ${renderDatasetImportQueue()}
+          </div>
           <label class="company-data-text">
-            <span>CSV or JSON data</span>
+            <span>Optional single-table paste</span>
             <textarea id="companyDataText" rows="8" spellcheck="false" placeholder="time_h,batch_id,vcd_million_ml,glucose_g_l,lactate_mM,ammonium_mM,do_pct..."></textarea>
           </label>
           <div class="company-data-actions">
@@ -12078,9 +12262,9 @@ function renderCompanyDataStudio() {
           </div>
         </form>
         <aside class="company-data-guide">
-          <article><span>Model fit</span><strong>Kinetics + boundaries</strong><p>VCD, titer, glucose, glutamine, DO, kLa, OUR, lactate and ammonium update dynamic profiles and CFD source/sink terms.</p></article>
-          <article><span>Economics</span><strong>TEA/LCA override</strong><p>Material, media, resin, filter, energy, water, waste and supplier data replace screening factors in export-ready tables.</p></article>
-          <article><span>Operations</span><strong>Scheduling data</strong><p>Equipment, room, operator, duration, cleaning and batch rows calibrate utilization and finite-capacity scheduling.</p></article>
+          <article><span>1 · Detect</span><strong>Automatic classification</strong><p>Historian, batch, MES, LIMS, supplier, TEA and LCA files are classified from headers and content.</p></article>
+          <article><span>2 · Validate</span><strong>Units + quality gates</strong><p>Only recognized, numeric and unit-compatible fields can change the model. Unknown columns stay visible for review.</p></article>
+          <article><span>3 · Apply</span><strong>Versioned calibration</strong><p>Axion records every source, previous value, new value, confidence level and model version.</p></article>
         </aside>
       </div>
       <div class="company-dataset-strip">
@@ -14293,6 +14477,22 @@ function bindEvents() {
   });
 
   els.sourcesBoard?.addEventListener("click", (event) => {
+    const openFilesButton = event.target.closest("[data-open-plant-files]");
+    if (openFilesButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      document.querySelector("#companyDataFile")?.click();
+      return;
+    }
+    const clearQueueButton = event.target.closest("[data-clear-data-queue]");
+    if (clearQueueButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.datasetImportQueue = [];
+      renderSources();
+      showToast("Plant data queue cleared");
+      return;
+    }
     const exampleButton = event.target.closest("[data-company-data-example]");
     if (exampleButton) {
       event.stopPropagation();
@@ -14338,16 +14538,27 @@ function bindEvents() {
 
   els.sourcesBoard?.addEventListener("change", async (event) => {
     const fileInput = event.target.closest("#companyDataFile");
-    if (!fileInput?.files?.[0]) return;
-    const file = fileInput.files[0];
-    const text = await file.text();
-    const textArea = document.querySelector("#companyDataText");
-    const nameInput = document.querySelector("#companyDataName");
-    const sourceInput = document.querySelector("#companyDataSource");
-    if (textArea) textArea.value = text.slice(0, 900000);
-    if (nameInput && !nameInput.value.trim()) nameInput.value = file.name.replace(/\.[^.]+$/, "");
-    if (sourceInput && !sourceInput.value.trim()) sourceInput.value = file.name;
-    showToast(`${file.name} loaded`);
+    if (!fileInput?.files?.length) return;
+    await queuePlantDataFiles(fileInput.files);
+  });
+
+  els.sourcesBoard?.addEventListener("dragover", (event) => {
+    const zone = event.target.closest("[data-plant-drop-zone]");
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.add("is-dragging");
+  });
+
+  els.sourcesBoard?.addEventListener("dragleave", (event) => {
+    event.target.closest("[data-plant-drop-zone]")?.classList.remove("is-dragging");
+  });
+
+  els.sourcesBoard?.addEventListener("drop", async (event) => {
+    const zone = event.target.closest("[data-plant-drop-zone]");
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.remove("is-dragging");
+    await queuePlantDataFiles(event.dataTransfer?.files);
   });
 
   els.scaleList.addEventListener("click", (event) => {
