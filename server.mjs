@@ -810,6 +810,15 @@ function seedUsers(db) {
   });
 }
 
+function configuredSeedUserCount() {
+  try {
+    const parsed = JSON.parse(process.env.AXION_SEED_USERS_JSON || "[]");
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function sanitizeUser(user) {
   if (!user) return null;
   return {
@@ -3582,6 +3591,7 @@ assertProductionConfig();
 server.listen(config.port, config.host, () => {
   console.log(`${config.productName} backend running at http://${config.host}:${config.port}`);
   console.log(`Price gate: ${(config.priceCents / 100).toFixed(2)} ${config.currency}`);
+  console.log(`Private workspace access configured: admin=${Boolean(config.adminPassword)}, seededUsers=${configuredSeedUserCount()}`);
   if (!config.stripeSecretKey) {
     console.log("Stripe Checkout is not configured yet. Set STRIPE_SECRET_KEY to enable automatic SaaS payment.");
   }
