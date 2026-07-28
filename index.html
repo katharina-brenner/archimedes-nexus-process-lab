@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260722-paywall-ux-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260728-public-simplified-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -18,127 +18,61 @@
             </span>
           </button>
           <nav>
-            <button type="button" data-public-target="publicHome">Home</button>
-            <button type="button" data-public-target="publicPlatform">Platform</button>
-            <button type="button" data-public-target="publicWorkflow">Workflow</button>
-            <button type="button" data-public-target="publicEcosystem">Ecosystem</button>
-            <button type="button" data-public-target="publicReadiness">Readiness</button>
-            <button type="button" data-public-target="publicReviews">Reviews</button>
+            <a href="#how-it-works">How it works</a>
             <button type="button" data-public-target="publicPricing">Pricing</button>
-            <button type="button" data-public-target="loginPanel">Login</button>
+            <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
           </nav>
         </header>
 
         <main class="public-scroll">
-          <section id="publicHome" class="public-hero public-page active-public-page" data-public-page="home" aria-label="Axion Process OS front page">
-            <div class="hero-grid" aria-hidden="true">
-              <span class="node node-feed">Media</span>
-              <span class="node node-seed">Seed</span>
-              <span class="node node-reactor">Bioreactor</span>
-              <span class="node node-purify">Purification</span>
-              <span class="node node-fill">Fill</span>
-              <i class="flow flow-a"></i>
-              <i class="flow flow-b"></i>
-              <i class="flow flow-c"></i>
-              <i class="flow flow-d"></i>
-            </div>
-            <div class="public-hero-copy">
-              <div class="hero-badge-row">
-                <span>Axion Process OS</span>
-                <b>Describe · Build · Refine</b>
-              </div>
-              <h1>Build a biomanufacturing plant from a product brief.</h1>
-              <span>Write the plant you want. Axion turns it into an engineering review workspace with equipment, streams, balances, scheduling, CFD-style transport fields, physical boundaries, source-backed assumptions, and LCA/TEA-ready exports.</span>
-            </div>
-            <figure class="hero-product-visual plant-overview-visual" aria-label="Complete Axion biomanufacturing plant overview">
-              <div class="plant-header">
-                <b>Complete production plant</b>
-                <span>Main process · support systems · data outputs</span>
-              </div>
-              <div class="plant-map">
-                <img class="plant-photo" src="./assets/axion-biomanufacturing-suite.png" alt="High-tech biomanufacturing production plant with reactors, utilities, process streams and analytics overlays" />
-                <span class="plant-zone zone-media">Media prep</span>
-                <span class="plant-zone zone-seed">Seed train</span>
-                <span class="plant-zone zone-bioreactor">Production bioreactor hall</span>
-                <span class="plant-zone zone-harvest">Harvest</span>
-                <span class="plant-zone zone-dsp">Purification / DSP</span>
-                <span class="plant-zone zone-fill">Fill + finish</span>
-                <span class="plant-zone zone-qc">QC release</span>
-                <span class="plant-zone support zone-wfi">WFI · clean steam</span>
-                <span class="plant-zone support zone-cip">CIP/SIP</span>
-                <span class="plant-zone support zone-heat">Heat reuse</span>
-                <span class="plant-zone support zone-waste">Wastewater</span>
-                <span class="plant-zone support zone-data">LCA/TEA exports</span>
-                <i class="plant-flow flow-media-seed"></i>
-                <i class="plant-flow flow-seed-br"></i>
-                <i class="plant-flow flow-br-harvest"></i>
-                <i class="plant-flow flow-harvest-dsp"></i>
-                <i class="plant-flow flow-dsp-fill"></i>
-                <i class="plant-flow flow-qc"></i>
-                <i class="plant-flow support-flow flow-wfi"></i>
-                <i class="plant-flow support-flow flow-cip"></i>
-                <i class="plant-flow support-flow flow-heat"></i>
-                <i class="plant-flow support-flow flow-waste"></i>
-                <div class="plant-tech-layer" aria-hidden="true">
-                  <span class="tech-chip chip-ai">AI design check</span>
-                  <span class="tech-chip chip-cfd">CFD oxygen field</span>
-                  <span class="tech-chip chip-tea">TEA/LCA stream</span>
-                  <span class="tech-chip chip-schedule">Schedule live</span>
-                  <i class="pulse-node pulse-a"></i>
-                  <i class="pulse-node pulse-b"></i>
-                  <i class="pulse-node pulse-c"></i>
-                  <i class="pulse-node pulse-d"></i>
-                </div>
-              </div>
-              <div class="plant-legend" aria-label="Plant layer legend">
-                <span><i class="main"></i>Main production</span>
-                <span><i class="support"></i>Support systems</span>
-                <span><i class="data"></i>Reports and decisions</span>
-              </div>
-            </figure>
-            <div class="hero-action-stack">
-              <div class="hero-composer" aria-label="Product brief composer preview">
-                <div class="composer-topline">
-                  <span>What should Axion model?</span>
-                  <b>Prompt-to-process</b>
-                </div>
-                <p>Model a 10,000 L CHO monoclonal antibody process with fed-batch production, Protein A capture, viral inactivation, UF/DF, CIP/SIP, heat recovery, ammonium and lactate boundary checks, pH/osmolality coupling, and transient CFD screening for oxygen and nutrient distribution.</p>
-                <div class="composer-actions">
+          <section id="publicHome" class="public-hero public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
+            <div class="public-minimal-hero">
+              <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real vaccine production facility with a 500-liter stainless-steel bioreactor, tangential-flow filtration, sanitary piping and process controls" />
+              <div class="public-minimal-hero-copy">
+                <p>Axion Process OS</p>
+                <h1>Bioprocess design in one workspace.</h1>
+                <span>Build the flowsheet, run engineering checks, compare costs, and prepare decisions.</span>
+                <div>
                   <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
-                  <button class="public-secondary" type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">See the mAb example</button>
+                  <a href="#how-it-works">See how it works</a>
                 </div>
               </div>
-              <div class="hero-outcome-panel" aria-label="Generated workspace preview">
-                <span>Generated workspace includes</span>
-                <b>76 units</b>
-                <b>81 streams</b>
-                <b>39 boundary checks</b>
-                <b>16 report modules</b>
-              </div>
-              <div class="hero-process-ribbon" aria-label="Animated generated process">
-                <span>Media</span>
-                <i></i>
-                <span>Seed</span>
-                <i></i>
-                <span class="process-core">Bioreactor</span>
-                <i></i>
-                <span>Purification</span>
-                <i></i>
-                <span>Fill</span>
-              </div>
-              <div class="prompt-suggestions" aria-label="Example process prompts">
-                <button type="button" data-public-target="loginPanel">Cultured meat pilot plant</button>
-                <button type="button" data-public-target="loginPanel">Penicillin fermentation</button>
-                <button type="button" data-public-target="publicPlatform" data-public-detail="mab-overview">Antibody GMP facility</button>
-                <button type="button" data-public-target="loginPanel">Wastewater + heat reuse</button>
-              </div>
-              <div class="hero-trust-strip" aria-label="Axion workspace highlights">
-                <span><strong>120+</strong> equipment items</span>
-                <span><strong>210</strong> equations</span>
-                <span><strong>LCA/TEA</strong> exports</span>
-                <span><strong>ICS 71.120</strong> mapped</span>
-              </div>
             </div>
+
+            <section id="how-it-works" class="public-minimal-workflow" aria-label="How Axion works">
+              <header>
+                <p>One connected model</p>
+                <h2>From process idea to engineering decision.</h2>
+              </header>
+              <div class="public-minimal-steps">
+                <article><span>01</span><h3>Describe</h3><p>Define the product, scale, organism, and constraints.</p></article>
+                <article><span>02</span><h3>Build</h3><p>Edit equipment, streams, utilities, and schedules.</p></article>
+                <article><span>03</span><h3>Refine</h3><p>Review balances, CFD, economics, LCA, and risk.</p></article>
+              </div>
+            </section>
+
+            <section class="public-minimal-views" aria-label="Axion product views">
+              <article>
+                <img src="./assets/photography/process-skid.jpg" alt="Real stainless-steel industrial process skid with piping, pumps and instrumentation" />
+                <div><p>Model the plant</p><h2>Equipment and streams stay connected.</h2><span>Move from the complete production route to individual units, operating data, and physical limits.</span></div>
+              </article>
+              <article>
+                <img src="./assets/photography/stainless-vessel.jpg" alt="Close view of a real stainless-steel industrial process vessel" />
+                <div><p>Evaluate the design</p><h2>Physics and economics in the same model.</h2><span>Inspect scale-up, scheduling, CFD, mass and energy balances, costs, and downloadable reports.</span></div>
+              </article>
+            </section>
+
+            <section class="public-minimal-modules" aria-label="Axion core modules">
+              <div><span>Process</span><strong>Flowsheets and equipment</strong></div>
+              <div><span>Simulate</span><strong>Balances, schedules, CFD</strong></div>
+              <div><span>Decide</span><strong>TEA, LCA, reports</strong></div>
+              <button class="public-primary" type="button" data-public-target="loginPanel">Start modelling</button>
+            </section>
+
+            <footer class="public-minimal-footer">
+              <span>Axion Process OS</span>
+              <small>Hero: CC1984USA / Wikimedia Commons, CC BY-SA 4.0. Additional photography: Marcelo Guarnieri and Crystal Kwok / Unsplash.</small>
+            </footer>
           </section>
 
           <section class="public-canvas-story public-page active-public-page" data-public-page="home" aria-label="Axion product canvas preview">
@@ -960,129 +894,43 @@
           <section id="publicPricing" class="public-section public-pricing public-page" data-public-page="pricing">
             <div class="section-heading">
               <p>Pricing</p>
-              <h2>Professional pricing for serious process-engineering teams.</h2>
-            </div>
-            <div class="public-visual-pair" aria-label="Pricing product visuals">
-              <figure class="explain-visual visual-value-map">
-                <figcaption><b>What the licence unlocks</b><span>The price is tied to usable engineering output, not only access.</span></figcaption>
-                <div class="value-stack">
-                  <span>Private projects</span><span>Process models</span><span>CFD screening</span><span>LCA/TEA exports</span><span>Collaboration</span>
-                </div>
-              </figure>
-              <figure class="explain-visual visual-plan-map">
-                <figcaption><b>Scale with the team</b><span>Plans are structured by workspace depth, governance needs, integrations, and support level.</span></figcaption>
-                <div class="plan-bars">
-                  <span style="--h:34%;"><b>Academic</b></span>
-                  <span style="--h:48%;"><b>Pro</b></span>
-                  <span style="--h:64%;"><b>Team</b></span>
-                  <span style="--h:82%;"><b>Partner</b></span>
-                  <span style="--h:96%;"><b>Enterprise</b></span>
-                </div>
-              </figure>
-            </div>
-            <div class="pricing-intro">
-              <p>Choose the workspace level that matches how your team models, reviews, and improves biomanufacturing processes. Team and enterprise access can include onboarding, private model libraries, integrations, and governance support.</p>
+              <h2>Choose the workspace that fits your team.</h2>
             </div>
             <div class="pricing-grid" aria-label="Axion pricing plans">
               <article>
-                <span>Academic Individual</span>
-                <h3>Request access</h3>
-                <p>for students and researchers</p>
+                <span>Academic</span>
+                <h3>Research workspace</h3>
                 <ul>
-                  <li>Learning workspace</li>
-                  <li>Core process builder</li>
-                  <li>Example models and downloads</li>
-                  <li>Academic-use license</li>
+                  <li>Process builder and simulation</li>
+                  <li>Examples and engineering exports</li>
+                  <li>Academic-use licence</li>
                 </ul>
               </article>
               <article class="pricing-featured">
-                <span>Professional Individual</span>
-                <h3>Professional access</h3>
-                <p>for advanced modelling work</p>
+                <span>Professional</span>
+                <h3>Private modelling workspace</h3>
                 <ul>
-                  <li>Full private workspace access</li>
-                  <li>Bioprocess flowsheets and equipment library</li>
-                  <li>Balances, CFD screening, AI help, uncertainty tools</li>
-                  <li>Entry simulation credits for scenario runs</li>
-                  <li>Downloadable stream, LCA, TEA, SVG, cost, and equation reports</li>
+                  <li>Full equipment and process library</li>
+                  <li>Balances, CFD, scheduling, TEA and LCA</li>
+                  <li>Private projects and downloadable reports</li>
                 </ul>
               </article>
               <article>
-                <span>Academic Department</span>
-                <h3>Department plan</h3>
-                <p>for teaching and lab groups</p>
+                <span>Enterprise</span>
+                <h3>Team and site deployment</h3>
                 <ul>
-                  <li>Teaching and lab licences</li>
-                  <li>Shared educational process models</li>
-                  <li>Course and project support</li>
-                  <li>Academic discount structure</li>
-                </ul>
-              </article>
-              <article>
-                <span>Small Team</span>
-                <h3>Team plan</h3>
-                <p>for shared process workspaces</p>
-                <ul>
-                  <li>Multiple users and project workspaces</li>
-                  <li>Supplier and technical-review exports</li>
-                  <li>Scale-up and readiness modules</li>
-                  <li>Vertical modules for cultivated meat, fermentation, mAbs, utilities, wastewater</li>
-                  <li>Onboarding workflow</li>
-                </ul>
-              </article>
-              <article>
-                <span>Engineering Partner</span>
-                <h3>Partner plan</h3>
-                <p>for multi-project delivery teams</p>
-                <ul>
-                  <li>Team process engineering workspace</li>
-                  <li>Client project libraries and model reuse</li>
-                  <li>Version comparison, audit trail, API handoffs</li>
-                  <li>Premium support, simulation credits, and implementation support</li>
-                </ul>
-              </article>
-              <article>
-                <span>Enterprise Site</span>
-                <h3>Custom agreement</h3>
-                <p>for governed site deployment</p>
-                <ul>
-                  <li>Site deployment and governance</li>
-                  <li>Custom integrations and governance</li>
-                  <li>Supplier, historian, and model-data workflows</li>
-                  <li>Private model libraries, private cloud or on-prem options</li>
-                  <li>Global enterprise access and support options</li>
+                  <li>Collaboration and model libraries</li>
+                  <li>Integrations, governance and support</li>
+                  <li>Private cloud or on-premise options</li>
                 </ul>
               </article>
             </div>
             <div class="pricing-note">
-              <strong>What is included?</strong>
-              <p>Paid plans include the core process workspace: visual plant logic, equipment, streams, equations, LCA/TEA handoff exports, downloadable visuals, uncertainty-ready reports, and explainable technical recommendations. Higher tiers add collaboration, governance, integrations, model libraries, support, cloud runs, private deployment, and enterprise access control.</p>
-              <button class="public-primary" type="button" data-public-target="loginPanel">Open private workspace</button>
+              <button class="public-primary" type="button" data-public-target="loginPanel">Request access</button>
             </div>
           </section>
 
           <section id="loginPanel" class="public-section public-login public-page" data-public-page="login">
-            <div class="section-heading access-heading">
-              <p>Secure access</p>
-              <h2>Sign in if you already have access. Activate a license if you do not.</h2>
-            </div>
-            <div class="paywall-status" aria-label="Axion paywall status">
-              <article>
-                <span>01</span>
-                <strong>Existing users</strong>
-                <p>Sign in with a configured workspace account or activated license.</p>
-              </article>
-              <article>
-                <span>02</span>
-                <strong>New users</strong>
-                <p>Checkout creates a license and unlocks the workspace after payment.</p>
-              </article>
-              <article>
-                <span>03</span>
-                <strong>Workspace</strong>
-                <p>Projects, datasets, Python runs, reports and collaborators stay behind login.</p>
-              </article>
-            </div>
             <div class="access-panel">
               <form id="loginForm" class="login-card access-card access-primary-card">
                 <div class="login-brand">
@@ -1092,7 +940,7 @@
                     <h1>Sign in to Axion</h1>
                   </div>
                 </div>
-                <p class="access-copy">Use your assigned workspace credentials to continue modelling, simulating, and improving biochemical production systems.</p>
+                <p class="access-copy">Continue to your process workspace.</p>
                 <label>
                   <span>User</span>
                   <input id="loginUser" autocomplete="username" placeholder="Username" />
@@ -1110,17 +958,16 @@
                   <small id="googleLoginStatus">Checking sign-in options.</small>
                 </div>
                 <p id="loginError" class="login-error" role="alert"></p>
-                <small>Private workspaces, projects, saved models, billing state, and collaboration permissions are handled by the backend.</small>
               </form>
               <form id="checkoutForm" class="access-card checkout-card">
                 <div class="checkout-header">
-                  <p>Paywall</p>
-                  <h3>Activate licensed access</h3>
+                  <p>New workspace</p>
+                  <h3>Start with Axion</h3>
                 </div>
-                <p class="access-copy">New users unlock Axion through hosted checkout. The backend records the order, activates the license after successful payment, and then allows login.</p>
+                <p class="access-copy">Create a licensed workspace through secure checkout.</p>
                 <div class="checkout-summary">
-                  <strong>Axion Pro · Professional Individual</strong>
-                  <span>Annual SaaS access for the private modelling workspace. Team, partner, and enterprise plans use managed onboarding.</span>
+                  <strong>Axion Pro</strong>
+                  <span>Annual access to the private modelling workspace.</span>
                 </div>
                 <label>
                   <span>Name</span>
@@ -1136,7 +983,6 @@
                 </label>
                 <button class="login-button checkout-button" type="submit">Activate access</button>
                 <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
-                <small>Payments are handled by Stripe Checkout. Without Stripe credentials, the backend shows setup instructions instead of silently failing.</small>
               </form>
             </div>
           </section>
