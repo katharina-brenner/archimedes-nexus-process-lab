@@ -12277,6 +12277,7 @@ const publicPageTargets = {
   publicPlatform: "platform",
   publicWorkflow: "workflow",
   publicEcosystem: "ecosystem",
+  publicReadiness: "readiness",
   publicReviews: "reviews",
   publicPricing: "pricing",
   loginPanel: "login",
@@ -12634,7 +12635,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", reviews: "publicReviews", pricing: "publicPricing", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", readiness: "publicReadiness", professional: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;

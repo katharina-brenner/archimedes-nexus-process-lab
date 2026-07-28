@@ -164,6 +164,7 @@ function publicConfig() {
       academicSourcesEndpoint: "/api/sources/academic",
       dataArchitectureEndpoint: "/api/data/architecture",
       backendProcessesEndpoint: "/api/backend/processes",
+      professionalReadinessEndpoint: "/api/professional-readiness",
       serviceStatusEndpoint: "/api/services/status",
       serviceProbeEndpoint: "/api/services/{openai|supabase|stripe|cfd}/probe",
       auditEndpoint: "/api/audit",
@@ -283,6 +284,73 @@ function serviceStatusFromReadiness() {
         label: item.label,
         missing: item.missing,
       })),
+  };
+}
+
+function professionalWebAppReadiness() {
+  return {
+    generatedAt: new Date().toISOString(),
+    productName: config.productName,
+    currentStage: "local engineering prototype with production-ready scaffolds",
+    summary: "Axion has a serious product surface and a growing backend, but a professional SaaS web app also needs hosted infrastructure, durable data, verified payments, identity, monitoring, operational security, and validated compute services.",
+    alreadyImplemented: [
+      {
+        area: "Product experience",
+        details: "Public site, private workspace, process builder, equipment and stream editing, CFD screening, scheduling, economics, LCA/TEA exports, downloads, and command-based process changes.",
+      },
+      {
+        area: "Backend API",
+        details: "Node API for login, checkout handoff, projects, versions, collaborators, datasets, connectors, Python model runs, CFD jobs, audit events, provider status, and provider probes.",
+      },
+      {
+        area: "Production scaffolds",
+        details: "Supabase/Postgres adapter, Stripe webhook path, Google token verification, Resend/SMTP invites, Dockerfiles, Render blueprint, Next.js BFF adapter, and CFD worker contract.",
+      },
+    ],
+    stillMissingBeforeProfessionalSaaS: [
+      {
+        area: "Identity and security",
+        required: "Production OAuth, role-based access, password reset or passwordless auth, invite acceptance, session rotation, admin protection, secret management, rate limits, and security headers.",
+        currentStatus: config.googleClientId ? "partially configured" : "needs provider setup",
+      },
+      {
+        area: "Persistent data",
+        required: "Real Supabase/Postgres project, RLS policy review, object storage for uploads, backups, retention policy, account deletion, and migration scripts.",
+        currentStatus: supabaseConfigured() ? "configured" : "needs provider setup",
+      },
+      {
+        area: "Billing",
+        required: "Stripe live mode, product/price, webhook signing secret, subscription lifecycle, invoices, failed-payment handling, VAT/tax review, and customer portal.",
+        currentStatus: config.stripeSecretKey ? "partially configured" : "needs provider setup",
+      },
+      {
+        area: "Deployment and domain",
+        required: "Public HTTPS backend, custom domain, DNS, TLS, environment secrets, deploy previews, production smoke tests, rollback, and uptime monitoring.",
+        currentStatus: config.appBaseUrl.startsWith("https://") ? "partially configured" : "needs public host/domain",
+      },
+      {
+        area: "AI and compute",
+        required: "OpenAI project with billing/quota, usage limits, prompt/operation safety, real worker queue, retry/timeout handling, and observability.",
+        currentStatus: config.openaiApiKey ? "key present; quota must be active" : "needs provider setup",
+      },
+      {
+        area: "Validated CFD",
+        required: "OpenFOAM/COMSOL/STAR-CCM+ worker, geometry generation, meshing, MRF/turbulence models, residual criteria, field storage, and validation against measured kLa/mixing-time data.",
+        currentStatus: config.cfdWorkerUrl ? "worker configured" : "screening only",
+      },
+      {
+        area: "Operations",
+        required: "Monitoring, logs, alerts, error tracking, audit review, CI/CD gates, dependency updates, vulnerability scanning, backups, incident plan, and support workflow.",
+        currentStatus: existsSync(join(rootDir, ".github", "workflows", "ci.yml")) ? "CI scaffold present" : "needs CI",
+      },
+    ],
+    endpointMap: {
+      readiness: "/api/production-readiness",
+      services: "/api/services/status",
+      probes: "/api/services/{openai|supabase|stripe|cfd}/probe",
+      audit: "/api/audit",
+      smoke: "npm run smoke:production",
+    },
   };
 }
 
@@ -1153,6 +1221,7 @@ function dataArchitectureBlueprint() {
       "Add dataset upload parsing for CSV/XLSX first, then PDF/document extraction as assisted evidence only.",
       "Expose a Python SDK that calls the same REST endpoints used by the frontend.",
     ],
+    professionalReadiness: professionalWebAppReadiness(),
   };
 }
 
@@ -1665,6 +1734,10 @@ async function backendProcesses(req, res) {
     return;
   }
   json(res, 200, backendProcessBlueprint());
+}
+
+async function professionalReadiness(req, res) {
+  json(res, 200, professionalWebAppReadiness());
 }
 
 async function serviceStatus(req, res) {
@@ -3175,6 +3248,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/production-readiness") {
     json(res, 200, productionReadiness());
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/professional-readiness") {
+    await professionalReadiness(req, res);
     return;
   }
   if (req.method === "GET" && pathname === "/api/product") {

@@ -107,10 +107,13 @@ Workspace users are configured through backend environment variables, activated 
 
 The public site presents Axion as a professional process-modelling workspace with platform, workflow, ecosystem, reviews, pricing, and login pages. Customer-facing copy focuses on product capabilities, implementation fit, data governance, and onboarding.
 
+The `Readiness` page explains the difference between the current working prototype and a production SaaS web app: product features are available locally, while real professional operation still depends on hosted infrastructure, persistent database setup, provider secrets, OAuth, payments, email delivery, monitoring, deployment, and validated CFD compute.
+
 ## Backend API
 
 - `GET /api/health` returns production health, storage, payment, Google, and invite-email readiness
 - `GET /api/production-readiness` returns a secret-safe setup checklist for Supabase, Stripe, Google, email, deployment, CFD worker and CI
+- `GET /api/professional-readiness` returns the public-safe professional SaaS gap analysis used by the Readiness page
 - `GET /api/product` lists product and backend configuration
 - `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR Professional Individual annual licence
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license

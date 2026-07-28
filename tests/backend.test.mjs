@@ -77,6 +77,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(product.response.status, 200);
     assert.equal(product.payload.payments.provider, "setup_required");
     assert.match(product.payload.backend.currentStorage, /local JSON/);
+    assert.equal(product.payload.backend.professionalReadinessEndpoint, "/api/professional-readiness");
 
     const health = await jsonFetch(server.baseUrl, "/api/health");
     assert.equal(health.response.status, 200);
@@ -88,6 +89,12 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(Array.isArray(readiness.payload.checks));
     assert.ok(readiness.payload.checks.some((item) => item.key === "stripe"));
     assert.ok(readiness.payload.checks.some((item) => item.key === "nextjs-bff"));
+
+    const professionalReadiness = await jsonFetch(server.baseUrl, "/api/professional-readiness");
+    assert.equal(professionalReadiness.response.status, 200);
+    assert.equal(professionalReadiness.payload.productName, "Axion Process OS");
+    assert.ok(professionalReadiness.payload.alreadyImplemented.some((item) => item.area === "Backend API"));
+    assert.ok(professionalReadiness.payload.stillMissingBeforeProfessionalSaaS.some((item) => item.area === "Deployment and domain"));
 
     const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
@@ -108,6 +115,11 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(processes.response.status, 200);
     assert.ok(processes.payload.processes.some((item) => item.id === "nextjs-bff"));
     assert.ok(processes.payload.deploymentOrder.length >= 4);
+
+    const architecture = await jsonFetch(server.baseUrl, "/api/data/architecture", { token });
+    assert.equal(architecture.response.status, 200);
+    assert.equal(architecture.payload.professionalReadiness.currentStage, "local engineering prototype with production-ready scaffolds");
+    assert.ok(architecture.payload.professionalReadiness.stillMissingBeforeProfessionalSaaS.length >= 6);
 
     const services = await jsonFetch(server.baseUrl, "/api/services/status", { token });
     assert.equal(services.response.status, 200);

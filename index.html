@@ -22,6 +22,7 @@
             <button type="button" data-public-target="publicPlatform">Platform</button>
             <button type="button" data-public-target="publicWorkflow">Workflow</button>
             <button type="button" data-public-target="publicEcosystem">Ecosystem</button>
+            <button type="button" data-public-target="publicReadiness">Readiness</button>
             <button type="button" data-public-target="publicReviews">Reviews</button>
             <button type="button" data-public-target="publicPricing">Pricing</button>
             <button type="button" data-public-target="loginPanel">Login</button>
@@ -763,6 +764,105 @@
                 <h3>Data + Source Layer</h3>
                 <p>Attach company CSV/JSON data, historian exports, supplier assumptions, standards, literature, internal notes, and validation context to the equipment and parameters they affect, so model decisions are easier to defend.</p>
               </article>
+            </div>
+          </section>
+
+          <section id="publicReadiness" class="public-section public-readiness public-page" data-public-page="readiness" aria-label="Professional web application readiness">
+            <div class="section-heading">
+              <p>Professional Web App Readiness</p>
+              <h2>What separates this prototype from a production SaaS product.</h2>
+            </div>
+            <div class="public-visual-pair" aria-label="Professional SaaS readiness visuals">
+              <figure class="explain-visual visual-professional-stack">
+                <figcaption><b>Production architecture</b><span>The app needs a secure hosted backend, durable data, payment, identity, jobs, monitoring, and deployment.</span></figcaption>
+                <div class="professional-stack-map">
+                  <span>Frontend</span>
+                  <i></i>
+                  <span>API core</span>
+                  <i></i>
+                  <span>Postgres</span>
+                  <i></i>
+                  <span>Workers</span>
+                  <i></i>
+                  <span>Monitoring</span>
+                </div>
+                <div class="professional-stack-tags">
+                  <b>HTTPS domain</b>
+                  <b>Stripe</b>
+                  <b>Google OAuth</b>
+                  <b>Email</b>
+                  <b>CFD cluster</b>
+                  <b>Audit</b>
+                </div>
+              </figure>
+              <figure class="explain-visual visual-product-maturity">
+                <figcaption><b>Product maturity</b><span>Axion already has the product surface; production readiness depends on account setup and validated services.</span></figcaption>
+                <div class="maturity-ladder">
+                  <span><b>01</b><em>Working local tool</em></span>
+                  <span><b>02</b><em>Secure backend</em></span>
+                  <span><b>03</b><em>Hosted SaaS</em></span>
+                  <span><b>04</b><em>Validated engineering platform</em></span>
+                </div>
+              </figure>
+            </div>
+            <div class="professional-gap-grid" aria-label="Professional web app comparison">
+              <article class="ready">
+                <span>Already implemented</span>
+                <h3>Product workspace</h3>
+                <p>Public site, private app shell, process builder, equipment library, animated streams, CFD screening, balances, economics, LCA/TEA downloads, project save/load, audit events, command planner, and backend APIs.</p>
+              </article>
+              <article class="partial">
+                <span>Partially implemented</span>
+                <h3>Backend SaaS foundation</h3>
+                <p>Node API, local JSON fallback, Supabase adapter, Stripe checkout, Google token verification, Resend/SMTP invites, provider probes, Docker files, Render blueprint, Next.js BFF, and CFD worker contract exist but need real secrets and hosting.</p>
+              </article>
+              <article class="missing">
+                <span>External setup needed</span>
+                <h3>Production accounts</h3>
+                <p>GitHub write auth, OpenAI billing/quota, Supabase project, Stripe live keys/webhook, Google OAuth client, verified email domain, backend host, DNS domain, TLS, and CFD worker compute cannot be completed by frontend code.</p>
+              </article>
+            </div>
+            <div class="professional-checklist" aria-label="Production SaaS checklist">
+              <article>
+                <h3>Security and identity</h3>
+                <ul>
+                  <li>Real OAuth provider, domain restrictions, role-based access, invite acceptance, password reset, session rotation, and protected admin routes.</li>
+                  <li>Secrets only in the host secret manager; no personal passwords, API keys, or service-role keys in GitHub or browser code.</li>
+                </ul>
+              </article>
+              <article>
+                <h3>Data and collaboration</h3>
+                <ul>
+                  <li>Postgres persistence, object storage for uploaded company data, project ownership, collaborators, version history, audit trail, exports, backups, and deletion policy.</li>
+                  <li>Later: real-time multi-user editing, comments, branches, model diffing, approval states, and enterprise workspaces.</li>
+                </ul>
+              </article>
+              <article>
+                <h3>Payments and onboarding</h3>
+                <ul>
+                  <li>Stripe Checkout, webhook verification, automatic license activation, invoices, subscription lifecycle, failed-payment handling, and customer account state.</li>
+                  <li>Customer-facing pricing should stay simple; operational pricing logic and strategy stay internal.</li>
+                </ul>
+              </article>
+              <article>
+                <h3>Engineering validation</h3>
+                <ul>
+                  <li>Validated source data, measured kinetics, supplier quotes, site utilities, QA review, unit tests, CI, monitoring, error handling, and traceable model assumptions.</li>
+                  <li>CFD needs an OpenFOAM-capable worker or equivalent solver environment, mesh validation, residual criteria, and experimental kLa/mixing-time comparison.</li>
+                </ul>
+              </article>
+            </div>
+            <div class="professional-next-panel">
+              <div>
+                <span>Next move</span>
+                <h3>Axion should present the prototype honestly: impressive model workspace now, production SaaS after provider setup.</h3>
+                <p>The code now exposes readiness endpoints and provider probes so a deployment can prove what is configured. Once GitHub auth, billing, secrets, domain, and worker hosting are active, this can become a real hosted web app rather than a localhost prototype.</p>
+              </div>
+              <div class="professional-next-actions">
+                <button type="button" data-public-target="loginPanel">Open workspace</button>
+                <button type="button" data-public-target="publicEcosystem">See ecosystem</button>
+                <button type="button" data-public-target="publicPricing">See plans</button>
+              </div>
             </div>
           </section>
 
