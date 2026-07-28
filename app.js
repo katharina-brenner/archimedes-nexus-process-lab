@@ -7032,6 +7032,18 @@ function renderSimulationBoard() {
   const bottleneckRows = scheduleBottleneckRows(schedule);
   const plantOccupancyPct = dataUtilizationFromSchedule(schedule);
   const peakBucket = [...scheduleBuckets].sort((a, b) => b.busyResourcePct - a.busyResourcePct)[0] || scheduleBuckets[0];
+  const peakBucketOperationCount = Math.max(
+    1,
+    ...scheduleBuckets.flatMap((bucket) => [
+      bucket.mainOperations,
+      bucket.supportOperations,
+      bucket.cleaningOperations,
+    ]),
+  );
+  const scheduleLaneHeight = (value) => Math.max(
+    6,
+    Math.min(92, Number(value || 0) / peakBucketOperationCount * 92),
+  );
 
   els.simulationBoard.innerHTML = `
     <section class="simulation-summary">
@@ -7104,9 +7116,9 @@ function renderSimulationBoard() {
             ${scheduleBuckets.map((bucket) => `
               <button type="button" data-factory-time="${formatNumber((bucket.startH + bucket.finishH) / 2, 2)}" title="${escapeAttr(`${bucket.bucketLabel}: ${bucket.activeBatches} batches, ${bucket.processOperations} process, ${bucket.cleaningOperations} cleaning, ${formatNumber(bucket.utilityLoadPct, 0)}% utility load`) }">
                 <span>${escapeHtml(bucket.bucketLabel)}</span>
-                <i class="main" style="--h:${Math.max(4, bucket.mainOperations * 13)}%;"></i>
-                <i class="support" style="--h:${Math.max(4, bucket.supportOperations * 13)}%;"></i>
-                <i class="clean" style="--h:${Math.max(4, bucket.cleaningOperations * 18)}%;"></i>
+                <i class="main" style="--h:${scheduleLaneHeight(bucket.mainOperations)}%;"></i>
+                <i class="support" style="--h:${scheduleLaneHeight(bucket.supportOperations)}%;"></i>
+                <i class="clean" style="--h:${scheduleLaneHeight(bucket.cleaningOperations)}%;"></i>
                 <small>${bucket.activeBatches}B</small>
               </button>
             `).join("")}
