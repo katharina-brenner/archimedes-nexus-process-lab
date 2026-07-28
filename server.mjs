@@ -32,8 +32,10 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
+const defaultHost = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+
 const config = {
-  host: process.env.HOST || "127.0.0.1",
+  host: process.env.HOST || defaultHost,
   port: Number(process.env.PORT || 8899),
   productName: process.env.PRODUCT_NAME || "Axion Process OS",
   priceCents: Number(process.env.AXION_PRICE_CENTS || 240000),
@@ -51,7 +53,7 @@ const config = {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean),
-  appBaseUrl: process.env.APP_BASE_URL || `http://${process.env.HOST || "127.0.0.1"}:${process.env.PORT || 8899}`,
+  appBaseUrl: process.env.APP_BASE_URL || `http://${process.env.HOST || defaultHost}:${process.env.PORT || 8899}`,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePriceId: process.env.STRIPE_PRICE_ID || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
@@ -74,6 +76,12 @@ const config = {
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
+
+const staticRootDir = process.env.AXION_STATIC_DIR
+  ? resolve(process.env.AXION_STATIC_DIR)
+  : process.env.NODE_ENV === "production" && existsSync(join(rootDir, "dist", "index.html"))
+    ? join(rootDir, "dist")
+    : rootDir;
 
 const staticTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -3532,14 +3540,14 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
 function serveStatic(req, res, pathname) {
   const requested = pathname === "/" ? "/index.html" : pathname;
   const clean = normalize(decodeURIComponent(requested)).replace(/^(\.\.[/\\])+/, "");
-  const filePath = resolve(rootDir, `.${clean}`);
-  if (!filePath.startsWith(rootDir)) {
+  const filePath = resolve(staticRootDir, `.${clean}`);
+  if (!filePath.startsWith(staticRootDir)) {
     res.writeHead(403);
     res.end("Forbidden");
     return;
   }
   if (!existsSync(filePath)) {
-    const fallback = join(rootDir, "index.html");
+    const fallback = join(staticRootDir, "index.html");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     createReadStream(fallback).pipe(res);
     return;
