@@ -18705,3 +18705,55 @@ body.locked .public-page:not(.active-public-page) {
   font-size: 11px;
   font-weight: 700;
 }
+
+/* Public-site finish: restore the calm, compact Axion presentation on every host. */
+.public-scroll {
+  padding-top: 28px !important;
+  scroll-padding-top: 92px;
+}
+
+.public-hero {
+  min-height: 0 !important;
+  padding-top: 64px !important;
+  padding-bottom: 78px !important;
+  gap: 30px !important;
+  align-content: start !important;
+}
+
+.public-hero-copy {
+  gap: 16px !important;
+}
+
+.public-nav nav button:focus,
+.public-nav nav button:focus-visible,
+.public-nav nav button.active {
+  outline: 2px solid rgba(143, 228, 218, 0.58) !important;
+  outline-offset: 2px;
+  border-color: rgba(143, 228, 218, 0.46) !important;
+  box-shadow: 0 10px 28px rgba(15, 90, 82, 0.14) !important;
+}
+
+@media (max-width: 760px) {
+  .public-scroll {
+    padding-top: 0 !important;
+  }
+
+  .public-hero {
+    padding: 46px 20px 60px !important;
+    gap: 24px !important;
+  }
+
+  .public-hero-copy {
+    gap: 14px !important;
+  }
+
+  .public-hero-copy h1 {
+    font-size: clamp(40px, 11vw, 52px) !important;
+    line-height: 1.02 !important;
+  }
+
+  .public-hero-copy > span {
+    font-size: 17px !important;
+    line-height: 1.55 !important;
+  }
+}
