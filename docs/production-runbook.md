@@ -134,6 +134,20 @@ Recommended first production path:
 ```bash
 curl https://axion-engineering.com/api/health
 curl https://axion-engineering.com/api/production-readiness
+npm run smoke:production
+```
+
+After admin login, use the provider probes:
+
+```bash
+curl -X POST https://axion-engineering.com/api/services/stripe/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://axion-engineering.com/api/services/supabase/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://axion-engineering.com/api/services/openai/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://axion-engineering.com/api/services/cfd/probe \
+  -H "authorization: Bearer $TOKEN"
 ```
 
 GitHub Pages can host a static marketing export, but it cannot run the secure

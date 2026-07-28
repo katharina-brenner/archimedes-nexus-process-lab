@@ -131,6 +131,9 @@ The public site presents Axion as a professional process-modelling workspace wit
 - `POST /api/integrations/:key/actions` runs configure, mapping-test, or export actions for a connector and stores an audit record
 - `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
 - `GET /api/backend/processes` returns the production backend process map, including API core, Next.js BFF, datasets, jobs, billing, OAuth, email and CFD worker responsibilities
+- `GET /api/services/status` returns secret-safe provider status for GitHub, Supabase, Stripe, Google, email, OpenAI and CFD
+- `POST /api/services/:key/probe` runs an admin-only safe live probe for `openai`, `supabase`, `stripe`, or `cfd`
+- `GET /api/audit` returns authenticated audit events, optionally filtered by `projectId`, `type`, and `limit`
 - `POST /api/commands/plan` creates a safe AI/deterministic model-edit plan for Cursor-style process commands
 - `POST /api/commands/:planId/apply` records an applied command as a project version and audit event
 - `POST /api/commands/undo` restores the archived model version behind the last applied command

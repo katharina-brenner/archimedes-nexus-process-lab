@@ -210,6 +210,19 @@ curl https://your-domain/api/product
 curl https://your-domain/api/production-readiness
 ```
 
+After signing in as an admin, verify live provider wiring without exposing secrets:
+
+```bash
+curl -X POST https://your-domain/api/services/stripe/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://your-domain/api/services/supabase/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://your-domain/api/services/openai/probe \
+  -H "authorization: Bearer $TOKEN"
+curl -X POST https://your-domain/api/services/cfd/probe \
+  -H "authorization: Bearer $TOKEN"
+```
+
 Expected:
 
 - `storage` should be `supabase-postgres-documents`
@@ -218,5 +231,6 @@ Expected:
 - `inviteEmailConfigured` should be `true`
 - company CSV/JSON datasets should register through `/api/datasets` and export through `/api/datasets/:id/export`
 - production readiness should show Stripe, Google, email and deployment ready
+- `/api/audit` should show provider probes, login, checkout, project, invite, dataset, simulation, CFD and command events as operational metadata
 
 See `docs/production-runbook.md` for the provider-side account actions and DNS steps.

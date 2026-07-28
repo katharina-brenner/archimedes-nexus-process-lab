@@ -36,5 +36,16 @@ jobs:
       - name: Backend API tests
         run: pnpm test
 
+      - name: Production doctor expected local failure
+        run: |
+          set +e
+          pnpm run doctor
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "Local CI doctor should fail without production secrets."
+            exit 1
+          fi
+          echo "Doctor correctly reports missing production secrets in CI."
+
       - name: Static build
         run: pnpm run build

@@ -164,6 +164,9 @@ function publicConfig() {
       academicSourcesEndpoint: "/api/sources/academic",
       dataArchitectureEndpoint: "/api/data/architecture",
       backendProcessesEndpoint: "/api/backend/processes",
+      serviceStatusEndpoint: "/api/services/status",
+      serviceProbeEndpoint: "/api/services/{openai|supabase|stripe|cfd}/probe",
+      auditEndpoint: "/api/audit",
       commandPlanEndpoint: "/api/commands/plan",
       commandApplyEndpoint: "/api/commands/{planId}/apply",
       commandUndoEndpoint: "/api/commands/undo",
@@ -210,6 +213,76 @@ function productionReadiness() {
     ready: checks.every((item) => item.ready || item.key === "cfd-worker" || item.key === "nextjs-bff"),
     checks,
     note: "CFD worker is optional for current screening jobs, but required for validated external CFD. Secret values are never returned.",
+  };
+}
+
+function serviceStatusFromReadiness() {
+  const readiness = productionReadiness();
+  const byKey = new Map(readiness.checks.map((item) => [item.key, item]));
+  const publicUrl = config.appBaseUrl.startsWith("https://") ? config.appBaseUrl : "";
+  return {
+    generatedAt: new Date().toISOString(),
+    productName: config.productName,
+    publicUrl,
+    requiredReady: readiness.ready,
+    services: [
+      {
+        key: "github",
+        label: "GitHub repository publishing",
+        configured: false,
+        status: "blocked-by-local-auth",
+        safeDetail: "Local git push returned GitHub 403. Re-authenticate local GitHub credentials or reconnect the GitHub app with contents-write permission.",
+      },
+      {
+        key: "supabase",
+        label: "Supabase/Postgres",
+        configured: byKey.get("postgres")?.ready || false,
+        status: byKey.get("postgres")?.ready ? "ready" : "missing-secrets",
+        safeDetail: supabaseConfigured() ? `Using ${config.supabaseStateTable} and ${config.supabaseDocumentsTable}` : "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the backend host.",
+      },
+      {
+        key: "stripe",
+        label: "Stripe Checkout/paywall",
+        configured: byKey.get("stripe")?.ready || false,
+        status: byKey.get("stripe")?.ready ? "ready" : "missing-secrets-or-https",
+        safeDetail: config.stripeSecretKey ? "Secret key is present; check STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and APP_BASE_URL." : "Set STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and public APP_BASE_URL.",
+      },
+      {
+        key: "google",
+        label: "Google OAuth",
+        configured: byKey.get("google")?.ready || false,
+        status: byKey.get("google")?.ready ? "ready" : "missing-client-or-https",
+        safeDetail: config.googleClientId ? "Client ID is present; APP_BASE_URL must match the authorized HTTPS origin." : "Create a Google Web Application OAuth Client ID and set GOOGLE_CLIENT_ID.",
+      },
+      {
+        key: "email",
+        label: "Invite email",
+        configured: byKey.get("email")?.ready || false,
+        status: byKey.get("email")?.ready ? "ready" : "missing-email-provider",
+        safeDetail: config.resendApiKey ? "Resend configured." : config.smtpHost ? "SMTP configured." : "Set Resend or SMTP variables on the backend host.",
+      },
+      {
+        key: "openai",
+        label: "OpenAI command planner",
+        configured: byKey.get("ai-command-planner")?.ready || false,
+        status: byKey.get("ai-command-planner")?.ready ? "key-present" : "missing-key",
+        safeDetail: byKey.get("ai-command-planner")?.ready ? "Key is present. Billing/quota must be active in the OpenAI Platform project." : "Set OPENAI_API_KEY on the backend host.",
+      },
+      {
+        key: "cfd-worker",
+        label: "External CFD worker",
+        configured: byKey.get("cfd-worker")?.ready || false,
+        status: byKey.get("cfd-worker")?.ready ? "connected-config-present" : "screening-only",
+        safeDetail: byKey.get("cfd-worker")?.ready ? "CFD worker URL/token are configured; use /api/cfd/jobs for handoff/status." : "Set CFD_WORKER_URL and CFD_WORKER_TOKEN for rigorous external jobs.",
+      },
+    ],
+    nextActions: readiness.checks
+      .filter((item) => !item.ready && !["nextjs-bff"].includes(item.key))
+      .map((item) => ({
+        key: item.key,
+        label: item.label,
+        missing: item.missing,
+      })),
   };
 }
 
@@ -389,6 +462,83 @@ async function stripeRequest(pathname, params = {}, method = "POST") {
     throw new Error(payload.error?.message || `Stripe request failed with status ${response.status}`);
   }
   return payload;
+}
+
+async function openAiHealthProbe() {
+  if (!config.openaiApiKey) return { ok: false, status: "missing-key", detail: "OPENAI_API_KEY is not set." };
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.openaiApiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.openaiModel,
+      input: "Return OK as plain text.",
+      max_output_tokens: 8,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      detail: payload.error?.message || payload.message || `OpenAI probe failed with ${response.status}`,
+    };
+  }
+  return {
+    ok: true,
+    status: "ready",
+    model: config.openaiModel,
+    detail: "OpenAI Responses API accepted a minimal command-planner probe.",
+  };
+}
+
+async function supabaseHealthProbe() {
+  if (!supabaseConfigured()) return { ok: false, status: "missing-secrets", detail: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set." };
+  try {
+    await supabaseRequest(`${config.supabaseStateTable}?id=eq.primary&select=id&limit=1`);
+    return { ok: true, status: "ready", detail: `Postgres REST read succeeded for ${config.supabaseStateTable}.` };
+  } catch (error) {
+    return { ok: false, status: "error", detail: error.message };
+  }
+}
+
+async function stripeHealthProbe() {
+  if (!config.stripeSecretKey) return { ok: false, status: "missing-key", detail: "STRIPE_SECRET_KEY is not set." };
+  try {
+    const account = await stripeRequest("/v1/account", {}, "GET");
+    return {
+      ok: true,
+      status: "ready",
+      detail: `Stripe account reachable${account.country ? ` (${account.country})` : ""}.`,
+      chargesEnabled: Boolean(account.charges_enabled),
+      payoutsEnabled: Boolean(account.payouts_enabled),
+    };
+  } catch (error) {
+    return { ok: false, status: "error", detail: error.message };
+  }
+}
+
+async function cfdWorkerHealthProbe() {
+  if (!config.cfdWorkerUrl || !config.cfdWorkerToken) return { ok: false, status: "screening-only", detail: "CFD_WORKER_URL or CFD_WORKER_TOKEN is not set." };
+  try {
+    const response = await fetch(`${config.cfdWorkerUrl}/health`, {
+      headers: { authorization: `Bearer ${config.cfdWorkerToken}` },
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.message || `CFD worker health failed with ${response.status}`);
+    return {
+      ok: true,
+      status: payload.dryRun ? "dry-run-worker" : "solver-worker",
+      detail: payload.solverAvailable ? `${payload.solver} is available.` : `${payload.solver || "solver"} is not available on the worker PATH.`,
+      worker: payload.worker || "axion-cfd-worker",
+      dryRun: Boolean(payload.dryRun),
+      solverAvailable: Boolean(payload.solverAvailable),
+    };
+  } catch (error) {
+    return { ok: false, status: "error", detail: error.message };
+  }
 }
 
 function verifyStripeSignature(rawBody, signatureHeader) {
@@ -1515,6 +1665,51 @@ async function backendProcesses(req, res) {
     return;
   }
   json(res, 200, backendProcessBlueprint());
+}
+
+async function serviceStatus(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  json(res, 200, serviceStatusFromReadiness());
+}
+
+async function serviceProbe(req, res, serviceKey) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") {
+    json(res, 403, { error: "Admin access required" });
+    return;
+  }
+  const probes = {
+    openai: openAiHealthProbe,
+    supabase: supabaseHealthProbe,
+    stripe: stripeHealthProbe,
+    cfd: cfdWorkerHealthProbe,
+  };
+  const probe = probes[serviceKey];
+  if (!probe) {
+    json(res, 404, { error: "Probe not found", available: Object.keys(probes) });
+    return;
+  }
+  const startedAt = new Date().toISOString();
+  const result = await probe();
+  const db = ensureDbShape(await loadDb());
+  db.audit.unshift({
+    at: startedAt,
+    type: "service.probe",
+    service: serviceKey,
+    ok: Boolean(result.ok),
+    status: result.status,
+    by: sessionPrincipal(session),
+  });
+  await saveDb(db);
+  json(res, 200, {
+    service: serviceKey,
+    checkedAt: new Date().toISOString(),
+    result,
+  });
 }
 
 async function listAcademicSources(req, res) {
@@ -2853,6 +3048,35 @@ async function account(req, res) {
   });
 }
 
+async function listAuditEvents(req, res, query = new URLSearchParams()) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const principal = sessionPrincipal(session);
+  const limit = Math.max(1, Math.min(250, Number(query.get("limit") || 100)));
+  const projectId = query.get("projectId") || "";
+  const type = query.get("type") || "";
+  const allowedProjectIds = new Set(db.projects.filter((project) => canAccessProject(session, project)).map((project) => project.id));
+  const events = db.audit
+    .filter((event) => {
+      if (projectId && event.projectId !== projectId) return false;
+      if (type && event.type !== type) return false;
+      if (session.role === "admin") return true;
+      if (event.projectId) return allowedProjectIds.has(event.projectId);
+      return event.by === principal || event.createdBy === principal;
+    })
+    .slice(0, limit);
+  json(res, 200, {
+    events,
+    limit,
+    filteredBy: { projectId, type },
+    note: "Audit events contain operational metadata only; secret values are never returned.",
+  });
+}
+
 async function listOrders(req, res) {
   const session = verifySession(getBearer(req));
   if (session?.role !== "admin") {
@@ -3041,6 +3265,15 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await backendProcesses(req, res);
     return;
   }
+  if (req.method === "GET" && pathname === "/api/services/status") {
+    await serviceStatus(req, res);
+    return;
+  }
+  const serviceProbeMatch = pathname.match(/^\/api\/services\/([^/]+)\/probe$/);
+  if (serviceProbeMatch && req.method === "POST") {
+    await serviceProbe(req, res, decodeURIComponent(serviceProbeMatch[1]));
+    return;
+  }
   if (req.method === "POST" && pathname === "/api/commands/plan") {
     await createCommandPlan(req, res);
     return;
@@ -3098,6 +3331,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/account") {
     await account(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/audit") {
+    await listAuditEvents(req, res, query);
     return;
   }
   if (req.method === "GET" && pathname === "/api/admin/orders") {

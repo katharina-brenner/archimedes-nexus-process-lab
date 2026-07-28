@@ -109,6 +109,18 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(processes.payload.processes.some((item) => item.id === "nextjs-bff"));
     assert.ok(processes.payload.deploymentOrder.length >= 4);
 
+    const services = await jsonFetch(server.baseUrl, "/api/services/status", { token });
+    assert.equal(services.response.status, 200);
+    assert.ok(services.payload.services.some((item) => item.key === "openai"));
+    assert.ok(services.payload.services.some((item) => item.key === "stripe"));
+    assert.ok(Array.isArray(services.payload.nextActions));
+
+    const missingProbe = await jsonFetch(server.baseUrl, "/api/services/stripe/probe", { token, method: "POST" });
+    assert.equal(missingProbe.response.status, 200);
+    assert.equal(missingProbe.payload.service, "stripe");
+    assert.equal(missingProbe.payload.result.ok, false);
+    assert.match(missingProbe.payload.result.detail, /STRIPE_SECRET_KEY/);
+
     const commandPlan = await jsonFetch(server.baseUrl, "/api/commands/plan", {
       token,
       method: "POST",
@@ -204,6 +216,11 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(exported.payload.project.id, created.payload.project.id);
     assert.ok(Array.isArray(exported.payload.versions));
     assert.ok(Array.isArray(exported.payload.cfdJobs));
+
+    const audit = await jsonFetch(server.baseUrl, "/api/audit?limit=20", { token });
+    assert.equal(audit.response.status, 200);
+    assert.ok(audit.payload.events.some((event) => event.type === "service.probe"));
+    assert.ok(audit.payload.events.some((event) => event.type === "cfd.job.created"));
 
     const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
     assert.match(schema, /create table if not exists public\.axion_state/);
