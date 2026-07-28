@@ -786,17 +786,23 @@ function seedUsers(db) {
     const username = normalizePrincipal(seed.username);
     const email = normalizePrincipal(seed.email || `${username}@local.axion`);
     const existing = db.users.find((user) => normalizePrincipal(user.username) === username || normalizePrincipal(user.email) === email);
-    if (existing) return;
-    db.users.push({
-      id: randomUUID(),
+    const seededUser = {
       username,
       email,
       name: seed.name || username,
       role: seed.role === "admin" ? "admin" : "user",
       paymentExempt: Boolean(seed.paymentExempt),
       passwordHash: userPasswordHash(seed.password),
-      createdAt: new Date().toISOString(),
       status: "active",
+    };
+    if (existing) {
+      Object.assign(existing, seededUser);
+      return;
+    }
+    db.users.push({
+      id: randomUUID(),
+      ...seededUser,
+      createdAt: new Date().toISOString(),
     });
   });
   db.users.forEach((user) => {

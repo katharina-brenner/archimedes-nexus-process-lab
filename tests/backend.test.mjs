@@ -21,6 +21,16 @@ async function startServer() {
       AXION_DATA_DIR: dataHome,
       SESSION_SECRET: "test-session-secret-with-enough-length",
       AXION_ADMIN_PASSWORD: "owner-test-password",
+      AXION_SEED_USERS_JSON: JSON.stringify([
+        {
+          username: "internal-test-user",
+          email: "internal-test-user@local.axion",
+          name: "Internal Test User",
+          password: "internal-test-password",
+          role: "user",
+          paymentExempt: true,
+        },
+      ]),
       AXION_DISABLE_OPENAI: "true",
       STRIPE_SECRET_KEY: "",
       GOOGLE_CLIENT_ID: "",
@@ -113,6 +123,14 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(login.response.status, 200);
     const token = login.payload.token;
     assert.ok(token);
+
+    const internalLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "internal-test-user", password: "internal-test-password" },
+    });
+    assert.equal(internalLogin.response.status, 200);
+    assert.equal(internalLogin.payload.account.name, "Internal Test User");
+    assert.equal(internalLogin.payload.account.billing.paymentExempt, true);
 
     const processes = await jsonFetch(server.baseUrl, "/api/backend/processes", { token });
     assert.equal(processes.response.status, 200);
