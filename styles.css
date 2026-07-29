@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 :root {
   color-scheme: light;
@@ -42,7 +42,7 @@
   --radius-lg: 32px;
   --radius-xl: 42px;
   --ui-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --display-font: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --display-font: "Space Grotesk", Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-family: var(--ui-font);
 }
 
@@ -20641,5 +20641,270 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .public-minimal-views figure img {
     transition: none;
+  }
+}
+
+/* Future-industrial layer: live model telemetry over real production photography. */
+.public-site {
+  --future-accent: #8fe4da;
+  --future-line: rgba(143, 228, 218, 0.28);
+}
+
+.public-nav {
+  border-bottom-color: rgba(143, 228, 218, 0.18) !important;
+  background: rgba(5, 17, 27, 0.9) !important;
+  box-shadow: 0 16px 50px rgba(2, 12, 20, 0.22) !important;
+}
+
+.public-brand strong,
+.public-nav nav a,
+.public-nav nav button,
+.public-minimal-hero-copy h1,
+.public-minimal-workflow h2,
+.public-minimal-steps h3,
+.public-minimal-views h2,
+.public-minimal-modules strong {
+  font-family: var(--display-font) !important;
+}
+
+.public-minimal-hero::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: 72%;
+  width: 1px;
+  pointer-events: none;
+  opacity: 0.62;
+  background: linear-gradient(180deg, transparent 7%, rgba(143, 228, 218, 0.92) 48%, transparent 92%);
+  animation: axionModelScan 9s ease-in-out infinite alternate;
+}
+
+.public-minimal-hero > img {
+  animation: axionPlantDrift 18s ease-in-out infinite alternate;
+}
+
+.public-system-rail {
+  position: absolute;
+  z-index: 3;
+  top: 28px;
+  left: clamp(28px, 6vw, 104px);
+  right: clamp(28px, 5vw, 82px);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(215, 241, 233, 0.24);
+  color: rgba(238, 248, 245, 0.72);
+  font-family: var(--display-font);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.public-system-rail span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(238, 248, 245, 0.72) !important;
+}
+
+.public-system-rail span:first-child {
+  margin-right: auto;
+  color: #f8fcfc !important;
+}
+
+.public-system-rail i,
+.public-hero-fact strong i {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--future-accent);
+  box-shadow: 0 0 0 5px rgba(143, 228, 218, 0.12);
+  animation: axionStatusPulse 2.2s ease-out infinite;
+}
+
+.public-minimal-hero-copy > p {
+  font-family: var(--display-font);
+  font-weight: 600 !important;
+}
+
+.public-minimal-hero-copy h1 {
+  font-weight: 500 !important;
+}
+
+.public-minimal-hero-copy .public-primary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  box-shadow: 0 14px 40px rgba(3, 19, 28, 0.24) !important;
+}
+
+.public-hero-fact {
+  right: clamp(28px, 5vw, 82px);
+  bottom: 28px;
+  grid-template-columns: repeat(3, auto);
+  gap: 0;
+  padding: 0;
+  border-left: 0;
+  border-top: 1px solid rgba(215, 241, 233, 0.3);
+}
+
+.public-hero-fact > div {
+  min-width: 132px;
+  display: grid;
+  gap: 5px;
+  padding: 14px 18px 0;
+  border-left: 1px solid rgba(215, 241, 233, 0.2);
+}
+
+.public-hero-fact > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.public-hero-fact span {
+  font-family: var(--display-font);
+  font-size: 9px;
+}
+
+.public-hero-fact strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--display-font);
+  font-size: 11px;
+}
+
+.public-minimal-workflow {
+  position: relative;
+  border-top: 1px solid rgba(143, 228, 218, 0.16);
+}
+
+.public-minimal-workflow::before {
+  content: "MODEL PIPELINE / 03 PHASES";
+  position: absolute;
+  top: 34px;
+  right: clamp(24px, 5vw, 70px);
+  color: #82bbae;
+  font-family: var(--display-font);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.public-minimal-steps span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(143, 228, 218, 0.42);
+  border-radius: 50%;
+  color: #bfece2 !important;
+  font-family: var(--display-font);
+}
+
+.public-minimal-views figure::before {
+  content: attr(data-layer);
+  position: absolute;
+  z-index: 2;
+  top: 28px;
+  left: clamp(24px, 4vw, 60px);
+  padding: 9px 13px;
+  border: 1px solid rgba(215, 241, 233, 0.26);
+  border-radius: 999px;
+  color: #f8fcfc;
+  background: rgba(5, 18, 27, 0.66);
+  backdrop-filter: blur(12px);
+  font-family: var(--display-font);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.public-minimal-views figcaption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--display-font);
+}
+
+.public-minimal-views figcaption::before {
+  content: "";
+  width: 24px;
+  height: 1px;
+  flex: 0 0 24px;
+  background: var(--future-accent);
+}
+
+.public-minimal-views article > div {
+  position: relative;
+}
+
+.public-minimal-views article > div::after {
+  content: "";
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 12px;
+  height: 12px;
+  border-right: 1px solid rgba(57, 121, 106, 0.44);
+  border-bottom: 1px solid rgba(57, 121, 106, 0.44);
+}
+
+.public-minimal-modules {
+  border-top: 1px solid rgba(143, 228, 218, 0.13);
+}
+
+.public-minimal-modules div {
+  position: relative;
+  padding-left: 18px;
+}
+
+.public-minimal-modules div::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--future-accent);
+}
+
+@keyframes axionModelScan {
+  from { transform: translateX(-7vw); }
+  to { transform: translateX(7vw); }
+}
+
+@keyframes axionPlantDrift {
+  from { transform: scale(1); }
+  to { transform: scale(1.025); }
+}
+
+@keyframes axionStatusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(143, 228, 218, 0.38); }
+  70%, 100% { box-shadow: 0 0 0 7px rgba(143, 228, 218, 0); }
+}
+
+@media (max-width: 900px) {
+  .public-system-rail,
+  .public-minimal-workflow::before,
+  .public-minimal-hero::before {
+    display: none;
+  }
+
+  .public-minimal-views figure::before {
+    top: 20px;
+    left: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-minimal-hero > img,
+  .public-system-rail i,
+  .public-hero-fact strong i {
+    animation: none;
   }
 }

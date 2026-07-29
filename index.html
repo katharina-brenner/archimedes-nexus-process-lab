@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
     <link rel="preload" as="image" href="./assets/photography/industrial-bioprocess-hall.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260729-industrial-identity-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260729-future-industrial-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -29,6 +29,11 @@
           <section id="publicHome" class="public-hero public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
             <div class="public-minimal-hero">
               <img src="./assets/photography/industrial-bioprocess-hall.jpg" alt="Wide view of a real industrial bioprocess hall with stainless-steel reactors, process skids, utilities and operating space" fetchpriority="high" />
+              <div class="public-system-rail" aria-label="Active engineering model">
+                <span><i></i>Model engine online</span>
+                <span>Scenario AX-01</span>
+                <span>Facility resolution</span>
+              </div>
               <div class="public-minimal-hero-copy">
                 <p>Axion Process OS · Industrial bioprocess engineering</p>
                 <h1>Engineer bioprocess plants at industrial scale.</h1>
@@ -38,9 +43,10 @@
                   <a href="#how-it-works">Explore the workflow</a>
                 </div>
               </div>
-              <div class="public-hero-fact">
-                <span>Plant-wide model</span>
-                <strong>Process · utilities · scheduling · economics</strong>
+              <div class="public-hero-fact" aria-label="Model scope">
+                <div><span>Scope</span><strong>Plant-wide</strong></div>
+                <div><span>Layers</span><strong>Process · physics · economics</strong></div>
+                <div><span>State</span><strong><i></i>Editable</strong></div>
               </div>
             </div>
 
@@ -58,7 +64,7 @@
 
             <section class="public-minimal-views" aria-label="Axion product views">
               <article>
-                <figure>
+                <figure data-layer="L01 · PROCESS ARCHITECTURE">
                   <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real vaccine production facility with stainless-steel bioreactors, filtration, sanitary piping and process controls" loading="lazy" />
                   <figcaption>Commercial process architecture · reactors, skids, controls and sanitary transfer</figcaption>
                 </figure>
@@ -74,7 +80,7 @@
                 </div>
               </article>
               <article>
-                <figure>
+                <figure data-layer="L02 · FACILITY OPERATIONS">
                   <img src="./assets/photography/process-skid.jpg" alt="Real stainless-steel industrial process skid with vessels, piping, pumps, valves and instrumentation" loading="lazy" />
                   <figcaption>Operational layer · equipment states, shared resources and production campaigns</figcaption>
                 </figure>
@@ -90,7 +96,7 @@
                 </div>
               </article>
               <article>
-                <figure>
+                <figure data-layer="L03 · ENGINEERING EVIDENCE">
                   <img src="./assets/photography/stainless-vessel.jpg" alt="Detailed view of a real sanitary stainless-steel process vessel with instrumentation and hygienic connections" loading="lazy" />
                   <figcaption>Engineering depth · vessel physics, boundary conditions and process economics</figcaption>
                 </figure>
