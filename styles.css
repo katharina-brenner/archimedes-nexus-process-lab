@@ -20908,3 +20908,219 @@ textarea::placeholder {
     animation: none;
   }
 }
+
+/* System Composer implementation trace. */
+.command-change-ledger {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid rgba(143, 228, 218, 0.2);
+  border-radius: 24px;
+  background: rgba(5, 19, 29, 0.68);
+}
+
+.command-change-ledger > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid rgba(143, 228, 218, 0.14);
+}
+
+.command-change-ledger > header div {
+  display: grid;
+  gap: 3px;
+}
+
+.command-change-ledger > header span,
+.command-trace-location small,
+.command-trace-what small,
+.command-trace-values small {
+  padding: 0 !important;
+  border: 0 !important;
+  color: rgba(205, 224, 228, 0.64) !important;
+  background: transparent !important;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.command-change-ledger > header strong {
+  color: #f7fbfc;
+  font-size: 13px;
+}
+
+.command-change-ledger > header > b {
+  color: #91d9ce;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.command-change-ledger > article {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(199, 225, 232, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.help-panel .help-result .command-trace-index {
+  grid-row: 1 / span 4;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0 !important;
+  border: 1px solid rgba(143, 228, 218, 0.3) !important;
+  border-radius: 50%;
+  color: #bdf5eb !important;
+  background: rgba(143, 228, 218, 0.08) !important;
+  font-family: var(--display-font);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.command-trace-location,
+.command-trace-what {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.command-trace-location b,
+.command-trace-what b {
+  overflow-wrap: anywhere;
+  color: #f7fbfc;
+  font-size: 12px;
+}
+
+.command-trace-what p {
+  margin: 0;
+  color: rgba(211, 226, 230, 0.76);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.command-trace-values {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid rgba(199, 225, 232, 0.1);
+  border-bottom: 1px solid rgba(199, 225, 232, 0.1);
+}
+
+.command-trace-values div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.help-panel .help-result .command-trace-values span,
+.help-panel .help-result .command-trace-values strong {
+  min-width: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow-wrap: anywhere;
+  background: transparent !important;
+  font-size: 12px;
+}
+
+.help-panel .help-result .command-trace-values span {
+  color: rgba(221, 232, 235, 0.7) !important;
+  text-decoration: line-through;
+  text-decoration-color: rgba(221, 232, 235, 0.28);
+}
+
+.help-panel .help-result .command-trace-values strong {
+  color: #bdf5eb !important;
+}
+
+.command-trace-values i {
+  color: rgba(143, 228, 218, 0.72);
+  font-style: normal;
+  text-align: center;
+}
+
+.command-change-ledger > article > button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-color: rgba(143, 228, 218, 0.22);
+  color: #e6f8f4;
+  background: rgba(143, 228, 218, 0.1);
+  font-size: 10px;
+}
+
+.command-history {
+  margin-top: 4px;
+}
+
+.command-history > b {
+  margin-bottom: 2px;
+}
+
+.command-history details {
+  border: 1px solid rgba(199, 225, 232, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.command-history summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.help-panel .help-result .command-history summary span {
+  padding: 0 !important;
+  border: 0 !important;
+  color: rgba(205, 224, 228, 0.58) !important;
+  background: transparent !important;
+  font-size: 9px;
+}
+
+.command-history summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f7fbfc;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-history summary em {
+  color: #91d9ce;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.command-history details p {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: rgba(211, 226, 230, 0.72);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+@media (max-width: 560px) {
+  .command-change-ledger > header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .command-change-ledger > header > b {
+    text-align: left;
+  }
+}

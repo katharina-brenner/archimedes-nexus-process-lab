@@ -13216,33 +13216,62 @@ function commandClampParam(key, value) {
   return Math.max(Number.isFinite(meta.min) ? meta.min : -Infinity, Math.min(Number.isFinite(meta.max) ? meta.max : Infinity, value));
 }
 
+function commandChangeView(type, key = "") {
+  const economicsKeys = new Set(["mediaCostPerL", "feedSupplementCostPerL", "materialLossFactor", "heatRecovery", "recycleFraction"]);
+  const cfdKeys = new Set(["workingVolume", "doSetpoint", "kla", "aeration", "feedRate", "perfusionRate", "glutamine", "lactate", "ammonia", "cellDensity"]);
+  if (type === "equipment" || type === "view" || type === "stream") return "flowsheet";
+  if (type === "cfd" || cfdKeys.has(key)) return "cfd";
+  if (economicsKeys.has(key)) return "economics";
+  if (type === "scale" || type === "template") return "start";
+  return "equations";
+}
+
+function commandFieldLabel(key) {
+  return {
+    cfdLayer: "Displayed CFD field",
+    cfdOxygenInlet: "Gas inlet boundary",
+    cfdNutrientInlet: "Nutrient inlet boundary",
+    cfdTurbulenceModel: "Turbulence model",
+    flowDetail: "Flow visibility",
+    canvasFocus: "Canvas focus",
+  }[key] || commandParamMeta(key).label || key;
+}
+
 function commandSetParam(key, value, changes, reason = "") {
   const meta = commandParamMeta(key);
+  const targetView = commandChangeView("parameter", key);
   const before = Number(state.params[key] ?? meta.value ?? 0);
   const after = commandClampParam(key, Number(value));
   if (!Number.isFinite(after) || Math.abs(before - after) < 1e-9) return;
   state.params[key] = Number(after.toFixed(Math.abs(after) < 10 ? 2 : 1));
   changes.push({
     type: "parameter",
-    where: `Parameters · ${meta.label}`,
+    where: `${pageTitle(targetView)} · ${meta.label}`,
+    what: meta.label,
+    field: key,
     before: `${formatNumber(before, 2)} ${meta.unit || ""}`.trim(),
     after: `${formatNumber(state.params[key], 2)} ${meta.unit || ""}`.trim(),
     reason: reason || `${meta.label} adjusted from command.`,
+    targetView,
   });
 }
 
 function commandHoldParam(key, value, changes, reason = "") {
   const meta = commandParamMeta(key);
+  const targetView = commandChangeView("constraint", key);
   const before = Number(state.params[key] ?? meta.value ?? 0);
   const protectedValue = commandClampParam(key, Number.isFinite(Number(value)) ? Number(value) : before);
   state.params[key] = Number(protectedValue.toFixed(Math.abs(protectedValue) < 10 ? 2 : 1));
   const formatted = `${formatNumber(state.params[key], 2)} ${meta.unit || ""}`.trim();
   changes.push({
     type: "constraint",
-    where: `Protected · ${meta.label}`,
+    where: `${pageTitle(targetView)} · ${meta.label}`,
+    what: `${meta.label} constraint`,
+    field: key,
     before: formatted,
     after: `${formatted} · held`,
     reason: reason || `${meta.label} remains fixed as a protected constraint.`,
+    targetView,
   });
 }
 
@@ -13253,10 +13282,13 @@ function commandSetTopLevel(key, value, changes, label, unit = "") {
   state[key] = after;
   changes.push({
     type: "model",
-    where: label,
+    where: `Model settings · ${label}`,
+    what: label,
+    field: key,
     before: `${formatNumber(before, 2)} ${unit}`.trim(),
     after: `${formatNumber(after, 2)} ${unit}`.trim(),
     reason: `${label} adjusted from command.`,
+    targetView: "overview",
   });
 }
 
@@ -13270,6 +13302,8 @@ function commandNumberNear(lower, terms) {
 
 function commandRelativePercent(lower, terms) {
   const joined = terms.join("|");
+  const explicitTarget = new RegExp(`(?:${joined})[^.]{0,24}\\b(?:to|at|auf)\\s*([0-9]+(?:[.,][0-9]+)?)\\s*%`, "i");
+  if (explicitTarget.test(lower)) return null;
   const decrease = "reduce|decrease|lower|cut|senke|senken|reduziere|reduzieren|verringere|verringern";
   const increase = "increase|raise|improve|grow|erhöhe|erhöhen|steigere|steigern";
   const patterns = [
@@ -13361,9 +13395,12 @@ function commandAddPresetOnce(preset, changes, reason) {
   changes.push({
     type: "equipment",
     where: "Process Builder",
+    what: `Added ${added.length} equipment item${added.length === 1 ? "" : "s"}`,
     before: `${beforeUnits} units`,
-    after: `${state.units.length} units`,
+    after: `${state.units.length} units · ${added.map((unit) => unit.id).join(", ")}`,
     reason,
+    targetView: "flowsheet",
+    targetId: added[0]?.id || "",
   });
   return added.map((unit) => unit.id);
 }
@@ -13376,9 +13413,12 @@ function commandAddUnit(type, changes, reason) {
   changes.push({
     type: "equipment",
     where: `Process Builder · ${added.id}`,
-    before: `${beforeUnits} units`,
-    after: `${state.units.length} units`,
+    what: `Added ${palette.find((item) => item.type === added.type)?.label || added.name || added.type}`,
+    before: "Not present",
+    after: `${added.id} added · ${state.units.length} total units`,
     reason,
+    targetView: "flowsheet",
+    targetId: added.id,
   });
   return [added.id];
 }
@@ -13411,12 +13451,16 @@ function commandSnapshotChanges(before, after, reason) {
     .filter((key) => Math.abs(Number(before.params?.[key] || 0) - Number(after.params?.[key] || 0)) > 1e-9)
     .map((key) => {
       const meta = commandParamMeta(key);
+      const targetView = commandChangeView("parameter", key);
       return {
         type: "parameter",
-        where: `Parameters · ${meta.label}`,
+        where: `${pageTitle(targetView)} · ${meta.label}`,
+        what: meta.label,
+        field: key,
         before: `${formatNumber(Number(before.params?.[key] || 0), 2)} ${meta.unit || ""}`.trim(),
         after: `${formatNumber(Number(after.params?.[key] || 0), 2)} ${meta.unit || ""}`.trim(),
         reason,
+        targetView,
       };
     });
 }
@@ -13430,14 +13474,20 @@ function commandRecord(prompt, guide, before) {
   if (before.streams !== after.streams) impacts.add(`Stream count ${before.streams} -> ${after.streams}`);
   guide.impacts = Array.from(impacts);
   guide.comparison = commandComparison(before, after);
+  guide.changeSummary = {
+    count: (guide.changes || []).length,
+    locations: new Set((guide.changes || []).map((change) => change.where || "Model")).size,
+  };
   const entry = {
     id: `cmd-${Date.now()}`,
     time: new Date().toISOString(),
     prompt,
     title: guide.title,
     changes: guide.changes || [],
+    comparison: guide.comparison || [],
     impacts: guide.impacts || [],
     targetView: guide.targetView,
+    changeSummary: guide.changeSummary,
   };
   if ((guide.changes || []).length || (guide.applied || []).length) state.commandHistory = [entry, ...(state.commandHistory || [])].slice(0, 12);
 }
@@ -13460,7 +13510,16 @@ function applySystemCommand(prompt) {
     loadTemplate(templateKey, lower.includes("keep scale"));
     applied.push(`Loaded ${templates[templateKey].label} as the active product model.`);
     steps.push("The workspace now uses the selected product model, so labels, streams, equipment and reports follow that process instead of the previous template.");
-    changes.push({ type: "model", where: "Product model", before: templates[before.template]?.label || before.template, after: templates[templateKey].label, reason: "Product family changed from the command." });
+    changes.push({
+      type: "template",
+      where: "New Model · Product model",
+      what: "Product model",
+      field: "template",
+      before: templates[before.template]?.label || before.template,
+      after: templates[templateKey].label,
+      reason: "Product family changed from the command.",
+      targetView: "start",
+    });
     state.units.slice(0, 8).forEach((unit) => affectedIds.add(unit.id));
     targetView = "overview";
   }
@@ -13470,7 +13529,16 @@ function applySystemCommand(prompt) {
     applyScale(scaleKey);
     applied.push(`Changed scale to ${scalePresets[scaleKey].label}.`);
     steps.push("Scale-dependent costs, batch size, annual batches and equipment sizing were recalculated.");
-    changes.push({ type: "scale", where: "Model scale", before: scalePresets[before.scale]?.label || before.scale, after: scalePresets[scaleKey].label, reason: "Scale preset selected from the command." });
+    changes.push({
+      type: "scale",
+      where: "New Model · Scale",
+      what: "Scale preset",
+      field: "scale",
+      before: scalePresets[before.scale]?.label || before.scale,
+      after: scalePresets[scaleKey].label,
+      reason: "Scale preset selected from the command.",
+      targetView: "start",
+    });
     needsRender = true;
   }
 
@@ -13591,7 +13659,17 @@ function applySystemCommand(prompt) {
     const beforeFeed = state.cfdNutrientInlet;
     state.cfdNutrientInlet = "feed-ring";
     if (beforeFeed !== state.cfdNutrientInlet) {
-      changes.push({ type: "cfd", where: "CFD · nutrient boundary", before: beforeFeed, after: "feed-ring", reason: "Moved nutrient addition to a distributed feed manifold." });
+      changes.push({
+        type: "cfd",
+        where: "Bioreactor CFD · Nutrient inlet",
+        what: "Nutrient inlet boundary",
+        field: "cfdNutrientInlet",
+        before: beforeFeed,
+        after: "feed-ring",
+        reason: "Moved nutrient addition to a distributed feed manifold.",
+        targetView: "cfd",
+        targetId: cfdBioreactors()[0]?.id || "",
+      });
     }
     state.cfdLayer = "nutrient";
     cfdBioreactors().forEach((unit) => affectedIds.add(unit.id));
@@ -13716,6 +13794,11 @@ function renderHelpResult(payload) {
   if (!els.helpResult) return;
   const guide = payload.guide || payload;
   const recent = (state.commandHistory || []).slice(0, 3);
+  const changes = guide.changes || [];
+  const changeSummary = guide.changeSummary || {
+    count: changes.length,
+    locations: new Set(changes.map((change) => change.where || "Model")).size,
+  };
   els.helpResult.innerHTML = `
     <strong>${guide.title || "Recommended next steps"}</strong>
     ${(guide.applied || []).length ? `<div class="command-applied">${guide.applied.map((item) => `<span class="applied-change">${escapeHtml(item)}</span>`).join("")}</div>` : ""}
@@ -13732,13 +13815,33 @@ function renderHelpResult(payload) {
         `).join("")}
       </section>
     ` : ""}
-    ${(guide.changes || []).length ? `
-      <section class="command-change-list" aria-label="Applied model changes">
-        ${(guide.changes || []).map((change) => `
+    ${changes.length ? `
+      <section class="command-change-ledger" aria-label="Implementation trace">
+        <header>
+          <div>
+            <span>Implementation trace</span>
+            <strong>${changeSummary.count} change${changeSummary.count === 1 ? "" : "s"} across ${changeSummary.locations} location${changeSummary.locations === 1 ? "" : "s"}</strong>
+          </div>
+          <b>Saved with this model version</b>
+        </header>
+        ${changes.map((change, index) => `
           <article>
-            <b>${escapeHtml(change.where || "Model")}</b>
-            <span>${escapeHtml(change.before || "before")} -> ${escapeHtml(change.after || "after")}</span>
-            <small>${escapeHtml(change.reason || "Applied by System Composer.")}</small>
+            <span class="command-trace-index">${String(index + 1).padStart(2, "0")}</span>
+            <div class="command-trace-location">
+              <small>Where</small>
+              <b>${escapeHtml(change.where || "Active model")}</b>
+            </div>
+            <div class="command-trace-what">
+              <small>What changed</small>
+              <b>${escapeHtml(change.what || change.field || change.type || "Model value")}</b>
+              <p>${escapeHtml(change.reason || "Applied by System Composer.")}</p>
+            </div>
+            <div class="command-trace-values">
+              <div><small>Before</small><span>${escapeHtml(change.before ?? "Not set")}</span></div>
+              <i aria-hidden="true">→</i>
+              <div><small>After</small><strong>${escapeHtml(change.after ?? "Not set")}</strong></div>
+            </div>
+            ${change.targetView ? `<button data-help-change-view="${escapeAttr(change.targetView)}" data-help-change-id="${escapeAttr(change.targetId || "")}" type="button">Show in ${escapeHtml(pageTitle(change.targetView))}</button>` : ""}
           </article>
         `).join("")}
       </section>
@@ -13751,8 +13854,17 @@ function renderHelpResult(payload) {
     ${(guide.commands || []).length ? `<div>${guide.commands.map((command) => `<button data-help-command="${escapeAttr(command)}" type="button">${escapeHtml(command)}</button>`).join("")}</div>` : ""}
     ${recent.length ? `
       <section class="command-history">
-        <b>Recent changes</b>
-        ${recent.map((entry) => `<button data-help-command="${escapeAttr(entry.prompt)}" type="button">${escapeHtml(entry.prompt)}</button>`).join("")}
+        <b>Saved change history</b>
+        ${recent.map((entry) => `
+          <details>
+            <summary>
+              <span>${escapeHtml(new Date(entry.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>
+              <strong>${escapeHtml(entry.prompt)}</strong>
+              <em>${entry.changes?.length || 0} edit${entry.changes?.length === 1 ? "" : "s"}</em>
+            </summary>
+            <p>${escapeHtml(Array.from(new Set((entry.changes || []).map((change) => change.where || "Model"))).join(" · ") || "Navigation or review only")}</p>
+          </details>
+        `).join("")}
       </section>
     ` : ""}
   `;
@@ -14342,7 +14454,18 @@ function applyCommandPlanOperations(prompt, commandPlan) {
         const beforeValue = state[operation.key];
         state[operation.key] = operation.value;
         if (beforeValue !== state[operation.key]) {
-          changes.push({ type: "cfd", where: `CFD · ${operation.key}`, before: beforeValue, after: state[operation.key], reason: operation.reason });
+          const fieldLabel = commandFieldLabel(operation.key);
+          changes.push({
+            type: "cfd",
+            where: `Bioreactor CFD · ${fieldLabel}`,
+            what: fieldLabel,
+            field: operation.key,
+            before: beforeValue,
+            after: state[operation.key],
+            reason: operation.reason,
+            targetView: "cfd",
+            targetId: cfdBioreactors()[0]?.id || "",
+          });
         }
         cfdBioreactors().forEach((unitItem) => affectedIds.add(unitItem.id));
         targetView = targetView || "cfd";
@@ -14360,9 +14483,19 @@ function applyCommandPlanOperations(prompt, commandPlan) {
       needsRender = true;
     }
     if (op === "setCanvas") {
+      const beforeValue = operation.key === "flowDetail" ? state.flowDetail : state.canvasFocus;
       if (operation.key === "flowDetail") state.flowDetail = String(operation.value || "full");
       if (operation.key === "canvasFocus") state.canvasFocus = String(operation.value || "all");
-      changes.push({ type: "view", where: `Canvas · ${operation.key}`, before: "previous", after: String(operation.value || ""), reason: operation.reason });
+      changes.push({
+        type: "view",
+        where: `Process Builder · ${operation.key}`,
+        what: operation.key === "flowDetail" ? "Flow visibility" : "Canvas focus",
+        field: operation.key,
+        before: String(beforeValue || "not set"),
+        after: String(operation.value || ""),
+        reason: operation.reason,
+        targetView: "flowsheet",
+      });
       targetView = "flowsheet";
       needsRender = true;
     }
@@ -14408,7 +14541,7 @@ function applyCommandPlanOperations(prompt, commandPlan) {
   return guide;
 }
 
-async function saveAppliedCommandPlan(commandPlanId, summary = commandModelSummary()) {
+async function saveAppliedCommandPlan(commandPlanId, summary = commandModelSummary(), changeLog = []) {
   if (!commandPlanId) return null;
   try {
     return await apiRequest(`/api/commands/${encodeURIComponent(commandPlanId)}/apply`, {
@@ -14417,6 +14550,7 @@ async function saveAppliedCommandPlan(commandPlanId, summary = commandModelSumma
         projectId: state.currentProjectId || "",
         modelStateAfter: exportCurrentModelState(),
         summary,
+        changeLog,
       }),
     });
   } catch {
@@ -14491,7 +14625,7 @@ async function applyCommandFromUi(prompt, options = {}) {
       }),
     });
     guide = applyCommandPlanOperations(command, payload.commandPlan);
-    const applied = await saveAppliedCommandPlan(payload.commandPlan.id, commandModelSummary());
+    const applied = await saveAppliedCommandPlan(payload.commandPlan.id, commandModelSummary(), guide.changes || []);
     if (applied?.versionId) guide.assumptions = [...(guide.assumptions || []), `Saved version: ${applied.versionId}`];
   } catch {
     guide = applySystemCommand(command);
@@ -14682,6 +14816,23 @@ function bindAuth() {
     const undoButton = event.target.closest("[data-help-undo]");
     if (undoButton) {
       undoLastCommand();
+      return;
+    }
+    const changeLocation = event.target.closest("[data-help-change-view]");
+    if (changeLocation) {
+      const targetId = changeLocation.dataset.helpChangeId || "";
+      if (targetId && (state.units.some((item) => item.id === targetId) || state.streams.some((item) => item.id === targetId))) {
+        state.selectedId = targetId;
+        state.commandHighlights = [targetId];
+      }
+      setView(changeLocation.dataset.helpChangeView);
+      if (changeLocation.dataset.helpChangeView === "flowsheet") {
+        renderCanvas();
+        window.requestAnimationFrame(() => {
+          document.querySelector(`.unit[data-id="${CSS.escape(targetId)}"]`)?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+        });
+      }
+      showToast(`Opened ${pageTitle(changeLocation.dataset.helpChangeView)}`);
       return;
     }
     const command = event.target.closest("[data-help-command]");

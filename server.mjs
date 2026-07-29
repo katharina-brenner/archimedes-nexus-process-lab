@@ -1679,6 +1679,8 @@ function deterministicCommandPlan(prompt, context = {}) {
   };
   const relativePercent = (terms) => {
     const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const explicitTarget = new RegExp(`(?:${escaped})[^.]{0,24}\\b(?:to|at|auf)\\s*([0-9]+(?:[.,][0-9]+)?)\\s*%`, "i");
+    if (explicitTarget.test(lower)) return null;
     const decrease = "reduce|decrease|lower|cut|senke|senken|reduziere|reduzieren|verringere|verringern";
     const increase = "increase|raise|improve|grow|erhöhe|erhöhen|steigere|steigern";
     const patterns = [
@@ -1934,6 +1936,19 @@ async function applyCommandPlan(req, res, planId) {
     return;
   }
   const body = await parseBody(req);
+  const changeLog = Array.isArray(body.changeLog)
+    ? body.changeLog.slice(0, 100).map((change) => ({
+      type: String(change.type || "model").slice(0, 80),
+      where: String(change.where || "Active model").slice(0, 240),
+      what: String(change.what || change.field || "Model value").slice(0, 240),
+      field: String(change.field || "").slice(0, 120),
+      before: String(change.before ?? "Not set").slice(0, 500),
+      after: String(change.after ?? "Not set").slice(0, 500),
+      reason: String(change.reason || "").slice(0, 800),
+      targetView: String(change.targetView || "").slice(0, 80),
+      targetId: String(change.targetId || "").slice(0, 120),
+    }))
+    : [];
   const db = ensureDbShape(await loadDb());
   const record = db.commandPlans.find((item) => item.id === planId);
   if (!record) {
@@ -1947,6 +1962,7 @@ async function applyCommandPlan(req, res, planId) {
   const now = new Date().toISOString();
   let versionId = "";
   let undoVersionId = "";
+  let changeSet = null;
   const projectId = String(record.projectId || body.projectId || "");
   if (projectId && body.modelStateAfter) {
     const project = db.projects.find((item) => item.id === projectId);
@@ -1974,7 +1990,10 @@ async function applyCommandPlan(req, res, planId) {
       branchId: branch.id,
       branchName: branch.name,
       parentVersionId,
+      changeLog,
     };
+    changeSet = summarizeVersionDiff(previous || {}, payload);
+    payload.changeSet = changeSet;
     await writeProjectModel(projectId, payload);
     await writeArchivedVersion(projectId, versionId, payload);
     branch.headVersionId = versionId;
@@ -1992,6 +2011,8 @@ async function applyCommandPlan(req, res, planId) {
       branchId: branch.id,
       branchName: branch.name,
       parentVersionId,
+      changeLog,
+      changeSet,
     });
     record.parentVersionId = parentVersionId;
   }
@@ -2000,11 +2021,13 @@ async function applyCommandPlan(req, res, planId) {
   record.appliedBy = sessionPrincipal(session);
   record.projectId = projectId;
   record.resultSummary = body.summary || {};
+  record.changeLog = changeLog;
+  record.changeSet = changeSet;
   record.versionId = versionId;
   record.undoVersionId = undoVersionId;
   db.audit.unshift({ at: now, type: "command.plan.applied", planId, projectId, versionId, by: sessionPrincipal(session) });
   await saveDb(db);
-  json(res, 200, { commandPlan: record, versionId });
+  json(res, 200, { commandPlan: record, versionId, changeLog, changeSet });
 }
 
 async function undoCommandPlan(req, res) {

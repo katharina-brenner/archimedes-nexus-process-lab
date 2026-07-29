@@ -197,7 +197,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     });
     assert.equal(commandPlan.response.status, 201);
     assert.equal(commandPlan.payload.commandPlan.status, "planned");
-    assert.ok(commandPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "setParam" && operation.key === "workingVolume"));
+    assert.ok(commandPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "setParam" && operation.key === "workingVolume" && operation.value === 70));
 
     const mediaCostPlan = await jsonFetch(server.baseUrl, "/api/commands/plan", {
       token,
@@ -235,10 +235,23 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
         projectId: created.payload.project.id,
         modelStateAfter: { template: "culturedMeat", scale: "pilot", params: { workingVolume: 70 }, units: [{ id: "BR-101" }], streams: [] },
         summary: { units: 1, streams: 0, command: "working volume 70" },
+        changeLog: [{
+          type: "parameter",
+          where: "Bioreactor CFD · Working volume",
+          what: "Working volume",
+          field: "workingVolume",
+          before: "72 %",
+          after: "70 %",
+          targetView: "cfd",
+          targetId: "BR-101",
+        }],
       },
     });
     assert.equal(commandApply.response.status, 200);
     assert.ok(commandApply.payload.versionId);
+    assert.equal(commandApply.payload.changeLog[0].where, "Bioreactor CFD · Working volume");
+    assert.equal(commandApply.payload.changeSet.summary.parameterChanges, 1);
+    assert.equal(commandApply.payload.commandPlan.changeLog[0].after, "70 %");
 
     const projectWithHistory = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}`, { token });
     assert.equal(projectWithHistory.response.status, 200);
