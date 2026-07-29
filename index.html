@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axion Process OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260729-helper-centering-v1" />
+    <link rel="preload" as="image" href="./assets/photography/industrial-bioprocess-hall.jpg" />
+    <link rel="stylesheet" href="./styles.css?v=20260729-industrial-identity-v1" />
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -27,38 +28,82 @@
         <main class="public-scroll">
           <section id="publicHome" class="public-hero public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
             <div class="public-minimal-hero">
-              <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real vaccine production facility with a 500-liter stainless-steel bioreactor, tangential-flow filtration, sanitary piping and process controls" />
+              <img src="./assets/photography/industrial-bioprocess-hall.jpg" alt="Wide view of a real industrial bioprocess hall with stainless-steel reactors, process skids, utilities and operating space" fetchpriority="high" />
               <div class="public-minimal-hero-copy">
-                <p>Axion Process OS</p>
-                <h1>Bioprocess design in one workspace.</h1>
-                <span>Build the flowsheet, run engineering checks, compare costs, and prepare decisions.</span>
+                <p>Axion Process OS · Industrial bioprocess engineering</p>
+                <h1>Engineer bioprocess plants at industrial scale.</h1>
+                <span>Design the plant, test operating scenarios, and prepare investment-grade engineering decisions in one connected model.</span>
                 <div>
-                  <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
-                  <a href="#how-it-works">See how it works</a>
+                  <button id="openLoginHero" class="public-primary" type="button">Enter workspace</button>
+                  <a href="#how-it-works">Explore the workflow</a>
                 </div>
+              </div>
+              <div class="public-hero-fact">
+                <span>Plant-wide model</span>
+                <strong>Process · utilities · scheduling · economics</strong>
               </div>
             </div>
 
             <section id="how-it-works" class="public-minimal-workflow" aria-label="How Axion works">
               <header>
                 <p>One connected model</p>
-                <h2>From process idea to engineering decision.</h2>
+                <h2>From product brief to operating plant.</h2>
               </header>
               <div class="public-minimal-steps">
-                <article><span>01</span><h3>Describe</h3><p>Define the product, scale, organism, and constraints.</p></article>
-                <article><span>02</span><h3>Build</h3><p>Edit equipment, streams, utilities, and schedules.</p></article>
-                <article><span>03</span><h3>Refine</h3><p>Review balances, CFD, economics, LCA, and risk.</p></article>
+                <article><span>01</span><h3>Describe</h3><p>Set the product, scale, biology, quality target, and facility constraints.</p></article>
+                <article><span>02</span><h3>Build</h3><p>Connect production equipment, support systems, utilities, cleaning, and schedules.</p></article>
+                <article><span>03</span><h3>Refine</h3><p>Resolve balances, capacity, CFD risk, economics, LCA, and design decisions.</p></article>
               </div>
             </section>
 
             <section class="public-minimal-views" aria-label="Axion product views">
               <article>
-                <img src="./assets/photography/process-skid.jpg" alt="Real stainless-steel industrial process skid with piping, pumps and instrumentation" />
-                <div><p>Model the plant</p><h2>Equipment and streams stay connected.</h2><span>Move from the complete production route to individual units, operating data, and physical limits.</span></div>
+                <figure>
+                  <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real vaccine production facility with stainless-steel bioreactors, filtration, sanitary piping and process controls" loading="lazy" />
+                  <figcaption>Commercial process architecture · reactors, skids, controls and sanitary transfer</figcaption>
+                </figure>
+                <div>
+                  <p>Model the complete facility</p>
+                  <h2>The full plant stays connected.</h2>
+                  <span>Move from the production route to equipment duty, utilities, CIP/SIP, recycle, heat integration, and physical limits without breaking the model.</span>
+                  <ul>
+                    <li>Upstream and downstream trains</li>
+                    <li>Utilities, cleaning, waste, and heat reuse</li>
+                    <li>Mass, energy, and component balances</li>
+                  </ul>
+                </div>
               </article>
               <article>
-                <img src="./assets/photography/stainless-vessel.jpg" alt="Close view of a real stainless-steel industrial process vessel" />
-                <div><p>Evaluate the design</p><h2>Physics and economics in the same model.</h2><span>Inspect scale-up, scheduling, CFD, mass and energy balances, costs, and downloadable reports.</span></div>
+                <figure>
+                  <img src="./assets/photography/process-skid.jpg" alt="Real stainless-steel industrial process skid with vessels, piping, pumps, valves and instrumentation" loading="lazy" />
+                  <figcaption>Operational layer · equipment states, shared resources and production campaigns</figcaption>
+                </figure>
+                <div>
+                  <p>Operate at production scale</p>
+                  <h2>Plan capacity across the facility.</h2>
+                  <span>Model parallel trains, shared equipment, transfers, cleaning cycles, hold times, operators, utilities, and inventory across complete campaigns.</span>
+                  <ul>
+                    <li>Batch and continuous operations</li>
+                    <li>Equipment occupancy and cleaning windows</li>
+                    <li>Debottlenecking and utilization scenarios</li>
+                  </ul>
+                </div>
+              </article>
+              <article>
+                <figure>
+                  <img src="./assets/photography/stainless-vessel.jpg" alt="Detailed view of a real sanitary stainless-steel process vessel with instrumentation and hygienic connections" loading="lazy" />
+                  <figcaption>Engineering depth · vessel physics, boundary conditions and process economics</figcaption>
+                </figure>
+                <div>
+                  <p>Evaluate the engineering</p>
+                  <h2>Physics and economics stay aligned.</h2>
+                  <span>Inspect scale-up, oxygen and nutrient transport, mass and energy balances, CAPEX, OPEX, LCA, uncertainty, and downloadable technical records.</span>
+                  <ul>
+                    <li>Bioreactor and CFD screening</li>
+                    <li>TEA, LCA, and cost-driver analysis</li>
+                    <li>Traceable assumptions and exports</li>
+                  </ul>
+                </div>
               </article>
             </section>
 
@@ -71,7 +116,7 @@
 
             <footer class="public-minimal-footer">
               <span>Axion Process OS</span>
-              <small>Hero: CC1984USA / Wikimedia Commons, CC BY-SA 4.0. Additional photography: Marcelo Guarnieri and Crystal Kwok / Unsplash.</small>
+              <small>Photography: TECNIC Bioprocess Solutions, Marcelo Guarnieri and Crystal Kwok / Unsplash; CC1984USA / Wikimedia Commons, CC BY-SA 4.0.</small>
             </footer>
           </section>
 

@@ -20347,3 +20347,299 @@ textarea::placeholder {
   color: #b7c9c8 !important;
   opacity: 1;
 }
+
+/* Industrial identity pass: restrained mark and large-format production photography. */
+.brand-mark {
+  width: 36px !important;
+  height: 24px !important;
+}
+
+.technical-logo::before {
+  left: 9px !important;
+  top: 6px !important;
+  width: 3px !important;
+  height: 3px !important;
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  box-shadow:
+    3px 0 #fff,
+    6px 0 #fff,
+    9px 0 #fff,
+    12px 0 #fff,
+    0 3px #fff,
+    3px 3px #fff,
+    6px 3px #fff,
+    9px 3px #fff,
+    12px 3px #fff,
+    0 6px #fff,
+    3px 6px #fff,
+    6px 6px #fff,
+    9px 6px #fff,
+    12px 6px #fff,
+    3px 9px #fff,
+    6px 9px #fff,
+    9px 9px #fff,
+    -3px -3px #fff,
+    15px -3px #fff,
+    -6px -6px #fff,
+    18px -6px #fff,
+    -9px 0 #fff,
+    21px 0 #fff,
+    -6px 3px #fff,
+    18px 3px #fff,
+    0 12px #fff,
+    12px 12px #fff !important;
+  transform: none !important;
+}
+
+.technical-logo::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 9px;
+  display: block;
+  width: 3px;
+  height: 3px;
+  background: #0b1828;
+  box-shadow: 9px 0 #0b1828;
+}
+
+.public-brand .brand-mark {
+  width: 36px !important;
+  height: 24px !important;
+  min-width: 36px !important;
+}
+
+.public-brand {
+  gap: 13px !important;
+}
+
+.public-brand strong {
+  font-size: 15px !important;
+  font-weight: 760 !important;
+}
+
+.public-brand small {
+  font-size: 9px !important;
+}
+
+.help-logo::before {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-6px, -7px) !important;
+}
+
+.help-logo::after {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-3px, -4px) !important;
+}
+
+.public-minimal-hero {
+  height: min(880px, calc(100svh - 72px)) !important;
+  min-height: 680px !important;
+  isolation: isolate;
+}
+
+.public-minimal-hero::after {
+  background:
+    linear-gradient(90deg, rgba(4, 14, 21, 0.94) 0%, rgba(4, 14, 21, 0.68) 42%, rgba(4, 14, 21, 0.08) 78%),
+    linear-gradient(0deg, rgba(4, 14, 21, 0.35), transparent 36%) !important;
+}
+
+.public-minimal-hero > img {
+  object-position: center 51% !important;
+  filter: saturate(0.72) contrast(1.08) brightness(0.88) !important;
+}
+
+.public-minimal-hero-copy {
+  left: clamp(28px, 6vw, 104px) !important;
+  width: min(780px, calc(100% - 56px)) !important;
+}
+
+.public-minimal-hero-copy h1 {
+  max-width: 770px !important;
+  font-size: clamp(52px, 6vw, 88px) !important;
+  line-height: 0.97 !important;
+}
+
+.public-minimal-hero-copy > span {
+  max-width: 650px !important;
+}
+
+.public-hero-fact {
+  position: absolute;
+  z-index: 2;
+  right: clamp(28px, 5vw, 82px);
+  bottom: 34px;
+  display: grid;
+  gap: 4px;
+  padding-left: 16px;
+  border-left: 2px solid #8fe4da;
+  color: #f8fcfc;
+}
+
+.public-hero-fact span {
+  color: #a9e4d6;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.public-hero-fact strong {
+  color: #f8fcfc;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.public-minimal-workflow {
+  padding-top: 122px !important;
+  padding-bottom: 116px !important;
+}
+
+.public-minimal-views article,
+.public-minimal-views article:nth-child(even) {
+  min-height: min(820px, 86svh) !important;
+  grid-template-columns: minmax(0, 1.65fr) minmax(360px, 0.72fr) !important;
+}
+
+.public-minimal-views article:nth-child(even) {
+  grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.65fr) !important;
+}
+
+.public-minimal-views article:nth-child(even) figure {
+  order: 2;
+}
+
+.public-minimal-views figure {
+  position: relative;
+  min-width: 0;
+  min-height: min(820px, 86svh);
+  margin: 0;
+  overflow: hidden;
+  background: #15242b;
+}
+
+.public-minimal-views figure::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(5, 18, 24, 0.7), transparent 34%);
+}
+
+.public-minimal-views figure img {
+  width: 100%;
+  height: 100%;
+  min-height: min(820px, 86svh);
+  display: block;
+  object-fit: cover;
+  filter: saturate(0.8) contrast(1.05);
+  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.public-minimal-views article:hover figure img {
+  transform: scale(1.015);
+}
+
+.public-minimal-views article:first-child figure img {
+  object-position: center 48%;
+}
+
+.public-minimal-views article:nth-child(2) figure img {
+  object-position: center;
+}
+
+.public-minimal-views article:nth-child(3) figure img {
+  object-position: center 46%;
+}
+
+.public-minimal-views figcaption {
+  position: absolute;
+  z-index: 1;
+  left: clamp(24px, 4vw, 60px);
+  right: clamp(24px, 4vw, 60px);
+  bottom: 30px;
+  color: #f8fcfc;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.public-minimal-views article > div {
+  padding: clamp(48px, 5vw, 82px) !important;
+}
+
+.public-minimal-views article > div ul {
+  display: grid;
+  gap: 12px;
+  margin: 32px 0 0;
+  padding: 26px 0 0;
+  border-top: 1px solid rgba(16, 32, 51, 0.15);
+  list-style: none;
+}
+
+.public-minimal-views article > div li {
+  position: relative;
+  padding-left: 18px;
+  color: #324c4a !important;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.public-minimal-views article > div li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 7px;
+  height: 2px;
+  background: #39796a;
+}
+
+@media (max-width: 900px) {
+  .public-minimal-hero {
+    height: calc(100svh - 68px) !important;
+    min-height: 680px !important;
+  }
+
+  .public-minimal-hero::after {
+    background: linear-gradient(0deg, rgba(4, 14, 21, 0.97) 0%, rgba(4, 14, 21, 0.64) 58%, rgba(4, 14, 21, 0.12) 100%) !important;
+  }
+
+  .public-minimal-hero-copy {
+    left: 24px !important;
+    right: 24px;
+    bottom: 92px !important;
+    width: auto !important;
+  }
+
+  .public-minimal-hero-copy h1 {
+    font-size: clamp(42px, 11vw, 62px) !important;
+  }
+
+  .public-hero-fact {
+    display: none;
+  }
+
+  .public-minimal-views article,
+  .public-minimal-views article:nth-child(even) {
+    min-height: 0 !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .public-minimal-views article:nth-child(even) figure {
+    order: 0;
+  }
+
+  .public-minimal-views figure,
+  .public-minimal-views figure img {
+    min-height: 0;
+    height: min(68svh, 620px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-minimal-views figure img {
+    transition: none;
+  }
+}
