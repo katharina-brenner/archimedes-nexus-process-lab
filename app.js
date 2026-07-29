@@ -2028,8 +2028,8 @@ const state = {
   paletteGroup: "core",
   paletteSearch: "",
   parameterSearch: "",
-  canvasFocus: "all",
-  flowDetail: "detailed",
+  canvasFocus: "main",
+  flowDetail: "standard",
   productBrief: "",
   productFiles: [],
   inferredTemplate: "culturedMeat",
@@ -2411,6 +2411,76 @@ function unitSymbol(item) {
   return item.icon;
 }
 
+function pfdSymbolType(item) {
+  const text = `${item.type} ${item.cls} ${item.name} ${item.isoName || ""}`.toLowerCase();
+  if (text.includes("valve")) return "valve";
+  if (text.includes("pump")) return "pump";
+  if (text.includes("heat exchanger") || text.includes("heat recovery") || text.includes("condenser")) return "heat-exchanger";
+  if (text.includes("centrifuge")) return "centrifuge";
+  if (text.includes("filter") || text.includes("membrane") || text.includes("ufdf")) return "filter";
+  if (text.includes("chromatography") || text.includes("column") || text.includes("absorber") || text.includes("desorber")) return "column";
+  if (text.includes("dryer")) return "dryer";
+  if (text.includes("bioreactor") || text.includes("fermenter") || text.includes("reactor")) return "bioreactor";
+  if (text.includes("sensor") || text.includes("meter") || text.includes("sample") || text.includes("analy")) return "instrument";
+  if (text.includes("mixer") || text.includes("blender")) return "mixer";
+  if (text.includes("splitter") || text.includes("manifold")) return "junction";
+  if (text.includes("filler") || text.includes("packag")) return "filling";
+  if (text.includes("tank") || text.includes("vessel") || text.includes("hold") || text.includes("prep") || text.includes("wfi")) return "vessel";
+  return "operation";
+}
+
+function pfdSymbolMarkup(item) {
+  const type = pfdSymbolType(item);
+  const instrumentCode = item.type.includes("flow") ? "F" : item.type.includes("pressure") ? "P" : item.type.includes("temperature") ? "T" : item.type.includes("sensor") ? "A" : "I";
+  const drawings = {
+    valve: `<path d="M12 22 32 32 12 42V22Zm40 0L32 32l20 10V22Z"/><path d="M32 12v20m-7-20h14"/>`,
+    pump: `<circle cx="31" cy="32" r="18"/><path d="M18 32h-8m39 0h8M25 22l17 10-17 10V22Z"/>`,
+    "heat-exchanger": `<circle cx="32" cy="32" r="21"/><path d="m18 18 28 28m0-28L18 46M8 32h8m32 0h8"/>`,
+    centrifuge: `<path d="M15 16h34l-5 32H20l-5-32Z"/><path d="M22 25c7 5 13 5 20 0m-18 12c6 4 10 4 16 0M32 8v8"/>`,
+    filter: `<path d="M13 18h38L39 46H25L13 18Z"/><path d="m20 22 23 19M27 20l18 15M18 31l17 14M8 32h9m30 0h9"/>`,
+    column: `<path d="M22 9h20v46H22z"/><path d="M22 17h20M22 26h20M22 35h20M22 44h20M16 9h32M16 55h32"/>`,
+    dryer: `<path d="M15 13h34v38H15z"/><path d="m20 43 8-8 7 5 9-11M9 32h6m34 0h6"/>`,
+    bioreactor: `<path d="M18 13c0-5 28-5 28 0v36c0 7-28 7-28 0V13Z"/><path d="M18 13c0 5 28 5 28 0M32 7v37m-10-19h20M23 32l18 8m0-8-18 8M22 48h20"/><circle cx="25" cy="45" r="1.5"/><circle cx="32" cy="48" r="1.5"/><circle cx="39" cy="44" r="1.5"/>`,
+    instrument: `<circle cx="32" cy="28" r="18"/><path d="M32 46v10M23 56h18"/><text x="32" y="33" text-anchor="middle">${instrumentCode}</text>`,
+    mixer: `<path d="M17 12h30v39H17z"/><path d="M32 7v36m-10-14 20 9m0-9-20 9M10 31h7m30 0h7"/>`,
+    junction: `<circle cx="32" cy="32" r="8"/><path d="M8 32h16m16 0h16M32 8v16m0 16v16"/>`,
+    filling: `<path d="M23 10h18v14l-5 6v18H28V30l-5-6V10Z"/><path d="M32 48v8m-12 0h24M12 31h11m18 0h11"/>`,
+    vessel: `<path d="M19 13c0-5 26-5 26 0v38c0 6-26 6-26 0V13Z"/><path d="M19 13c0 5 26 5 26 0M19 43h26M14 31h5m26 0h5"/>`,
+    operation: `<rect x="12" y="15" width="40" height="34" rx="3"/><path d="M8 32h4m40 0h4M20 24h24M20 32h24M20 40h16"/>`,
+  };
+  return `
+    <svg class="pfd-symbol pfd-symbol-${type}" data-symbol-type="${type}" viewBox="0 0 64 64" aria-hidden="true">
+      ${drawings[type]}
+    </svg>
+  `;
+}
+
+function processReactionSummary() {
+  if (state.template === "antibody") return "CHO + C₆H₁₂O₆ + O₂ → mAb + CO₂ + lactate + NH₄⁺";
+  if (state.template === "penicillin") return "C₆H₁₂O₆ + NH₄⁺ + O₂ → penicillin G + CO₂ + H₂O";
+  if (state.template === "culturedMeat") return "Xᵥ + C₆H₁₂O₆ + O₂ → biomass + CO₂ + lactate + NH₄⁺";
+  if (state.template === "cellTherapy") return "T cells + C₆H₁₂O₆ + O₂ → expanded cells + CO₂ + lactate";
+  return "C₆H₁₂O₆ + O₂ + NH₄⁺ → biomass / product + CO₂ + H₂O";
+}
+
+function streamChemistry(item, kind, from, to) {
+  const text = `${item.composition} ${item.phase} ${from?.name || ""} ${to?.name || ""}`.toLowerCase();
+  if (kind === "qc") return "PAT · pH · DO · T · F";
+  if (text.includes("air") || text.includes("oxygen") || item.phase === "Gas") return "O₂ + N₂ (+ CO₂)";
+  if (text.includes("cip") || text.includes("caustic") || text.includes("clean")) return "NaOH(aq) + H₂O";
+  if (text.includes("acid")) return "H⁺(aq) + H₂O";
+  if (text.includes("steam") || text.includes("condensate")) return "H₂O(g) ⇌ H₂O(l)";
+  if (text.includes("wfi") || text.includes("water") || text.includes("rinse")) return "H₂O";
+  if (text.includes("buffer") || text.includes("salt")) return "H₂O + NaCl + buffer ions";
+  if (text.includes("media") || text.includes("feed") || text.includes("nutrient")) return "H₂O + C₆H₁₂O₆ + AA + salts";
+  if (kind === "waste") return "COD + biomass + NH₄⁺";
+  if (text.includes("broth") || text.includes("culture") || from?.cls === "Bioreactor") return processReactionSummary();
+  if (state.template === "antibody" && text.includes("product")) return "mAb + H₂O + buffer";
+  if (state.template === "penicillin" && (text.includes("penicillin") || text.includes("crystal"))) return "penicillin G + mother liquor";
+  if (state.template === "culturedMeat" && (text.includes("biomass") || text.includes("cell"))) return "Xᵥ + H₂O + residual medium";
+  return item.composition;
+}
+
 function unitLayer(item) {
   const text = `${item.id} ${item.type} ${item.name} ${item.cls}`.toLowerCase();
   if (text.includes("cip") || text.includes("sip") || text.includes("clean") || text.includes("rinse") || text.includes("caustic") || text.includes("acid hold")) return "cleaning";
@@ -2446,15 +2516,17 @@ function unitFocusLevel(item) {
 }
 
 function unitWidth(item) {
-  return isMinorUnit(item) ? 172 : 286;
+  if (isMinorUnit(item)) return 112;
+  return pfdSymbolType(item) === "bioreactor" ? 206 : 184;
 }
 
 function unitHeight(item) {
-  return isMinorUnit(item) ? 78 : 118;
+  if (isMinorUnit(item)) return 62;
+  return pfdSymbolType(item) === "bioreactor" ? 112 : 96;
 }
 
 function unitMidline(item) {
-  return item.y + (isMinorUnit(item) ? 36 : 56);
+  return item.y + unitHeight(item) / 2;
 }
 
 function snapToCanvasGrid(value, step = 16) {
@@ -2482,6 +2554,9 @@ function loadTemplate(key, preserveScale = false) {
   state.nextStream = 900;
   state.activeRoute = "primary";
   state.recipeOverrides = {};
+  state.canvasFocus = "main";
+  state.flowDetail = "standard";
+  state.zoom = 0.68;
 
   if (!preserveScale) {
     state.batchSize = template.batchSize;
@@ -2492,7 +2567,6 @@ function loadTemplate(key, preserveScale = false) {
 
   syncInputs();
   renderAll();
-  window.requestAnimationFrame(() => fitCanvas(true));
   showToast(`${template.label} template loaded`);
 }
 
@@ -2565,7 +2639,7 @@ function importModelState(modelState = {}) {
   state.streams = Array.isArray(modelState.streams) ? clone(modelState.streams) : clone(templates[template].streams);
   state.costs = Array.isArray(modelState.costs) ? clone(modelState.costs) : clone(templates[template].costs);
   state.selectedId = modelState.selectedId || state.units[0]?.id || null;
-  state.zoom = Math.max(0.72, Math.min(1.35, Number(modelState.zoom) || state.zoom));
+  state.zoom = Math.max(0.44, Math.min(1.35, Number(modelState.zoom) || state.zoom));
   state.nextUnit = Number(modelState.nextUnit) || 900;
   state.nextStream = Number(modelState.nextStream) || 900;
   state.batchSize = Number(modelState.batchSize) || state.batchSize;
@@ -2576,8 +2650,8 @@ function importModelState(modelState = {}) {
   state.paletteGroup = modelState.paletteGroup || state.paletteGroup;
   state.paletteSearch = modelState.paletteSearch || "";
   state.parameterSearch = modelState.parameterSearch || "";
-  state.canvasFocus = modelState.canvasFocus || "all";
-  state.flowDetail = modelState.flowDetail || "detailed";
+  state.canvasFocus = modelState.canvasFocus || "main";
+  state.flowDetail = modelState.flowDetail || "standard";
   state.productBrief = modelState.productBrief || "";
   state.productFiles = Array.isArray(modelState.productFiles) ? clone(modelState.productFiles) : [];
   state.inferredTemplate = modelState.inferredTemplate || template;
@@ -2590,7 +2664,6 @@ function importModelState(modelState = {}) {
   state.commandHighlights = [];
   syncInputs();
   renderAll();
-  window.requestAnimationFrame(() => fitCanvas(true));
 }
 
 function applyScale(key) {
@@ -6646,6 +6719,81 @@ function renderProcessLanes(stage, stageHeight) {
     `).join(""));
 }
 
+function streamGeometry(from, to) {
+  const x1 = from.x + unitWidth(from);
+  const y1 = unitMidline(from);
+  const x2 = to.x;
+  const y2 = unitMidline(to);
+  const forward = x2 > x1 + 72;
+  const elbowX = forward ? Math.round((x1 + x2) / 2) : Math.max(x1, x2) + 88;
+  const pad = 18;
+  const minX = Math.min(x1, x2, elbowX) - pad;
+  const maxX = Math.max(x1, x2, elbowX) + pad;
+  const minY = Math.min(y1, y2) - pad;
+  const maxY = Math.max(y1, y2) + pad;
+  return {
+    left: minX,
+    top: minY,
+    width: Math.max(36, maxX - minX),
+    height: Math.max(36, maxY - minY),
+    d: `M ${x1 - minX} ${y1 - minY} H ${elbowX - minX} V ${y2 - minY} H ${x2 - minX}`,
+    labelX: forward ? elbowX : Math.max(x1, x2) + 44,
+    labelY: Math.abs(y2 - y1) > 48 ? Math.round((y1 + y2) / 2) : y1,
+  };
+}
+
+function streamPathMarkup(item, kind, geometry) {
+  const markerId = `flow-${item.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return `
+    <svg viewBox="0 0 ${geometry.width} ${geometry.height}" width="${geometry.width}" height="${geometry.height}" aria-hidden="true">
+      <defs>
+        <marker id="${markerId}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L8,4 L0,8 Z" class="stream-path-arrow"></path>
+        </marker>
+      </defs>
+      <path class="stream-path-base" d="${geometry.d}"></path>
+      <path class="stream-path-flow" d="${geometry.d}" marker-end="url(#${markerId})"></path>
+    </svg>
+  `;
+}
+
+function rectanglesOverlap(a, b, margin = 8) {
+  return !(a.right + margin <= b.left || a.left >= b.right + margin || a.bottom + margin <= b.top || a.top >= b.bottom + margin);
+}
+
+function placeStreamLabel(x, y, occupied, force = false) {
+  const width = 210;
+  const height = 48;
+  const candidates = [
+    [0, -38],
+    [0, 38],
+    [0, -68],
+    [0, 68],
+    [0, -96],
+    [0, 96],
+    [116, 0],
+    [-116, 0],
+  ];
+  for (const [offsetX, offsetY] of candidates) {
+    const centerX = x + offsetX;
+    const centerY = y + offsetY;
+    const rect = {
+      left: centerX - width / 2,
+      right: centerX + width / 2,
+      top: centerY - height / 2,
+      bottom: centerY + height / 2,
+    };
+    if (!occupied.some((item) => rectanglesOverlap(rect, item))) {
+      occupied.push(rect);
+      return { x: centerX, y: centerY };
+    }
+  }
+  if (!force) return null;
+  const fallback = { x, y: y - 38 };
+  occupied.push({ left: x - width / 2, right: x + width / 2, top: fallback.y - height / 2, bottom: fallback.y + height / 2 });
+  return fallback;
+}
+
 function renderCanvas() {
   els.canvas.innerHTML = "";
   const visibleUnits = state.units.filter(isUnitVisible);
@@ -6667,6 +6815,8 @@ function renderCanvas() {
 
   stage.dataset.focus = state.canvasFocus;
   stage.dataset.flowDetail = state.flowDetail;
+  const reaction = document.querySelector("#processReaction");
+  if (reaction) reaction.textContent = processReactionSummary();
   stage.insertAdjacentHTML("beforeend", `
     <div class="canvas-focus-note">
       <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
@@ -6674,25 +6824,28 @@ function renderCanvas() {
     </div>
   `);
 
-  visibleStreams.forEach((item) => {
+  const occupiedLabels = visibleUnits.map((item) => ({
+    left: item.x - 10,
+    right: item.x + unitWidth(item) + 10,
+    top: item.y - 10,
+    bottom: item.y + unitHeight(item) + 10,
+  }));
+
+  visibleStreams.forEach((item, streamIndex) => {
     const from = state.units.find((candidate) => candidate.id === item.from);
     const to = state.units.find((candidate) => candidate.id === item.to);
     if (!from || !to) return;
     const line = document.createElement("button");
-    const x1 = from.x + unitWidth(from);
-    const y1 = unitMidline(from);
-    const x2 = to.x;
-    const y2 = unitMidline(to);
-    const length = Math.hypot(x2 - x1, y2 - y1);
-    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
     const kind = streamKind(item, from, to);
+    const geometry = streamGeometry(from, to);
     line.className = `stream-line stream-${kind}`;
     line.dataset.streamId = item.id;
     line.dataset.tooltip = streamTooltip(item, from, to, kind);
-    line.style.left = `${x1}px`;
-    line.style.top = `${y1}px`;
-    line.style.width = `${length}px`;
-    line.style.transform = `rotate(${angle}deg)`;
+    line.style.left = `${geometry.left}px`;
+    line.style.top = `${geometry.top}px`;
+    line.style.width = `${geometry.width}px`;
+    line.style.height = `${geometry.height}px`;
+    line.innerHTML = streamPathMarkup(item, kind, geometry);
     line.title = `${item.id}: ${item.composition} · ${streamLabel(kind)}`;
     line.addEventListener("click", () => {
       state.selectedId = item.id;
@@ -6703,19 +6856,36 @@ function renderCanvas() {
     if (state.selectedId === item.id) line.classList.add("selected");
     if ((state.commandHighlights || []).includes(item.id)) line.classList.add("command-highlight");
     stage.appendChild(line);
-    if (state.flowDetail !== "standard" || state.selectedId === item.id || kind === "main") {
+    const selected = state.selectedId === item.id;
+    const shouldLabel = selected
+      || state.flowDetail !== "standard"
+      || (kind === "main" && !isMinorUnit(from) && !isMinorUnit(to) && streamIndex % 2 === 0);
+    if (shouldLabel) {
+      const labelPosition = placeStreamLabel(geometry.labelX, geometry.labelY, occupiedLabels, selected || state.flowDetail === "full");
+      if (!labelPosition) return;
       const label = document.createElement("button");
-      label.className = `stream-label stream-label-${kind}${state.selectedId === item.id ? " selected" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
+      label.className = `stream-label stream-label-${kind}${selected ? " selected" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
       label.dataset.streamId = item.id;
       label.dataset.tooltip = streamTooltip(item, from, to, kind);
-      label.style.left = `${(x1 + x2) / 2}px`;
-      label.style.top = `${(y1 + y2) / 2}px`;
-      const compact = state.flowDetail === "detailed" || state.flowDetail === "standard";
+      label.style.left = `${labelPosition.x}px`;
+      label.style.top = `${labelPosition.y}px`;
+      const chemistry = streamChemistry(item, kind, from, to);
+      const compact = state.flowDetail === "standard" || state.flowDetail === "detailed";
       label.innerHTML = compact ? `
-        <b>${item.id}</b><span>${streamLabel(kind).replace(" flow", "")}</span>
+        <span class="stream-label-head"><b>${item.id}</b><em>${item.phase}</em></span>
+        <code class="stream-chemistry">${chemistry}</code>
       ` : `
-        <b>${item.id} → ${to.id}</b><span>${streamFlow(item)} · ${item.composition}</span>
+        <span class="stream-label-head"><b>${item.id} → ${to.id}</b><em>${item.phase}</em></span>
+        <code class="stream-chemistry">${chemistry}</code>
+        <span class="stream-flow-value">${streamFlow(item)} · ${item.composition}</span>
       `;
+      label.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.selectedId = item.id;
+        renderEquationSpotlight();
+        renderCanvas();
+      });
       label.addEventListener("click", () => {
         state.selectedId = item.id;
         renderEquationSpotlight();
@@ -6742,20 +6912,19 @@ function renderCanvas() {
     node.innerHTML = `
       <i class="unit-port port-in" title="Input port"></i>
       <i class="unit-port port-out" title="Output port"></i>
-      <span class="unit-icon" style="background:${item.color}">
-        <strong>${unitSymbol(item)}</strong>
-        <small>${item.icon}</small>
+      <span class="unit-icon" style="--symbol-color:${item.color}">
+        ${pfdSymbolMarkup(item)}
       </span>
       <span class="unit-body">
         <span class="unit-header">
           <h3>${item.id}</h3>
-          <em class="unit-role">${unitLayerLabel(layer)}</em>
+          <em class="unit-role">${layer === "main" ? item.cls : unitLayerLabel(layer)}</em>
         </span>
         <p>${item.name}</p>
-        <small>${unitSize(item)} · ${unitPower(item)}</small>
+        <small>${showEquipmentMeta ? `${unitSize(item)} · ${unitPower(item)}` : item.isoName || item.cls}</small>
         ${showEquipmentMeta ? `<small class="unit-ics">${ics.code} · ${item.cls}</small>` : ""}
       </span>
-      <em class="unit-pfd-tag">${item.cls}</em>
+      <em class="unit-pfd-tag">${pfdSymbolType(item).replace("-", " ")}</em>
     `;
     wireUnitNode(node, item);
     stage.appendChild(node);
@@ -6819,14 +6988,13 @@ function redrawStreamsOnly() {
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
     if (!line || !from || !to) return;
-    const x1 = from.x + unitWidth(from);
-    const y1 = unitMidline(from);
-    const x2 = to.x;
-    const y2 = unitMidline(to);
-    line.style.left = `${x1}px`;
-    line.style.top = `${y1}px`;
-    line.style.width = `${Math.hypot(x2 - x1, y2 - y1)}px`;
-    line.style.transform = `rotate(${Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI}deg)`;
+    const geometry = streamGeometry(from, to);
+    const kind = streamKind(streamItem, from, to);
+    line.style.left = `${geometry.left}px`;
+    line.style.top = `${geometry.top}px`;
+    line.style.width = `${geometry.width}px`;
+    line.style.height = `${geometry.height}px`;
+    line.innerHTML = streamPathMarkup(streamItem, kind, geometry);
   });
 }
 
@@ -12222,7 +12390,6 @@ function jumpToView(view) {
 
 function openProcessCanvas() {
   window.requestAnimationFrame(() => {
-    fitCanvas(true);
     const workspace = document.querySelector(".workspace");
     const target = document.querySelector("#flowsheetView");
     const topbar = document.querySelector(".topbar");
@@ -12245,13 +12412,14 @@ function setZoom(value) {
 }
 
 function fitCanvas(silent = false) {
-  if (!state.units.length) return;
-  const maxX = Math.max(...state.units.map((item) => item.x + unitWidth(item) + 96));
-  const maxY = Math.max(...state.units.map((item) => item.y + unitHeight(item) + 96));
+  const visibleUnits = state.units.filter(isUnitVisible);
+  if (!visibleUnits.length) return;
+  const maxX = Math.max(...visibleUnits.map((item) => item.x + unitWidth(item) + 96));
+  const maxY = Math.max(...visibleUnits.map((item) => item.y + unitHeight(item) + 96));
   const rect = els.canvas.getBoundingClientRect();
   const availableWidth = Math.max(240, rect.width - 48);
   const availableHeight = Math.max(220, rect.height - 48);
-  state.zoom = Math.max(0.72, Math.min(1, Math.min(availableWidth / maxX, availableHeight / maxY)));
+  state.zoom = Math.max(0.24, Math.min(1, Math.min(availableWidth / maxX, availableHeight / maxY)));
   renderCanvas();
   els.canvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
   if (!silent) showToast(`Fitted full process at ${Math.round(state.zoom * 100)}%`);
@@ -15513,6 +15681,13 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
+    const processStream = event.target.closest?.(".stream-line, .stream-label");
+    if (processStream?.dataset.streamId) {
+      state.selectedId = processStream.dataset.streamId;
+      renderEquationSpotlight();
+      renderCanvas();
+      return;
+    }
     const publicNextButton = event.target.closest("[data-public-detail-next]");
     if (publicNextButton) {
       event.preventDefault();

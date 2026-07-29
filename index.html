@@ -18,7 +18,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/axion-biomanufacturing-suite.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/axion-biomanufacturing-suite.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260729-edge-gateway-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260730-pfd-canvas-v2" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1495,39 +1495,61 @@
                 <div id="palette" class="palette" aria-label="Draggable unit operations"></div>
               </div>
             </div>
-            <div class="canvas-toolbar" aria-label="Canvas tools">
-              <button class="tool active" data-mode="select"><b>Select & Move Units</b><span>Click equipment to highlight it, drag it, or use Duplicate and Connect</span></button>
-              <button class="tool" data-mode="connect"><b>Draw Process Stream</b><span>Click a source unit, then a destination unit</span></button>
-              <span id="modeHint">Select mode: click equipment or streams to highlight them. Equations update below the canvas; use the top actions to duplicate, connect, export, or reset.</span>
+            <div class="canvas-toolbar" aria-label="Process flowsheet tools">
+              <div class="canvas-tool-heading">
+                <span>Process flowsheet</span>
+                <strong>Build and connect the plant</strong>
+              </div>
+              <div class="canvas-mode-switch" role="group" aria-label="Editing mode">
+                <button class="tool active" data-mode="select"><b>1 · Select</b><span>Move or inspect equipment</span></button>
+                <button class="tool" data-mode="connect"><b>2 · Connect</b><span>Choose source, then destination</span></button>
+              </div>
+              <ol class="canvas-guide" aria-label="How to edit the flowsheet">
+                <li><b>Add</b><span>Drag a PFD symbol from the library.</span></li>
+                <li><b>Connect</b><span>Create the material or utility stream.</span></li>
+                <li><b>Inspect</b><span>Select a tag to open balances and equations.</span></li>
+              </ol>
+              <div class="canvas-chemistry" aria-label="Active process chemistry">
+                <span>Biochemical shorthand</span>
+                <strong id="processReaction">Substrate + O₂ → product + CO₂ + H₂O</strong>
+              </div>
+              <span id="modeHint">Select a PFD symbol to move it or inspect its model.</span>
             </div>
-            <div class="canvas-assist">
-              <div class="quick-add-panel">
-                <strong>Quick add near selection</strong>
-                <div id="quickAdd" class="quick-add"></div>
+            <details class="canvas-options">
+              <summary>
+                <span>View and placement options</span>
+                <small>Focus levels, stream detail, inline equipment and legend</small>
+              </summary>
+              <div class="canvas-assist">
+                <div class="quick-add-panel">
+                  <strong>Inline equipment</strong>
+                  <div id="quickAdd" class="quick-add"></div>
+                </div>
+                <div class="canvas-focus" aria-label="Flowsheet focus">
+                  <strong>Plant level</strong>
+                  <div id="canvasFocus" class="focus-toggle"></div>
+                </div>
+                <div class="flow-detail-panel" aria-label="Flow visibility">
+                  <strong>Drawing detail</strong>
+                  <div id="flowDetail" class="focus-toggle flow-detail-toggle"></div>
+                </div>
+                <div class="flow-legend" aria-label="Flow legend">
+                  <strong>Stream classes</strong>
+                  <span class="legend-main">Material / product</span>
+                  <span class="legend-utility">Utility / service</span>
+                  <span class="legend-waste">Waste / side stream</span>
+                  <span class="legend-qc">Signal / sample</span>
+                </div>
+                <div class="role-legend" aria-label="Process role legend">
+                  <strong>Equipment roles</strong>
+                  <span class="role-main">Main process</span>
+                  <span class="role-support">Support</span>
+                  <span class="role-cleaning">CIP/SIP</span>
+                  <span class="role-recycle">Recycle/reuse</span>
+                  <span class="role-heat">Heat reuse</span>
+                </div>
               </div>
-              <div class="canvas-focus" aria-label="Flowsheet focus">
-                <strong>Canvas focus</strong>
-                <div id="canvasFocus" class="focus-toggle"></div>
-              </div>
-              <div class="flow-detail-panel" aria-label="Flow visibility">
-                <strong>Flow visibility</strong>
-                <div id="flowDetail" class="focus-toggle flow-detail-toggle"></div>
-              </div>
-              <div class="flow-legend" aria-label="Flow legend">
-                <span class="legend-main">Main product</span>
-                <span class="legend-utility">Utility</span>
-                <span class="legend-waste">Waste</span>
-                <span class="legend-qc">QC / data</span>
-              </div>
-              <div class="role-legend" aria-label="Process role legend">
-                <strong>Process roles</strong>
-                <span class="role-main">Main process</span>
-                <span class="role-support">Support</span>
-                <span class="role-cleaning">CIP/SIP</span>
-                <span class="role-recycle">Recycle/reuse</span>
-                <span class="role-heat">Heat reuse</span>
-              </div>
-            </div>
+            </details>
             <div id="flowsheetCanvas" class="flowsheet-canvas" tabindex="0" aria-label="Drag and drop process canvas"></div>
             <div id="equationSpotlight" class="equation-spotlight"></div>
           </div>
@@ -1636,6 +1658,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260729-edge-gateway-v1"></script>
+    <script type="module" src="./app.js?v=20260730-pfd-canvas-v2"></script>
   </body>
 </html>
