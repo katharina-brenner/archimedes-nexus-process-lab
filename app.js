@@ -14946,6 +14946,44 @@ function bindAuth() {
   });
 }
 
+function bindPublicPointerMotion() {
+  if (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const surfaces = document.querySelectorAll([
+    ".public-pointer-scene",
+    ".explain-visual",
+    ".public-section article",
+    ".comparison-intro",
+    ".comparison-note",
+  ].join(","));
+
+  surfaces.forEach((surface) => {
+    if (surface.dataset.pointerMotionBound === "true") return;
+    surface.dataset.pointerMotionBound = "true";
+    let animationFrame = 0;
+
+    surface.addEventListener("pointermove", (event) => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const rect = surface.getBoundingClientRect();
+        const normalizedX = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)));
+        const normalizedY = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(rect.height, 1)));
+        surface.style.setProperty("--pointer-x", `${normalizedX * 100}%`);
+        surface.style.setProperty("--pointer-y", `${normalizedY * 100}%`);
+        surface.style.setProperty("--image-shift-x", `${(normalizedX - 0.5) * -4}px`);
+        surface.style.setProperty("--image-shift-y", `${(normalizedY - 0.5) * -3}px`);
+      });
+    });
+
+    surface.addEventListener("pointerleave", () => {
+      window.cancelAnimationFrame(animationFrame);
+      surface.style.setProperty("--pointer-x", "50%");
+      surface.style.setProperty("--pointer-y", "50%");
+      surface.style.setProperty("--image-shift-x", "0px");
+      surface.style.setProperty("--image-shift-y", "0px");
+    });
+  });
+}
+
 function renderAll() {
   renderStartBoard();
   renderProjectsBoard();
@@ -15687,6 +15725,7 @@ function bindEvents() {
 }
 
 bindAuth();
+bindPublicPointerMotion();
 bindEvents();
 loadTemplate("culturedMeat");
 startRealtimeTelemetry();
