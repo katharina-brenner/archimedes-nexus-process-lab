@@ -40,6 +40,10 @@ Axion Process OS public website:
   - Author: Hwaegemn bbepp
   - License: CC BY-SA 3.0
 
+- `industrial-bioprocess-hall.jpg`
+  - Source: TECNIC Bioprocess Solutions
+  - Context: Bioprocess equipment manufacturing hall with stainless-steel process systems.
+
 Images are resized and presented with colour and contrast adjustments through
 the website stylesheet. No endorsement by the photographers or depicted
 organisations is implied.
