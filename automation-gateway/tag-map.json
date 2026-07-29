@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "equipmentId": "BR-101",
+  "description": "Commissioning template. Replace nodeIds with the reviewed plant namespace before connecting to an OPC UA server.",
+  "tags": [
+    { "tag": "BR101.PV.DO", "nodeId": "ns=2;s=BR101.PV.DO", "label": "Dissolved oxygen", "unit": "%", "dataType": "Double", "min": 0, "max": 100, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.SP.DO", "nodeId": "ns=2;s=BR101.SP.DO", "label": "DO setpoint", "unit": "%", "dataType": "Double", "min": 10, "max": 80, "writable": true, "criticality": "CPP" },
+    { "tag": "BR101.PV.PH", "nodeId": "ns=2;s=BR101.PV.PH", "label": "pH", "unit": "pH", "dataType": "Double", "min": 6, "max": 8, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.SP.PH", "nodeId": "ns=2;s=BR101.SP.PH", "label": "pH setpoint", "unit": "pH", "dataType": "Double", "min": 6.5, "max": 7.5, "writable": true, "criticality": "CPP" },
+    { "tag": "BR101.PV.TEMP", "nodeId": "ns=2;s=BR101.PV.TEMP", "label": "Temperature", "unit": "degC", "dataType": "Double", "min": 20, "max": 45, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.SP.TEMP", "nodeId": "ns=2;s=BR101.SP.TEMP", "label": "Temperature setpoint", "unit": "degC", "dataType": "Double", "min": 25, "max": 42, "writable": true, "criticality": "CPP" },
+    { "tag": "BR101.MV.AGITATION", "nodeId": "ns=2;s=BR101.MV.AGITATION", "label": "Agitation command", "unit": "rpm", "dataType": "Double", "min": 20, "max": 160, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.MV.AIRFLOW", "nodeId": "ns=2;s=BR101.MV.AIRFLOW", "label": "Air-flow command", "unit": "vvm", "dataType": "Double", "min": 0, "max": 1.5, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.MV.FEED", "nodeId": "ns=2;s=BR101.MV.FEED", "label": "Feed command", "unit": "L/h", "dataType": "Double", "min": 0, "max": 500, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.MV.BASE", "nodeId": "ns=2;s=BR101.MV.BASE", "label": "Base addition command", "unit": "mL/min", "dataType": "Double", "min": 0, "max": 200, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.MV.JACKET", "nodeId": "ns=2;s=BR101.MV.JACKET", "label": "Jacket valve command", "unit": "%", "dataType": "Double", "min": 0, "max": 100, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.PV.LEVEL", "nodeId": "ns=2;s=BR101.PV.LEVEL", "label": "Working volume", "unit": "%", "dataType": "Double", "min": 0, "max": 85, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.PV.PRESSURE", "nodeId": "ns=2;s=BR101.PV.PRESSURE", "label": "Headspace pressure", "unit": "bar(g)", "dataType": "Double", "min": 0, "max": 1.5, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.PV.AMMONIUM", "nodeId": "ns=2;s=BR101.PV.AMMONIUM", "label": "Ammonium soft sensor", "unit": "mM", "dataType": "Double", "min": 0, "max": 8, "writable": false, "criticality": "CQA proxy" },
+    { "tag": "BR101.PV.LACTATE", "nodeId": "ns=2;s=BR101.PV.LACTATE", "label": "Lactate soft sensor", "unit": "g/L", "dataType": "Double", "min": 0, "max": 8, "writable": false, "criticality": "CQA proxy" },
+    { "tag": "BATCH.PHASE", "nodeId": "ns=2;s=BATCH.PHASE", "label": "Batch phase", "unit": "state", "dataType": "Int32", "min": 0, "max": 8, "writable": false, "criticality": "context" }
+  ]
+}

@@ -1,9 +1,21 @@
 allowBuilds:
   esbuild: true
   sharp: true
+minimumReleaseAgeExclude:
+  - node-opcua-address-space-for-conformance-testing@2.175.3
+  - node-opcua-address-space@2.175.3
+  - node-opcua-aggregates@2.175.3
+  - node-opcua-client@2.175.3
+  - node-opcua-nodeset-ua@2.175.3
+  - node-opcua-nodesets@2.175.3
+  - node-opcua-server-discovery@2.175.3
+  - node-opcua-server@2.175.3
+  - node-opcua-vendor-diagnostic@2.175.3
+  - node-opcua@2.175.3
 onlyBuiltDependencies:
   - esbuild
   - sharp
 packages:
   - "."
   - "nextjs-bff"
+  - "automation-gateway"

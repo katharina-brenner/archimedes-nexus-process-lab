@@ -23889,6 +23889,7 @@ body:not(.locked) .help-panel #askHelp {
 .automation-head,
 .automation-connection-panel,
 .automation-live-panel,
+.automation-commissioning-panel,
 .automation-historian-panel,
 .automation-loop-section,
 .automation-audit-panel {
@@ -24020,6 +24021,7 @@ body:not(.locked) .help-panel #askHelp {
 
 .automation-connection-panel,
 .automation-live-panel,
+.automation-commissioning-panel,
 .automation-historian-panel,
 .automation-loop-section,
 .automation-audit-panel {
@@ -24231,6 +24233,119 @@ body:not(.locked) .help-panel #askHelp {
 
 .automation-source-line strong {
   color: #203840;
+}
+
+.automation-commissioning-summary {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(180px, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.automation-commissioning-summary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: #eaf2f0;
+}
+
+.automation-commissioning-summary strong {
+  color: #11242c;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.automation-commissioning-summary span {
+  color: #63767e;
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.automation-commissioning-summary button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  color: #f7fbfa;
+  background: #153a43;
+  font-weight: 750;
+}
+
+.automation-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.automation-check-grid > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f1f6f5;
+}
+
+.automation-check-grid i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #d2a552;
+}
+
+.automation-check-grid .pass i,
+.automation-check-grid .not-applicable i {
+  background: #2cad92;
+}
+
+.automation-check-grid .fail i,
+.automation-check-grid .site-evidence i {
+  background: #a64e58;
+}
+
+.automation-check-grid span,
+.automation-check-grid strong,
+.automation-check-grid small {
+  display: block;
+  min-width: 0;
+}
+
+.automation-check-grid strong {
+  color: #173039;
+  font-size: 12px;
+}
+
+.automation-check-grid small {
+  margin-top: 3px;
+  color: #61747c;
+  font-size: 10px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.automation-check-grid b {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #3c5e61;
+  background: #e0ebe8;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.automation-empty-state {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #5e7178;
+  background: #eef4f2;
+  font-size: 12px;
 }
 
 .automation-trend-svg {
@@ -24450,7 +24565,9 @@ body:not(.locked) .help-panel #askHelp {
 
   .automation-status-grid,
   .automation-form,
-  .automation-live-grid {
+  .automation-live-grid,
+  .automation-commissioning-summary,
+  .automation-check-grid {
     grid-template-columns: 1fr;
   }
 

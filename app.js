@@ -11685,6 +11685,7 @@ function fallbackAutomationState() {
     gateway: { configured: false, writesEnabled: false, physicalWritePolicy: "physical writes locked" },
     connections: [{ id: "local-simulator", name: "Axion verified simulator", kind: "simulation", endpoint: "axion://verified-simulator", status: "connected", mode: "read-write", writeEnabled: false, securityMode: "local" }],
     tagDefinitions: definitions,
+    tagMap: definitions.map((definition) => ({ ...definition, nodeId: `ns=2;s=${definition.tag}`, commissioningState: "template-node-id" })),
     latest,
     history,
     loops: [
@@ -11693,6 +11694,7 @@ function fallbackAutomationState() {
       { id: "local-temp", key: "temperature", name: "Temperature control", pvTag: "BR101.PV.TEMP", spTag: "BR101.SP.TEMP", mvTag: "BR101.MV.JACKET", kp: 8, ki: 0.35, kd: 0.1, mode: "observe", enabled: true, connectionId: "local-simulator", safetyLow: 30, safetyHigh: 40 },
     ],
     actions: [],
+    commissioningRuns: [],
     generatedAt: new Date(now).toISOString(),
     note: "Local simulator active. Start the backend to persist connections, historian samples, loop approvals and audit records.",
   };
@@ -11867,9 +11869,39 @@ function renderAutomationCockpit() {
         </article>
       </div>
 
+      <article class="automation-commissioning-panel">
+        <div class="automation-panel-title">
+          <span>03 · Commission</span>
+          <h4>Read-only FAT/SAT gate</h4>
+          <p>Verify the connection, mapped namespace, signal quality, timestamps, engineering limits, historian continuity and write lock before any closed-loop release.</p>
+        </div>
+        <div class="automation-commissioning-summary">
+          <div>
+            <strong>${automation.tagMap?.length || 0}</strong>
+            <span>mapped tags</span>
+          </div>
+          <div>
+            <strong>${automation.commissioningRuns?.[0]?.status || "not run"}</strong>
+            <span>latest gate status</span>
+          </div>
+          <button data-automation-commission type="button">Run commissioning checks</button>
+        </div>
+        ${automation.commissioningRuns?.[0] ? `
+          <div class="automation-check-grid">
+            ${automation.commissioningRuns[0].checks.map((check) => `
+              <div class="${escapeAttr(check.status)}">
+                <i></i>
+                <span><strong>${escapeHtml(check.label)}</strong><small>${escapeHtml(check.evidence)}</small></span>
+                <b>${escapeHtml(check.status)}</b>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<p class="automation-empty-state">No commissioning run yet. The first run is non-invasive and does not write to a PLC.</p>`}
+      </article>
+
       <article class="automation-historian-panel">
         <div class="automation-panel-title">
-          <span>03 · Diagnose</span>
+          <span>04 · Diagnose</span>
           <h4>Historian trend</h4>
           <p>Normalized operating trajectories make drift, oscillation, metabolic accumulation and control response visible on one clock.</p>
         </div>
@@ -11878,7 +11910,7 @@ function renderAutomationCockpit() {
 
       <section class="automation-loop-section">
         <div class="automation-panel-title">
-          <span>04 · Control</span>
+          <span>05 · Control</span>
           <h4>Closed-loop control matrix</h4>
           <p>Manual calculates nothing. Observe reads only. Advisory calculates a recommendation. Closed loop requires approval and still cannot reach a physical PLC unless the backend and edge gateway allow it.</p>
         </div>
@@ -11922,7 +11954,7 @@ function renderAutomationCockpit() {
 
       <article class="automation-audit-panel">
         <div class="automation-panel-title">
-          <span>05 · Verify</span>
+          <span>06 · Verify</span>
           <h4>Control action log</h4>
           <p>Every calculation records PV, SP, current MV, proposed MV, execution state, reason, user and timestamp.</p>
         </div>
@@ -12024,6 +12056,21 @@ async function runAutomationCycleFromUi(loopId) {
     showToast(`${payload.action.loopName}: ${payload.action.execution}`);
   } catch (error) {
     showToast(error.message || "Control cycle failed");
+  }
+}
+
+async function runAutomationCommissioningFromUi() {
+  const connectionId = activeAutomationState().connections?.[0]?.id || "";
+  try {
+    const payload = await apiRequest("/api/automation/commissioning/run", {
+      method: "POST",
+      body: JSON.stringify({ projectId: state.currentProjectId || "", connectionId }),
+    });
+    state.automationState = payload.state;
+    renderTwinWorkspace();
+    showToast(`Commissioning gate: ${payload.run.status}`);
+  } catch (error) {
+    showToast(error.message || "Commissioning checks failed");
   }
 }
 
@@ -15902,6 +15949,11 @@ function bindEvents() {
     const cycleButton = event.target.closest("[data-automation-cycle]");
     if (cycleButton) {
       runAutomationCycleFromUi(cycleButton.dataset.automationCycle);
+      return;
+    }
+    const commissioningButton = event.target.closest("[data-automation-commission]");
+    if (commissioningButton) {
+      runAutomationCommissioningFromUi();
       return;
     }
     const promptButton = event.target.closest("[data-twin-prompt]");

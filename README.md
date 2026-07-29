@@ -71,6 +71,12 @@ Keep `AXION_AUTOMATION_WRITES_ENABLED=false` during tag mapping, read-only commi
 
 The gateway contract exposes `POST /v1/connections/test` for connection verification and `POST /v1/write` for approved commands. OPC UA certificates, endpoint trust, tag namespaces, PLC interlocks, independent trips, and site cybersecurity controls remain plant-specific commissioning work. Axion never bypasses those safeguards.
 
+The executable gateway is in `automation-gateway/`, its reviewed tag-map template is `automation-gateway/tag-map.json`, and the complete commissioning runbook is in `docs/automation-gateway.md`. Start its safe simulator with:
+
+```bash
+pnpm gateway:start
+```
+
 Automation API routes:
 
 ```text
@@ -78,6 +84,7 @@ GET  /api/automation/state
 POST /api/automation/connections
 POST /api/automation/connections/:id/test
 POST /api/automation/telemetry
+POST /api/automation/commissioning/run
 POST /api/automation/control-loops/:id
 POST /api/automation/control-loops/:id/cycle
 ```

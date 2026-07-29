@@ -89,6 +89,17 @@ const checks = [
     requiresOwnerAction: true,
     requiresPaymentApproval: true,
   },
+  {
+    area: "PLC/SCADA edge gateway",
+    ready: has("AUTOMATION_GATEWAY_URL")
+      && has("AUTOMATION_GATEWAY_TOKEN")
+      && has("AXION_AUTOMATION_INGEST_TOKEN")
+      && has("AXION_AUTOMATION_INGEST_OWNER"),
+    missing: ["AUTOMATION_GATEWAY_URL", "AUTOMATION_GATEWAY_TOKEN", "AXION_AUTOMATION_INGEST_TOKEN", "AXION_AUTOMATION_INGEST_OWNER"].filter((key) => !has(key)),
+    optional: true,
+    requiresOwnerAction: true,
+    requiresPaymentApproval: true,
+  },
 ];
 
 const rows = checks;

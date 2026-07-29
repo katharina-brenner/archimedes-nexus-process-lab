@@ -37,6 +37,8 @@ async function startServer(extraEnv = {}) {
       GOOGLE_CLIENT_ID: "",
       SUPABASE_URL: "",
       SUPABASE_SERVICE_ROLE_KEY: "",
+      AXION_AUTOMATION_INGEST_TOKEN: "automation-ingest-test-token",
+      AXION_AUTOMATION_INGEST_OWNER: "owner",
       ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -314,8 +316,36 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(automationState.payload.gateway.writesEnabled, false);
     assert.equal(automationState.payload.loops.length, 3);
     assert.ok(automationState.payload.latest.some((sample) => sample.tag === "BR101.PV.DO"));
+    assert.equal(automationState.payload.tagMap.length, automationState.payload.tagDefinitions.length);
     const doLoop = automationState.payload.loops.find((loop) => loop.key === "do-cascade");
     assert.ok(doLoop);
+
+    const commissioning = await jsonFetch(server.baseUrl, "/api/automation/commissioning/run", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        connectionId: automationConnection.payload.connection.id,
+      },
+    });
+    assert.equal(commissioning.response.status, 201);
+    assert.equal(commissioning.payload.run.status, "passed");
+    assert.ok(commissioning.payload.run.checks.some((check) => check.key === "write-lock" && check.status === "pass"));
+    assert.ok(commissioning.payload.run.checks.some((check) => check.key === "interlocks" && check.status === "not-applicable"));
+
+    const machineTelemetry = await jsonFetch(server.baseUrl, "/api/automation/telemetry", {
+      token: "automation-ingest-test-token",
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        connectionId: automationConnection.payload.connection.id,
+        samples: [
+          { tag: "BR101.PV.PRESSURE", value: 0.28, unit: "bar(g)", quality: "Good", timestamp: new Date().toISOString() },
+        ],
+      },
+    });
+    assert.equal(machineTelemetry.response.status, 201);
+    assert.equal(machineTelemetry.payload.accepted, 1);
 
     const blockedClosedLoop = await jsonFetch(
       server.baseUrl,

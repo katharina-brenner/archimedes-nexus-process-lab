@@ -91,6 +91,8 @@ const config = {
   automationGatewayUrl: (process.env.AUTOMATION_GATEWAY_URL || "").replace(/\/+$/, ""),
   automationGatewayToken: process.env.AUTOMATION_GATEWAY_TOKEN || "",
   automationWritesEnabled: process.env.AXION_AUTOMATION_WRITES_ENABLED === "true",
+  automationIngestToken: process.env.AXION_AUTOMATION_INGEST_TOKEN || "",
+  automationIngestOwner: normalizePrincipal(process.env.AXION_AUTOMATION_INGEST_OWNER || ""),
   requireProductionConfig: process.env.AXION_REQUIRE_PRODUCTION_CONFIG === "true",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
@@ -134,6 +136,7 @@ const defaultDb = {
   automationTelemetry: [],
   automationControlLoops: [],
   automationActions: [],
+  automationCommissioningRuns: [],
   audit: [],
 };
 
@@ -217,11 +220,13 @@ function publicConfig() {
       automationConnectionEndpoint: "/api/automation/connections",
       automationTelemetryEndpoint: "/api/automation/telemetry",
       automationControlEndpoint: "/api/automation/control-loops",
+      automationCommissioningEndpoint: "/api/automation/commissioning/run",
       billingPortalEndpoint: "/api/billing/portal",
       nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
       aiCommandPlanner: Boolean(config.openaiApiKey),
       automationGateway: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      automationMachineIngest: Boolean(config.automationIngestToken && config.automationIngestOwner),
       physicalAutomationWrites: config.automationWritesEnabled,
     },
   };
@@ -340,8 +345,8 @@ function productionReadiness() {
     {
       key: "automation-gateway",
       label: "PLC/SCADA edge gateway",
-      ready: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
-      missing: ["AUTOMATION_GATEWAY_URL", "AUTOMATION_GATEWAY_TOKEN"].filter((key) => !process.env[key]),
+      ready: Boolean(config.automationGatewayUrl && config.automationGatewayToken && config.automationIngestToken && config.automationIngestOwner),
+      missing: ["AUTOMATION_GATEWAY_URL", "AUTOMATION_GATEWAY_TOKEN", "AXION_AUTOMATION_INGEST_TOKEN", "AXION_AUTOMATION_INGEST_OWNER"].filter((key) => !process.env[key]),
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
       ownerAction: "Deploy an OT-network edge gateway with trusted OPC UA certificates, read-only tags first, outbound TLS, and a reviewed allowlist before enabling any physical write.",
@@ -1451,6 +1456,7 @@ function ensureDbShape(db) {
   db.automationTelemetry ||= [];
   db.automationControlLoops ||= [];
   db.automationActions ||= [];
+  db.automationCommissioningRuns ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -3718,6 +3724,14 @@ const automationTagDefinitions = [
   { tag: "BATCH.PHASE", label: "Batch phase", unit: "state", min: 0, max: 8, target: 3, writable: false, modelKey: "batchPhase" },
 ];
 
+const automationTagMap = automationTagDefinitions.map((definition) => ({
+  ...definition,
+  nodeId: `ns=2;s=${definition.tag}`,
+  dataType: definition.tag === "BATCH.PHASE" ? "Int32" : "Double",
+  criticality: definition.tag.includes(".MV.") ? "CMA" : definition.tag === "BATCH.PHASE" ? "context" : "CPP",
+  commissioningState: "template-node-id",
+}));
+
 const automationLoopTemplates = [
   { key: "do-cascade", name: "DO cascade", pvTag: "BR101.PV.DO", spTag: "BR101.SP.DO", mvTag: "BR101.MV.AGITATION", kp: 1.8, ki: 0.08, kd: 0.05, outputMin: 30, outputMax: 150, rateLimit: 8, safetyLow: 10, safetyHigh: 80 },
   { key: "ph-control", name: "pH control", pvTag: "BR101.PV.PH", spTag: "BR101.SP.PH", mvTag: "BR101.MV.BASE", kp: 18, ki: 0.6, kd: 0.2, outputMin: 0, outputMax: 200, rateLimit: 15, safetyLow: 6.6, safetyHigh: 7.5 },
@@ -3846,6 +3860,9 @@ function automationSnapshot(db, session, projectId = "") {
   const actions = db.automationActions
     .filter((item) => item.owner === owner && item.projectId === projectId)
     .slice(0, 40);
+  const commissioningRuns = db.automationCommissioningRuns
+    .filter((item) => item.owner === owner && item.projectId === projectId)
+    .slice(0, 10);
   return {
     projectId,
     gateway: {
@@ -3855,10 +3872,12 @@ function automationSnapshot(db, session, projectId = "") {
     },
     connections,
     tagDefinitions: automationTagDefinitions,
+    tagMap: automationTagMap,
     latest: latestAutomationTelemetry(db, owner, projectId),
     history: automationHistory(db, owner, projectId),
     loops,
     actions,
+    commissioningRuns,
     generatedAt: new Date().toISOString(),
     note: "Simulation and advisory control are available immediately. Physical PLC writes require an approved edge gateway, a write-enabled connection, a closed-loop approval and AXION_AUTOMATION_WRITES_ENABLED=true.",
   };
@@ -3954,7 +3973,17 @@ async function testAutomationConnection(req, res, connectionId) {
 }
 
 async function ingestAutomationTelemetry(req, res) {
-  const session = verifySession(getBearer(req));
+  const token = getBearer(req);
+  let session = verifySession(token);
+  let machineIngest = false;
+  if (!session && config.automationIngestToken && config.automationIngestOwner && safeCompare(token, config.automationIngestToken)) {
+    session = {
+      username: config.automationIngestOwner,
+      name: "Axion automation edge gateway",
+      role: "automation-gateway",
+    };
+    machineIngest = true;
+  }
   if (!session) return json(res, 401, { error: "Not authenticated" });
   const body = await parseBody(req);
   const db = ensureDbShape(await loadDb());
@@ -3988,9 +4017,124 @@ async function ingestAutomationTelemetry(req, res) {
   });
   db.automationTelemetry.push(...accepted);
   if (db.automationTelemetry.length > 20_000) db.automationTelemetry = db.automationTelemetry.slice(-20_000);
-  db.audit.unshift({ at: receivedAt, type: "automation.telemetry.ingested", projectId, connectionId, accepted: accepted.length, by: owner });
+  db.audit.unshift({
+    at: receivedAt,
+    type: "automation.telemetry.ingested",
+    projectId,
+    connectionId,
+    accepted: accepted.length,
+    by: machineIngest ? `edge:${owner}` : owner,
+  });
   await saveDb(db);
   json(res, 201, { accepted: accepted.length, rejected: samples.length - accepted.length, state: automationSnapshot(db, session, projectId) });
+}
+
+function commissioningCheck(key, label, status, evidence, required = true) {
+  return { key, label, status, evidence, required };
+}
+
+async function runAutomationCommissioning(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "").slice(0, 200);
+  if (!automationProjectAllowed(db, session, projectId)) return json(res, 404, { error: "Project not found" });
+  const owner = automationOwner(session);
+  const connectionId = String(body.connectionId || "").slice(0, 200);
+  const connection = db.automationConnections.find((item) => item.id === connectionId && item.owner === owner && item.projectId === projectId)
+    || db.automationConnections.find((item) => item.owner === owner && item.projectId === projectId)
+    || null;
+  const latest = latestAutomationTelemetry(db, owner, projectId);
+  const definitionMap = new Map(automationTagDefinitions.map((item) => [item.tag, item]));
+  const good = latest.filter((item) => item.quality === "Good");
+  const recent = latest.filter((item) => Date.now() - Date.parse(item.sourceTimestamp) < 120_000);
+  const insideRange = latest.filter((item) => {
+    const definition = definitionMap.get(item.tag);
+    return !definition || (Number(item.value) >= definition.min && Number(item.value) <= definition.max);
+  });
+  const physical = connection && connection.kind !== "simulation";
+  const checks = [
+    commissioningCheck(
+      "connection",
+      "Data-source handshake",
+      connection?.status === "connected" ? "pass" : connection ? "review" : "fail",
+      connection ? `${connection.name}: ${connection.status}` : "Create and test a data-source connection.",
+    ),
+    commissioningCheck(
+      "read-only",
+      "Read-only commissioning",
+      !connection || connection.mode === "read-only" || connection.kind === "simulation" ? "pass" : "review",
+      connection?.kind === "simulation" ? "Simulator has no physical outputs." : `Connection mode: ${connection?.mode || "not configured"}.`,
+    ),
+    commissioningCheck(
+      "tag-map",
+      "Tag-map completeness",
+      automationTagMap.length === automationTagDefinitions.length ? "pass" : "fail",
+      `${automationTagMap.length}/${automationTagDefinitions.length} required Axion tags have a node-map entry.`,
+    ),
+    commissioningCheck(
+      "namespace",
+      "Plant namespace review",
+      physical ? "review" : "pass",
+      physical ? "Replace template ns=2 node IDs with the exported and independently reviewed PLC namespace." : "Template namespace is valid for the simulator.",
+    ),
+    commissioningCheck(
+      "quality",
+      "Signal quality",
+      good.length === latest.length && latest.length ? "pass" : good.length ? "review" : "fail",
+      `${good.length}/${latest.length} current values report Good quality.`,
+    ),
+    commissioningCheck(
+      "timestamps",
+      "Timestamp freshness",
+      recent.length === latest.length && latest.length ? "pass" : "review",
+      `${recent.length}/${latest.length} values are newer than 120 seconds.`,
+    ),
+    commissioningCheck(
+      "engineering-limits",
+      "Engineering-unit limits",
+      insideRange.length === latest.length ? "pass" : "fail",
+      `${insideRange.length}/${latest.length} values lie inside configured engineering ranges.`,
+    ),
+    commissioningCheck(
+      "write-lock",
+      "Physical write lock",
+      !config.automationWritesEnabled ? "pass" : "review",
+      config.automationWritesEnabled ? "Backend writes are enabled; verify gateway allowlist and site approval." : "Backend physical writes remain locked.",
+    ),
+    commissioningCheck(
+      "interlocks",
+      "PLC interlocks and independent trips",
+      physical ? "site-evidence" : "not-applicable",
+      physical ? "Attach approved cause-and-effect, interlock and trip test evidence before closed-loop release." : "Not applicable to the verified simulator.",
+      physical,
+    ),
+    commissioningCheck(
+      "historian",
+      "Historian continuity",
+      automationHistory(db, owner, projectId).length >= 30 ? "pass" : "review",
+      `${automationHistory(db, owner, projectId).length} recent historian samples are available.`,
+    ),
+  ];
+  const blocking = checks.filter((item) => item.required && ["fail", "site-evidence"].includes(item.status));
+  const run = {
+    id: randomUUID(),
+    owner,
+    projectId,
+    connectionId: connection?.id || "",
+    connectionName: connection?.name || "No connection",
+    mode: physical ? "site-read-only" : "simulator",
+    status: blocking.length ? "blocked" : checks.some((item) => item.status === "review") ? "review-required" : "passed",
+    checks,
+    createdAt: new Date().toISOString(),
+    createdBy: owner,
+  };
+  db.automationCommissioningRuns.unshift(run);
+  db.automationCommissioningRuns = db.automationCommissioningRuns.slice(0, 2000);
+  db.audit.unshift({ at: run.createdAt, type: "automation.commissioning.run", projectId, connectionId: run.connectionId, status: run.status, by: owner });
+  await saveDb(db);
+  json(res, 201, { run, state: automationSnapshot(db, session, projectId) });
 }
 
 function boundedNumber(value, fallback, min, max) {
@@ -5160,6 +5304,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "POST" && pathname === "/api/automation/telemetry") {
     await ingestAutomationTelemetry(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/automation/commissioning/run") {
+    await runAutomationCommissioning(req, res);
     return;
   }
   const automationLoopMatch = pathname.match(/^\/api\/automation\/control-loops\/([^/]+)$/);

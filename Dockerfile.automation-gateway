@@ -1,0 +1,18 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY automation-gateway/package.json ./package.json
+RUN npm install --omit=dev
+
+COPY automation-gateway/server.mjs ./server.mjs
+COPY automation-gateway/tag-map.json ./tag-map.json
+
+ENV HOST=0.0.0.0
+ENV PORT=8921
+ENV AUTOMATION_TAG_MAP=/app/tag-map.json
+ENV AUTOMATION_GATEWAY_WRITES_ENABLED=false
+
+EXPOSE 8921
+
+CMD ["node", "server.mjs"]
