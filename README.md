@@ -55,15 +55,16 @@ The paywall is backend-enforced. Do not use a static GitHub Pages deployment for
 
 1. Copy `.env.example` to `.env`.
 2. Set `SESSION_SECRET` to a long private random string.
-3. Set `AXION_PRICE_CENTS=240000` and `AXION_CURRENCY=EUR` for the Professional Individual annual licence.
-4. Create a Stripe product/price for the annual Axion license, or let the backend create a one-off checkout price from `AXION_PRICE_CENTS`.
+3. Set `AXION_PRICE_CENTS=240000`, `AXION_CURRENCY=EUR`, and `AXION_BILLING_MODE=subscription` for the Professional annual subscription.
+4. Create a recurring annual Stripe product/price, or let the backend create recurring inline price data from `AXION_PRICE_CENTS`.
 5. Set `STRIPE_SECRET_KEY`.
-6. Optional but recommended: set `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET`.
+6. Set the recurring `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET`; enable `STRIPE_AUTOMATIC_TAX=true` only after Stripe Tax is configured for the account.
 7. Set `APP_BASE_URL` to the public backend URL, for example `https://your-domain.com`.
-8. Start the backend with `npm run backend`.
-9. New paying users open the login page and submit the paid-access form.
-10. The backend creates a Stripe Checkout session and redirects the user to secure payment.
-11. After Stripe confirms payment, the backend creates a license and the frontend logs the user in automatically.
+8. Activate and configure Stripe's hosted customer portal for invoice, payment-method, and subscription management.
+9. Start the backend with `npm run backend`.
+10. New paying users open the login page and submit the paid-access form.
+11. The backend creates a Stripe Checkout subscription session and redirects the user to secure payment.
+12. After Stripe confirms payment, the backend creates a license and the frontend logs the user in automatically.
 
 For production Stripe activation on a public HTTPS backend, set:
 
@@ -71,6 +72,8 @@ For production Stripe activation on a public HTTPS backend, set:
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+AXION_BILLING_MODE=subscription
+STRIPE_AUTOMATIC_TAX=false
 APP_BASE_URL=https://your-public-backend-domain.com
 ```
 
@@ -80,7 +83,7 @@ Configure the Stripe webhook endpoint to:
 https://your-public-backend-domain.com/api/stripe/webhook
 ```
 
-Listen for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.async_payment_failed`.
+Listen for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, and `invoice.payment_action_required`.
 
 For local webhook testing with Stripe CLI:
 
@@ -128,6 +131,7 @@ The backend readiness payload now marks which missing systems require account-ow
 - `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR Professional Individual annual licence
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
 - `POST /api/stripe/webhook` receives Stripe checkout payment events and activates paid orders
+- `POST /api/billing/portal` creates an authenticated Stripe customer-portal session for subscription and invoice management
 - `POST /api/auth/login` logs in the owner workspace
 - `GET /api/auth/google-config` tells the frontend whether Google login is configured
 - `POST /api/auth/google` verifies a Google ID token and creates a server session

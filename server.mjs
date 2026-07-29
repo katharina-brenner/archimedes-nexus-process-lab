@@ -69,6 +69,9 @@ const config = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
   stripePriceId: process.env.STRIPE_PRICE_ID || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  stripeApiBaseUrl: (process.env.STRIPE_API_BASE_URL || "https://api.stripe.com").replace(/\/+$/, ""),
+  stripeBillingMode: process.env.AXION_BILLING_MODE === "payment" ? "payment" : "subscription",
+  stripeAutomaticTax: process.env.STRIPE_AUTOMATIC_TAX === "true",
   supabaseUrl: (process.env.SUPABASE_URL || "").replace(/\/+$/, ""),
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   supabaseStateTable: process.env.SUPABASE_STATE_TABLE || "axion_state",
@@ -180,6 +183,10 @@ function publicConfig() {
       provider: config.stripeSecretKey ? "stripe" : "setup_required",
       stripeEnabled: Boolean(config.stripeSecretKey),
       automaticActivation: Boolean(config.stripeSecretKey),
+      billingMode: config.stripeBillingMode,
+      interval: config.stripeBillingMode === "subscription" ? "year" : "one-time",
+      customerPortal: Boolean(config.stripeSecretKey),
+      automaticTax: config.stripeAutomaticTax,
     },
     backend: {
       currentStorage: supabaseConfigured() ? `Supabase/Postgres tables ${config.supabaseStateTable} + ${config.supabaseDocumentsTable}` : "local JSON files in .data/models",
@@ -196,6 +203,7 @@ function publicConfig() {
       commandPlanEndpoint: "/api/commands/plan",
       commandApplyEndpoint: "/api/commands/{planId}/apply",
       commandUndoEndpoint: "/api/commands/undo",
+      billingPortalEndpoint: "/api/billing/portal",
       nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
       aiCommandPlanner: Boolean(config.openaiApiKey),
@@ -645,7 +653,7 @@ async function stripeRequest(pathname, params = {}, method = "POST") {
   if (!config.stripeSecretKey) {
     throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY on the backend; add STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and APP_BASE_URL for automatic SaaS checkout.");
   }
-  const response = await fetch(`https://api.stripe.com${pathname}`, {
+  const response = await fetch(`${config.stripeApiBaseUrl}${pathname}`, {
     method,
     headers: {
       authorization: `Bearer ${config.stripeSecretKey}`,
@@ -1094,6 +1102,11 @@ function sanitizeOrder(order) {
     customerEmail: order.customerEmail,
     company: order.company,
     licenseKey: order.licenseKey || "",
+    billingMode: order.billingMode || "subscription",
+    stripeCustomerId: order.stripeCustomerId || "",
+    stripeSubscriptionId: order.stripeSubscriptionId || "",
+    subscriptionStatus: order.subscriptionStatus || "",
+    currentPeriodEnd: order.currentPeriodEnd || "",
   };
 }
 
@@ -1106,6 +1119,10 @@ function sanitizeLicense(license) {
     orderId: license.orderId,
     createdAt: license.createdAt,
     status: license.status,
+    billingStatus: license.billingStatus || "",
+    stripeCustomerId: license.stripeCustomerId || "",
+    stripeSubscriptionId: license.stripeSubscriptionId || "",
+    currentPeriodEnd: license.currentPeriodEnd || "",
   };
 }
 
@@ -1174,23 +1191,36 @@ function billingProfileForSession(session) {
   const isExempt = Boolean(session.paymentExempt);
   return {
     plan: isAdmin ? "Owner workspace" : isCustomer ? "Professional license" : isExempt ? "Workspace access" : "Private workspace",
-    paymentStatus: isCustomer ? "paid active" : isAdmin ? "workspace access" : isExempt ? "workspace access" : "workspace access",
+    paymentStatus: session.billingStatus || (isCustomer ? "paid active" : "workspace access"),
     amount,
     amountFormatted,
     currency: config.currency,
     billingEmail: session.email || "",
-    customerId: session.licenseKey || sessionPrincipal(session),
+    customerId: session.stripeCustomerId || session.licenseKey || sessionPrincipal(session),
     licenseKey: session.licenseKey || "",
     paymentExempt: isExempt || isAdmin,
     checkoutConfigured: Boolean(config.stripeSecretKey),
-    renewal: "annual SaaS access",
+    stripeCustomerId: session.stripeCustomerId || "",
+    stripeSubscriptionId: session.stripeSubscriptionId || "",
+    currentPeriodEnd: session.currentPeriodEnd || "",
+    billingPortalAvailable: Boolean(config.stripeSecretKey && session.stripeCustomerId),
+    renewal: config.stripeBillingMode === "subscription" ? "renews annually until cancelled" : "annual access",
   };
 }
 
-function activatePaidOrder(db, order, { paymentProvider = "stripe", paymentId = "", paidAt = new Date().toISOString() } = {}) {
+function activatePaidOrder(db, order, {
+  paymentProvider = "stripe",
+  paymentId = "",
+  stripeCustomerId = "",
+  stripeSubscriptionId = "",
+  subscriptionStatus = "",
+  currentPeriodEnd = "",
+  paidAt = new Date().toISOString(),
+} = {}) {
+  let license = order.licenseKey ? db.licenses.find((item) => item.key === order.licenseKey) : null;
   if (!order.licenseKey) {
     order.licenseKey = makeLicenseKey();
-    db.licenses.unshift({
+    license = {
       key: order.licenseKey,
       customerEmail: order.customerEmail,
       customerName: order.customerName,
@@ -1198,14 +1228,75 @@ function activatePaidOrder(db, order, { paymentProvider = "stripe", paymentId = 
       orderId: order.id,
       createdAt: paidAt,
       status: "active",
-    });
+    };
+    db.licenses.unshift(license);
+  }
+  license ||= db.licenses.find((item) => item.key === order.licenseKey);
+  if (license) {
+    license.status = "active";
+    license.billingStatus = subscriptionStatus || "active";
+    license.stripeCustomerId = stripeCustomerId || license.stripeCustomerId || "";
+    license.stripeSubscriptionId = stripeSubscriptionId || license.stripeSubscriptionId || "";
+    license.currentPeriodEnd = currentPeriodEnd || license.currentPeriodEnd || "";
   }
   order.status = "paid_active";
   order.paidAt = paidAt;
   order.paymentProvider = paymentProvider;
+  order.stripeCustomerId = stripeCustomerId || order.stripeCustomerId || "";
+  order.stripeSubscriptionId = stripeSubscriptionId || order.stripeSubscriptionId || "";
+  order.subscriptionStatus = subscriptionStatus || order.subscriptionStatus || (order.billingMode === "subscription" ? "active" : "paid");
+  order.currentPeriodEnd = currentPeriodEnd || order.currentPeriodEnd || "";
   if (paymentId) order.paymentId = paymentId;
   db.audit.unshift({ at: paidAt, type: "order.paid", orderId: order.id, reference: order.reference, licenseKey: order.licenseKey, paymentProvider, paymentId });
   return order.licenseKey;
+}
+
+function stripeTimestamp(value) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toISOString() : "";
+}
+
+function findStripeOrder(db, object = {}) {
+  const subscriptionId = typeof object.subscription === "string"
+    ? object.subscription
+    : object.id?.startsWith?.("sub_") ? object.id : object.parent?.subscription_details?.subscription || "";
+  const customerId = typeof object.customer === "string" ? object.customer : object.customer?.id || "";
+  const orderId = object.metadata?.orderId || object.client_reference_id || "";
+  return db.orders.find((item) =>
+    (orderId && item.id === orderId)
+    || (object.id?.startsWith?.("cs_") && item.stripeSessionId === object.id)
+    || (subscriptionId && item.stripeSubscriptionId === subscriptionId)
+    || (customerId && item.stripeCustomerId === customerId));
+}
+
+function syncSubscriptionAccess(db, order, subscription = {}) {
+  if (!order) return;
+  const status = String(subscription.status || order.subscriptionStatus || "active");
+  const activeStatuses = new Set(["active", "trialing", "past_due"]);
+  const accessStatus = activeStatuses.has(status) ? "active" : "suspended";
+  const currentPeriodEnd = stripeTimestamp(subscription.current_period_end) || order.currentPeriodEnd || "";
+  order.stripeCustomerId = String(subscription.customer || order.stripeCustomerId || "");
+  order.stripeSubscriptionId = String(subscription.id || order.stripeSubscriptionId || "");
+  order.subscriptionStatus = status;
+  order.currentPeriodEnd = currentPeriodEnd;
+  order.status = accessStatus === "active" ? "paid_active" : `subscription_${status}`;
+  const license = db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id);
+  if (license) {
+    license.status = accessStatus;
+    license.billingStatus = status;
+    license.stripeCustomerId = order.stripeCustomerId;
+    license.stripeSubscriptionId = order.stripeSubscriptionId;
+    license.currentPeriodEnd = currentPeriodEnd;
+  }
+  db.audit.unshift({
+    at: new Date().toISOString(),
+    type: "billing.subscription.synced",
+    orderId: order.id,
+    reference: order.reference,
+    subscriptionId: order.stripeSubscriptionId,
+    status,
+    accessStatus,
+  });
 }
 
 async function createCheckout(req, res) {
@@ -1241,29 +1332,45 @@ async function createCheckout(req, res) {
     customerName,
     customerEmail,
     company,
+    billingMode: config.stripeBillingMode,
   };
   db.orders.unshift(order);
   db.audit.unshift({ at: order.createdAt, type: "checkout.created", orderId: order.id, reference: order.reference, provider: "stripe" });
   await saveDb(db);
 
   const sessionParams = {
-    mode: "payment",
-    success_url: `${config.appBaseUrl}/index.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${config.appBaseUrl}/index.html?checkout=cancelled`,
+    mode: config.stripeBillingMode,
+    success_url: `${config.appBaseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${config.appBaseUrl}/?checkout=cancelled`,
     customer_email: customerEmail,
     client_reference_id: order.id,
     "metadata[orderId]": order.id,
     "metadata[reference]": order.reference,
     "metadata[customerEmail]": customerEmail,
     "automatic_payment_methods[enabled]": "true",
+    billing_address_collection: "required",
+    "tax_id_collection[enabled]": "true",
+    allow_promotion_codes: "true",
+    locale: "auto",
     "line_items[0][quantity]": 1,
   };
+  if (config.stripeAutomaticTax) sessionParams["automatic_tax[enabled]"] = "true";
+  if (config.stripeBillingMode === "subscription") {
+    sessionParams["subscription_data[metadata][orderId]"] = order.id;
+    sessionParams["subscription_data[metadata][reference]"] = order.reference;
+  } else {
+    sessionParams.customer_creation = "always";
+    sessionParams["invoice_creation[enabled]"] = "true";
+  }
   if (config.stripePriceId) {
     sessionParams["line_items[0][price]"] = config.stripePriceId;
   } else {
     sessionParams["line_items[0][price_data][currency]"] = config.currency.toLowerCase();
     sessionParams["line_items[0][price_data][unit_amount]"] = config.priceCents;
     sessionParams["line_items[0][price_data][product_data][name]"] = `${config.productName} annual access`;
+    if (config.stripeBillingMode === "subscription") {
+      sessionParams["line_items[0][price_data][recurring][interval]"] = "year";
+    }
   }
   const session = await stripeRequest("/v1/checkout/sessions", sessionParams);
   order.stripeSessionId = session.id;
@@ -1281,7 +1388,11 @@ async function createCheckout(req, res) {
       checkoutUrl: session.url,
       sessionId: session.id,
       automaticActivation: true,
-      instruction: "Continue to secure checkout. Your Axion license activates automatically after successful payment.",
+      billingMode: config.stripeBillingMode,
+      interval: config.stripeBillingMode === "subscription" ? "year" : "one-time",
+      instruction: config.stripeBillingMode === "subscription"
+        ? "Continue to secure checkout. Your annual subscription and workspace access activate automatically after successful payment."
+        : "Continue to secure checkout. Your license activates automatically after successful payment.",
     },
   });
 }
@@ -4060,6 +4171,10 @@ async function googleLogin(req, res) {
     name: user.name || profile.name || email,
     paymentExempt: Boolean(user.paymentExempt),
     licenseKey: license?.key || "",
+    billingStatus: license?.billingStatus || "",
+    stripeCustomerId: license?.stripeCustomerId || "",
+    stripeSubscriptionId: license?.stripeSubscriptionId || "",
+    currentPeriodEnd: license?.currentPeriodEnd || "",
     exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
   });
   json(res, 200, {
@@ -4071,7 +4186,18 @@ async function googleLogin(req, res) {
       email,
       productName: config.productName,
       licenseKey: license?.key || "",
-      billing: billingProfileForSession({ role: user.role || "user", email, username: user.username, name: user.name, paymentExempt: Boolean(user.paymentExempt), licenseKey: license?.key || "" }),
+      billing: billingProfileForSession({
+        role: user.role || "user",
+        email,
+        username: user.username,
+        name: user.name,
+        paymentExempt: Boolean(user.paymentExempt),
+        licenseKey: license?.key || "",
+        billingStatus: license?.billingStatus || "",
+        stripeCustomerId: license?.stripeCustomerId || "",
+        stripeSubscriptionId: license?.stripeSubscriptionId || "",
+        currentPeriodEnd: license?.currentPeriodEnd || "",
+      }),
     },
   });
 }
@@ -4099,6 +4225,7 @@ async function login(req, res) {
 
   const localUser = db.users.find((item) => item.status === "active" && (item.username === user || item.email === user));
   if (localUser?.passwordHash && safeCompare(localUser.passwordHash, userPasswordHash(password))) {
+    const localLicense = activeLicenseForEmail(db, localUser.email);
     const token = signSession({
       sub: localUser.id,
       role: localUser.role || "user",
@@ -4106,6 +4233,11 @@ async function login(req, res) {
       email: localUser.email,
       name: localUser.name,
       paymentExempt: Boolean(localUser.paymentExempt),
+      licenseKey: localLicense?.key || "",
+      billingStatus: localLicense?.billingStatus || "",
+      stripeCustomerId: localLicense?.stripeCustomerId || "",
+      stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
+      currentPeriodEnd: localLicense?.currentPeriodEnd || "",
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
     });
     json(res, 200, {
@@ -4116,7 +4248,19 @@ async function login(req, res) {
         username: localUser.username,
         email: localUser.email,
         productName: config.productName,
-        billing: billingProfileForSession({ role: localUser.role || "user", username: localUser.username, email: localUser.email, name: localUser.name, paymentExempt: Boolean(localUser.paymentExempt) }),
+        licenseKey: localLicense?.key || "",
+        billing: billingProfileForSession({
+          role: localUser.role || "user",
+          username: localUser.username,
+          email: localUser.email,
+          name: localUser.name,
+          paymentExempt: Boolean(localUser.paymentExempt),
+          licenseKey: localLicense?.key || "",
+          billingStatus: localLicense?.billingStatus || "",
+          stripeCustomerId: localLicense?.stripeCustomerId || "",
+          stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
+          currentPeriodEnd: localLicense?.currentPeriodEnd || "",
+        }),
       },
     });
     return;
@@ -4125,8 +4269,30 @@ async function login(req, res) {
   const license = db.licenses.find((item) => item.key === licenseKey && item.status === "active");
   const emailMatches = !user || license?.customerEmail === user;
   if (license && emailMatches) {
-    const token = signSession({ sub: license.key, role: "customer", email: license.customerEmail, name: license.customerName, licenseKey: license.key, exp: Date.now() + 1000 * 60 * 60 * 24 * 14 });
-    json(res, 200, { token, account: { role: "customer", name: license.customerName, email: license.customerEmail, productName: config.productName, licenseKey: license.key, billing: billingProfileForSession({ role: "customer", email: license.customerEmail, name: license.customerName, licenseKey: license.key }) } });
+    const customerSession = {
+      sub: license.key,
+      role: "customer",
+      email: license.customerEmail,
+      name: license.customerName,
+      licenseKey: license.key,
+      billingStatus: license.billingStatus || "",
+      stripeCustomerId: license.stripeCustomerId || "",
+      stripeSubscriptionId: license.stripeSubscriptionId || "",
+      currentPeriodEnd: license.currentPeriodEnd || "",
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
+    };
+    const token = signSession(customerSession);
+    json(res, 200, {
+      token,
+      account: {
+        role: "customer",
+        name: license.customerName,
+        email: license.customerEmail,
+        productName: config.productName,
+        licenseKey: license.key,
+        billing: billingProfileForSession(customerSession),
+      },
+    });
     return;
   }
 
@@ -4223,7 +4389,13 @@ async function checkoutSessionStatus(req, res, sessionId) {
     return;
   }
   if (session.payment_status === "paid") {
-    activatePaidOrder(db, order, { paymentProvider: "stripe", paymentId: session.payment_intent || session.id });
+    activatePaidOrder(db, order, {
+      paymentProvider: "stripe",
+      paymentId: session.payment_intent || session.id,
+      stripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id || "",
+      stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : session.subscription?.id || "",
+      subscriptionStatus: config.stripeBillingMode === "subscription" ? "active" : "paid",
+    });
     await saveDb(db);
   }
   json(res, 200, {
@@ -4244,25 +4416,107 @@ async function stripeWebhook(req, res) {
     return;
   }
   const event = JSON.parse(rawBody);
-  const session = event.data?.object || {};
+  const object = event.data?.object || {};
   const db = ensureDbShape(await loadDb());
-  if ((event.type === "checkout.session.completed" && session.payment_status === "paid") || event.type === "checkout.session.async_payment_succeeded") {
-    const orderId = session.metadata?.orderId || session.client_reference_id;
-    const order = db.orders.find((item) => item.id === orderId || item.stripeSessionId === session.id);
+  let changed = false;
+  if ((event.type === "checkout.session.completed" && object.payment_status === "paid") || event.type === "checkout.session.async_payment_succeeded") {
+    const order = findStripeOrder(db, object);
     if (order) {
-      activatePaidOrder(db, order, { paymentProvider: "stripe", paymentId: session.payment_intent || session.id });
-      await saveDb(db);
+      activatePaidOrder(db, order, {
+        paymentProvider: "stripe",
+        paymentId: object.payment_intent || object.id,
+        stripeCustomerId: typeof object.customer === "string" ? object.customer : object.customer?.id || "",
+        stripeSubscriptionId: typeof object.subscription === "string" ? object.subscription : object.subscription?.id || "",
+        subscriptionStatus: config.stripeBillingMode === "subscription" ? "active" : "paid",
+      });
+      changed = true;
     }
   }
   if (event.type === "checkout.session.async_payment_failed") {
-    const order = db.orders.find((item) => item.id === session.metadata?.orderId || item.stripeSessionId === session.id);
+    const order = findStripeOrder(db, object);
     if (order) {
       order.status = "payment_failed";
       db.audit.unshift({ at: new Date().toISOString(), type: "order.payment_failed", orderId: order.id, reference: order.reference });
-      await saveDb(db);
+      changed = true;
     }
   }
+  if ([
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "customer.subscription.paused",
+    "customer.subscription.resumed",
+  ].includes(event.type)) {
+    const order = findStripeOrder(db, object);
+    if (order) {
+      syncSubscriptionAccess(db, order, object);
+      changed = true;
+    }
+  }
+  if (event.type === "invoice.paid") {
+    const order = findStripeOrder(db, object);
+    if (order) {
+      const license = db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id);
+      order.status = "paid_active";
+      order.subscriptionStatus = "active";
+      if (license) {
+        license.status = "active";
+        license.billingStatus = "active";
+      }
+      db.audit.unshift({ at: new Date().toISOString(), type: "billing.invoice.paid", orderId: order.id, invoiceId: object.id });
+      changed = true;
+    }
+  }
+  if (["invoice.payment_failed", "invoice.payment_action_required"].includes(event.type)) {
+    const order = findStripeOrder(db, object);
+    if (order) {
+      const license = db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id);
+      order.status = "payment_action_required";
+      order.subscriptionStatus = "past_due";
+      if (license) license.billingStatus = "past_due";
+      db.audit.unshift({ at: new Date().toISOString(), type: "billing.invoice.action_required", orderId: order.id, invoiceId: object.id });
+      changed = true;
+    }
+  }
+  if (changed) await saveDb(db);
   json(res, 200, { received: true });
+}
+
+async function createBillingPortal(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return;
+  }
+  if (!config.stripeSecretKey) {
+    json(res, 503, { error: "Stripe billing is not configured on the backend." });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const principal = normalizePrincipal(session.email || "");
+  const license = db.licenses.find((item) =>
+    (session.licenseKey && item.key === session.licenseKey)
+    || (principal && normalizePrincipal(item.customerEmail) === principal));
+  const order = db.orders.find((item) =>
+    (license?.orderId && item.id === license.orderId)
+    || (principal && normalizePrincipal(item.customerEmail) === principal));
+  const customerId = session.stripeCustomerId || license?.stripeCustomerId || order?.stripeCustomerId || "";
+  if (!customerId) {
+    json(res, 409, { error: "No Stripe customer is linked to this account yet." });
+    return;
+  }
+  const portal = await stripeRequest("/v1/billing_portal/sessions", {
+    customer: customerId,
+    return_url: `${config.appBaseUrl}/?page=login`,
+  });
+  db.audit.unshift({
+    at: new Date().toISOString(),
+    type: "billing.portal.created",
+    customerId,
+    by: sessionPrincipal(session),
+  });
+  await saveDb(db);
+  json(res, 201, { url: portal.url });
 }
 
 async function routeApi(req, res, pathname, query = new URLSearchParams()) {
@@ -4301,6 +4555,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "POST" && pathname === "/api/stripe/webhook") {
     await stripeWebhook(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/billing/portal") {
+    await createBillingPortal(req, res);
     return;
   }
   if (req.method === "POST" && pathname === "/api/auth/login") {

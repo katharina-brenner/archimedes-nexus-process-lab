@@ -2139,6 +2139,9 @@ const els = {
   checkoutName: document.querySelector("#checkoutName"),
   checkoutEmail: document.querySelector("#checkoutEmail"),
   checkoutCompany: document.querySelector("#checkoutCompany"),
+  checkoutTerms: document.querySelector("#checkoutTerms"),
+  checkoutPrice: document.querySelector("#checkoutPrice"),
+  checkoutBillingMode: document.querySelector("#checkoutBillingMode"),
   checkoutResult: document.querySelector("#checkoutResult"),
   loginUser: document.querySelector("#loginUser"),
   loginPassword: document.querySelector("#loginPassword"),
@@ -12456,6 +12459,7 @@ function renderProfileMenu() {
       <div class="profile-actions">
         <button data-profile-view="projects" type="button">Projects</button>
         <button data-profile-view="reports" type="button">Invoices / Exports</button>
+        ${billing.billingPortalAvailable ? '<button data-profile-billing type="button">Manage subscription</button>' : ""}
         <button id="logoutButton" data-profile-logout type="button">Logout</button>
       </div>
     </section>
@@ -12476,6 +12480,20 @@ function renderProductConfig(config) {
       ? "Backend online. Private process workspace ready."
       : "Backend online. Private workspace ready.";
   }
+  const amount = config?.amountFormatted || "€2,400";
+  const recurring = config?.payments?.billingMode === "subscription";
+  const intervalLabel = recurring ? "year" : "annual access";
+  const billingNote = recurring ? "Annual subscription · secure Stripe Checkout" : "Annual access · secure Stripe Checkout";
+  if (els.checkoutPrice) els.checkoutPrice.textContent = `${amount} / ${intervalLabel}`;
+  if (els.checkoutBillingMode) {
+    els.checkoutBillingMode.textContent = recurring
+      ? "Annual subscription · renews until cancelled"
+      : "One-time annual access";
+  }
+  const professionalPrice = document.querySelector("#professionalPrice");
+  const professionalBillingNote = document.querySelector("#professionalBillingNote");
+  if (professionalPrice) professionalPrice.textContent = `${amount} / ${intervalLabel}`;
+  if (professionalBillingNote) professionalBillingNote.textContent = billingNote;
   renderProfileMenu();
 }
 
@@ -12529,7 +12547,8 @@ function renderCheckoutResult(payload) {
       <dl>
         <dt>Reference</dt><dd>${escapeHtml(order.reference || payment.reference || "")}</dd>
         <dt>Amount</dt><dd>${escapeHtml(`${amount} ${currency}`)}</dd>
-        <dt>Activation</dt><dd>automatic after payment</dd>
+        <dt>Billing</dt><dd>${payment.billingMode === "subscription" ? "annual subscription" : "annual access"}</dd>
+        <dt>Activation</dt><dd>automatic after verified payment</dd>
       </dl>
       <p>${escapeHtml(payment.instruction || "Continue to Stripe Checkout. Your license activates automatically after successful payment.")}</p>
       <a class="checkout-link" href="${escapeHtml(checkoutUrl)}">Open secure checkout</a>
@@ -12559,6 +12578,14 @@ async function createCheckoutOrder() {
     `;
     if (!customerName) els.checkoutName?.focus();
     else els.checkoutEmail?.focus();
+    return;
+  }
+  if (!els.checkoutTerms?.checked) {
+    els.checkoutResult.innerHTML = `
+      <strong>Confirm the terms</strong>
+      <p>Review and accept the terms and privacy notice before continuing to secure checkout.</p>
+    `;
+    els.checkoutTerms?.focus();
     return;
   }
   els.checkoutResult.innerHTML = "<p>Preparing secure checkout...</p>";
@@ -12622,7 +12649,9 @@ const publicPageTargets = {
   publicEcosystem: "ecosystem",
   publicReadiness: "readiness",
   publicReviews: "reviews",
+  publicComparison: "compare",
   publicPricing: "pricing",
+  publicLegal: "legal",
   loginPanel: "login",
 };
 
@@ -12941,14 +12970,62 @@ function openPublicDetail(key = "mab-overview", { scroll = true } = {}) {
   }, 80);
 }
 
-function showPublicPage(page = "home", { scroll = true, focusLogin = false, defaultDetail = true } = {}) {
+const publicPageMeta = {
+  home: {
+    title: "Bioprocess Simulation, Process Design & Digital Twin | Axion Process OS",
+    description: "Browser-based bioprocess simulation and plant design for flowsheets, balances, scheduling, CFD screening, TEA, LCA, collaboration and model versioning.",
+  },
+  platform: {
+    title: "Bioprocess Engineering Platform | Axion Process OS",
+    description: "Build editable bioprocess flowsheets, equipment trains, balances, CFD screening models, schedules and engineering exports in one browser workspace.",
+  },
+  workflow: {
+    title: "Bioprocess Design Workflow | Axion Process OS",
+    description: "Move from product brief to process model, simulation, scheduling, TEA, LCA and technical review in one connected engineering workflow.",
+  },
+  ecosystem: {
+    title: "Biopharma, Fermentation & Food Process Modelling | Axion",
+    description: "Explore Axion workflows for biopharma, CDMO, fermentation, cultivated meat, industrial biotech and process-engineering teams.",
+  },
+  compare: {
+    title: "SuperPro Designer Alternative for Collaborative Bioprocess Design | Axion",
+    description: "Compare Axion's browser-first collaboration, versioning, APIs and engineering decision workflow with classical desktop process simulation.",
+  },
+  readiness: {
+    title: "Security and Production Architecture | Axion Process OS",
+    description: "Review the security, identity, data, payment, deployment and validated-compute architecture behind Axion Process OS.",
+  },
+  pricing: {
+    title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
+    description: "Explore annual Axion Process OS access for professional bioprocess modelling, private projects, balances, scheduling, CFD screening, TEA and LCA.",
+  },
+  legal: {
+    title: "Privacy and Terms | Axion Process OS",
+    description: "Read the privacy, subscription and engineering-use terms for Axion Process OS.",
+  },
+  login: {
+    title: "Sign in or Start Axion Professional | Axion Process OS",
+    description: "Sign in to Axion Process OS or start a professional bioprocess modelling workspace through secure Stripe Checkout.",
+  },
+};
+
+function showPublicPage(page = "home", { scroll = true, focusLogin = false, defaultDetail = true, syncUrl = false } = {}) {
   const targetPage = page || "home";
   document.querySelectorAll(".public-page").forEach((section) => {
     section.classList.toggle("active-public-page", section.dataset.publicPage === targetPage);
   });
   document.querySelectorAll(".public-nav [data-public-target]").forEach((button) => {
     button.classList.toggle("active", publicPageTargets[button.dataset.publicTarget] === targetPage);
+    if (publicPageTargets[button.dataset.publicTarget] === targetPage) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
+  const meta = publicPageMeta[targetPage] || publicPageMeta.home;
+  document.title = meta.title;
+  document.querySelector('meta[name="description"]')?.setAttribute("content", meta.description);
+  if (syncUrl) {
+    const nextUrl = targetPage === "home" ? window.location.pathname : `${window.location.pathname}?page=${encodeURIComponent(targetPage)}`;
+    window.history.pushState({ publicPage: targetPage }, "", nextUrl);
+  }
   if (scroll) {
     els.loginGate?.scrollTo({ top: 0, behavior: "smooth" });
   } else {
@@ -12964,7 +13041,7 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false, defa
 function scrollPublicTarget(targetId, focusLogin = false) {
   const publicPage = publicPageTargets[targetId];
   if (publicPage) {
-    showPublicPage(publicPage, { focusLogin });
+    showPublicPage(publicPage, { focusLogin, syncUrl: true });
     return;
   }
   const target = document.getElementById(targetId);
@@ -12978,7 +13055,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", readiness: "publicReadiness", professional: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", legal: "publicLegal", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;
@@ -14667,7 +14744,12 @@ async function checkStoredAuth() {
 
 function bindAuth() {
   loadProductConfig().finally(() => setupGoogleLogin());
-  showPublicPage("home", { scroll: false });
+  const requestedPublicPage = new URLSearchParams(window.location.search).get("page") || "home";
+  showPublicPage(publicPageMeta[requestedPublicPage] ? requestedPublicPage : "home", { scroll: false });
+  window.addEventListener("popstate", () => {
+    const page = new URLSearchParams(window.location.search).get("page") || "home";
+    showPublicPage(publicPageMeta[page] ? page : "home", { scroll: false });
+  });
 
   els.publicLogo?.addEventListener("click", () => scrollPublicTarget("publicHome"));
   els.workspaceLogo?.addEventListener("click", showPublicHome);
@@ -14769,6 +14851,22 @@ function bindAuth() {
       setView(viewButton.dataset.profileView);
       els.profilePanel.hidden = true;
       els.profileButton?.setAttribute("aria-expanded", "false");
+      return;
+    }
+    const billingButton = event.target.closest("[data-profile-billing]");
+    if (billingButton) {
+      billingButton.disabled = true;
+      billingButton.textContent = "Opening billing…";
+      apiRequest("/api/billing/portal", { method: "POST" })
+        .then((payload) => {
+          if (!payload.url) throw new Error("Billing portal URL was not returned.");
+          window.location.assign(payload.url);
+        })
+        .catch((error) => {
+          billingButton.disabled = false;
+          billingButton.textContent = "Manage subscription";
+          showToast(error.message || "Billing portal could not be opened.");
+        });
       return;
     }
     const logoutButton = event.target.closest("[data-profile-logout]");

@@ -92,6 +92,52 @@ async function startGitHubMock() {
   };
 }
 
+async function startStripeMock() {
+  const received = { checkout: null, portal: null };
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      const params = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+      res.setHeader("content-type", "application/json");
+      if (req.method === "POST" && req.url === "/v1/checkout/sessions") {
+        received.checkout = Object.fromEntries(params);
+        res.end(JSON.stringify({
+          id: "cs_test_axion_subscription",
+          url: "https://checkout.stripe.test/cs_test_axion_subscription",
+        }));
+        return;
+      }
+      if (req.method === "GET" && req.url === "/v1/checkout/sessions/cs_test_axion_subscription") {
+        res.end(JSON.stringify({
+          id: "cs_test_axion_subscription",
+          client_reference_id: received.checkout?.client_reference_id,
+          metadata: { orderId: received.checkout?.["metadata[orderId]"] },
+          payment_status: "paid",
+          payment_intent: "pi_test_axion",
+          customer: "cus_test_axion",
+          subscription: "sub_test_axion",
+        }));
+        return;
+      }
+      if (req.method === "POST" && req.url === "/v1/billing_portal/sessions") {
+        received.portal = Object.fromEntries(params);
+        res.end(JSON.stringify({ url: "https://billing.stripe.test/session" }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: { message: `Unhandled Stripe mock route ${req.method} ${req.url}` } }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    received,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}
+
 async function stopServer(server) {
   server.child.kill("SIGTERM");
   await new Promise((resolve) => server.child.once("exit", resolve));
@@ -118,6 +164,8 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     const product = await jsonFetch(server.baseUrl, "/api/product");
     assert.equal(product.response.status, 200);
     assert.equal(product.payload.payments.provider, "setup_required");
+    assert.equal(product.payload.payments.billingMode, "subscription");
+    assert.equal(product.payload.payments.interval, "year");
     assert.match(product.payload.backend.currentStorage, /local JSON/);
     assert.equal(product.payload.backend.professionalReadinessEndpoint, "/api/professional-readiness");
 
@@ -155,6 +203,13 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(login.response.status, 200);
     const token = login.payload.token;
     assert.ok(token);
+
+    const billingPortal = await jsonFetch(server.baseUrl, "/api/billing/portal", {
+      token,
+      method: "POST",
+    });
+    assert.equal(billingPortal.response.status, 503);
+    assert.match(billingPortal.payload.error, /Stripe billing is not configured/);
 
     const internalLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
       method: "POST",
@@ -481,5 +536,61 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
   } finally {
     await stopServer(server);
     await githubMock.close();
+  }
+});
+
+test("Stripe subscription checkout activates access and opens the billing portal", async () => {
+  const stripeMock = await startStripeMock();
+  const server = await startServer({
+    STRIPE_API_BASE_URL: stripeMock.baseUrl,
+    STRIPE_SECRET_KEY: "sk_test_axion",
+    STRIPE_PRICE_ID: "price_test_annual",
+    STRIPE_WEBHOOK_SECRET: "whsec_test_axion",
+    AXION_BILLING_MODE: "subscription",
+  });
+  try {
+    const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
+      method: "POST",
+      body: {
+        customerName: "Paid Test User",
+        customerEmail: "paid@example.com",
+        company: "Axion Test",
+      },
+    });
+    assert.equal(checkout.response.status, 201);
+    assert.equal(checkout.payload.payment.billingMode, "subscription");
+    assert.equal(checkout.payload.payment.interval, "year");
+    assert.equal(stripeMock.received.checkout.mode, "subscription");
+    assert.equal(stripeMock.received.checkout["line_items[0][price]"], "price_test_annual");
+    assert.equal(stripeMock.received.checkout.billing_address_collection, "required");
+    assert.equal(stripeMock.received.checkout["tax_id_collection[enabled]"], "true");
+
+    const checkoutStatus = await jsonFetch(server.baseUrl, "/api/checkout/session/cs_test_axion_subscription");
+    assert.equal(checkoutStatus.response.status, 200);
+    assert.equal(checkoutStatus.payload.paid, true);
+    assert.ok(checkoutStatus.payload.licenseKey);
+
+    const paidLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: {
+        user: "paid@example.com",
+        password: checkoutStatus.payload.licenseKey,
+        licenseKey: checkoutStatus.payload.licenseKey,
+      },
+    });
+    assert.equal(paidLogin.response.status, 200);
+    assert.equal(paidLogin.payload.account.billing.stripeCustomerId, "cus_test_axion");
+    assert.equal(paidLogin.payload.account.billing.billingPortalAvailable, true);
+
+    const portal = await jsonFetch(server.baseUrl, "/api/billing/portal", {
+      token: paidLogin.payload.token,
+      method: "POST",
+    });
+    assert.equal(portal.response.status, 201);
+    assert.equal(portal.payload.url, "https://billing.stripe.test/session");
+    assert.equal(stripeMock.received.portal.customer, "cus_test_axion");
+  } finally {
+    await stopServer(server);
+    await stripeMock.close();
   }
 });

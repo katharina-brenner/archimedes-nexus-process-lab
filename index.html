@@ -3,9 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Axion Process OS</title>
+    <title>Bioprocess Simulation, Process Design &amp; Digital Twin | Axion Process OS</title>
+    <meta name="description" content="Browser-based bioprocess simulation and plant design for flowsheets, mass and energy balances, scheduling, CFD screening, TEA, LCA, collaboration and model versioning." />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="theme-color" content="#07131c" />
+    <link rel="canonical" href="https://mediumturquoise-lapwing-443102.hostingersite.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Axion Process OS" />
+    <meta property="og:title" content="Axion Process OS · Bioprocess Simulation and Plant Design" />
+    <meta property="og:description" content="Design biomanufacturing plants, connect process models, test operating scenarios, and prepare engineering decisions in one browser workspace." />
+    <meta property="og:url" content="https://mediumturquoise-lapwing-443102.hostingersite.com/" />
+    <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/industrial-bioprocess-hall.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/industrial-bioprocess-hall.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260729-change-trace-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260729-growth-billing-v1" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://mediumturquoise-lapwing-443102.hostingersite.com/#website",
+            "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/",
+            "name": "Axion Process OS",
+            "alternateName": "Axion"
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://mediumturquoise-lapwing-443102.hostingersite.com/#organization",
+            "name": "Axion Process OS",
+            "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://mediumturquoise-lapwing-443102.hostingersite.com/#software",
+            "name": "Axion Process OS",
+            "applicationCategory": "BusinessApplication",
+            "applicationSubCategory": "Bioprocess engineering and process simulation",
+            "operatingSystem": "Web browser",
+            "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/",
+            "description": "Browser-based bioprocess plant design with flowsheets, balances, scheduling, CFD screening, TEA, LCA, collaboration, versioning and engineering exports.",
+            "featureList": [
+              "Bioprocess flowsheet and equipment builder",
+              "Mass and energy balances",
+              "Production scheduling and equipment occupancy",
+              "Bioreactor CFD engineering screening",
+              "Techno-economic and life-cycle analysis",
+              "Project collaboration, branches and model history"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "2400",
+              "priceCurrency": "EUR",
+              "category": "Annual professional subscription",
+              "availability": "https://schema.org/OnlineOnly"
+            },
+            "publisher": {
+              "@id": "https://mediumturquoise-lapwing-443102.hostingersite.com/#organization"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body class="locked">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
@@ -19,8 +78,12 @@
             </span>
           </button>
           <nav>
-            <a href="#how-it-works">How it works</a>
-            <button type="button" data-public-target="publicPricing">Pricing</button>
+            <a href="./?page=platform" data-public-target="publicPlatform">Platform</a>
+            <a href="./?page=workflow" data-public-target="publicWorkflow">Workflow</a>
+            <a href="./?page=ecosystem" data-public-target="publicEcosystem">Industries</a>
+            <a href="./?page=compare" data-public-target="publicComparison">Compare</a>
+            <a href="./?page=readiness" data-public-target="publicReadiness">Security</a>
+            <a href="./?page=pricing" data-public-target="publicPricing">Pricing</a>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
           </nav>
         </header>
@@ -59,6 +122,48 @@
                 <article><span>01</span><h3>Describe</h3><p>Set the product, scale, biology, quality target, and facility constraints.</p></article>
                 <article><span>02</span><h3>Build</h3><p>Connect production equipment, support systems, utilities, cleaning, and schedules.</p></article>
                 <article><span>03</span><h3>Refine</h3><p>Resolve balances, capacity, CFD risk, economics, LCA, and design decisions.</p></article>
+              </div>
+            </section>
+
+            <section class="public-motion-lab" aria-label="Interactive Axion engineering models">
+              <header>
+                <p>Interactive engineering views</p>
+                <h2>Move from plant topology to reactor physics and operating time.</h2>
+                <span>Hover a model to inspect how Axion keeps process architecture, transport phenomena, and production schedules connected.</span>
+              </header>
+              <div class="public-motion-grid">
+                <figure class="motion-model motion-process">
+                  <div class="motion-process-line" aria-hidden="true">
+                    <span class="motion-unit motion-feed">M</span><i></i>
+                    <span class="motion-unit motion-seed">S</span><i></i>
+                    <span class="motion-unit motion-reactor">BR</span><i></i>
+                    <span class="motion-unit motion-dsp">DSP</span>
+                    <b class="motion-packet packet-one"></b>
+                    <b class="motion-packet packet-two"></b>
+                  </div>
+                  <figcaption><b>Process topology</b><span>Streams expose direction, sequence, and the role of each unit.</span></figcaption>
+                </figure>
+                <figure class="motion-model motion-reactor-field">
+                  <div class="motion-vessel" aria-hidden="true">
+                    <span class="motion-shaft"></span>
+                    <span class="motion-impeller upper"></span>
+                    <span class="motion-impeller lower"></span>
+                    <span class="motion-sparger"></span>
+                    <i class="motion-plume plume-one"></i>
+                    <i class="motion-plume plume-two"></i>
+                    <i class="motion-plume plume-three"></i>
+                  </div>
+                  <figcaption><b>Bioreactor field</b><span>Impellers, gas inlet, scalar transport, and working volume remain explicit.</span></figcaption>
+                </figure>
+                <figure class="motion-model motion-schedule">
+                  <div class="motion-timeboard" aria-hidden="true">
+                    <span><b>BR-101</b><i class="run-long"></i><em>CIP</em></span>
+                    <span><b>CF-201</b><i class="run-medium"></i><em>Flush</em></span>
+                    <span><b>UF-301</b><i class="run-short"></i><em>Release</em></span>
+                    <u></u>
+                  </div>
+                  <figcaption><b>Facility schedule</b><span>Batches, cleaning, release, and equipment reuse move on one clock.</span></figcaption>
+                </figure>
               </div>
             </section>
 
@@ -122,6 +227,10 @@
 
             <footer class="public-minimal-footer">
               <span>Axion Process OS</span>
+              <div>
+                <a href="./?page=legal#privacy" data-public-target="publicLegal">Privacy</a>
+                <a href="./?page=legal#terms" data-public-target="publicLegal">Terms</a>
+              </div>
               <small>Photography: TECNIC Bioprocess Solutions, Marcelo Guarnieri and Crystal Kwok / Unsplash; CC1984USA / Wikimedia Commons, CC BY-SA 4.0.</small>
             </footer>
           </section>
@@ -942,6 +1051,56 @@
             </div>
           </section>
 
+          <section id="publicComparison" class="public-section public-comparison public-page" data-public-page="compare">
+            <div class="section-heading">
+              <p>Compare workflows</p>
+              <h2>A browser-first alternative for modern bioprocess engineering teams.</h2>
+              <span>Axion connects flowsheets, engineering evidence, operational planning, and team decisions. It can sit alongside validated desktop simulators while teams migrate selected workflows.</span>
+            </div>
+            <div class="comparison-intro">
+              <div>
+                <span>For teams evaluating a SuperPro Designer alternative</span>
+                <h3>Keep the calculation work you trust. Modernize how the team works around it.</h3>
+                <p>Start with one representative, customer-owned process. Reconstruct or import permitted data, validate mass balance and economics in parallel, then compare speed, traceability, and collaboration before expanding the scope.</p>
+              </div>
+              <div class="comparison-orbit" aria-hidden="true">
+                <span>Model</span><i></i><span>Validate</span><i></i><span>Collaborate</span><i></i><span>Decide</span>
+              </div>
+            </div>
+            <div class="comparison-table" role="table" aria-label="Axion and classical process simulation workflow comparison">
+              <div class="comparison-row comparison-head" role="row">
+                <span role="columnheader">Capability</span>
+                <span role="columnheader">Axion Process OS</span>
+                <span role="columnheader">Classical desktop workflow</span>
+              </div>
+              <div class="comparison-row" role="row">
+                <b role="cell">Access and collaboration</b>
+                <span role="cell">Browser workspace, shared projects, roles, comments, branches, versions, and audit history.</span>
+                <span role="cell">Often desktop- and file-centred, with collaboration managed outside the model.</span>
+              </div>
+              <div class="comparison-row" role="row">
+                <b role="cell">Process model</b>
+                <span role="cell">Editable plant canvas linked to streams, balances, schedules, evidence, economics, LCA, and exports.</span>
+                <span role="cell">Mature unit-operation calculations and established process-design workflows.</span>
+              </div>
+              <div class="comparison-row" role="row">
+                <b role="cell">Integration</b>
+                <span role="cell">JSON model, REST APIs, Python jobs, webhooks, company-data ingestion, and connector registry.</span>
+                <span role="cell">Typically desktop automation, files, spreadsheets, or vendor-specific interfaces.</span>
+              </div>
+              <div class="comparison-row" role="row">
+                <b role="cell">Decision workflow</b>
+                <span role="cell">Before/after model changes, traceable assumptions, scenario branches, TEA/LCA, and review-ready exports.</span>
+                <span role="cell">Strong calculations, with decision records and review context commonly maintained separately.</span>
+              </div>
+            </div>
+            <div class="comparison-note">
+              <strong>Responsible migration</strong>
+              <p>Axion uses original implementations, public scientific knowledge, and data that customers are authorized to use. It does not copy proprietary manuals, model libraries, or restricted simulator files.</p>
+              <button class="public-primary" type="button" data-public-target="loginPanel">Evaluate with one process</button>
+            </div>
+          </section>
+
           <section id="publicPricing" class="public-section public-pricing public-page" data-public-page="pricing">
             <div class="section-heading">
               <p>Pricing</p>
@@ -951,6 +1110,7 @@
               <article>
                 <span>Academic</span>
                 <h3>Research workspace</h3>
+                <strong class="pricing-price">Contact us</strong>
                 <ul>
                   <li>Process builder and simulation</li>
                   <li>Examples and engineering exports</li>
@@ -960,6 +1120,8 @@
               <article class="pricing-featured">
                 <span>Professional</span>
                 <h3>Private modelling workspace</h3>
+                <strong id="professionalPrice" class="pricing-price">€2,400 / year</strong>
+                <small id="professionalBillingNote">Annual subscription · secure Stripe Checkout</small>
                 <ul>
                   <li>Full equipment and process library</li>
                   <li>Balances, CFD, scheduling, TEA and LCA</li>
@@ -969,6 +1131,7 @@
               <article>
                 <span>Enterprise</span>
                 <h3>Team and site deployment</h3>
+                <strong class="pricing-price">Custom</strong>
                 <ul>
                   <li>Collaboration and model libraries</li>
                   <li>Integrations, governance and support</li>
@@ -976,8 +1139,37 @@
                 </ul>
               </article>
             </div>
+            <div class="payment-trust" aria-label="Payment and subscription features">
+              <span><b>Hosted checkout</b><small>Payment details stay on Stripe Checkout.</small></span>
+              <span><b>Automatic access</b><small>The workspace activates after verified payment.</small></span>
+              <span><b>Self-service billing</b><small>Manage invoices, payment methods, and subscription in the billing portal.</small></span>
+            </div>
             <div class="pricing-note">
-              <button class="public-primary" type="button" data-public-target="loginPanel">Request access</button>
+              <button class="public-primary" type="button" data-public-target="loginPanel">Start secure checkout</button>
+            </div>
+          </section>
+
+          <section id="publicLegal" class="public-section public-legal public-page" data-public-page="legal">
+            <div class="section-heading">
+              <p>Legal</p>
+              <h2>Clear terms for an engineering workspace.</h2>
+            </div>
+            <div class="legal-grid">
+              <article id="privacy">
+                <span>Privacy</span>
+                <h3>Company data remains project data.</h3>
+                <p>Account, billing, project, uploaded-data, and audit records are processed to operate the service. Production deployments should use configured database, storage, identity, and deletion policies. Secrets and payment-card details must never be stored in the browser model.</p>
+              </article>
+              <article id="terms">
+                <span>Terms</span>
+                <h3>Engineering support, not an automatic validation claim.</h3>
+                <p>Axion supports design and screening decisions. Users remain responsible for reviewing model assumptions, safety, GMP, regulatory, equipment, and investment decisions with qualified experts and validated data.</p>
+              </article>
+              <article>
+                <span>Subscription</span>
+                <h3>Annual professional access.</h3>
+                <p>Paid access renews annually until cancelled. Billing, invoices, payment methods, and cancellation are handled through secure Stripe-hosted pages when production billing is configured.</p>
+              </article>
             </div>
           </section>
 
@@ -1017,8 +1209,9 @@
                 </div>
                 <p class="access-copy">Create a licensed workspace through secure checkout.</p>
                 <div class="checkout-summary">
-                  <strong>Axion Pro</strong>
-                  <span>Annual access to the private modelling workspace.</span>
+                  <strong>Axion Professional</strong>
+                  <span id="checkoutPrice">€2,400 / year</span>
+                  <small id="checkoutBillingMode">Annual subscription · renews until cancelled</small>
                 </div>
                 <label>
                   <span>Name</span>
@@ -1032,7 +1225,12 @@
                   <span>Company</span>
                   <input id="checkoutCompany" autocomplete="organization" placeholder="Company or university" />
                 </label>
-                <button class="login-button checkout-button" type="submit">Activate access</button>
+                <label class="checkout-consent">
+                  <input id="checkoutTerms" type="checkbox" required />
+                  <span>I agree to the <a href="./?page=legal#terms" data-public-target="publicLegal">terms</a> and <a href="./?page=legal#privacy" data-public-target="publicLegal">privacy notice</a>.</span>
+                </label>
+                <button class="login-button checkout-button" type="submit">Continue to secure checkout</button>
+                <p class="checkout-security">Payment details are entered on Stripe Checkout. Axion receives only the verified billing and subscription status needed to activate access.</p>
                 <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
               </form>
             </div>
@@ -1353,6 +1551,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260729-change-trace-v1"></script>
+    <script type="module" src="./app.js?v=20260729-growth-billing-v1"></script>
   </body>
 </html>
