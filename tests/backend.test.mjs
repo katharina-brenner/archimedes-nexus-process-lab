@@ -208,6 +208,59 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(commandApply.response.status, 200);
     assert.ok(commandApply.payload.versionId);
 
+    const projectWithHistory = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}`, { token });
+    assert.equal(projectWithHistory.response.status, 200);
+    assert.ok(projectWithHistory.payload.branches.some((branch) => branch.name === "main"));
+    assert.ok(projectWithHistory.payload.versions.some((version) => version.id === commandApply.payload.versionId));
+
+    const branchCreated = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/branches`, {
+      token,
+      method: "POST",
+      body: { name: "lower-media-cost" },
+    });
+    assert.equal(branchCreated.response.status, 201);
+    assert.equal(branchCreated.payload.branch.name, "lower-media-cost");
+
+    const branchCheckout = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/branches/${branchCreated.payload.branch.id}/checkout`, {
+      token,
+      method: "POST",
+      body: {},
+    });
+    assert.equal(branchCheckout.response.status, 200);
+    assert.equal(branchCheckout.payload.branch.name, "lower-media-cost");
+
+    const branchSave = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/save`, {
+      token,
+      method: "POST",
+      body: {
+        name: "Backend smoke project",
+        label: "Lower media scenario",
+        modelState: { template: "culturedMeat", scale: "pilot", params: { workingVolume: 65, mediaCostPerL: 33.6 }, units: [{ id: "BR-101" }, { id: "T-201" }], streams: [] },
+        summary: { units: 2, streams: 0, template: "culturedMeat", scale: "pilot" },
+      },
+    });
+    assert.equal(branchSave.response.status, 200);
+
+    const versionCompare = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/versions/compare`, {
+      token,
+      method: "POST",
+      body: { baseVersionId: commandApply.payload.versionId, headVersionId: branchSave.payload.versionId },
+    });
+    assert.equal(versionCompare.response.status, 200);
+    assert.ok(versionCompare.payload.diff.summary.parameterChanges >= 1);
+    assert.ok(versionCompare.payload.diff.units.added.includes("T-201"));
+
+    const mainBranch = projectWithHistory.payload.branches.find((branch) => branch.name === "main");
+    const mainCheckout = await jsonFetch(server.baseUrl, `/api/projects/${created.payload.project.id}/branches/${mainBranch.id}/checkout`, {
+      token,
+      method: "POST",
+      body: {},
+    });
+    assert.equal(mainCheckout.response.status, 200);
+    assert.equal(mainCheckout.payload.branch.name, "main");
+    assert.equal(mainCheckout.payload.model.modelState.params.workingVolume, 70);
+    assert.equal(mainCheckout.payload.model.modelState.units.length, 1);
+
     const dataset = await jsonFetch(server.baseUrl, "/api/datasets", {
       token,
       method: "POST",

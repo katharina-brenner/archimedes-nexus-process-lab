@@ -2041,6 +2041,8 @@ const state = {
   projectName: "Untitled Axion model",
   projects: [],
   projectVersions: [],
+  projectBranches: [],
+  versionComparison: null,
   projectInvites: [],
   datasets: [],
   datasetImportQueue: [],
@@ -8764,11 +8766,65 @@ function renderProductionReadinessPanel() {
   `;
 }
 
+function renderVersionComparison(comparison) {
+  const diff = comparison.diff || comparison;
+  const summary = diff.summary || {};
+  const parameterRows = (diff.parameters || []).slice(0, 8);
+  const topLevelRows = (diff.topLevel || []).slice(0, 6);
+  return `
+    <div class="version-diff-result">
+      <header>
+        <div><span>Parameter changes</span><strong>${summary.parameterChanges || 0}</strong></div>
+        <div><span>Equipment changes</span><strong>${summary.equipmentChanges || 0}</strong></div>
+        <div><span>Stream changes</span><strong>${summary.streamChanges || 0}</strong></div>
+      </header>
+      <div class="version-diff-columns">
+        <article>
+          <h4>Parameters + model</h4>
+          ${[...topLevelRows, ...parameterRows].length ? [...topLevelRows, ...parameterRows].map((change) => `<p><b>${escapeHtml(change.key)}</b><span>${escapeHtml(String(change.before ?? "—"))} → ${escapeHtml(String(change.after ?? "—"))}</span></p>`).join("") : `<p>No parameter changes.</p>`}
+        </article>
+        <article>
+          <h4>Equipment</h4>
+          <p><b>Added</b><span>${escapeHtml((diff.units?.added || []).join(", ") || "None")}</span></p>
+          <p><b>Removed</b><span>${escapeHtml((diff.units?.removed || []).join(", ") || "None")}</span></p>
+          <p><b>Changed</b><span>${escapeHtml((diff.units?.changed || []).join(", ") || "None")}</span></p>
+        </article>
+        <article>
+          <h4>Streams</h4>
+          <p><b>Added</b><span>${escapeHtml((diff.streams?.added || []).join(", ") || "None")}</span></p>
+          <p><b>Removed</b><span>${escapeHtml((diff.streams?.removed || []).join(", ") || "None")}</span></p>
+          <p><b>Changed</b><span>${escapeHtml((diff.streams?.changed || []).join(", ") || "None")}</span></p>
+        </article>
+      </div>
+    </div>
+  `;
+}
+
 function renderProjectsBoard() {
   if (!els.projectsBoard) return;
   const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
+  const activeBranch = state.projectBranches.find((branch) => branch.id === activeProject?.currentBranchId) || state.projectBranches[0];
   const openProjects = state.projects.filter((item) => !item.archived);
   const archivedProjects = state.projects.filter((item) => item.archived);
+  const versionById = new Map(state.projectVersions.map((version) => [version.id, version]));
+  const branchVersions = [];
+  const visitedVersions = new Set();
+  let historyVersionId = activeBranch?.headVersionId;
+  while (historyVersionId && !visitedVersions.has(historyVersionId)) {
+    const version = versionById.get(historyVersionId);
+    if (!version) break;
+    branchVersions.push(version);
+    visitedVersions.add(historyVersionId);
+    historyVersionId = version.parentVersionId;
+  }
+  if (!branchVersions.length) {
+    branchVersions.push(...(activeBranch
+      ? state.projectVersions.filter((version) => version.branchId === activeBranch.id || (!version.branchId && activeBranch.name === "main"))
+      : state.projectVersions));
+  }
+  const compareOption = (version, selected = false) => `<option value="${escapeAttr(version.id)}" ${selected ? "selected" : ""}>${escapeHtml(version.branchName || "main")} · ${escapeHtml(version.label || version.id.slice(0, 8))}</option>`;
+  const baseCompareOptions = state.projectVersions.map((version, index) => compareOption(version, index === Math.min(1, state.projectVersions.length - 1))).join("");
+  const headCompareOptions = state.projectVersions.map((version, index) => compareOption(version, index === 0)).join("");
   els.projectsBoard.innerHTML = `
     <section class="projects-hero">
       <div>
@@ -8789,14 +8845,21 @@ function renderProjectsBoard() {
         </div>
       </article>
       <article>
-        <span>Old model folder</span>
-        <strong>${state.projectFolders.archivedModels || ".data/models/archive"}</strong>
-        <p>Every backend save archives the previous model JSON here. Static mode uses browser localStorage as a fallback.</p>
+        <span>Active branch</span>
+        <strong>${escapeHtml(activeBranch?.name || "main")}</strong>
+        <p>${state.projectBranches.length || 1} branch${state.projectBranches.length === 1 ? "" : "es"} · ${branchVersions.length} saved version${branchVersions.length === 1 ? "" : "s"}</p>
+        <div class="branch-switcher">
+          <select id="projectBranchSelect" ${activeProject ? "" : "disabled"}>
+            ${state.projectBranches.map((branch) => `<option value="${escapeAttr(branch.id)}" ${branch.id === activeBranch?.id ? "selected" : ""}>${escapeHtml(branch.name)}</option>`).join("") || `<option value="">main</option>`}
+          </select>
+          <button data-checkout-branch type="button" ${activeProject ? "" : "disabled"}>Switch branch</button>
+        </div>
       </article>
       <article>
-        <span>Active model folder</span>
-        <strong>${state.projectFolders.activeModels || ".data/models/projects"}</strong>
-        <p>Each project has a current model file plus version entries for older process states.</p>
+        <span>New process branch</span>
+        <input id="newBranchName" type="text" placeholder="e.g. lower-media-cost" ${activeProject ? "" : "disabled"} />
+        <p>Create an independent process variant from the current version. Changes stay isolated until you deliberately restore or compare them.</p>
+        <button data-create-branch type="button" ${activeProject ? "" : "disabled"}>Create branch</button>
       </article>
     </section>
     ${renderProductionReadinessPanel()}
@@ -8823,17 +8886,38 @@ function renderProjectsBoard() {
         `).join("") : `<article class="project-card"><p>No saved backend projects yet. Save the current model to create one.</p></article>`}
       </div>
       <div class="project-column">
-        <h3>Old versions</h3>
-        ${state.projectVersions.length ? state.projectVersions.slice(0, 8).map((version) => `
-          <article class="project-version-card clickable-surface" data-version-card="${escapeAttr(version.id)}" tabindex="0" role="button" aria-label="Open saved model version ${escapeAttr(version.label || version.id)}">
-            <span>${version.label || "Saved model"}</span>
-            <strong>${new Date(version.createdAt).toLocaleString()}</strong>
-            <p>${version.createdBy || "user"} · ${version.summary?.units || 0} units · ${version.summary?.streams || 0} streams</p>
-            <button data-restore-version="${version.id}" type="button">Restore this model</button>
+        <div class="history-heading">
+          <div><span>Version control</span><h3>${escapeHtml(activeBranch?.name || "main")} history</h3></div>
+          <b>${branchVersions.length} commits</b>
+        </div>
+        ${branchVersions.length ? branchVersions.slice(0, 16).map((version, index) => `
+          <article class="project-version-card version-commit clickable-surface ${version.id === activeBranch?.headVersionId ? "head" : ""}" data-version-card="${escapeAttr(version.id)}" tabindex="0" role="button" aria-label="Open saved model version ${escapeAttr(version.label || version.id)}">
+            <i aria-hidden="true"></i>
+            <div>
+              <span>${escapeHtml(version.label || "Saved model")}</span>
+              <strong>${escapeHtml(version.id.slice(0, 8))}${version.id === activeBranch?.headVersionId ? " · HEAD" : ""}</strong>
+              <p>${escapeHtml(version.createdBy || "user")} committed ${new Date(version.createdAt).toLocaleString()} · ${version.summary?.units || 0} units · ${version.summary?.streams || 0} streams</p>
+              ${version.parentVersionId ? `<small>Parent ${escapeHtml(version.parentVersionId.slice(0, 8))}</small>` : `<small>Initial version</small>`}
+            </div>
+            <button data-restore-version="${escapeAttr(version.id)}" type="button">Restore as new version</button>
           </article>
-        `).join("") : `<article class="project-version-card"><p>Open a project to see its old model versions.</p></article>`}
+        `).join("") : `<article class="project-version-card"><p>Open or save a project to create its first version.</p></article>`}
         ${archivedProjects.length ? `<h3>Archived projects</h3>${archivedProjects.slice(0, 6).map((project) => `<article class="project-version-card clickable-surface" data-project-card="${escapeAttr(project.id)}" tabindex="0" role="button"><span>${escapeHtml(project.name)}</span><p>${project.updatedAt ? new Date(project.updatedAt).toLocaleString() : ""}</p></article>`).join("")}` : ""}
       </div>
+    </section>
+    <section class="version-compare-panel">
+      <div>
+        <p>Compare versions</p>
+        <h3>See exactly what changed between two model states.</h3>
+        <span>Parameters, equipment, streams and top-level process assumptions are compared without changing the active branch.</span>
+      </div>
+      <div class="version-compare-controls">
+        <label>Base<select id="compareBaseVersion">${baseCompareOptions}</select></label>
+        <span aria-hidden="true">→</span>
+        <label>Head<select id="compareHeadVersion">${headCompareOptions}</select></label>
+        <button data-compare-versions type="button" ${state.projectVersions.length > 1 ? "" : "disabled"}>Compare</button>
+      </div>
+      ${state.versionComparison ? renderVersionComparison(state.versionComparison) : `<div class="version-compare-empty">Select two saved versions to inspect the process diff.</div>`}
     </section>
     <section class="collaboration-panel">
       <div>
@@ -13836,6 +13920,18 @@ async function refreshProjects() {
     state.currentProjectId = latestOpenProject.id;
     state.projectName = latestOpenProject.name || state.projectName;
   }
+  if (state.currentProjectId) {
+    try {
+      const activePayload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}`);
+      state.projectVersions = activePayload.versions || [];
+      state.projectBranches = activePayload.branches || [];
+      state.projectInvites = activePayload.invites || state.projectInvites;
+    } catch {
+      const store = normalizeLocalProjectOwnership(localProjectStore());
+      state.projectVersions = store.versions.filter((version) => version.projectId === state.currentProjectId);
+      state.projectBranches = [{ id: `local-main-${state.currentProjectId}`, projectId: state.currentProjectId, name: "main", headVersionId: state.projectVersions[0]?.id || "" }];
+    }
+  }
   renderProjectsBoard();
   renderSources();
   renderReportsBoard();
@@ -13862,6 +13958,7 @@ async function saveCurrentProject() {
       });
     }
     await refreshProjects();
+    await refreshActiveProjectHistory();
     showToast("Project saved");
   } catch {
     const store = normalizeLocalProjectOwnership(localProjectStore());
@@ -13890,12 +13987,30 @@ async function saveCurrentProject() {
   }
 }
 
+async function refreshActiveProjectHistory() {
+  if (!state.currentProjectId) return null;
+  try {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}`);
+    state.projectVersions = payload.versions || [];
+    state.projectBranches = payload.branches || [];
+    state.projectInvites = payload.invites || state.projectInvites;
+    const projectIndex = state.projects.findIndex((project) => project.id === payload.project.id);
+    if (projectIndex >= 0) state.projects[projectIndex] = payload.project;
+    renderProjectsBoard();
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 async function loadProject(projectId) {
   try {
     const payload = await apiRequest(`/api/projects/${encodeURIComponent(projectId)}`);
     state.currentProjectId = payload.project.id;
     state.projectName = payload.project.name;
     state.projectVersions = payload.versions || [];
+    state.projectBranches = payload.branches || [];
+    state.versionComparison = null;
     state.projectInvites = payload.invites || state.projectInvites;
     importModelState(payload.model?.modelState || {});
     await refreshDatasets();
@@ -13908,11 +14023,70 @@ async function loadProject(projectId) {
     state.currentProjectId = project.id;
     state.projectName = project.name;
     state.projectVersions = store.versions.filter((item) => item.projectId === projectId);
+    state.projectBranches = [{ id: `local-main-${projectId}`, projectId, name: "main", headVersionId: state.projectVersions[0]?.id || "" }];
+    state.versionComparison = null;
     state.datasets = localDatasetStore().filter((dataset) => !dataset.projectId || dataset.projectId === projectId);
     importModelState(project.modelState || {});
     renderSources();
     setView("overview");
     showToast(`${project.name} loaded`);
+  }
+}
+
+async function createProjectBranch() {
+  if (!state.currentProjectId) return showToast("Save or load a project first");
+  const input = document.querySelector("#newBranchName");
+  const name = String(input?.value || "").trim();
+  if (!name) return showToast("Enter a branch name");
+  try {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/branches`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    await refreshProjects();
+    await refreshActiveProjectHistory();
+    if (input) input.value = "";
+    showToast(`Branch ${payload.branch.name} created`);
+  } catch (error) {
+    showToast(error.message || "Branch could not be created");
+  }
+}
+
+async function checkoutProjectBranch() {
+  if (!state.currentProjectId) return showToast("Save or load a project first");
+  const branchId = document.querySelector("#projectBranchSelect")?.value;
+  if (!branchId) return;
+  try {
+    const payload = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/branches/${encodeURIComponent(branchId)}/checkout`, {
+      method: "POST",
+      body: "{}",
+    });
+    state.projectVersions = (await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}`)).versions || state.projectVersions;
+    state.versionComparison = null;
+    importModelState(payload.model?.modelState || {});
+    await refreshProjects();
+    await refreshActiveProjectHistory();
+    setView("projects");
+    showToast(`Switched to ${payload.branch.name}`);
+  } catch (error) {
+    showToast(error.message || "Branch could not be opened");
+  }
+}
+
+async function compareProjectVersions() {
+  if (!state.currentProjectId) return;
+  const baseVersionId = document.querySelector("#compareBaseVersion")?.value;
+  const headVersionId = document.querySelector("#compareHeadVersion")?.value;
+  if (!baseVersionId || !headVersionId || baseVersionId === headVersionId) return showToast("Choose two different versions");
+  try {
+    state.versionComparison = await apiRequest(`/api/projects/${encodeURIComponent(state.currentProjectId)}/versions/compare`, {
+      method: "POST",
+      body: JSON.stringify({ baseVersionId, headVersionId }),
+    });
+    renderProjectsBoard();
+    showToast("Version comparison ready");
+  } catch (error) {
+    showToast(error.message || "Versions could not be compared");
   }
 }
 
@@ -13972,7 +14146,10 @@ async function restoreProjectVersion(versionId) {
       body: "{}",
     });
     importModelState(payload.model?.modelState || {});
-    showToast("Archived model restored");
+    await refreshProjects();
+    await refreshActiveProjectHistory();
+    setView("projects");
+    showToast("Version restored as a new commit");
   } catch {
     const store = normalizeLocalProjectOwnership(localProjectStore());
     const version = store.versions.find((item) => item.id === versionId && item.projectId === state.currentProjectId);
@@ -14558,6 +14735,24 @@ function bindEvents() {
   });
 
   els.projectsBoard?.addEventListener("click", (event) => {
+    const createBranchButton = event.target.closest("[data-create-branch]");
+    if (createBranchButton) {
+      createProjectBranch();
+      event.stopPropagation();
+      return;
+    }
+    const checkoutBranchButton = event.target.closest("[data-checkout-branch]");
+    if (checkoutBranchButton) {
+      checkoutProjectBranch();
+      event.stopPropagation();
+      return;
+    }
+    const compareVersionsButton = event.target.closest("[data-compare-versions]");
+    if (compareVersionsButton) {
+      compareProjectVersions();
+      event.stopPropagation();
+      return;
+    }
     const saveButton = event.target.closest("[data-save-project]");
     if (saveButton) {
       saveCurrentProject();

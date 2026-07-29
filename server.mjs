@@ -113,6 +113,7 @@ const defaultDb = {
   licenses: [],
   projects: [],
   projectVersions: [],
+  projectBranches: [],
   invites: [],
   projectBriefs: [],
   datasets: [],
@@ -936,6 +937,76 @@ function sanitizeProject(project) {
     })),
     currentVersionId: project.currentVersionId || "",
     versionCount: project.versionCount || 0,
+    currentBranchId: project.currentBranchId || "",
+    currentBranchName: project.currentBranchName || "main",
+    branchCount: project.branchCount || 1,
+  };
+}
+
+function ensureProjectBranches(db, project) {
+  let branches = db.projectBranches.filter((branch) => branch.projectId === project.id);
+  if (!branches.length) {
+    const branch = {
+      id: `main-${project.id}`,
+      projectId: project.id,
+      name: "main",
+      headVersionId: project.currentVersionId || "",
+      createdAt: project.createdAt || project.updatedAt || new Date().toISOString(),
+      updatedAt: project.updatedAt || project.createdAt || new Date().toISOString(),
+      createdBy: project.owner,
+    };
+    db.projectBranches.push(branch);
+    branches = [branch];
+  }
+  const current = branches.find((branch) => branch.id === project.currentBranchId) || branches.find((branch) => branch.name === "main") || branches[0];
+  project.currentBranchId = current.id;
+  project.currentBranchName = current.name;
+  project.branchCount = branches.length;
+  db.projectVersions
+    .filter((version) => version.projectId === project.id)
+    .forEach((version) => {
+      version.branchId ||= current.id;
+      version.branchName ||= current.name;
+    });
+  return branches;
+}
+
+function activeProjectBranch(db, project) {
+  const branches = ensureProjectBranches(db, project);
+  return branches.find((branch) => branch.id === project.currentBranchId) || branches[0];
+}
+
+function summarizeVersionDiff(basePayload = {}, headPayload = {}) {
+  const base = basePayload.modelState || {};
+  const head = headPayload.modelState || {};
+  const parameterKeys = Array.from(new Set([...Object.keys(base.params || {}), ...Object.keys(head.params || {})]));
+  const parameters = parameterKeys
+    .filter((key) => JSON.stringify(base.params?.[key]) !== JSON.stringify(head.params?.[key]))
+    .map((key) => ({ key, before: base.params?.[key] ?? null, after: head.params?.[key] ?? null }));
+  const baseUnits = new Map((base.units || []).map((unit) => [unit.id, unit]));
+  const headUnits = new Map((head.units || []).map((unit) => [unit.id, unit]));
+  const baseStreams = new Map((base.streams || []).map((stream) => [stream.id, stream]));
+  const headStreams = new Map((head.streams || []).map((stream) => [stream.id, stream]));
+  const changedIds = (left, right) => Array.from(new Set([...left.keys(), ...right.keys()])).filter((id) => JSON.stringify(left.get(id)) !== JSON.stringify(right.get(id)));
+  const topLevelKeys = ["template", "scale", "batchSize", "batchCount", "titer", "recovery"];
+  return {
+    parameters,
+    topLevel: topLevelKeys.filter((key) => JSON.stringify(base[key]) !== JSON.stringify(head[key])).map((key) => ({ key, before: base[key] ?? null, after: head[key] ?? null })),
+    units: {
+      added: [...headUnits.keys()].filter((id) => !baseUnits.has(id)),
+      removed: [...baseUnits.keys()].filter((id) => !headUnits.has(id)),
+      changed: changedIds(baseUnits, headUnits).filter((id) => baseUnits.has(id) && headUnits.has(id)),
+    },
+    streams: {
+      added: [...headStreams.keys()].filter((id) => !baseStreams.has(id)),
+      removed: [...baseStreams.keys()].filter((id) => !headStreams.has(id)),
+      changed: changedIds(baseStreams, headStreams).filter((id) => baseStreams.has(id) && headStreams.has(id)),
+    },
+    summary: {
+      parameterChanges: parameters.length,
+      equipmentChanges: changedIds(baseUnits, headUnits).length,
+      streamChanges: changedIds(baseStreams, headStreams).length,
+    },
   };
 }
 
@@ -1217,6 +1288,7 @@ function ensureDbShape(db) {
   db.licenses ||= [];
   db.projects ||= [];
   db.projectVersions ||= [];
+  db.projectBranches ||= [];
   db.invites ||= [];
   db.projectBriefs ||= [];
   db.datasets ||= [];
@@ -1868,6 +1940,7 @@ async function applyCommandPlan(req, res, planId) {
   }
   const now = new Date().toISOString();
   let versionId = "";
+  let undoVersionId = "";
   const projectId = String(record.projectId || body.projectId || "");
   if (projectId && body.modelStateAfter) {
     const project = db.projects.find((item) => item.id === projectId);
@@ -1875,9 +1948,12 @@ async function applyCommandPlan(req, res, planId) {
       json(res, 404, { error: "Project not found" });
       return;
     }
+    const branch = activeProjectBranch(db, project);
     const previous = await readProjectModel(projectId);
+    const parentVersionId = branch.headVersionId || project.currentVersionId || "";
     versionId = randomUUID();
-    if (previous) await writeArchivedVersion(projectId, versionId, previous);
+    undoVersionId = randomUUID();
+    if (previous) await writeArchivedVersion(projectId, undoVersionId, previous);
     project.updatedAt = now;
     project.currentVersionId = versionId;
     project.versionCount = (project.versionCount || 0) + 1;
@@ -1889,8 +1965,16 @@ async function applyCommandPlan(req, res, planId) {
       modelState: body.modelStateAfter || {},
       commandPlanId: planId,
       commandPrompt: record.prompt,
+      branchId: branch.id,
+      branchName: branch.name,
+      parentVersionId,
     };
     await writeProjectModel(projectId, payload);
+    await writeArchivedVersion(projectId, versionId, payload);
+    branch.headVersionId = versionId;
+    branch.updatedAt = now;
+    project.currentBranchId = branch.id;
+    project.currentBranchName = branch.name;
     db.projectVersions.unshift({
       id: versionId,
       projectId,
@@ -1899,7 +1983,11 @@ async function applyCommandPlan(req, res, planId) {
       label: `AI command: ${record.prompt}`.slice(0, 120),
       summary: body.summary || {},
       commandPlanId: planId,
+      branchId: branch.id,
+      branchName: branch.name,
+      parentVersionId,
     });
+    record.parentVersionId = parentVersionId;
   }
   record.status = "applied";
   record.appliedAt = now;
@@ -1907,6 +1995,7 @@ async function applyCommandPlan(req, res, planId) {
   record.projectId = projectId;
   record.resultSummary = body.summary || {};
   record.versionId = versionId;
+  record.undoVersionId = undoVersionId;
   db.audit.unshift({ at: now, type: "command.plan.applied", planId, projectId, versionId, by: sessionPrincipal(session) });
   await saveDb(db);
   json(res, 200, { commandPlan: record, versionId });
@@ -1927,11 +2016,11 @@ async function undoCommandPlan(req, res) {
     return;
   }
   const applied = db.commandPlans.find((item) => item.projectId === projectId && item.status === "applied" && (!body.planId || item.id === body.planId));
-  if (!applied?.versionId) {
+  if (!applied?.undoVersionId && !applied?.versionId) {
     json(res, 404, { error: "No applied command version is available to undo" });
     return;
   }
-  const archived = await readArchivedVersion(projectId, applied.versionId);
+  const archived = await readArchivedVersion(projectId, applied.undoVersionId || applied.versionId);
   if (!archived) {
     json(res, 404, { error: "Undo archive not found" });
     return;
@@ -1939,6 +2028,12 @@ async function undoCommandPlan(req, res) {
   const now = new Date().toISOString();
   await writeProjectModel(projectId, { ...archived, restoredAt: now, restoredBy: sessionPrincipal(session), undoOfCommandPlanId: applied.id });
   project.updatedAt = now;
+  const branch = activeProjectBranch(db, project);
+  if (applied.parentVersionId) {
+    branch.headVersionId = applied.parentVersionId;
+    branch.updatedAt = now;
+    project.currentVersionId = applied.parentVersionId;
+  }
   applied.status = "undone";
   applied.undoneAt = now;
   applied.undoneBy = sessionPrincipal(session);
@@ -3185,6 +3280,7 @@ async function listProjects(req, res) {
     return;
   }
   const db = ensureDbShape(await loadDb());
+  db.projects.forEach((project) => ensureProjectBranches(db, project));
   const projects = db.projects
     .filter((project) => canAccessProject(session, project))
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
@@ -3231,6 +3327,9 @@ async function createProject(req, res) {
     collaborators: [],
     currentVersionId: versionId,
     versionCount: 1,
+    currentBranchId: `main-${id}`,
+    currentBranchName: "main",
+    branchCount: 1,
   };
   const modelPayload = {
     project: sanitizeProject(project),
@@ -3240,6 +3339,15 @@ async function createProject(req, res) {
     modelState: body.modelState || {},
   };
   db.projects.unshift(project);
+  db.projectBranches.unshift({
+    id: project.currentBranchId,
+    projectId: id,
+    name: "main",
+    headVersionId: versionId,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: sessionPrincipal(session),
+  });
   db.projectVersions.unshift({
     id: versionId,
     projectId: id,
@@ -3247,6 +3355,9 @@ async function createProject(req, res) {
     createdBy: sessionPrincipal(session),
     label: "Initial model",
     summary: body.summary || {},
+    branchId: project.currentBranchId,
+    branchName: "main",
+    parentVersionId: "",
   });
   db.audit.unshift({ at: now, type: "project.created", projectId: id, by: sessionPrincipal(session) });
   await writeProjectModel(id, modelPayload);
@@ -3267,10 +3378,12 @@ async function loadProject(req, res, projectId) {
     json(res, 404, { error: "Project not found" });
     return;
   }
+  const branches = ensureProjectBranches(db, project);
   json(res, 200, {
     project: sanitizeProject(project),
     model: await readProjectModel(projectId),
-    versions: db.projectVersions.filter((item) => item.projectId === projectId),
+    versions: db.projectVersions.filter((item) => item.projectId === projectId).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+    branches: branches.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     invites: db.invites.filter((item) => item.projectId === projectId),
   });
 }
@@ -3325,12 +3438,10 @@ async function saveProject(req, res, projectId) {
     json(res, 404, { error: "Project not found" });
     return;
   }
+  const branch = activeProjectBranch(db, project);
   const now = new Date().toISOString();
   const versionId = randomUUID();
-  const previous = await readProjectModel(projectId);
-  if (previous) {
-    await writeArchivedVersion(projectId, versionId, previous);
-  }
+  const parentVersionId = branch.headVersionId || project.currentVersionId || "";
   project.name = String(body.name || project.name).trim().slice(0, 120);
   project.description = String(body.description || project.description || "").trim().slice(0, 2000);
   project.template = String(body.modelState?.template || project.template || "");
@@ -3344,8 +3455,16 @@ async function saveProject(req, res, projectId) {
     savedBy: sessionPrincipal(session),
     summary: body.summary || {},
     modelState: body.modelState || {},
+    branchId: branch.id,
+    branchName: branch.name,
+    parentVersionId,
   };
   await writeProjectModel(projectId, payload);
+  await writeArchivedVersion(projectId, versionId, payload);
+  branch.headVersionId = versionId;
+  branch.updatedAt = now;
+  project.currentBranchId = branch.id;
+  project.currentBranchName = branch.name;
   db.projectVersions.unshift({
     id: versionId,
     projectId,
@@ -3353,6 +3472,9 @@ async function saveProject(req, res, projectId) {
     createdBy: sessionPrincipal(session),
     label: String(body.label || `Saved ${project.versionCount}`).slice(0, 120),
     summary: body.summary || {},
+    branchId: branch.id,
+    branchName: branch.name,
+    parentVersionId,
   });
   db.audit.unshift({ at: now, type: "project.saved", projectId, versionId, by: sessionPrincipal(session) });
   await saveDb(db);
@@ -3396,11 +3518,109 @@ async function restoreVersion(req, res, projectId, versionId) {
     return;
   }
   const now = new Date().toISOString();
-  await writeProjectModel(projectId, { ...archived, restoredAt: now, restoredBy: sessionPrincipal(session) });
+  const branch = activeProjectBranch(db, project);
+  const restoredVersionId = randomUUID();
+  const restoredPayload = {
+    ...archived,
+    project: sanitizeProject(project),
+    savedAt: now,
+    savedBy: sessionPrincipal(session),
+    restoredAt: now,
+    restoredBy: sessionPrincipal(session),
+    restoredFromVersionId: versionId,
+    branchId: branch.id,
+    branchName: branch.name,
+    parentVersionId: branch.headVersionId || project.currentVersionId || "",
+  };
+  await writeProjectModel(projectId, restoredPayload);
+  await writeArchivedVersion(projectId, restoredVersionId, restoredPayload);
   project.updatedAt = now;
-  db.audit.unshift({ at: now, type: "project.version.restored", projectId, versionId, by: sessionPrincipal(session) });
+  project.currentVersionId = restoredVersionId;
+  project.versionCount = (project.versionCount || 0) + 1;
+  branch.headVersionId = restoredVersionId;
+  branch.updatedAt = now;
+  db.projectVersions.unshift({
+    id: restoredVersionId,
+    projectId,
+    createdAt: now,
+    createdBy: sessionPrincipal(session),
+    label: `Restore ${String(versionId).slice(0, 8)}`,
+    summary: archived.summary || {},
+    branchId: branch.id,
+    branchName: branch.name,
+    parentVersionId: restoredPayload.parentVersionId,
+    restoredFromVersionId: versionId,
+  });
+  db.audit.unshift({ at: now, type: "project.version.restored", projectId, versionId, restoredVersionId, branchId: branch.id, by: sessionPrincipal(session) });
   await saveDb(db);
-  json(res, 200, { project: sanitizeProject(project), model: archived });
+  json(res, 200, { project: sanitizeProject(project), model: restoredPayload, versionId: restoredVersionId, branch });
+}
+
+async function createProjectBranch(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) return json(res, 404, { error: "Project not found" });
+  const branches = ensureProjectBranches(db, project);
+  const name = String(body.name || "").trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._/-]/g, "").slice(0, 64);
+  if (!name) return json(res, 400, { error: "Enter a branch name" });
+  if (branches.some((branch) => branch.name.toLowerCase() === name.toLowerCase())) return json(res, 409, { error: "A branch with this name already exists" });
+  const sourceVersionId = String(body.fromVersionId || project.currentVersionId || "");
+  let sourcePayload = sourceVersionId ? await readArchivedVersion(projectId, sourceVersionId) : null;
+  if (!sourcePayload) sourcePayload = await readProjectModel(projectId);
+  if (!sourcePayload) return json(res, 404, { error: "Branch source model not found" });
+  const now = new Date().toISOString();
+  let headVersionId = sourceVersionId;
+  if (!headVersionId || !(await readArchivedVersion(projectId, headVersionId))) {
+    headVersionId = randomUUID();
+    await writeArchivedVersion(projectId, headVersionId, sourcePayload);
+    db.projectVersions.unshift({ id: headVersionId, projectId, createdAt: now, createdBy: sessionPrincipal(session), label: `Branch point for ${name}`, summary: sourcePayload.summary || {}, branchId: project.currentBranchId, branchName: project.currentBranchName || "main", parentVersionId: project.currentVersionId || "" });
+  }
+  const branch = { id: randomUUID(), projectId, name, headVersionId, createdAt: now, updatedAt: now, createdBy: sessionPrincipal(session), sourceVersionId: headVersionId };
+  db.projectBranches.unshift(branch);
+  project.branchCount = branches.length + 1;
+  project.updatedAt = now;
+  db.audit.unshift({ at: now, type: "project.branch.created", projectId, branchId: branch.id, branchName: name, fromVersionId: headVersionId, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 201, { branch, project: sanitizeProject(project) });
+}
+
+async function checkoutProjectBranch(req, res, projectId, branchId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) return json(res, 404, { error: "Project not found" });
+  const branches = ensureProjectBranches(db, project);
+  const branch = branches.find((item) => item.id === branchId || item.name === branchId);
+  if (!branch) return json(res, 404, { error: "Branch not found" });
+  const model = branch.headVersionId ? await readArchivedVersion(projectId, branch.headVersionId) : await readProjectModel(projectId);
+  if (!model) return json(res, 404, { error: "Branch head model not found" });
+  const now = new Date().toISOString();
+  project.currentBranchId = branch.id;
+  project.currentBranchName = branch.name;
+  project.currentVersionId = branch.headVersionId;
+  project.updatedAt = now;
+  await writeProjectModel(projectId, { ...model, project: sanitizeProject(project), checkedOutAt: now, checkedOutBy: sessionPrincipal(session), branchId: branch.id, branchName: branch.name });
+  db.audit.unshift({ at: now, type: "project.branch.checked_out", projectId, branchId: branch.id, branchName: branch.name, by: sessionPrincipal(session) });
+  await saveDb(db);
+  json(res, 200, { project: sanitizeProject(project), branch, model });
+}
+
+async function compareProjectVersions(req, res, projectId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project || !canAccessProject(session, project)) return json(res, 404, { error: "Project not found" });
+  const baseVersionId = String(body.baseVersionId || "");
+  const headVersionId = String(body.headVersionId || "");
+  const [base, head] = await Promise.all([readArchivedVersion(projectId, baseVersionId), readArchivedVersion(projectId, headVersionId)]);
+  if (!base || !head) return json(res, 404, { error: "One or both model versions were not found" });
+  json(res, 200, { baseVersionId, headVersionId, diff: summarizeVersionDiff(base, head) });
 }
 
 async function inviteCollaborator(req, res, projectId) {
@@ -3836,6 +4056,21 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   const projectSaveMatch = pathname.match(/^\/api\/projects\/([^/]+)\/save$/);
   if (projectSaveMatch && req.method === "POST") {
     await saveProject(req, res, decodeURIComponent(projectSaveMatch[1]));
+    return;
+  }
+  const projectBranchCreateMatch = pathname.match(/^\/api\/projects\/([^/]+)\/branches$/);
+  if (projectBranchCreateMatch && req.method === "POST") {
+    await createProjectBranch(req, res, decodeURIComponent(projectBranchCreateMatch[1]));
+    return;
+  }
+  const projectBranchCheckoutMatch = pathname.match(/^\/api\/projects\/([^/]+)\/branches\/([^/]+)\/checkout$/);
+  if (projectBranchCheckoutMatch && req.method === "POST") {
+    await checkoutProjectBranch(req, res, decodeURIComponent(projectBranchCheckoutMatch[1]), decodeURIComponent(projectBranchCheckoutMatch[2]));
+    return;
+  }
+  const projectVersionCompareMatch = pathname.match(/^\/api\/projects\/([^/]+)\/versions\/compare$/);
+  if (projectVersionCompareMatch && req.method === "POST") {
+    await compareProjectVersions(req, res, decodeURIComponent(projectVersionCompareMatch[1]));
     return;
   }
   const projectArchiveMatch = pathname.match(/^\/api\/projects\/([^/]+)\/archive$/);

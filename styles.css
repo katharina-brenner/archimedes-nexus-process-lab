@@ -19728,6 +19728,234 @@ body.locked .public-page:not(.active-public-page) {
   }
 }
 
+/* Git-style process branches and model history. */
+.branch-switcher,
+.version-compare-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.branch-switcher select,
+.version-compare-controls select,
+#newBranchName {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(31, 42, 58, 0.14);
+  border-radius: 14px;
+  padding: 0 12px;
+  color: #102033;
+  background: rgba(255, 255, 255, 0.9);
+  font: inherit;
+}
+
+.history-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.history-heading span,
+.version-compare-panel > div:first-child > p {
+  color: #0f5a52;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-heading h3,
+.version-compare-panel h3 {
+  margin: 3px 0 0;
+}
+
+.history-heading b {
+  padding: 6px 9px;
+  border: 1px solid rgba(15, 90, 82, 0.14);
+  border-radius: 999px;
+  color: #214c43;
+  background: #e8f2ef;
+  font-size: 11px;
+}
+
+.version-commit {
+  position: relative;
+  grid-template-columns: 18px minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center;
+}
+
+.version-commit > i {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #f4f7f6;
+  border-radius: 50%;
+  background: #81908d;
+  box-shadow: 0 0 0 2px rgba(33, 76, 67, 0.2);
+}
+
+.version-commit:not(:last-of-type) > i::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 3px;
+  width: 2px;
+  height: 72px;
+  background: rgba(33, 76, 67, 0.18);
+}
+
+.version-commit.head {
+  border-color: rgba(15, 90, 82, 0.34);
+  background: linear-gradient(180deg, rgba(231, 244, 240, 0.96), rgba(248, 251, 250, 0.98));
+}
+
+.version-commit.head > i {
+  background: #0f5a52;
+  box-shadow: 0 0 0 3px rgba(15, 90, 82, 0.14);
+}
+
+.version-commit > div {
+  display: grid;
+  gap: 4px;
+}
+
+.version-commit small {
+  color: #778491;
+  font-size: 10px;
+}
+
+.version-compare-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(420px, 1.25fr);
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(31, 42, 58, 0.1);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 20px 52px rgba(8, 23, 43, 0.08);
+}
+
+.version-compare-panel > div:first-child span {
+  color: #617080;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.version-compare-controls {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.version-compare-controls label {
+  display: grid;
+  gap: 5px;
+  color: #536474;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.version-compare-controls > span {
+  padding-top: 18px;
+  color: #71827f;
+}
+
+.version-compare-controls button,
+[data-create-branch],
+[data-checkout-branch] {
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 15px;
+  color: #fff;
+  background: linear-gradient(135deg, #245c52, #092923);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.version-compare-empty,
+.version-diff-result {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(31, 42, 58, 0.1);
+  border-radius: 20px;
+  padding: 16px;
+  color: #667585;
+  background: #f4f7f6;
+}
+
+.version-diff-result header {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.version-diff-result header div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #e5efec;
+}
+
+.version-diff-result header span {
+  color: #617080;
+  font-size: 10px;
+}
+
+.version-diff-result header strong {
+  color: #123b35;
+  font-size: 22px;
+}
+
+.version-diff-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.version-diff-columns article {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.version-diff-columns h4 {
+  margin: 0 0 10px;
+}
+
+.version-diff-columns p {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0;
+  color: #667585;
+  font-size: 11px;
+}
+
+.version-diff-columns p b {
+  color: #18332f;
+}
+
+@media (max-width: 980px) {
+  .version-compare-panel,
+  .version-diff-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .version-compare-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .version-compare-controls > span {
+    display: none;
+  }
+}
+
 /* Helper launcher: fixed corner geometry and optically centered pixel mark. */
 .help-dock:not(.open) {
   width: 54px !important;
