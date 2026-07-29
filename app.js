@@ -2054,6 +2054,8 @@ const state = {
   githubConnections: [],
   selectedIntegration: "",
   connectorResults: {},
+  automationState: null,
+  automationLoading: false,
   productionReadiness: null,
   projectFolders: {},
   factoryTimeH: null,
@@ -2545,6 +2547,12 @@ function exportCurrentModelState() {
     plantDataBindings: clone(state.plantDataBindings || []),
     dataApplicationHistory: clone(state.dataApplicationHistory || []),
     commandHistory: clone(state.commandHistory || []),
+    automationState: state.automationState ? clone({
+      connections: state.automationState.connections || [],
+      loops: state.automationState.loops || [],
+      actions: state.automationState.actions || [],
+      gateway: state.automationState.gateway || {},
+    }) : null,
   };
 }
 
@@ -2578,6 +2586,7 @@ function importModelState(modelState = {}) {
   state.plantDataBindings = Array.isArray(modelState.plantDataBindings) ? clone(modelState.plantDataBindings) : [];
   state.dataApplicationHistory = Array.isArray(modelState.dataApplicationHistory) ? clone(modelState.dataApplicationHistory) : [];
   state.commandHistory = Array.isArray(modelState.commandHistory) ? clone(modelState.commandHistory).slice(0, 20) : [];
+  state.automationState = modelState.automationState && typeof modelState.automationState === "object" ? clone(modelState.automationState) : null;
   state.commandHighlights = [];
   syncInputs();
   renderAll();
@@ -11615,6 +11624,416 @@ function renderRecommendations() {
   `;
 }
 
+function fallbackAutomationState() {
+  const now = Date.now();
+  const definitions = [
+    ["BR101.PV.DO", "Dissolved oxygen", "%", 0, 100, 40, false],
+    ["BR101.SP.DO", "DO setpoint", "%", 10, 80, 40, true],
+    ["BR101.PV.PH", "pH", "pH", 6, 8, 7.1, false],
+    ["BR101.SP.PH", "pH setpoint", "pH", 6.5, 7.5, 7.1, true],
+    ["BR101.PV.TEMP", "Temperature", "degC", 20, 45, 37, false],
+    ["BR101.SP.TEMP", "Temperature setpoint", "degC", 25, 42, 37, true],
+    ["BR101.MV.AGITATION", "Agitation command", "rpm", 20, 160, 78, true],
+    ["BR101.MV.BASE", "Base addition command", "mL/min", 0, 200, 24, true],
+    ["BR101.MV.JACKET", "Jacket valve command", "%", 0, 100, 48, true],
+    ["BR101.PV.LEVEL", "Working volume", "%", 0, 85, 72, false],
+    ["BR101.PV.AMMONIUM", "Ammonium soft sensor", "mM", 0, 8, 1.4, false],
+    ["BR101.PV.LACTATE", "Lactate soft sensor", "g/L", 0, 8, 1.8, false],
+  ].map(([tag, label, unit, min, max, target, writable]) => ({ tag, label, unit, min, max, target, writable }));
+  const valueAt = (tag, timestamp) => {
+    const t = timestamp / 1000;
+    const values = {
+      "BR101.PV.DO": 40 + Math.sin(t / 4.8) * 5.6,
+      "BR101.SP.DO": 40,
+      "BR101.PV.PH": 7.08 + Math.sin(t / 9.5) * 0.045,
+      "BR101.SP.PH": 7.1,
+      "BR101.PV.TEMP": 36.96 + Math.sin(t / 12.5) * 0.12,
+      "BR101.SP.TEMP": 37,
+      "BR101.MV.AGITATION": 78 + Math.sin(t / 5.2) * 6,
+      "BR101.MV.BASE": 24 + Math.sin(t / 9.5) * 4,
+      "BR101.MV.JACKET": 48 + Math.sin(t / 12.5) * 3,
+      "BR101.PV.LEVEL": 72,
+      "BR101.PV.AMMONIUM": 1.35 + Math.sin(t / 20) * 0.08,
+      "BR101.PV.LACTATE": 1.75 + Math.sin(t / 16) * 0.12,
+    };
+    return values[tag] ?? definitions.find((item) => item.tag === tag)?.target ?? 0;
+  };
+  const latest = definitions.map((definition) => ({
+    id: `local-${definition.tag}`,
+    tag: definition.tag,
+    value: valueAt(definition.tag, now),
+    unit: definition.unit,
+    quality: "Good",
+    sourceTimestamp: new Date(now).toISOString(),
+    source: "Axion verified simulator",
+    simulated: true,
+  }));
+  const trendTags = ["BR101.PV.DO", "BR101.PV.PH", "BR101.PV.TEMP", "BR101.PV.AMMONIUM", "BR101.PV.LACTATE"];
+  const history = Array.from({ length: 48 }, (_, index) => {
+    const timestamp = now - (47 - index) * 60_000;
+    return trendTags.map((tag) => ({
+      tag,
+      value: valueAt(tag, timestamp),
+      unit: definitions.find((item) => item.tag === tag)?.unit || "",
+      quality: "Good",
+      sourceTimestamp: new Date(timestamp).toISOString(),
+      source: "Axion verified simulator",
+      simulated: true,
+    }));
+  }).flat();
+  return {
+    gateway: { configured: false, writesEnabled: false, physicalWritePolicy: "physical writes locked" },
+    connections: [{ id: "local-simulator", name: "Axion verified simulator", kind: "simulation", endpoint: "axion://verified-simulator", status: "connected", mode: "read-write", writeEnabled: false, securityMode: "local" }],
+    tagDefinitions: definitions,
+    latest,
+    history,
+    loops: [
+      { id: "local-do", key: "do-cascade", name: "DO cascade", pvTag: "BR101.PV.DO", spTag: "BR101.SP.DO", mvTag: "BR101.MV.AGITATION", kp: 1.8, ki: 0.08, kd: 0.05, mode: "observe", enabled: true, connectionId: "local-simulator", safetyLow: 10, safetyHigh: 80 },
+      { id: "local-ph", key: "ph-control", name: "pH control", pvTag: "BR101.PV.PH", spTag: "BR101.SP.PH", mvTag: "BR101.MV.BASE", kp: 18, ki: 0.6, kd: 0.2, mode: "observe", enabled: true, connectionId: "local-simulator", safetyLow: 6.6, safetyHigh: 7.5 },
+      { id: "local-temp", key: "temperature", name: "Temperature control", pvTag: "BR101.PV.TEMP", spTag: "BR101.SP.TEMP", mvTag: "BR101.MV.JACKET", kp: 8, ki: 0.35, kd: 0.1, mode: "observe", enabled: true, connectionId: "local-simulator", safetyLow: 30, safetyHigh: 40 },
+    ],
+    actions: [],
+    generatedAt: new Date(now).toISOString(),
+    note: "Local simulator active. Start the backend to persist connections, historian samples, loop approvals and audit records.",
+  };
+}
+
+function activeAutomationState() {
+  return state.automationState || fallbackAutomationState();
+}
+
+function automationSample(tag, automation = activeAutomationState()) {
+  return automation.latest?.find((item) => item.tag === tag) || null;
+}
+
+function automationManipulatedVariableLabel(tag) {
+  return {
+    "BR101.MV.AGITATION": "Agitation",
+    "BR101.MV.AIRFLOW": "Air flow",
+    "BR101.MV.FEED": "Feed rate",
+    "BR101.MV.BASE": "Base dose",
+    "BR101.MV.JACKET": "Jacket valve",
+  }[tag] || tag.split(".").at(-1) || tag;
+}
+
+function automationTrendSvg(automation) {
+  const series = [
+    { tag: "BR101.PV.DO", label: "DO", color: "#5fd2bd" },
+    { tag: "BR101.PV.PH", label: "pH", color: "#8ca6b8" },
+    { tag: "BR101.PV.TEMP", label: "Temp", color: "#d2a552" },
+    { tag: "BR101.PV.AMMONIUM", label: "NH4", color: "#ab7a9b" },
+    { tag: "BR101.PV.LACTATE", label: "Lactate", color: "#7da789" },
+  ];
+  const width = 760;
+  const height = 250;
+  const plot = { left: 46, top: 24, width: 684, height: 172 };
+  const definitions = new Map((automation.tagDefinitions || []).map((item) => [item.tag, item]));
+  const histories = new Map(series.map((item) => [item.tag, (automation.history || []).filter((sample) => sample.tag === item.tag).slice(-60)]));
+  const maxPoints = Math.max(2, ...[...histories.values()].map((items) => items.length));
+  const paths = series.map((item) => {
+    const definition = definitions.get(item.tag) || { min: 0, max: 100 };
+    const points = histories.get(item.tag) || [];
+    const d = points.map((sample, index) => {
+      const x = plot.left + (index / Math.max(1, maxPoints - 1)) * plot.width;
+      const ratio = (Number(sample.value) - definition.min) / Math.max(0.0001, definition.max - definition.min);
+      const y = plot.top + plot.height - Math.max(0, Math.min(1, ratio)) * plot.height;
+      return `${index ? "L" : "M"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(" ");
+    return `<path d="${d}" fill="none" stroke="${item.color}" stroke-width="2.4" vector-effect="non-scaling-stroke"/>`;
+  }).join("");
+  return `
+    <svg class="automation-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Historian trend for dissolved oxygen, pH, temperature, ammonium and lactate">
+      <g class="automation-grid">
+        ${[0, 1, 2, 3, 4].map((index) => `<line x1="${plot.left}" y1="${plot.top + index * plot.height / 4}" x2="${plot.left + plot.width}" y2="${plot.top + index * plot.height / 4}"/>`).join("")}
+        ${[0, 1, 2, 3, 4, 5, 6].map((index) => `<line x1="${plot.left + index * plot.width / 6}" y1="${plot.top}" x2="${plot.left + index * plot.width / 6}" y2="${plot.top + plot.height}"/>`).join("")}
+      </g>
+      ${paths}
+      <g class="automation-legend">
+        ${series.map((item, index) => `<circle cx="${plot.left + index * 116}" cy="226" r="4" fill="${item.color}"/><text x="${plot.left + 10 + index * 116}" y="230">${item.label}</text>`).join("")}
+      </g>
+    </svg>
+  `;
+}
+
+function renderAutomationCockpit() {
+  const automation = activeAutomationState();
+  const connections = automation.connections || [];
+  const latest = automation.latest || [];
+  const importantTags = ["BR101.PV.DO", "BR101.PV.PH", "BR101.PV.TEMP", "BR101.PV.LEVEL", "BR101.PV.AMMONIUM", "BR101.PV.LACTATE"];
+  const definitionMap = new Map((automation.tagDefinitions || []).map((item) => [item.tag, item]));
+  const connectionOptions = connections.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.status)}</option>`).join("");
+  return `
+    <section class="automation-cockpit" aria-label="PLC SCADA historian and closed-loop control workspace">
+      <header class="automation-head">
+        <div>
+          <p>Autonomous factory control layer</p>
+          <h3>PLC, SCADA, historian and closed-loop operations</h3>
+          <span>Bring plant tags into the model, compare live state with engineering limits, calculate control action, and keep every physical write behind an explicit OT approval gate.</span>
+        </div>
+        <div class="automation-state-badges">
+          <b class="${automation.gateway?.configured ? "ready" : "simulated"}">${automation.gateway?.configured ? "Edge gateway ready" : "Verified simulator"}</b>
+          <b class="${automation.gateway?.writesEnabled ? "warning" : "locked"}">${escapeHtml(automation.gateway?.physicalWritePolicy || "physical writes locked")}</b>
+        </div>
+      </header>
+
+      <div class="automation-status-grid">
+        <article>
+          <span>Connections</span>
+          <strong>${connections.length}</strong>
+          <p>${connections.filter((item) => item.status === "connected").length} online · OPC UA, PI Web API, MQTT edge or simulator.</p>
+        </article>
+        <article>
+          <span>Good tag quality</span>
+          <strong>${latest.filter((item) => item.quality === "Good").length}/${latest.length}</strong>
+          <p>Bad or uncertain PV values inhibit automatic control action.</p>
+        </article>
+        <article>
+          <span>Control loops</span>
+          <strong>${(automation.loops || []).filter((item) => item.enabled).length}</strong>
+          <p>${(automation.loops || []).filter((item) => item.mode === "closed-loop").length} approved for closed-loop mode.</p>
+        </article>
+        <article>
+          <span>Audit actions</span>
+          <strong>${(automation.actions || []).length}</strong>
+          <p>Recommendations, simulated writes, blocked writes and gateway acknowledgements.</p>
+        </article>
+      </div>
+
+      <div class="automation-main-grid">
+        <article class="automation-connection-panel">
+          <div class="automation-panel-title">
+            <span>01 · Connect</span>
+            <h4>Plant data source</h4>
+            <p>Use the simulator now, or connect an OT edge gateway. Plant credentials stay on the backend and are never returned to the browser.</p>
+          </div>
+          <div class="automation-form">
+            <label><span>Name</span><input id="automationConnectionName" type="text" value="BR-101 production cell" /></label>
+            <label><span>Connector</span>
+              <select id="automationConnectionKind">
+                <option value="simulation">Axion verified simulator</option>
+                <option value="opcua-edge">OPC UA edge gateway</option>
+                <option value="pi-web-api">AVEVA PI Web API</option>
+                <option value="mqtt-edge">MQTT edge gateway</option>
+              </select>
+            </label>
+            <label class="automation-endpoint"><span>Plant endpoint</span><input id="automationConnectionEndpoint" type="text" placeholder="opc.tcp://plc-gateway.company.local:4840" /></label>
+            <label><span>Access</span>
+              <select id="automationConnectionMode">
+                <option value="read-only">Read-only commissioning</option>
+                <option value="read-write">Read/write after OT approval</option>
+              </select>
+            </label>
+            <label class="automation-secret"><span>Gateway credential</span><input id="automationConnectionSecret" type="password" autocomplete="new-password" placeholder="Stored encrypted on backend" /></label>
+            <label class="automation-write-check"><input id="automationConnectionWrite" type="checkbox" ${automation.gateway?.writesEnabled ? "" : "disabled"} /><span>Request physical write permission</span></label>
+            <button data-automation-connect type="button">Add connection</button>
+          </div>
+          <div class="automation-connection-list">
+            ${connections.length ? connections.map((item) => `
+              <div class="automation-connection ${escapeAttr(item.status)}">
+                <i></i>
+                <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.kind)} · ${escapeHtml(item.securityMode || "TLS")} · ${escapeHtml(item.mode || "read-only")}</span></div>
+                <b>${escapeHtml(item.status)}</b>
+                <button data-automation-test="${escapeAttr(item.id)}" type="button">Test</button>
+              </div>
+            `).join("") : `<p>No plant connection yet.</p>`}
+          </div>
+        </article>
+
+        <article class="automation-live-panel">
+          <div class="automation-panel-title">
+            <span>02 · Observe</span>
+            <h4>Live process state</h4>
+            <p>Current value, engineering unit, quality and source timestamp for the active production cell.</p>
+          </div>
+          <div class="automation-live-grid">
+            ${importantTags.map((tag) => {
+              const sample = latest.find((item) => item.tag === tag);
+              const definition = definitionMap.get(tag) || {};
+              return `
+                <div class="automation-tag ${escapeAttr((sample?.quality || "Bad").toLowerCase())}">
+                  <span>${escapeHtml(definition.label || tag)}</span>
+                  <strong>${sample ? formatNumber(Number(sample.value), Math.abs(Number(sample.value)) < 10 ? 2 : 1) : "n/a"}</strong>
+                  <small>${escapeHtml(sample?.unit || definition.unit || "")}</small>
+                  <b>${escapeHtml(sample?.quality || "Bad")}</b>
+                </div>
+              `;
+            }).join("")}
+          </div>
+          <div class="automation-source-line">
+            <span>Source</span>
+            <strong>${escapeHtml(latest[0]?.source || "No telemetry")}</strong>
+            <small>${latest[0]?.sourceTimestamp ? new Date(latest[0].sourceTimestamp).toLocaleString() : "No timestamp"}</small>
+          </div>
+        </article>
+      </div>
+
+      <article class="automation-historian-panel">
+        <div class="automation-panel-title">
+          <span>03 · Diagnose</span>
+          <h4>Historian trend</h4>
+          <p>Normalized operating trajectories make drift, oscillation, metabolic accumulation and control response visible on one clock.</p>
+        </div>
+        ${automationTrendSvg(automation)}
+      </article>
+
+      <section class="automation-loop-section">
+        <div class="automation-panel-title">
+          <span>04 · Control</span>
+          <h4>Closed-loop control matrix</h4>
+          <p>Manual calculates nothing. Observe reads only. Advisory calculates a recommendation. Closed loop requires approval and still cannot reach a physical PLC unless the backend and edge gateway allow it.</p>
+        </div>
+        <div class="automation-loop-grid">
+          ${(automation.loops || []).map((loop) => {
+            const pv = automationSample(loop.pvTag, automation);
+            const sp = automationSample(loop.spTag, automation);
+            const lastAction = (automation.actions || []).find((item) => item.loopId === loop.id);
+            return `
+              <article class="automation-loop-card ${escapeAttr(loop.mode)}">
+                <header>
+                  <div><span>${escapeHtml(loop.key)}</span><h4>${escapeHtml(loop.name)}</h4></div>
+                  <b>${escapeHtml(loop.mode)}</b>
+                </header>
+                <div class="automation-loop-values">
+                  <div><span>PV</span><strong>${pv ? formatNumber(Number(pv.value), Math.abs(Number(pv.value)) < 10 ? 2 : 1) : "n/a"}</strong><small>${escapeHtml(pv?.unit || "")}</small></div>
+                  <div><span>SP</span><strong>${sp ? formatNumber(Number(sp.value), Math.abs(Number(sp.value)) < 10 ? 2 : 1) : "n/a"}</strong><small>${escapeHtml(sp?.unit || "")}</small></div>
+                  <div><span>MV</span><strong>${escapeHtml(automationManipulatedVariableLabel(loop.mvTag))}</strong><small>${lastAction ? `proposed ${formatNumber(lastAction.proposedMv, 2)}` : "no action yet"}</small></div>
+                </div>
+                <div class="automation-loop-tuning">
+                  <label><span>Kp</span><input data-automation-kp="${escapeAttr(loop.id)}" type="number" step="0.01" value="${escapeAttr(loop.kp)}" /></label>
+                  <label><span>Ki</span><input data-automation-ki="${escapeAttr(loop.id)}" type="number" step="0.01" value="${escapeAttr(loop.ki)}" /></label>
+                  <label><span>Kd</span><input data-automation-kd="${escapeAttr(loop.id)}" type="number" step="0.01" value="${escapeAttr(loop.kd)}" /></label>
+                </div>
+                <label class="automation-mode-select"><span>Mode</span>
+                  <select data-automation-loop-mode="${escapeAttr(loop.id)}">
+                    ${["manual", "observe", "advisory", "closed-loop"].map((mode) => `<option value="${mode}"${loop.mode === mode ? " selected" : ""}>${mode === "closed-loop" ? "Closed loop" : mode[0].toUpperCase() + mode.slice(1)}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="automation-approval"><input data-automation-loop-approval="${escapeAttr(loop.id)}" type="checkbox" /><span>I approve closed-loop mode for this loop</span></label>
+                <div class="automation-loop-actions">
+                  <button data-automation-loop-save="${escapeAttr(loop.id)}" type="button">Apply mode + tuning</button>
+                  <button class="primary" data-automation-cycle="${escapeAttr(loop.id)}" type="button">Run one control cycle</button>
+                </div>
+                <p>${lastAction ? `<b>${escapeHtml(lastAction.execution)}</b> · ${escapeHtml(lastAction.reason || "")}` : `Safety envelope ${formatNumber(loop.safetyLow, 2)}–${formatNumber(loop.safetyHigh, 2)}.`}</p>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+
+      <article class="automation-audit-panel">
+        <div class="automation-panel-title">
+          <span>05 · Verify</span>
+          <h4>Control action log</h4>
+          <p>Every calculation records PV, SP, current MV, proposed MV, execution state, reason, user and timestamp.</p>
+        </div>
+        <div class="automation-audit-table">
+          ${(automation.actions || []).length ? (automation.actions || []).slice(0, 12).map((action) => `
+            <div>
+              <time>${new Date(action.at).toLocaleTimeString()}</time>
+              <strong>${escapeHtml(action.loopName)}</strong>
+              <span>PV ${formatNumber(action.pv, 2)} · SP ${formatNumber(action.sp, 2)}</span>
+              <span>MV ${formatNumber(action.currentMv, 2)} → ${formatNumber(action.proposedMv, 2)}</span>
+              <b class="${escapeAttr(action.execution)}">${escapeHtml(action.execution)}</b>
+            </div>
+          `).join("") : `<p>No control action has been calculated yet. Run one control cycle to create an auditable before/after record.</p>`}
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+async function refreshAutomationState({ silent = false } = {}) {
+  if (state.automationLoading) return;
+  state.automationLoading = true;
+  try {
+    const query = state.currentProjectId ? `?projectId=${encodeURIComponent(state.currentProjectId)}` : "";
+    state.automationState = await apiRequest(`/api/automation/state${query}`);
+  } catch {
+    state.automationState ||= fallbackAutomationState();
+  } finally {
+    state.automationLoading = false;
+  }
+  if (document.body.dataset.activeView === "twin") renderTwinWorkspace();
+  if (!silent) showToast("Automation state refreshed");
+}
+
+async function createAutomationConnectionFromUi() {
+  const kind = document.querySelector("#automationConnectionKind")?.value || "simulation";
+  const name = document.querySelector("#automationConnectionName")?.value.trim() || "Production cell";
+  const endpoint = document.querySelector("#automationConnectionEndpoint")?.value.trim() || "";
+  const mode = document.querySelector("#automationConnectionMode")?.value || "read-only";
+  const secret = document.querySelector("#automationConnectionSecret")?.value || "";
+  const writeEnabled = Boolean(document.querySelector("#automationConnectionWrite")?.checked);
+  try {
+    const payload = await apiRequest("/api/automation/connections", {
+      method: "POST",
+      body: JSON.stringify({ projectId: state.currentProjectId || "", kind, name, endpoint, mode, secret, writeEnabled, securityMode: "SignAndEncrypt" }),
+    });
+    state.automationState = payload.state;
+    renderTwinWorkspace();
+    showToast(`${payload.connection.name} added`);
+  } catch (error) {
+    showToast(error.message || "Automation connection could not be added");
+  }
+}
+
+async function testAutomationConnectionFromUi(connectionId) {
+  try {
+    const payload = await apiRequest(`/api/automation/connections/${encodeURIComponent(connectionId)}/test`, { method: "POST", body: "{}" });
+    state.automationState = payload.state;
+    renderTwinWorkspace();
+    showToast(payload.result?.detail || "Connection test complete");
+  } catch (error) {
+    showToast(error.message || "Connection test failed");
+    await refreshAutomationState({ silent: true });
+  }
+}
+
+async function saveAutomationLoopFromUi(loopId) {
+  const mode = document.querySelector(`[data-automation-loop-mode="${CSS.escape(loopId)}"]`)?.value || "observe";
+  const approved = Boolean(document.querySelector(`[data-automation-loop-approval="${CSS.escape(loopId)}"]`)?.checked);
+  const kp = Number(document.querySelector(`[data-automation-kp="${CSS.escape(loopId)}"]`)?.value);
+  const ki = Number(document.querySelector(`[data-automation-ki="${CSS.escape(loopId)}"]`)?.value);
+  const kd = Number(document.querySelector(`[data-automation-kd="${CSS.escape(loopId)}"]`)?.value);
+  const connectionId = activeAutomationState().connections?.[0]?.id || "";
+  try {
+    const payload = await apiRequest(`/api/automation/control-loops/${encodeURIComponent(loopId)}`, {
+      method: "POST",
+      body: JSON.stringify({ mode, approved, kp, ki, kd, connectionId }),
+    });
+    state.automationState = payload.state;
+    renderTwinWorkspace();
+    showToast(`${payload.loop.name}: ${payload.loop.mode}`);
+  } catch (error) {
+    showToast(error.message || "Control-loop update failed");
+  }
+}
+
+async function runAutomationCycleFromUi(loopId) {
+  const automation = activeAutomationState();
+  const loop = automation.loops?.find((item) => item.id === loopId);
+  const connection = automation.connections?.find((item) => item.id === loop?.connectionId) || automation.connections?.[0];
+  if (loop?.mode === "closed-loop" && connection?.kind !== "simulation") {
+    const confirmed = window.confirm(`Run one approved physical control cycle for ${loop.name}? Axion will request a write through the configured OT edge gateway.`);
+    if (!confirmed) return;
+  }
+  try {
+    const payload = await apiRequest(`/api/automation/control-loops/${encodeURIComponent(loopId)}/cycle`, { method: "POST", body: "{}" });
+    state.automationState = payload.state;
+    renderTwinWorkspace();
+    showToast(`${payload.action.loopName}: ${payload.action.execution}`);
+  } catch (error) {
+    showToast(error.message || "Control cycle failed");
+  }
+}
+
+function startAutomationPolling() {
+  window.clearInterval(startAutomationPolling.timer);
+  startAutomationPolling.timer = window.setInterval(() => {
+    if (document.body.dataset.activeView === "twin" && document.visibilityState === "visible") refreshAutomationState({ silent: true });
+  }, 5000);
+}
+
 function renderTwinWorkspace() {
   const active = activeTemplate();
   els.twinBoard.innerHTML = `
@@ -11626,6 +12045,7 @@ function renderTwinWorkspace() {
       </div>
       <button class="action-button primary" data-jump-view="flowsheet" type="button">Open process canvas</button>
     </section>
+    ${renderAutomationCockpit()}
     <section class="twin-hierarchy" aria-label="Clickable factory hierarchy">
       ${twinWorkspace.hierarchy.map((item, index) => `
         <button data-twin-view="${item.view}" type="button">
@@ -11734,6 +12154,10 @@ function setView(view) {
   if (view === "cfd") renderCfdBoard();
   if (view === "reports") renderReportsBoard();
   if (view === "recommendations") renderRecommendations();
+  if (view === "twin") {
+    renderTwinWorkspace();
+    refreshAutomationState({ silent: true });
+  }
   document.querySelectorAll(".view").forEach((item) => item.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
@@ -14001,8 +14425,8 @@ function localIntegrations() {
     { key: "comsol", name: "COMSOL Multiphysics", category: "CFD / multiphysics", status: "handoff ready", direction: "Export reactor geometry and boundary conditions", auth: "file/API", description: "Reactor geometry, sparger, impeller, boundary conditions, kinetics and turbulence assumptions can be packaged for rigorous CFD setup." },
     { key: "starccm", name: "Simcenter STAR-CCM+", category: "CFD", status: "handoff ready", direction: "Export CFD screening cases", auth: "file/API", description: "Oxygen, nutrient, shear, gas-liquid, turbulence and agitation case metadata can be exported for external CFD review." },
     { key: "gproms", name: "gPROMS / equation-oriented modelling", category: "High-fidelity modelling", status: "handoff ready", direction: "Export equations, parameters, units, and estimation cases", auth: "file/API", description: "Dynamic equations, parameters, estimation cases, soft-sensor variables and optimization payloads are packaged for external model work." },
-    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "tag map ready", direction: "Read historian tags", auth: "server credentials", description: "Live pH, DO, temperature, pressure, flow and batch-state tags are mapped to model parameters; live sync needs plant credentials." },
-    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "tag map ready", direction: "Read batch historian", auth: "enterprise connector", description: "Batch-profile calibration, deviation windows, soft-sensor inputs and continued process verification fields are mapped for export." },
+    { key: "opcua", name: "OPC UA / SCADA", category: "Live plant data", status: "edge gateway + telemetry API ready", direction: "Subscribe/read plus approval-gated writes", auth: "X.509 trust + gateway token + user role", description: "OPC UA monitored-item tags feed the Factory Twin through a backend edge gateway. Physical writes remain locked until connection, role, allowlist and closed-loop approval checks pass." },
+    { key: "osisoft-pi", name: "AVEVA PI / OSIsoft PI", category: "Historian", status: "historian ingestion API ready", direction: "Read current and recorded process values", auth: "PI Web API identity via edge gateway", description: "Quality-coded PI values can be ingested into the Axion historian, mapped to process variables, trended, and used for model residuals and advisory control." },
     { key: "benchling", name: "Benchling", category: "ELN/LIMS", status: "schema map ready", direction: "Read experiments and assays", auth: "API key/OAuth", description: "Titer, viability, media, assay, strain and cell-line metadata fields are mapped; live sync needs customer API access." },
     { key: "limsid", name: "LIMS / ELN generic", category: "Quality data", status: "schema map ready", direction: "Read/write assay metadata", auth: "API key", description: "Release-test, sterility, HCP, DNA, endotoxin and bioburden handoff fields are available as export contract." },
     { key: "erp", name: "ERP / procurement", category: "Economics", status: "schema map ready", direction: "Read material prices, inventory, and vendor quote records", auth: "enterprise connector", description: "Regional costs, supplier quotes, media BOMs, consumables, resin, packaging and working-capital fields are mapped for procurement integration." },
@@ -15460,6 +15884,26 @@ function bindEvents() {
   });
 
   els.twinBoard.addEventListener("click", (event) => {
+    const connectButton = event.target.closest("[data-automation-connect]");
+    if (connectButton) {
+      createAutomationConnectionFromUi();
+      return;
+    }
+    const testButton = event.target.closest("[data-automation-test]");
+    if (testButton) {
+      testAutomationConnectionFromUi(testButton.dataset.automationTest);
+      return;
+    }
+    const loopSaveButton = event.target.closest("[data-automation-loop-save]");
+    if (loopSaveButton) {
+      saveAutomationLoopFromUi(loopSaveButton.dataset.automationLoopSave);
+      return;
+    }
+    const cycleButton = event.target.closest("[data-automation-cycle]");
+    if (cycleButton) {
+      runAutomationCycleFromUi(cycleButton.dataset.automationCycle);
+      return;
+    }
     const promptButton = event.target.closest("[data-twin-prompt]");
     if (promptButton) {
       els.helpDock?.classList.add("open");
@@ -15737,5 +16181,6 @@ bindPublicPointerMotion();
 bindEvents();
 loadTemplate("culturedMeat");
 startRealtimeTelemetry();
+startAutomationPolling();
 setView("start");
 checkStoredAuth().finally(() => handleCheckoutReturn());

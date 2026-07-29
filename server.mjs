@@ -88,6 +88,9 @@ const config = {
   openaiApiKey: process.env.AXION_DISABLE_OPENAI === "true" ? "" : process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
   githubApiBaseUrl: (process.env.GITHUB_API_BASE_URL || "https://api.github.com").replace(/\/+$/, ""),
+  automationGatewayUrl: (process.env.AUTOMATION_GATEWAY_URL || "").replace(/\/+$/, ""),
+  automationGatewayToken: process.env.AUTOMATION_GATEWAY_TOKEN || "",
+  automationWritesEnabled: process.env.AXION_AUTOMATION_WRITES_ENABLED === "true",
   requireProductionConfig: process.env.AXION_REQUIRE_PRODUCTION_CONFIG === "true",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
@@ -127,6 +130,10 @@ const defaultDb = {
   commandPlans: [],
   githubConnections: [],
   personalIntegrations: [],
+  automationConnections: [],
+  automationTelemetry: [],
+  automationControlLoops: [],
+  automationActions: [],
   audit: [],
 };
 
@@ -154,6 +161,8 @@ function backendFeatures() {
     "Python SDK and webhook-ready integration targets",
     "Cloud run, parameter sweep, Monte Carlo and scenario-run roadmap",
     "Live-data, historian, LIMS, ERP and vendor-quote connector registry",
+    "OPC UA edge-gateway, SCADA and historian telemetry ingestion",
+    "Audited PID-style control-loop workspace with observe, advisory and closed-loop modes",
     "Versioned process models with project archives and collaboration roles",
     "AI command planning with safe model operations, project versions and undo-ready audit trail",
     "Admin order and license listing",
@@ -204,10 +213,16 @@ function publicConfig() {
       commandPlanEndpoint: "/api/commands/plan",
       commandApplyEndpoint: "/api/commands/{planId}/apply",
       commandUndoEndpoint: "/api/commands/undo",
+      automationStateEndpoint: "/api/automation/state",
+      automationConnectionEndpoint: "/api/automation/connections",
+      automationTelemetryEndpoint: "/api/automation/telemetry",
+      automationControlEndpoint: "/api/automation/control-loops",
       billingPortalEndpoint: "/api/billing/portal",
       nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
       aiCommandPlanner: Boolean(config.openaiApiKey),
+      automationGateway: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      physicalAutomationWrites: config.automationWritesEnabled,
     },
   };
 }
@@ -323,6 +338,15 @@ function productionReadiness() {
       ownerAction: "Provision an OpenFOAM-capable worker/cluster, set the token-protected URL, and validate solver output before regulated use.",
     },
     {
+      key: "automation-gateway",
+      label: "PLC/SCADA edge gateway",
+      ready: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      missing: ["AUTOMATION_GATEWAY_URL", "AUTOMATION_GATEWAY_TOKEN"].filter((key) => !process.env[key]),
+      requiresOwnerAction: true,
+      requiresPaymentApproval: true,
+      ownerAction: "Deploy an OT-network edge gateway with trusted OPC UA certificates, read-only tags first, outbound TLS, and a reviewed allowlist before enabling any physical write.",
+    },
+    {
       key: "ci",
       label: "Tests/CI",
       ready: existsSync(join(rootDir, ".github", "workflows", "ci.yml")),
@@ -402,6 +426,15 @@ function serviceStatusFromReadiness() {
         configured: byKey.get("cfd-worker")?.ready || false,
         status: byKey.get("cfd-worker")?.ready ? "connected-config-present" : "screening-only",
         safeDetail: byKey.get("cfd-worker")?.ready ? "CFD worker URL/token are configured; use /api/cfd/jobs for handoff/status." : "Set CFD_WORKER_URL and CFD_WORKER_TOKEN for rigorous external jobs.",
+      },
+      {
+        key: "automation-gateway",
+        label: "PLC/SCADA edge gateway",
+        configured: byKey.get("automation-gateway")?.ready || false,
+        status: byKey.get("automation-gateway")?.ready ? (config.automationWritesEnabled ? "gateway-plus-approved-writes" : "read-only-gateway") : "simulator-only",
+        safeDetail: byKey.get("automation-gateway")?.ready
+          ? `Gateway configured. Physical writes are ${config.automationWritesEnabled ? "backend-enabled but still approval-gated" : "locked"}.`
+          : "Set AUTOMATION_GATEWAY_URL and AUTOMATION_GATEWAY_TOKEN. Keep AXION_AUTOMATION_WRITES_ENABLED=false until OT validation is complete.",
       },
     ],
     nextActions: readiness.checks
@@ -1414,6 +1447,10 @@ function ensureDbShape(db) {
   db.commandPlans ||= [];
   db.githubConnections ||= [];
   db.personalIntegrations ||= [];
+  db.automationConnections ||= [];
+  db.automationTelemetry ||= [];
+  db.automationControlLoops ||= [];
+  db.automationActions ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -3475,19 +3512,19 @@ function integrationRegistry() {
       key: "opcua",
       name: "OPC UA / SCADA",
       category: "Live plant data",
-      status: "tag map ready",
-      direction: "Read historian tags",
-      auth: "server credentials",
-      description: "Live pH, DO, temperature, pressure, flow and batch-state tags are mapped to model parameters; live sync needs plant credentials.",
+      status: "edge gateway + telemetry API ready",
+      direction: "Subscribe/read plus approval-gated writes",
+      auth: "X.509 trust + gateway token + user role",
+      description: "OPC UA monitored-item tags feed the Factory Twin through a backend edge gateway. Physical writes remain locked until connection, role, allowlist and closed-loop approval checks pass.",
     },
     {
       key: "osisoft-pi",
       name: "AVEVA PI / OSIsoft PI",
       category: "Historian",
-      status: "tag map ready",
-      direction: "Read batch historian",
-      auth: "enterprise connector",
-      description: "Batch-profile calibration, deviation windows, soft-sensor inputs and continued process verification fields are mapped for export.",
+      status: "historian ingestion API ready",
+      direction: "Read current and recorded process values",
+      auth: "PI Web API identity via edge gateway",
+      description: "Quality-coded PI values can be ingested into the Axion historian, mapped to process variables, trended, and used for model residuals and advisory control.",
     },
     {
       key: "benchling",
@@ -3660,6 +3697,460 @@ async function connectorAction(req, res, integrationKey) {
   db.audit.unshift({ at: now, type: `connector.${action}`, connectorKey: integration.key, runId: run.id, by: sessionPrincipal(session) });
   await saveDb(db);
   json(res, 200, { connector: integration, runId: run.id, result, handoff });
+}
+
+const automationTagDefinitions = [
+  { tag: "BR101.PV.DO", label: "Dissolved oxygen", unit: "%", min: 0, max: 100, target: 40, writable: false, modelKey: "dissolvedOxygen" },
+  { tag: "BR101.SP.DO", label: "DO setpoint", unit: "%", min: 10, max: 80, target: 40, writable: true, modelKey: "dissolvedOxygenSetpoint" },
+  { tag: "BR101.PV.PH", label: "pH", unit: "pH", min: 6, max: 8, target: 7.1, writable: false, modelKey: "pH" },
+  { tag: "BR101.SP.PH", label: "pH setpoint", unit: "pH", min: 6.5, max: 7.5, target: 7.1, writable: true, modelKey: "pHSetpoint" },
+  { tag: "BR101.PV.TEMP", label: "Temperature", unit: "degC", min: 20, max: 45, target: 37, writable: false, modelKey: "temperature" },
+  { tag: "BR101.SP.TEMP", label: "Temperature setpoint", unit: "degC", min: 25, max: 42, target: 37, writable: true, modelKey: "temperatureSetpoint" },
+  { tag: "BR101.MV.AGITATION", label: "Agitation command", unit: "rpm", min: 20, max: 160, target: 78, writable: true, modelKey: "agitation" },
+  { tag: "BR101.MV.AIRFLOW", label: "Air-flow command", unit: "vvm", min: 0, max: 1.5, target: 0.35, writable: true, modelKey: "airflow" },
+  { tag: "BR101.MV.FEED", label: "Feed command", unit: "L/h", min: 0, max: 500, target: 110, writable: true, modelKey: "feedRate" },
+  { tag: "BR101.MV.BASE", label: "Base addition command", unit: "mL/min", min: 0, max: 200, target: 24, writable: true, modelKey: "baseAddition" },
+  { tag: "BR101.MV.JACKET", label: "Jacket valve command", unit: "%", min: 0, max: 100, target: 48, writable: true, modelKey: "jacketValve" },
+  { tag: "BR101.PV.LEVEL", label: "Working volume", unit: "%", min: 0, max: 85, target: 72, writable: false, modelKey: "workingVolume" },
+  { tag: "BR101.PV.PRESSURE", label: "Headspace pressure", unit: "bar(g)", min: 0, max: 1.5, target: 0.25, writable: false, modelKey: "pressure" },
+  { tag: "BR101.PV.AMMONIUM", label: "Ammonium soft sensor", unit: "mM", min: 0, max: 8, target: 1.5, writable: false, modelKey: "ammonium" },
+  { tag: "BR101.PV.LACTATE", label: "Lactate soft sensor", unit: "g/L", min: 0, max: 8, target: 1.8, writable: false, modelKey: "lactate" },
+  { tag: "BATCH.PHASE", label: "Batch phase", unit: "state", min: 0, max: 8, target: 3, writable: false, modelKey: "batchPhase" },
+];
+
+const automationLoopTemplates = [
+  { key: "do-cascade", name: "DO cascade", pvTag: "BR101.PV.DO", spTag: "BR101.SP.DO", mvTag: "BR101.MV.AGITATION", kp: 1.8, ki: 0.08, kd: 0.05, outputMin: 30, outputMax: 150, rateLimit: 8, safetyLow: 10, safetyHigh: 80 },
+  { key: "ph-control", name: "pH control", pvTag: "BR101.PV.PH", spTag: "BR101.SP.PH", mvTag: "BR101.MV.BASE", kp: 18, ki: 0.6, kd: 0.2, outputMin: 0, outputMax: 200, rateLimit: 15, safetyLow: 6.6, safetyHigh: 7.5 },
+  { key: "temperature", name: "Temperature control", pvTag: "BR101.PV.TEMP", spTag: "BR101.SP.TEMP", mvTag: "BR101.MV.JACKET", kp: 8, ki: 0.35, kd: 0.1, outputMin: 0, outputMax: 100, rateLimit: 8, safetyLow: 30, safetyHigh: 40 },
+];
+
+function automationOwner(session) {
+  return sessionPrincipal(session);
+}
+
+function automationProjectAllowed(db, session, projectId = "") {
+  if (!projectId) return true;
+  const project = db.projects.find((item) => item.id === projectId);
+  return Boolean(project && canAccessProject(session, project));
+}
+
+function sanitizeAutomationConnection(connection) {
+  return {
+    id: connection.id,
+    owner: connection.owner,
+    projectId: connection.projectId || "",
+    name: connection.name,
+    kind: connection.kind,
+    endpoint: connection.endpoint,
+    securityMode: connection.securityMode,
+    mode: connection.mode,
+    status: connection.status,
+    writeEnabled: Boolean(connection.writeEnabled),
+    secretConfigured: Boolean(connection.secretCiphertext),
+    lastTestedAt: connection.lastTestedAt || "",
+    lastConnectedAt: connection.lastConnectedAt || "",
+    error: connection.error || "",
+  };
+}
+
+function ensureAutomationLoops(db, owner, projectId = "") {
+  automationLoopTemplates.forEach((template) => {
+    const exists = db.automationControlLoops.some((item) => item.owner === owner && item.projectId === projectId && item.key === template.key);
+    if (exists) return;
+    db.automationControlLoops.push({
+      id: randomUUID(),
+      owner,
+      projectId,
+      ...template,
+      mode: "observe",
+      enabled: true,
+      integral: 0,
+      previousError: 0,
+      previousOutput: template.outputMin,
+      lastCycleAt: "",
+      approvedBy: "",
+      approvedAt: "",
+      connectionId: "",
+    });
+  });
+}
+
+function simulationTelemetry(now = Date.now()) {
+  const t = now / 1000;
+  const phase = Math.floor((t / 18) % 6);
+  const values = {
+    "BR101.PV.DO": 40 + Math.sin(t / 4.8) * 5.6 + Math.sin(t / 1.7) * 1.2,
+    "BR101.SP.DO": 40,
+    "BR101.PV.PH": 7.08 + Math.sin(t / 9.5) * 0.045,
+    "BR101.SP.PH": 7.1,
+    "BR101.PV.TEMP": 36.96 + Math.sin(t / 12.5) * 0.12,
+    "BR101.SP.TEMP": 37,
+    "BR101.MV.AGITATION": 78 + Math.sin(t / 5.2) * 6,
+    "BR101.MV.AIRFLOW": 0.35 + Math.sin(t / 6.4) * 0.04,
+    "BR101.MV.FEED": phase < 2 ? 0 : 110 + Math.sin(t / 8) * 12,
+    "BR101.MV.BASE": 24 + Math.sin(t / 9.5) * 4,
+    "BR101.MV.JACKET": 48 + Math.sin(t / 12.5) * 3,
+    "BR101.PV.LEVEL": 68 + phase * 1.7,
+    "BR101.PV.PRESSURE": 0.24 + Math.sin(t / 7) * 0.025,
+    "BR101.PV.AMMONIUM": 0.8 + phase * 0.19 + Math.sin(t / 20) * 0.06,
+    "BR101.PV.LACTATE": 1.1 + phase * 0.14 + Math.sin(t / 16) * 0.09,
+    "BATCH.PHASE": phase,
+  };
+  const timestamp = new Date(now).toISOString();
+  return automationTagDefinitions.map((definition) => ({
+    id: `sim-${definition.tag}`,
+    tag: definition.tag,
+    value: values[definition.tag] ?? definition.target,
+    unit: definition.unit,
+    quality: "Good",
+    sourceTimestamp: timestamp,
+    receivedAt: timestamp,
+    source: "Axion verified simulator",
+    simulated: true,
+  }));
+}
+
+function latestAutomationTelemetry(db, owner, projectId = "") {
+  const samples = db.automationTelemetry
+    .filter((item) => item.owner === owner && item.projectId === projectId)
+    .sort((a, b) => String(b.sourceTimestamp).localeCompare(String(a.sourceTimestamp)));
+  const latest = new Map();
+  samples.forEach((item) => {
+    if (!latest.has(item.tag)) latest.set(item.tag, item);
+  });
+  simulationTelemetry().forEach((item) => {
+    if (!latest.has(item.tag)) latest.set(item.tag, item);
+  });
+  return [...latest.values()];
+}
+
+function automationHistory(db, owner, projectId = "", limit = 240) {
+  const stored = db.automationTelemetry
+    .filter((item) => item.owner === owner && item.projectId === projectId)
+    .sort((a, b) => String(a.sourceTimestamp).localeCompare(String(b.sourceTimestamp)))
+    .slice(-limit);
+  if (stored.length) return stored;
+  const now = Date.now();
+  return Array.from({ length: 48 }, (_, index) => simulationTelemetry(now - (47 - index) * 60_000))
+    .flat()
+    .filter((item) => ["BR101.PV.DO", "BR101.PV.PH", "BR101.PV.TEMP", "BR101.PV.AMMONIUM", "BR101.PV.LACTATE"].includes(item.tag));
+}
+
+function automationSnapshot(db, session, projectId = "") {
+  const owner = automationOwner(session);
+  ensureAutomationLoops(db, owner, projectId);
+  const connections = db.automationConnections
+    .filter((item) => item.owner === owner && item.projectId === projectId)
+    .map(sanitizeAutomationConnection);
+  const loops = db.automationControlLoops.filter((item) => item.owner === owner && item.projectId === projectId);
+  const actions = db.automationActions
+    .filter((item) => item.owner === owner && item.projectId === projectId)
+    .slice(0, 40);
+  return {
+    projectId,
+    gateway: {
+      configured: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      writesEnabled: config.automationWritesEnabled,
+      physicalWritePolicy: config.automationWritesEnabled ? "approved closed-loop writes only" : "physical writes locked",
+    },
+    connections,
+    tagDefinitions: automationTagDefinitions,
+    latest: latestAutomationTelemetry(db, owner, projectId),
+    history: automationHistory(db, owner, projectId),
+    loops,
+    actions,
+    generatedAt: new Date().toISOString(),
+    note: "Simulation and advisory control are available immediately. Physical PLC writes require an approved edge gateway, a write-enabled connection, a closed-loop approval and AXION_AUTOMATION_WRITES_ENABLED=true.",
+  };
+}
+
+async function listAutomationState(req, res, query) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const projectId = String(query.get("projectId") || "").slice(0, 200);
+  const db = ensureDbShape(await loadDb());
+  if (!automationProjectAllowed(db, session, projectId)) return json(res, 404, { error: "Project not found" });
+  const snapshot = automationSnapshot(db, session, projectId);
+  await saveDb(db);
+  json(res, 200, snapshot);
+}
+
+async function createAutomationConnection(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "").slice(0, 200);
+  if (!automationProjectAllowed(db, session, projectId)) return json(res, 404, { error: "Project not found" });
+  const kind = ["simulation", "opcua-edge", "pi-web-api", "mqtt-edge"].includes(body.kind) ? body.kind : "simulation";
+  const endpoint = String(body.endpoint || "").trim().slice(0, 1000);
+  if (kind !== "simulation" && !endpoint) return json(res, 400, { error: "Enter the plant endpoint exposed to the approved edge gateway." });
+  const owner = automationOwner(session);
+  const now = new Date().toISOString();
+  const connection = {
+    id: randomUUID(),
+    owner,
+    projectId,
+    name: String(body.name || `${kind} connection`).trim().slice(0, 120),
+    kind,
+    endpoint: kind === "simulation" ? "axion://verified-simulator" : endpoint,
+    securityMode: kind === "opcua-edge" ? String(body.securityMode || "SignAndEncrypt").slice(0, 80) : "TLS",
+    mode: body.mode === "read-write" ? "read-write" : "read-only",
+    status: kind === "simulation" ? "connected" : "configured",
+    writeEnabled: Boolean(body.writeEnabled && body.mode === "read-write" && config.automationWritesEnabled),
+    secretCiphertext: body.secret ? encryptIntegrationSecret(String(body.secret).slice(0, 4000)) : "",
+    createdAt: now,
+    updatedAt: now,
+    lastConnectedAt: kind === "simulation" ? now : "",
+    error: "",
+  };
+  db.automationConnections.unshift(connection);
+  db.audit.unshift({ at: now, type: "automation.connection.created", projectId, connectionId: connection.id, kind, by: owner });
+  await saveDb(db);
+  json(res, 201, { connection: sanitizeAutomationConnection(connection), state: automationSnapshot(db, session, projectId) });
+}
+
+async function testAutomationConnection(req, res, connectionId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const db = ensureDbShape(await loadDb());
+  const owner = automationOwner(session);
+  const connection = db.automationConnections.find((item) => item.id === connectionId && item.owner === owner);
+  if (!connection) return json(res, 404, { error: "Automation connection not found" });
+  const now = new Date().toISOString();
+  let result = { ok: false, status: "gateway-required", detail: "Configure AUTOMATION_GATEWAY_URL and AUTOMATION_GATEWAY_TOKEN on the backend." };
+  if (connection.kind === "simulation") {
+    result = { ok: true, status: "connected", detail: "Axion verified simulator is producing quality-coded telemetry." };
+  } else if (config.automationGatewayUrl && config.automationGatewayToken) {
+    try {
+      const response = await fetch(`${config.automationGatewayUrl}/v1/connections/test`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${config.automationGatewayToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          kind: connection.kind,
+          endpoint: connection.endpoint,
+          securityMode: connection.securityMode,
+          mode: connection.mode,
+          credential: decryptIntegrationSecret(connection.secretCiphertext),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || payload.message || `Gateway test failed with ${response.status}`);
+      result = { ok: true, status: "connected", detail: payload.detail || "Edge gateway accepted the connection contract." };
+    } catch (error) {
+      result = { ok: false, status: "error", detail: String(error.message || error).slice(0, 500) };
+    }
+  }
+  connection.status = result.status;
+  connection.error = result.ok ? "" : result.detail;
+  connection.lastTestedAt = now;
+  if (result.ok) connection.lastConnectedAt = now;
+  db.audit.unshift({ at: now, type: "automation.connection.tested", projectId: connection.projectId, connectionId, ok: result.ok, by: owner });
+  await saveDb(db);
+  json(res, result.ok ? 200 : 424, { result, connection: sanitizeAutomationConnection(connection), state: automationSnapshot(db, session, connection.projectId) });
+}
+
+async function ingestAutomationTelemetry(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const projectId = String(body.projectId || "").slice(0, 200);
+  if (!automationProjectAllowed(db, session, projectId)) return json(res, 404, { error: "Project not found" });
+  const owner = automationOwner(session);
+  const connectionId = String(body.connectionId || "").slice(0, 200);
+  const connection = db.automationConnections.find((item) => item.id === connectionId && item.owner === owner && item.projectId === projectId);
+  if (connectionId && !connection) return json(res, 404, { error: "Automation connection not found" });
+  const samples = Array.isArray(body.samples) ? body.samples.slice(0, 1000) : [];
+  if (!samples.length) return json(res, 400, { error: "Provide at least one telemetry sample." });
+  const receivedAt = new Date().toISOString();
+  const accepted = samples.flatMap((sample) => {
+    const tag = String(sample.tag || "").trim().slice(0, 200);
+    const value = Number(sample.value);
+    if (!tag || !Number.isFinite(value)) return [];
+    return [{
+      id: randomUUID(),
+      owner,
+      projectId,
+      connectionId,
+      tag,
+      value,
+      unit: String(sample.unit || automationTagDefinitions.find((item) => item.tag === tag)?.unit || "").slice(0, 40),
+      quality: ["Good", "Uncertain", "Bad"].includes(sample.quality) ? sample.quality : "Good",
+      sourceTimestamp: Number.isNaN(Date.parse(sample.timestamp)) ? receivedAt : new Date(sample.timestamp).toISOString(),
+      receivedAt,
+      source: connection?.name || "Axion API ingest",
+      simulated: false,
+    }];
+  });
+  db.automationTelemetry.push(...accepted);
+  if (db.automationTelemetry.length > 20_000) db.automationTelemetry = db.automationTelemetry.slice(-20_000);
+  db.audit.unshift({ at: receivedAt, type: "automation.telemetry.ingested", projectId, connectionId, accepted: accepted.length, by: owner });
+  await saveDb(db);
+  json(res, 201, { accepted: accepted.length, rejected: samples.length - accepted.length, state: automationSnapshot(db, session, projectId) });
+}
+
+function boundedNumber(value, fallback, min, max) {
+  const numeric = Number(value);
+  return Math.max(min, Math.min(max, Number.isFinite(numeric) ? numeric : fallback));
+}
+
+async function updateAutomationLoop(req, res, loopId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const owner = automationOwner(session);
+  const loop = db.automationControlLoops.find((item) => item.id === loopId && item.owner === owner);
+  if (!loop) return json(res, 404, { error: "Control loop not found" });
+  const mode = ["manual", "observe", "advisory", "closed-loop"].includes(body.mode) ? body.mode : loop.mode;
+  if (mode === "closed-loop" && !body.approved) {
+    return json(res, 409, { error: "Closed-loop mode requires an explicit approval for this project and loop." });
+  }
+  loop.mode = mode;
+  loop.enabled = body.enabled === undefined ? loop.enabled : Boolean(body.enabled);
+  loop.kp = boundedNumber(body.kp, loop.kp, 0, 1000);
+  loop.ki = boundedNumber(body.ki, loop.ki, 0, 1000);
+  loop.kd = boundedNumber(body.kd, loop.kd, 0, 1000);
+  loop.rateLimit = boundedNumber(body.rateLimit, loop.rateLimit, 0.001, 10000);
+  loop.connectionId = String(body.connectionId || loop.connectionId || "").slice(0, 200);
+  if (mode === "closed-loop") {
+    loop.approvedBy = owner;
+    loop.approvedAt = new Date().toISOString();
+  } else {
+    loop.approvedBy = "";
+    loop.approvedAt = "";
+  }
+  const now = new Date().toISOString();
+  db.audit.unshift({ at: now, type: "automation.loop.updated", projectId: loop.projectId, loopId, mode, by: owner });
+  await saveDb(db);
+  json(res, 200, { loop, state: automationSnapshot(db, session, loop.projectId) });
+}
+
+async function writeAutomationGateway(connection, payload) {
+  if (!config.automationGatewayUrl || !config.automationGatewayToken) throw new Error("Automation gateway is not configured.");
+  const response = await fetch(`${config.automationGatewayUrl}/v1/write`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.automationGatewayToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      connection: {
+        kind: connection.kind,
+        endpoint: connection.endpoint,
+        securityMode: connection.securityMode,
+        credential: decryptIntegrationSecret(connection.secretCiphertext),
+      },
+      write: payload,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || result.message || `Gateway write failed with ${response.status}`);
+  return result;
+}
+
+async function runAutomationCycle(req, res, loopId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const db = ensureDbShape(await loadDb());
+  const owner = automationOwner(session);
+  const loop = db.automationControlLoops.find((item) => item.id === loopId && item.owner === owner);
+  if (!loop) return json(res, 404, { error: "Control loop not found" });
+  const latest = latestAutomationTelemetry(db, owner, loop.projectId);
+  const pv = latest.find((item) => item.tag === loop.pvTag);
+  const sp = latest.find((item) => item.tag === loop.spTag);
+  const mv = latest.find((item) => item.tag === loop.mvTag);
+  if (!pv || !sp || !mv) return json(res, 409, { error: "The loop is missing PV, SP or MV telemetry." });
+  if (pv.quality !== "Good" || sp.quality !== "Good") return json(res, 409, { error: "Control calculation blocked because PV or SP quality is not Good." });
+  const nowMs = Date.now();
+  const previousMs = loop.lastCycleAt ? Date.parse(loop.lastCycleAt) : nowMs - 5000;
+  const dt = Math.max(0.25, Math.min(60, (nowMs - previousMs) / 1000));
+  const error = Number(sp.value) - Number(pv.value);
+  const outsideSafety = Number(pv.value) < loop.safetyLow || Number(pv.value) > loop.safetyHigh;
+  loop.integral = boundedNumber(loop.integral + error * dt, 0, -10000, 10000);
+  const derivative = (error - Number(loop.previousError || 0)) / dt;
+  const rawOutput = Number(mv.value) + loop.kp * error + loop.ki * loop.integral + loop.kd * derivative;
+  const previousOutput = loop.lastCycleAt ? Number(loop.previousOutput ?? mv.value) : Number(mv.value);
+  const rateDelta = Math.max(-loop.rateLimit, Math.min(loop.rateLimit, rawOutput - previousOutput));
+  const output = boundedNumber(previousOutput + rateDelta, mv.value, loop.outputMin, loop.outputMax);
+  const connection = db.automationConnections.find((item) => item.id === loop.connectionId && item.owner === owner);
+  const simulatorWrite = connection?.kind === "simulation";
+  const physicalWritePermitted = Boolean(
+    loop.mode === "closed-loop"
+    && loop.approvedBy
+    && config.automationWritesEnabled
+    && connection?.writeEnabled
+    && connection.mode === "read-write"
+    && config.automationGatewayUrl
+    && config.automationGatewayToken
+  );
+  let execution = loop.mode === "advisory" || loop.mode === "observe" ? "recommendation" : "blocked";
+  let gatewayResult = null;
+  let reason = "";
+  if (!loop.enabled) {
+    reason = "Loop is disabled.";
+  } else if (outsideSafety) {
+    reason = "PV is outside the configured safety envelope; automatic action is inhibited.";
+  } else if (loop.mode === "closed-loop" && simulatorWrite) {
+    execution = "simulated-write";
+    reason = "Command applied to the Axion simulator only.";
+  } else if (physicalWritePermitted) {
+    try {
+      gatewayResult = await writeAutomationGateway(connection, {
+        tag: loop.mvTag,
+        value: output,
+        timestamp: new Date(nowMs).toISOString(),
+        reason: `${loop.name}: PV ${pv.value}, SP ${sp.value}`,
+        approvedBy: loop.approvedBy,
+      });
+      execution = "physical-write";
+      reason = "Approved write acknowledged by the edge gateway.";
+    } catch (errorWrite) {
+      execution = "write-failed";
+      reason = String(errorWrite.message || errorWrite).slice(0, 500);
+    }
+  } else if (loop.mode === "closed-loop") {
+    reason = "Physical write is locked until the backend flag, gateway, write-enabled connection and approval are all present.";
+  } else if (loop.mode === "manual") {
+    reason = "Manual mode calculates no automatic actuation.";
+  } else if (loop.mode === "advisory") {
+    reason = "Recommendation calculated from current PV, SP and MV; no command was written.";
+  } else if (loop.mode === "observe") {
+    reason = "Observe mode records the calculated response without proposing automatic actuation.";
+  }
+  loop.previousError = error;
+  loop.previousOutput = output;
+  loop.lastCycleAt = new Date(nowMs).toISOString();
+  const action = {
+    id: randomUUID(),
+    owner,
+    projectId: loop.projectId,
+    loopId: loop.id,
+    loopName: loop.name,
+    at: loop.lastCycleAt,
+    mode: loop.mode,
+    pvTag: loop.pvTag,
+    pv: Number(pv.value),
+    spTag: loop.spTag,
+    sp: Number(sp.value),
+    mvTag: loop.mvTag,
+    currentMv: Number(mv.value),
+    proposedMv: output,
+    error,
+    execution,
+    reason,
+    gatewayAcknowledgement: gatewayResult?.acknowledgement || "",
+    by: owner,
+  };
+  db.automationActions.unshift(action);
+  db.automationActions = db.automationActions.slice(0, 5000);
+  db.audit.unshift({ at: action.at, type: "automation.control.cycle", projectId: loop.projectId, loopId, execution, by: owner });
+  await saveDb(db);
+  json(res, 200, { action, loop, state: automationSnapshot(db, session, loop.projectId) });
 }
 
 async function listProjects(req, res) {
@@ -4652,6 +5143,33 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   const integrationActionMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/actions$/);
   if (integrationActionMatch && req.method === "POST") {
     await connectorAction(req, res, decodeURIComponent(integrationActionMatch[1]));
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/automation/state") {
+    await listAutomationState(req, res, query);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/automation/connections") {
+    await createAutomationConnection(req, res);
+    return;
+  }
+  const automationConnectionTestMatch = pathname.match(/^\/api\/automation\/connections\/([^/]+)\/test$/);
+  if (automationConnectionTestMatch && req.method === "POST") {
+    await testAutomationConnection(req, res, decodeURIComponent(automationConnectionTestMatch[1]));
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/automation/telemetry") {
+    await ingestAutomationTelemetry(req, res);
+    return;
+  }
+  const automationLoopMatch = pathname.match(/^\/api\/automation\/control-loops\/([^/]+)$/);
+  if (automationLoopMatch && req.method === "POST") {
+    await updateAutomationLoop(req, res, decodeURIComponent(automationLoopMatch[1]));
+    return;
+  }
+  const automationCycleMatch = pathname.match(/^\/api\/automation\/control-loops\/([^/]+)\/cycle$/);
+  if (automationCycleMatch && req.method === "POST") {
+    await runAutomationCycle(req, res, decodeURIComponent(automationCycleMatch[1]));
     return;
   }
   if (req.method === "GET" && pathname === "/api/data/architecture") {

@@ -283,6 +283,127 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(created.response.status, 201);
     assert.ok(created.payload.project.id);
 
+    const automationConnection = await jsonFetch(server.baseUrl, "/api/automation/connections", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        name: "Verified test simulator",
+        kind: "simulation",
+        mode: "read-write",
+      },
+    });
+    assert.equal(automationConnection.response.status, 201);
+    assert.equal(automationConnection.payload.connection.status, "connected");
+    assert.equal(automationConnection.payload.connection.writeEnabled, false);
+
+    const automationConnectionTest = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/connections/${automationConnection.payload.connection.id}/test`,
+      { token, method: "POST" },
+    );
+    assert.equal(automationConnectionTest.response.status, 200);
+    assert.equal(automationConnectionTest.payload.result.ok, true);
+
+    const automationState = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/state?projectId=${created.payload.project.id}`,
+      { token },
+    );
+    assert.equal(automationState.response.status, 200);
+    assert.equal(automationState.payload.gateway.writesEnabled, false);
+    assert.equal(automationState.payload.loops.length, 3);
+    assert.ok(automationState.payload.latest.some((sample) => sample.tag === "BR101.PV.DO"));
+    const doLoop = automationState.payload.loops.find((loop) => loop.key === "do-cascade");
+    assert.ok(doLoop);
+
+    const blockedClosedLoop = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/control-loops/${doLoop.id}`,
+      {
+        token,
+        method: "POST",
+        body: {
+          projectId: created.payload.project.id,
+          connectionId: automationConnection.payload.connection.id,
+          mode: "closed-loop",
+          approved: false,
+        },
+      },
+    );
+    assert.equal(blockedClosedLoop.response.status, 409);
+
+    const advisoryLoop = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/control-loops/${doLoop.id}`,
+      {
+        token,
+        method: "POST",
+        body: {
+          connectionId: automationConnection.payload.connection.id,
+          mode: "advisory",
+          kp: 2.1,
+          ki: 0.09,
+          kd: 0.04,
+          rateLimit: 6,
+        },
+      },
+    );
+    assert.equal(advisoryLoop.response.status, 200);
+    assert.equal(advisoryLoop.payload.loop.mode, "advisory");
+
+    const advisoryCycle = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/control-loops/${doLoop.id}/cycle`,
+      { token, method: "POST", body: {} },
+    );
+    assert.equal(advisoryCycle.response.status, 200);
+    assert.equal(advisoryCycle.payload.action.execution, "recommendation");
+    assert.ok(Number.isFinite(advisoryCycle.payload.action.proposedMv));
+    assert.ok(Math.abs(advisoryCycle.payload.action.proposedMv - advisoryCycle.payload.action.currentMv) <= 6.0001);
+    assert.match(advisoryCycle.payload.action.reason, /no command was written/i);
+
+    const telemetryIngest = await jsonFetch(server.baseUrl, "/api/automation/telemetry", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        connectionId: automationConnection.payload.connection.id,
+        samples: [
+          { tag: "BR101.PV.DO", value: 33.5, unit: "%", quality: "Good", timestamp: new Date().toISOString() },
+          { tag: "BR101.PV.AMMONIUM", value: 1.7, unit: "mM", quality: "Good", timestamp: new Date().toISOString() },
+        ],
+      },
+    });
+    assert.equal(telemetryIngest.response.status, 201);
+    assert.equal(telemetryIngest.payload.accepted, 2);
+    assert.equal(telemetryIngest.payload.state.latest.find((sample) => sample.tag === "BR101.PV.DO").value, 33.5);
+
+    const approvedSimulatorLoop = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/control-loops/${doLoop.id}`,
+      {
+        token,
+        method: "POST",
+        body: {
+          connectionId: automationConnection.payload.connection.id,
+          mode: "closed-loop",
+          approved: true,
+        },
+      },
+    );
+    assert.equal(approvedSimulatorLoop.response.status, 200);
+    assert.equal(approvedSimulatorLoop.payload.loop.approvedBy, "owner");
+
+    const simulatorCycle = await jsonFetch(
+      server.baseUrl,
+      `/api/automation/control-loops/${doLoop.id}/cycle`,
+      { token, method: "POST", body: {} },
+    );
+    assert.equal(simulatorCycle.response.status, 200);
+    assert.equal(simulatorCycle.payload.action.execution, "simulated-write");
+    assert.match(simulatorCycle.payload.action.reason, /simulator only/i);
+
     const commandApply = await jsonFetch(server.baseUrl, `/api/commands/${commandPlan.payload.commandPlan.id}/apply`, {
       token,
       method: "POST",
@@ -522,7 +643,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.ok(Array.isArray(exported.payload.versions));
     assert.ok(Array.isArray(exported.payload.cfdJobs));
 
-    const audit = await jsonFetch(server.baseUrl, "/api/audit?limit=20", { token });
+    const audit = await jsonFetch(server.baseUrl, "/api/audit?limit=100", { token });
     assert.equal(audit.response.status, 200);
     assert.ok(audit.payload.events.some((event) => event.type === "service.probe"));
     assert.ok(audit.payload.events.some((event) => event.type === "cfd.job.created"));

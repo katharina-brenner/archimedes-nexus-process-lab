@@ -49,6 +49,39 @@ export GOOGLE_ALLOWED_DOMAINS=""
 
 Google login uses Google Identity Services in the browser and verifies the returned ID token on the backend. It only renders as active when `GOOGLE_CLIENT_ID` is configured.
 
+## Plant automation and autonomous operation
+
+Axion includes an automation cockpit for quality-coded process telemetry, historian trends, PID advisory calculations, approval-gated control modes, and an immutable action log. The built-in verified simulator is available without plant infrastructure.
+
+Real PLC/SCADA connectivity is routed through an independently deployed OT edge gateway. Configure:
+
+```bash
+AUTOMATION_GATEWAY_URL=https://your-approved-edge-gateway.example
+AUTOMATION_GATEWAY_TOKEN=replace-with-a-secret-token
+AXION_AUTOMATION_WRITES_ENABLED=false
+```
+
+Keep `AXION_AUTOMATION_WRITES_ENABLED=false` during tag mapping, read-only commissioning, alarm verification, and site acceptance testing. A physical write is permitted only when all of these conditions are true:
+
+1. The backend write flag is enabled.
+2. The connection is explicitly configured as read-write.
+3. The control loop is in closed-loop mode with a named approval.
+4. PV and SP quality are `Good` and the PV remains inside its safety envelope.
+5. The edge gateway accepts and acknowledges the write.
+
+The gateway contract exposes `POST /v1/connections/test` for connection verification and `POST /v1/write` for approved commands. OPC UA certificates, endpoint trust, tag namespaces, PLC interlocks, independent trips, and site cybersecurity controls remain plant-specific commissioning work. Axion never bypasses those safeguards.
+
+Automation API routes:
+
+```text
+GET  /api/automation/state
+POST /api/automation/connections
+POST /api/automation/connections/:id/test
+POST /api/automation/telemetry
+POST /api/automation/control-loops/:id
+POST /api/automation/control-loops/:id/cycle
+```
+
 ## Paywall setup
 
 The paywall is backend-enforced. Do not use a static GitHub Pages deployment for real paid access, because static HTML cannot securely verify payment. Use `npm run backend` or deploy `server.mjs` to a Node hosting provider.
