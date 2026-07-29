@@ -1,0 +1,64 @@
+{
+  "integrations": [
+    {
+      "key": "axion-projects",
+      "name": "Axion Projects API",
+      "category": "Process model lifecycle",
+      "description": "Project, branch, version, collaborator and export contracts for external engineering workflows.",
+      "auth": "Axion bearer token",
+      "direction": "Read and version process models",
+      "payloads": [
+        "projects",
+        "branches",
+        "versions",
+        "collaborators",
+        "engineering exports"
+      ],
+      "endpoints": [
+        "GET /api/projects",
+        "POST /api/projects",
+        "POST /api/projects/{projectId}/branches",
+        "POST /api/projects/{projectId}/versions/compare",
+        "GET /api/projects/{projectId}/export"
+      ]
+    },
+    {
+      "key": "axion-company-data",
+      "name": "Axion Company Data API",
+      "category": "Plant data",
+      "description": "Dataset ingestion and model binding for historian, experimental, TEA, LCA, QC and supplier data.",
+      "auth": "Axion bearer token",
+      "direction": "Import company data and bind it to model parameters",
+      "payloads": [
+        "CSV and JSON datasets",
+        "column mappings",
+        "quality flags",
+        "model bindings"
+      ],
+      "endpoints": [
+        "GET /api/datasets",
+        "POST /api/datasets/import",
+        "POST /api/datasets/apply"
+      ]
+    },
+    {
+      "key": "axion-cfd-worker",
+      "name": "Axion CFD Worker Contract",
+      "category": "CFD compute",
+      "description": "Reactor geometry, boundary conditions, biology kinetics and solver-job handoff for an external OpenFOAM worker.",
+      "auth": "Worker bearer token",
+      "direction": "Submit CFD cases and retrieve solver status",
+      "payloads": [
+        "reactor geometry",
+        "boundary conditions",
+        "kinetics",
+        "solver controls",
+        "result fields"
+      ],
+      "endpoints": [
+        "POST /api/cfd/jobs",
+        "GET /api/cfd/jobs/{jobId}"
+      ]
+    }
+  ]
+}

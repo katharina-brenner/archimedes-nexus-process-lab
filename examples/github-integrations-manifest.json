@@ -1,0 +1,38 @@
+{
+  "integrations": [
+    {
+      "key": "company-lims",
+      "name": "Company LIMS",
+      "category": "Quality data",
+      "description": "Batch, sample and assay metadata used by process models and release workflows.",
+      "baseUrl": "https://api.company.example",
+      "auth": "OAuth 2.0",
+      "direction": "Read batches and assays; publish model references",
+      "payloads": [
+        "batches",
+        "samples",
+        "assays",
+        "release status"
+      ],
+      "endpoints": [
+        "GET /batches",
+        "GET /samples",
+        "POST /model-references"
+      ]
+    },
+    {
+      "key": "supplier-quotes",
+      "name": "Supplier Quote API",
+      "category": "Economics",
+      "description": "Company-specific material prices and supplier quotes for TEA calculations.",
+      "auth": "API key",
+      "direction": "Read material and equipment quote data",
+      "payloads": [
+        "materials",
+        "equipment quotes",
+        "currency",
+        "validity dates"
+      ]
+    }
+  ]
+}

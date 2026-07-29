@@ -103,6 +103,14 @@ The response contains the activated license key. The user can then log in with t
 
 Workspace users are configured through backend environment variables, activated licenses, Google OAuth, or admin-managed access. No customer-facing default users are embedded in the browser.
 
+## GitHub personal API registry
+
+Authenticated users can connect a GitHub repository from the Projects connector registry. Axion reads either a JSON document with `integrations`, `connectors`, or `apis`, or a JSON OpenAPI document. Repository code is never executed.
+
+Use [examples/github-integrations-manifest.json](/Users/katharinajuliabrenner/Documents/GitHub/superpro-designer/examples/github-integrations-manifest.json) as a starting point and commit it as `.axion/integrations.json` in the company repository. Public repositories do not require a token. Private repositories should use a fine-grained GitHub token with read-only access to repository contents.
+
+Tokens are encrypted with the backend `SESSION_SECRET`, stored only in backend persistence, and omitted from all API responses and audit records. Use a long, production-only `SESSION_SECRET` and HTTPS for the hosted application.
+
 ## Public website
 
 The public site presents Axion as a professional process-modelling workspace with platform, workflow, ecosystem, reviews, pricing, and login pages. Customer-facing copy focuses on product capabilities, implementation fit, data governance, and onboarding.
@@ -134,6 +142,9 @@ The backend readiness payload now marks which missing systems require account-ow
 - `POST /api/projects/:id/versions/:versionId/restore` restores an archived model version
 - `GET /api/integrations` lists prepared API connector targets
 - `POST /api/integrations/:key/actions` runs configure, mapping-test, or export actions for a connector and stores an audit record
+- `POST /api/integrations/github/connect` connects a public or private GitHub repository and imports a JSON/OpenAPI connector manifest
+- `POST /api/integrations/github/:connectionId/sync` refreshes personal API definitions from the configured repository ref
+- `DELETE /api/integrations/github/:connectionId` removes the connection and its imported definitions
 - `GET /api/data/architecture` returns the recommended production data stack and Postgres schema blueprint
 - `GET /api/backend/processes` returns the production backend process map, including API core, Next.js BFF, datasets, jobs, billing, OAuth, email and CFD worker responsibilities
 - `GET /api/services/status` returns secret-safe provider status for GitHub, Supabase, Stripe, Google, email, OpenAI and CFD

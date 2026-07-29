@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -84,6 +84,7 @@ const config = {
   nextjsBffUrl: (process.env.NEXTJS_BFF_URL || "").replace(/\/+$/, ""),
   openaiApiKey: process.env.AXION_DISABLE_OPENAI === "true" ? "" : process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+  githubApiBaseUrl: (process.env.GITHUB_API_BASE_URL || "https://api.github.com").replace(/\/+$/, ""),
   requireProductionConfig: process.env.AXION_REQUIRE_PRODUCTION_CONFIG === "true",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
@@ -121,6 +122,8 @@ const defaultDb = {
   connectorRuns: [],
   cfdJobs: [],
   commandPlans: [],
+  githubConnections: [],
+  personalIntegrations: [],
   audit: [],
 };
 
@@ -137,6 +140,7 @@ function backendFeatures() {
     "Project archives for old model versions",
     "Username/email invitations for collaboration",
     "External integration registry for modelling and data tools",
+    "User-scoped GitHub repository sync for personal JSON and OpenAPI connector definitions",
     "REST API and JSON model handoff architecture",
     "Optional Next.js backend-for-frontend adapter for production app-edge deployment",
     "Python modelling runtime for dynamic bioprocess screening",
@@ -1296,6 +1300,8 @@ function ensureDbShape(db) {
   db.connectorRuns ||= [];
   db.cfdJobs ||= [];
   db.commandPlans ||= [];
+  db.githubConnections ||= [];
+  db.personalIntegrations ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -2993,8 +2999,253 @@ async function exportDataset(req, res, datasetId) {
   });
 }
 
+function integrationSecretKey() {
+  return createHash("sha256").update(config.sessionSecret).digest();
+}
+
+function encryptIntegrationSecret(value) {
+  if (!value) return "";
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", integrationSecretKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(String(value), "utf8"), cipher.final()]);
+  return [iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), encrypted.toString("base64url")].join(".");
+}
+
+function decryptIntegrationSecret(value) {
+  if (!value) return "";
+  const [iv, tag, encrypted] = String(value).split(".");
+  if (!iv || !tag || !encrypted) return "";
+  const decipher = createDecipheriv("aes-256-gcm", integrationSecretKey(), Buffer.from(iv, "base64url"));
+  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(encrypted, "base64url")), decipher.final()]).toString("utf8");
+}
+
+function sanitizeGitHubConnection(connection) {
+  return {
+    id: connection.id,
+    repository: connection.repository,
+    ref: connection.ref,
+    manifestPath: connection.manifestPath,
+    status: connection.status || "configured",
+    private: Boolean(connection.private),
+    tokenConfigured: Boolean(connection.tokenCiphertext),
+    tokenHint: connection.tokenHint || "",
+    importedCount: Number(connection.importedCount || 0),
+    lastSyncedAt: connection.lastSyncedAt || "",
+    error: connection.error || "",
+  };
+}
+
+function normalizeRepository(value) {
+  const repository = String(value || "").trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\.git$/i, "").replace(/^\/+|\/+$/g, "");
+  return /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repository) ? repository : "";
+}
+
+function normalizeManifestPath(value) {
+  const path = String(value || ".axion/integrations.json").trim().replace(/^\/+/, "");
+  if (!path || path.includes("..") || !/^[a-zA-Z0-9_./-]+\.json$/i.test(path)) return "";
+  return path;
+}
+
+async function githubApiRequest(path, token = "") {
+  const response = await fetch(`${config.githubApiBaseUrl}${path}`, {
+    signal: AbortSignal.timeout(15000),
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "Axion-Process-OS",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    const detail = payload?.message ? `: ${payload.message}` : "";
+    throw new Error(`GitHub request failed (${response.status})${detail}`);
+  }
+  return payload;
+}
+
+function personalIntegrationId(connectionId, key) {
+  return `personal-${createHash("sha256").update(`${connectionId}:${key}`).digest("hex").slice(0, 16)}`;
+}
+
+function normalizePersonalIntegration(definition, connection, index = 0) {
+  const rawKey = String(definition.key || definition.id || definition.name || `api-${index + 1}`).toLowerCase();
+  const key = rawKey.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || `api-${index + 1}`;
+  const endpoints = Array.isArray(definition.endpoints)
+    ? definition.endpoints.slice(0, 100).map((endpoint) => typeof endpoint === "string" ? endpoint : `${String(endpoint.method || "GET").toUpperCase()} ${endpoint.path || endpoint.url || ""}`.trim())
+    : [];
+  const payloads = Array.isArray(definition.payloads)
+    ? definition.payloads.slice(0, 20).map(String)
+    : endpoints.slice(0, 8);
+  const baseUrl = /^https?:\/\//i.test(String(definition.baseUrl || "")) ? String(definition.baseUrl).slice(0, 500) : "";
+  return {
+    id: personalIntegrationId(connection.id, key),
+    key: `custom-${connection.id.slice(0, 8)}-${key}`,
+    sourceKey: key,
+    name: String(definition.name || definition.title || key).slice(0, 120),
+    category: String(definition.category || "Personal API").slice(0, 80),
+    status: "GitHub synced",
+    direction: String(definition.direction || "Customer-defined API handoff").slice(0, 220),
+    auth: String(definition.auth || definition.authType || "configured by company").slice(0, 120),
+    description: String(definition.description || "API definition imported from a connected GitHub repository.").slice(0, 1000),
+    payloads: payloads.length ? payloads : ["project JSON", "equipment", "streams", "parameters"],
+    endpoints,
+    baseUrl,
+    owner: connection.owner,
+    connectionId: connection.id,
+    repository: connection.repository,
+    manifestPath: connection.manifestPath,
+    source: "github",
+  };
+}
+
+function integrationsFromManifest(manifest, connection) {
+  let definitions = [];
+  if (Array.isArray(manifest)) definitions = manifest;
+  else if (Array.isArray(manifest?.integrations)) definitions = manifest.integrations;
+  else if (Array.isArray(manifest?.connectors)) definitions = manifest.connectors;
+  else if (Array.isArray(manifest?.apis)) definitions = manifest.apis;
+  else if (manifest?.openapi || manifest?.swagger) {
+    const endpoints = Object.entries(manifest.paths || {}).flatMap(([path, methods]) => Object.keys(methods || {}).filter((method) => /^(get|post|put|patch|delete)$/i.test(method)).map((method) => `${method.toUpperCase()} ${path}`));
+    definitions = [{
+      key: manifest.info?.title || "openapi",
+      name: manifest.info?.title || "Imported OpenAPI",
+      description: manifest.info?.description || "OpenAPI definition imported from GitHub.",
+      category: "OpenAPI",
+      baseUrl: manifest.servers?.[0]?.url || "",
+      endpoints,
+      payloads: [...new Set(Object.values(manifest.paths || {}).flatMap((methods) => Object.values(methods || {}).flatMap((operation) => operation?.tags || [])))],
+      auth: Object.keys(manifest.components?.securitySchemes || {}).join(", ") || "defined by OpenAPI",
+    }];
+  }
+  return definitions.slice(0, 50).filter((definition) => definition && typeof definition === "object").map((definition, index) => normalizePersonalIntegration(definition, connection, index));
+}
+
+async function syncGitHubConnection(db, connection) {
+  const token = decryptIntegrationSecret(connection.tokenCiphertext);
+  const [owner, repository] = connection.repository.split("/");
+  const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`;
+  const encodedManifest = connection.manifestPath.split("/").map(encodeURIComponent).join("/");
+  const [repositoryInfo, content] = await Promise.all([
+    githubApiRequest(repoPath, token),
+    githubApiRequest(`${repoPath}/contents/${encodedManifest}?ref=${encodeURIComponent(connection.ref)}`, token),
+  ]);
+  if (content?.type !== "file" || content.encoding !== "base64" || !content.content) throw new Error("The GitHub manifest must be a JSON file smaller than the repository contents API limit.");
+  let manifest;
+  try {
+    manifest = JSON.parse(Buffer.from(String(content.content).replace(/\s/g, ""), "base64").toString("utf8"));
+  } catch {
+    throw new Error("The GitHub integration manifest is not valid JSON.");
+  }
+  const integrations = integrationsFromManifest(manifest, connection);
+  if (!integrations.length) throw new Error("No integrations were found. Add integrations[], connectors[], apis[], or an OpenAPI JSON document.");
+  db.personalIntegrations = db.personalIntegrations.filter((item) => item.connectionId !== connection.id);
+  db.personalIntegrations.push(...integrations);
+  connection.status = "connected";
+  connection.private = Boolean(repositoryInfo.private);
+  connection.defaultBranch = repositoryInfo.default_branch || connection.ref;
+  connection.importedCount = integrations.length;
+  connection.lastSyncedAt = new Date().toISOString();
+  connection.error = "";
+  return integrations;
+}
+
+function availableIntegrations(db, session) {
+  const principal = sessionPrincipal(session);
+  const personal = db.personalIntegrations.filter((item) => session.role === "admin" || normalizePrincipal(item.owner) === principal);
+  return [...integrationRegistry(), ...personal];
+}
+
+async function connectGitHubRepository(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  const repository = normalizeRepository(body.repository);
+  const manifestPath = normalizeManifestPath(body.manifestPath);
+  const ref = String(body.ref || "main").trim().slice(0, 200);
+  const token = String(body.token || "").trim();
+  if (!repository) return json(res, 400, { error: "Enter a GitHub repository as owner/name" });
+  if (!manifestPath) return json(res, 400, { error: "Enter a safe JSON manifest path" });
+  if (!ref || /\s/.test(ref)) return json(res, 400, { error: "Enter a valid branch, tag, or commit ref" });
+  if (token.length > 1000) return json(res, 400, { error: "GitHub token is too long" });
+  const db = ensureDbShape(await loadDb());
+  const owner = sessionPrincipal(session);
+  let connection = db.githubConnections.find((item) => normalizePrincipal(item.owner) === owner && item.repository.toLowerCase() === repository.toLowerCase() && item.manifestPath === manifestPath);
+  const now = new Date().toISOString();
+  if (!connection) {
+    connection = { id: randomUUID(), owner, repository, ref, manifestPath, createdAt: now, status: "configuring", tokenCiphertext: "", tokenHint: "" };
+    db.githubConnections.push(connection);
+  }
+  connection.ref = ref;
+  connection.updatedAt = now;
+  if (token) {
+    connection.tokenCiphertext = encryptIntegrationSecret(token);
+    connection.tokenHint = token.slice(-4);
+  }
+  try {
+    const integrations = await syncGitHubConnection(db, connection);
+    db.audit.unshift({ at: now, type: "github.integration.connected", connectionId: connection.id, repository, importedCount: integrations.length, by: owner });
+    await saveDb(db);
+    json(res, 201, { connection: sanitizeGitHubConnection(connection), integrations });
+  } catch (error) {
+    connection.status = "error";
+    connection.error = String(error.message || error).slice(0, 500);
+    await saveDb(db);
+    json(res, 502, { error: connection.error, connection: sanitizeGitHubConnection(connection) });
+  }
+}
+
+async function resyncGitHubRepository(req, res, connectionId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const db = ensureDbShape(await loadDb());
+  const owner = sessionPrincipal(session);
+  const connection = db.githubConnections.find((item) => item.id === connectionId && (session.role === "admin" || normalizePrincipal(item.owner) === owner));
+  if (!connection) return json(res, 404, { error: "GitHub connection not found" });
+  try {
+    const integrations = await syncGitHubConnection(db, connection);
+    db.audit.unshift({ at: connection.lastSyncedAt, type: "github.integration.synced", connectionId, repository: connection.repository, importedCount: integrations.length, by: owner });
+    await saveDb(db);
+    json(res, 200, { connection: sanitizeGitHubConnection(connection), integrations });
+  } catch (error) {
+    connection.status = "error";
+    connection.error = String(error.message || error).slice(0, 500);
+    await saveDb(db);
+    json(res, 502, { error: connection.error, connection: sanitizeGitHubConnection(connection) });
+  }
+}
+
+async function disconnectGitHubRepository(req, res, connectionId) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const db = ensureDbShape(await loadDb());
+  const owner = sessionPrincipal(session);
+  const connection = db.githubConnections.find((item) => item.id === connectionId && (session.role === "admin" || normalizePrincipal(item.owner) === owner));
+  if (!connection) return json(res, 404, { error: "GitHub connection not found" });
+  db.githubConnections = db.githubConnections.filter((item) => item.id !== connectionId);
+  db.personalIntegrations = db.personalIntegrations.filter((item) => item.connectionId !== connectionId);
+  db.audit.unshift({ at: new Date().toISOString(), type: "github.integration.disconnected", connectionId, repository: connection.repository, by: owner });
+  await saveDb(db);
+  json(res, 200, { removed: true, connectionId });
+}
+
 function integrationRegistry() {
   return [
+    {
+      key: "github-repository",
+      name: "GitHub API repository",
+      category: "Personal integrations",
+      status: "repository sync available",
+      direction: "Import company API manifests and OpenAPI JSON",
+      auth: "fine-grained token or public repository",
+      description: "Connect a repository, keep its token encrypted on the backend, and sync declarative API definitions into the Axion connector registry.",
+    },
     {
       key: "legacy-simulator",
       name: "Legacy process simulator",
@@ -3144,6 +3395,7 @@ function integrationRegistry() {
 
 function connectorPayloadGroups(key) {
   const byKey = {
+    "github-repository": ["integration manifest", "OpenAPI JSON", "endpoint catalogue", "payload contract"],
     "legacy-simulator": ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
     "rest-api": ["project JSON", "version records", "unit operations", "stream table", "reports"],
     "python-sdk": ["model id", "parameter set", "run id", "sweep matrix", "calibration output"],
@@ -3169,7 +3421,7 @@ function connectorMappingChecks(integration, modelSnapshot = {}) {
   const streams = Number(modelSnapshot.streams ?? modelSnapshot.streamCount ?? 0);
   const equations = Number(modelSnapshot.equations ?? modelSnapshot.equationCount ?? 0);
   const scheduleRows = Number(modelSnapshot.scheduleRows ?? modelSnapshot.scheduleCount ?? 0);
-  const payloads = connectorPayloadGroups(integration.key);
+  const payloads = integration.payloads?.length ? integration.payloads : connectorPayloadGroups(integration.key);
   const needsCredentials = /planned|connector|SDK|queue|handoff/i.test(integration.status || "");
   return [
     { label: "Equipment register", value: `${units} units mapped`, status: units >= 12 ? "pass" : "warn" },
@@ -3182,11 +3434,13 @@ function connectorMappingChecks(integration, modelSnapshot = {}) {
 }
 
 function connectorConfigurationRows(integration, modelSnapshot = {}) {
+  const payloads = integration.payloads?.length ? integration.payloads : connectorPayloadGroups(integration.key);
   return [
     ["Connector mode", integration.status?.includes("planned") ? "Prepared handoff shell" : "Configured handoff scaffold"],
     ["Authentication", integration.auth || "credential setup"],
     ["Model source", `${modelSnapshot.projectName || "Current model"} · ${modelSnapshot.template || "active process"}`],
-    ["Data contract", connectorPayloadGroups(integration.key).join(" + ")],
+    ["Data contract", payloads.join(" + ")],
+    ...(integration.repository ? [["GitHub source", `${integration.repository}/${integration.manifestPath}`]] : []),
   ];
 }
 
@@ -3231,7 +3485,8 @@ async function connectorAction(req, res, integrationKey) {
   }
   const body = await parseBody(req);
   const action = ["configure", "test", "export"].includes(body.action) ? body.action : "configure";
-  const integration = integrationRegistry().find((item) => item.key === integrationKey);
+  const db = ensureDbShape(await loadDb());
+  const integration = availableIntegrations(db, session).find((item) => item.key === integrationKey);
   if (!integration) {
     json(res, 404, { error: "Connector not found" });
     return;
@@ -3250,12 +3505,11 @@ async function connectorAction(req, res, integrationKey) {
       scale: modelSnapshot.scale || "",
     },
     connector: integration,
-    payloads: connectorPayloadGroups(integration.key),
+    payloads: integration.payloads?.length ? integration.payloads : connectorPayloadGroups(integration.key),
     modelSnapshot,
     checks: result.checks,
     note: "Live third-party synchronization requires customer credentials, vendor API access, schema mapping and project-specific validation.",
   } : null;
-  const db = ensureDbShape(await loadDb());
   const run = {
     id: randomUUID(),
     createdAt: now,
@@ -3292,7 +3546,10 @@ async function listProjects(req, res) {
   json(res, 200, {
     projects,
     invites,
-    integrations: integrationRegistry(),
+    integrations: availableIntegrations(db, session),
+    githubConnections: db.githubConnections
+      .filter((connection) => session.role === "admin" || normalizePrincipal(connection.owner) === sessionPrincipal(session))
+      .map(sanitizeGitHubConnection),
     storage: {
       provider: supabaseConfigured() ? "supabase-postgres" : "local-json",
       activeModels: supabaseConfigured() ? `${config.supabaseDocumentsTable}: kind=project_model` : projectsDir,
@@ -3691,9 +3948,13 @@ async function listIntegrations(req, res) {
     json(res, 401, { error: "Not authenticated" });
     return;
   }
+  const db = ensureDbShape(await loadDb());
   json(res, 200, {
-    integrations: integrationRegistry(),
-    note: "These are connector definitions and API handoff targets. Live third-party connections need customer credentials and vendor API access.",
+    integrations: availableIntegrations(db, session),
+    githubConnections: db.githubConnections
+      .filter((connection) => session.role === "admin" || normalizePrincipal(connection.owner) === sessionPrincipal(session))
+      .map(sanitizeGitHubConnection),
+    note: "Built-in connector definitions and user-scoped GitHub API manifests. Repository tokens remain encrypted on the backend and are never returned to the browser.",
   });
 }
 
@@ -4090,6 +4351,20 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/integrations") {
     await listIntegrations(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/integrations/github/connect") {
+    await connectGitHubRepository(req, res);
+    return;
+  }
+  const githubSyncMatch = pathname.match(/^\/api\/integrations\/github\/([^/]+)\/sync$/);
+  if (githubSyncMatch && req.method === "POST") {
+    await resyncGitHubRepository(req, res, decodeURIComponent(githubSyncMatch[1]));
+    return;
+  }
+  const githubDisconnectMatch = pathname.match(/^\/api\/integrations\/github\/([^/]+)$/);
+  if (githubDisconnectMatch && req.method === "DELETE") {
+    await disconnectGitHubRepository(req, res, decodeURIComponent(githubDisconnectMatch[1]));
     return;
   }
   const integrationActionMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/actions$/);

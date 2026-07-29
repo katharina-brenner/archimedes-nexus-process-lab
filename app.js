@@ -2051,6 +2051,7 @@ const state = {
   plantDataBindings: [],
   dataApplicationHistory: [],
   integrations: [],
+  githubConnections: [],
   selectedIntegration: "",
   connectorResults: {},
   productionReadiness: null,
@@ -8544,13 +8545,15 @@ function renderInviteCard(invite) {
 }
 
 function connectorStatusTone(status = "") {
-  if (status.includes("ready") || status.includes("active")) return "ready";
+  if (status.includes("ready") || status.includes("active") || status.toLowerCase().includes("synced") || status.includes("available")) return "ready";
   if (status.includes("scaffold") || status.includes("import") || status.includes("map")) return "partial";
   return "planned";
 }
 
 function connectorPayloads(item) {
+  if (Array.isArray(item.payloads) && item.payloads.length) return item.payloads;
   const byKey = {
+    "github-repository": ["integration manifest", "OpenAPI JSON", "endpoint catalogue", "payload contract"],
     "legacy-simulator": ["stream table CSV", "equipment register CSV", "mass and energy balances", "economic report basis"],
     aspen: ["component list", "stream vectors", "property package assumptions", "unit operation duty table"],
     comsol: ["bioreactor geometry", "boundary conditions", "sparger and impeller metadata", "DO/nutrient target fields"],
@@ -8570,6 +8573,7 @@ function connectorConfigurationRows(item) {
     ["Authentication", authLabel],
     ["Model source", `${state.projectName || "Current model"} · ${activeTemplate().label}`],
     ["Data contract", connectorPayloads(item).join(" + ")],
+    ...(item.repository ? [["GitHub source", `${item.repository}/${item.manifestPath}`]] : []),
   ];
 }
 
@@ -8657,6 +8661,49 @@ function connectorRegistryItems() {
 
 function selectedConnectorItem(items = connectorRegistryItems()) {
   return items.find((item) => item.key === state.selectedIntegration) || items[0] || null;
+}
+
+function renderGitHubIntegrationPanel() {
+  const connections = state.githubConnections || [];
+  return `
+    <article class="github-integration-panel" aria-label="GitHub personal API connections">
+      <header>
+        <div>
+          <span>Personal API source</span>
+          <h4>Connect a GitHub repository</h4>
+          <p>Sync a JSON integration manifest or OpenAPI document. Tokens are encrypted by the backend and never returned to this page.</p>
+        </div>
+        <b>${connections.length} connected</b>
+      </header>
+      <div class="github-integration-form">
+        <label><span>Repository</span><input id="githubRepositoryInput" type="text" placeholder="company/process-api-definitions" autocomplete="off" /></label>
+        <label><span>Branch or tag</span><input id="githubRefInput" type="text" value="main" placeholder="main" autocomplete="off" /></label>
+        <label><span>Manifest path</span><input id="githubManifestInput" type="text" value=".axion/integrations.json" placeholder=".axion/integrations.json" autocomplete="off" /></label>
+        <label><span>Fine-grained token <small>optional for public repositories</small></span><input id="githubTokenInput" type="password" placeholder="github_pat_••••" autocomplete="new-password" /></label>
+        <button data-connect-github type="button">Connect and import APIs</button>
+      </div>
+      <details class="github-manifest-example">
+        <summary>Manifest format</summary>
+        <code>{ "integrations": [{ "key": "lims", "name": "Company LIMS", "baseUrl": "https://api.company.com", "auth": "OAuth 2.0", "payloads": ["batches", "assays"] }] }</code>
+      </details>
+      <div class="github-connection-list">
+        ${connections.length ? connections.map((connection) => `
+          <section class="github-connection ${escapeAttr(connection.status || "configured")}">
+            <div>
+              <span>${escapeHtml(connection.status || "configured")}${connection.private ? " · private" : ""}</span>
+              <strong>${escapeHtml(connection.repository)}</strong>
+              <p>${escapeHtml(connection.ref)} · ${escapeHtml(connection.manifestPath)} · ${connection.importedCount || 0} APIs</p>
+              ${connection.error ? `<small>${escapeHtml(connection.error)}</small>` : connection.lastSyncedAt ? `<small>Synced ${new Date(connection.lastSyncedAt).toLocaleString()}</small>` : ""}
+            </div>
+            <footer>
+              <button data-sync-github="${escapeAttr(connection.id)}" type="button">Sync now</button>
+              <button data-disconnect-github="${escapeAttr(connection.id)}" type="button">Disconnect</button>
+            </footer>
+          </section>
+        `).join("") : `<p class="github-connection-empty">No repository connected yet. Public repositories work without a token.</p>`}
+      </div>
+    </article>
+  `;
 }
 
 function renderConnectorRegistryPanel() {
@@ -8951,6 +8998,7 @@ function renderProjectsBoard() {
           <h3>API connector registry</h3>
           <p>Prepared handoff targets for simulation, CFD, historian, ELN/LIMS, and plant-data tools. Live sync needs credentials and vendor access.</p>
         </div>
+        ${renderGitHubIntegrationPanel()}
         ${renderConnectorRegistryPanel()}
         ${renderIntegrationRegistry()}
       </div>
@@ -13746,6 +13794,7 @@ function normalizeLocalProjectOwnership(store) {
 
 function localIntegrations() {
   return [
+    { key: "github-repository", name: "GitHub API repository", category: "Personal integrations", status: "backend required", direction: "Import company API manifests and OpenAPI JSON", auth: "fine-grained token or public repository", description: "Connect a repository through the hosted backend to add company-specific APIs without exposing credentials in browser code." },
     { key: "legacy-simulator", name: "Legacy process simulator", category: "Process simulation", status: "import-export scaffold", direction: "Import reports / export Axion model", auth: "file", description: "CSV, equipment, stream, balance, and economic report handoff for legitimate customer-owned simulator workflows." },
     { key: "rest-api", name: "Axion REST API", category: "API-first modelling", status: "schema scaffold", direction: "Read/write JSON process models", auth: "token", description: "Prepared for project, version, equipment, stream, parameter, simulation-run, and report endpoints." },
     { key: "python-sdk", name: "Python SDK", category: "Automation", status: "handoff ready", direction: "Run sweeps, fit parameters, export reports", auth: "token", description: "Notebook payload, parameter grid, Monte Carlo, Sobol-style sensitivity and calibration package can be exported now; live execution needs an SDK package/token." },
@@ -13822,6 +13871,58 @@ function connectorModelSnapshot() {
     streamPreview: streamRows().slice(0, 16),
     summary: currentModelSummary(),
   };
+}
+
+async function connectGitHubIntegration() {
+  const repository = String(document.querySelector("#githubRepositoryInput")?.value || "").trim();
+  const ref = String(document.querySelector("#githubRefInput")?.value || "main").trim();
+  const manifestPath = String(document.querySelector("#githubManifestInput")?.value || ".axion/integrations.json").trim();
+  const token = String(document.querySelector("#githubTokenInput")?.value || "").trim();
+  if (!repository) return showToast("Enter a GitHub repository as owner/name");
+  showToast("Connecting GitHub repository…");
+  try {
+    const payload = await apiRequest("/api/integrations/github/connect", {
+      method: "POST",
+      body: JSON.stringify({ repository, ref, manifestPath, token }),
+    });
+    state.githubConnections = [payload.connection, ...state.githubConnections.filter((item) => item.id !== payload.connection.id)];
+    state.integrations = [...state.integrations.filter((item) => item.connectionId !== payload.connection.id), ...(payload.integrations || [])];
+    state.selectedIntegration = payload.integrations?.[0]?.key || "github-repository";
+    const tokenInput = document.querySelector("#githubTokenInput");
+    if (tokenInput) tokenInput.value = "";
+    await refreshProjects();
+    showToast(`${payload.integrations?.length || 0} personal APIs imported from GitHub`);
+  } catch (error) {
+    showToast(error.message || "GitHub repository could not be connected");
+  }
+}
+
+async function syncGitHubIntegration(connectionId) {
+  showToast("Syncing GitHub API definitions…");
+  try {
+    const payload = await apiRequest(`/api/integrations/github/${encodeURIComponent(connectionId)}/sync`, { method: "POST", body: "{}" });
+    state.githubConnections = [payload.connection, ...state.githubConnections.filter((item) => item.id !== payload.connection.id)];
+    state.integrations = [...state.integrations.filter((item) => item.connectionId !== connectionId), ...(payload.integrations || [])];
+    state.selectedIntegration = payload.integrations?.[0]?.key || state.selectedIntegration;
+    await refreshProjects();
+    showToast(`${payload.integrations?.length || 0} personal APIs synchronized`);
+  } catch (error) {
+    showToast(error.message || "GitHub sync failed");
+  }
+}
+
+async function disconnectGitHubIntegration(connectionId) {
+  if (!window.confirm("Disconnect this repository and remove its imported API definitions?")) return;
+  try {
+    await apiRequest(`/api/integrations/github/${encodeURIComponent(connectionId)}`, { method: "DELETE" });
+    state.githubConnections = state.githubConnections.filter((item) => item.id !== connectionId);
+    state.integrations = state.integrations.filter((item) => item.connectionId !== connectionId);
+    state.selectedIntegration = "github-repository";
+    await refreshProjects();
+    showToast("GitHub repository disconnected");
+  } catch (error) {
+    showToast(error.message || "GitHub repository could not be disconnected");
+  }
 }
 
 async function handleIntegrationAction(action, key) {
@@ -13903,6 +14004,7 @@ async function refreshProjects() {
     state.projects = payload.projects || [];
     state.projectInvites = payload.invites || [];
     state.integrations = payload.integrations || [];
+    state.githubConnections = payload.githubConnections || [];
     state.projectFolders = payload.folders || {};
     state.datasets = datasetsPayload.datasets || [];
     state.productionReadiness = readiness;
@@ -13912,6 +14014,7 @@ async function refreshProjects() {
     state.projectInvites = store.invites || [];
     state.datasets = localDatasetStore();
     state.integrations = localIntegrations();
+    state.githubConnections = [];
     state.projectFolders = { activeModels: "Browser localStorage", archivedModels: "Browser localStorage old model versions" };
     state.productionReadiness = fallbackProductionReadiness();
   }
@@ -14793,6 +14896,24 @@ function bindEvents() {
     const integrationButton = event.target.closest("[data-integration-action]");
     if (integrationButton) {
       handleIntegrationAction(integrationButton.dataset.integrationAction, integrationButton.dataset.integrationKey);
+      event.stopPropagation();
+      return;
+    }
+    const githubConnectButton = event.target.closest("[data-connect-github]");
+    if (githubConnectButton) {
+      connectGitHubIntegration();
+      event.stopPropagation();
+      return;
+    }
+    const githubSyncButton = event.target.closest("[data-sync-github]");
+    if (githubSyncButton) {
+      syncGitHubIntegration(githubSyncButton.dataset.syncGithub);
+      event.stopPropagation();
+      return;
+    }
+    const githubDisconnectButton = event.target.closest("[data-disconnect-github]");
+    if (githubDisconnectButton) {
+      disconnectGitHubIntegration(githubDisconnectButton.dataset.disconnectGithub);
       event.stopPropagation();
       return;
     }

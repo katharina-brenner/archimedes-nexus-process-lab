@@ -3,12 +3,13 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import test from "node:test";
 
 const nodeBin = process.execPath;
 const rootDir = new URL("..", import.meta.url).pathname;
 
-async function startServer() {
+async function startServer(extraEnv = {}) {
   const dataHome = await mkdtemp(join(tmpdir(), "axion-test-"));
   const port = 9899 + Math.floor(Math.random() * 500);
   const child = spawn(nodeBin, ["server.mjs"], {
@@ -36,6 +37,7 @@ async function startServer() {
       GOOGLE_CLIENT_ID: "",
       SUPABASE_URL: "",
       SUPABASE_SERVICE_ROLE_KEY: "",
+      ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -61,6 +63,35 @@ async function startServer() {
   throw new Error(`Server did not start. Logs:\n${logs}`);
 }
 
+async function startGitHubMock() {
+  const manifest = {
+    integrations: [
+      { key: "company-lims", name: "Company LIMS", category: "Quality data", baseUrl: "https://api.company.test", auth: "OAuth 2.0", payloads: ["batches", "assays"], endpoints: ["GET /batches", "POST /assays"] },
+      { key: "supplier-api", name: "Supplier API", category: "Economics", auth: "API key", payloads: ["quotes", "materials"] },
+    ],
+  };
+  const server = createServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === "/repos/private-company/axion-apis") {
+      res.end(JSON.stringify({ private: true, default_branch: "main" }));
+      return;
+    }
+    if (req.url?.startsWith("/repos/private-company/axion-apis/contents/.axion/integrations.json")) {
+      assert.equal(req.headers.authorization, "Bearer github_pat_test_secret_1234");
+      res.end(JSON.stringify({ type: "file", encoding: "base64", content: Buffer.from(JSON.stringify(manifest)).toString("base64") }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ message: "Not Found" }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}
+
 async function stopServer(server) {
   server.child.kill("SIGTERM");
   await new Promise((resolve) => server.child.once("exit", resolve));
@@ -81,7 +112,8 @@ async function jsonFetch(baseUrl, pathname, { token = "", method = "GET", body }
 }
 
 test("login, projects, connector actions, CFD jobs and paywall setup", async () => {
-  const server = await startServer();
+  const githubMock = await startGitHubMock();
+  const server = await startServer({ GITHUB_API_BASE_URL: githubMock.baseUrl });
   try {
     const product = await jsonFetch(server.baseUrl, "/api/product");
     assert.equal(product.response.status, 200);
@@ -358,6 +390,51 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(connector.payload.result.title, "6/6 checks passed");
     assert.ok(connector.payload.runId);
 
+    const githubConnection = await jsonFetch(server.baseUrl, "/api/integrations/github/connect", {
+      token,
+      method: "POST",
+      body: {
+        repository: "private-company/axion-apis",
+        ref: "main",
+        manifestPath: ".axion/integrations.json",
+        token: "github_pat_test_secret_1234",
+      },
+    });
+    assert.equal(githubConnection.response.status, 201);
+    assert.equal(githubConnection.payload.connection.status, "connected");
+    assert.equal(githubConnection.payload.connection.tokenConfigured, true);
+    assert.equal(githubConnection.payload.connection.tokenCiphertext, undefined);
+    assert.equal(githubConnection.payload.integrations.length, 2);
+    const customConnector = githubConnection.payload.integrations.find((item) => item.sourceKey === "company-lims");
+    assert.ok(customConnector);
+
+    const integrationList = await jsonFetch(server.baseUrl, "/api/integrations", { token });
+    assert.equal(integrationList.response.status, 200);
+    assert.ok(integrationList.payload.integrations.some((item) => item.key === customConnector.key));
+    assert.equal(integrationList.payload.githubConnections.length, 1);
+
+    const customConnectorTest = await jsonFetch(server.baseUrl, `/api/integrations/${encodeURIComponent(customConnector.key)}/actions`, {
+      token,
+      method: "POST",
+      body: { action: "test", modelSnapshot: { projectName: "Backend smoke project", units: 18, streams: 20, equations: 230, scheduleRows: 8 } },
+    });
+    assert.equal(customConnectorTest.response.status, 200);
+    assert.equal(customConnectorTest.payload.connector.repository, "private-company/axion-apis");
+    assert.ok(customConnectorTest.payload.result.rows.some(([label]) => label === "GitHub source"));
+
+    const githubResync = await jsonFetch(server.baseUrl, `/api/integrations/github/${githubConnection.payload.connection.id}/sync`, { token, method: "POST", body: {} });
+    assert.equal(githubResync.response.status, 200);
+    assert.equal(githubResync.payload.integrations.length, 2);
+
+    const storedDatabase = await readFile(join(server.dataHome, "axion-licensing.json"), "utf8");
+    assert.equal(storedDatabase.includes("github_pat_test_secret_1234"), false);
+
+    const githubDisconnect = await jsonFetch(server.baseUrl, `/api/integrations/github/${githubConnection.payload.connection.id}`, { token, method: "DELETE" });
+    assert.equal(githubDisconnect.response.status, 200);
+    const integrationsAfterDisconnect = await jsonFetch(server.baseUrl, "/api/integrations", { token });
+    assert.equal(integrationsAfterDisconnect.payload.githubConnections.length, 0);
+    assert.equal(integrationsAfterDisconnect.payload.integrations.some((item) => item.key === customConnector.key), false);
+
     const cfd = await jsonFetch(server.baseUrl, "/api/cfd/jobs", {
       token,
       method: "POST",
@@ -390,5 +467,6 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     }
   } finally {
     await stopServer(server);
+    await githubMock.close();
   }
 });
