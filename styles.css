@@ -19647,3 +19647,52 @@ body.locked .public-page:not(.active-public-page) {
     text-align: left;
   }
 }
+
+/* Helper launcher: fixed corner geometry and optically centered pixel mark. */
+.help-dock:not(.open) {
+  width: 54px !important;
+  height: 54px;
+  justify-items: center !important;
+}
+
+.help-dock.open {
+  width: min(460px, calc(100vw - 28px)) !important;
+  justify-items: end !important;
+}
+
+.help-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  justify-self: end !important;
+  width: 54px !important;
+  height: 54px !important;
+  min-width: 54px;
+  min-height: 54px !important;
+  padding: 0 !important;
+  line-height: 0;
+  box-sizing: border-box;
+}
+
+.help-logo {
+  position: relative;
+  display: block !important;
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.help-logo::before {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-6px, -6px);
+}
+
+@media (max-width: 620px) {
+  .help-dock {
+    right: 14px !important;
+    bottom: 14px !important;
+  }
+}
