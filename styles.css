@@ -31,6 +31,11 @@
   --deep-panel: #102033;
   --deep-panel-2: #182b40;
   --enterprise-blue: #173f37;
+  --text-on-dark: #f8fcfc;
+  --muted-on-dark: #c2d6d4;
+  --accent-on-dark: #a9e4d6;
+  --text-on-light: #102033;
+  --muted-on-light: #52647e;
   --radius-xs: 14px;
   --radius-sm: 18px;
   --radius-md: 24px;
@@ -15773,8 +15778,19 @@ body[data-active-view="projects"] .kpi-strip {
 .twin-hero h3,
 .ai-hero h3 {
   max-width: 760px;
+  color: #ffffff !important;
   font-size: clamp(27px, 3vw, 46px) !important;
   line-height: 1.04 !important;
+}
+
+.start-hero p,
+.projects-hero p,
+.cfd-hero p,
+.reports-hero p,
+.overview-hero p,
+.twin-hero p,
+.ai-hero p {
+  color: #a9e4d6 !important;
 }
 
 .start-hero span,
@@ -20243,4 +20259,91 @@ body.locked .public-page:not(.active-public-page) {
     right: 14px !important;
     bottom: 14px !important;
   }
+}
+
+/* Accessibility pass: keep text contrast predictable across light and dark surfaces. */
+:where(
+  .start-hero,
+  .projects-hero,
+  .cfd-hero,
+  .reports-hero,
+  .overview-hero,
+  .ai-hero,
+  .source-hero,
+  .recommendation-hero,
+  .twin-hero
+) > div :where(h1, h2, h3, h4, strong, b) {
+  color: var(--text-on-dark) !important;
+}
+
+:where(
+  .start-hero,
+  .projects-hero,
+  .cfd-hero,
+  .reports-hero,
+  .overview-hero,
+  .ai-hero,
+  .source-hero,
+  .recommendation-hero,
+  .twin-hero
+) > div > p {
+  color: var(--accent-on-dark) !important;
+}
+
+:where(
+  .start-hero,
+  .projects-hero,
+  .cfd-hero,
+  .reports-hero,
+  .overview-hero,
+  .ai-hero,
+  .source-hero,
+  .recommendation-hero,
+  .twin-hero
+) > div > span {
+  color: var(--muted-on-dark) !important;
+}
+
+.source-hero > strong,
+.recommendation-hero > strong {
+  color: var(--text-on-dark) !important;
+}
+
+.sidebar .brand p,
+.suite-nav-label {
+  color: #a9bdc2 !important;
+}
+
+.suite-link {
+  color: #d7e5e7 !important;
+}
+
+.help-result > strong::after {
+  color: #bfd0d6 !important;
+}
+
+.public-brand small,
+.public-minimal-footer {
+  color: #b8c8c5 !important;
+}
+
+.public-minimal-steps p {
+  color: #c5d3cf !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #66717f;
+  opacity: 1;
+}
+
+:where(
+  .sidebar,
+  .help-panel,
+  .github-integration-panel,
+  .login-panel,
+  #loginPanel
+) :where(input, textarea)::placeholder {
+  color: #b7c9c8 !important;
+  opacity: 1;
 }
