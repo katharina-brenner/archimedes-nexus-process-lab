@@ -22188,6 +22188,23 @@ body.locked .public-section .section-heading > span {
   color: #b9eee4 !important;
 }
 
+.public-hero-credit {
+  position: absolute;
+  z-index: 4;
+  bottom: 14px;
+  left: clamp(28px, 6vw, 104px);
+  max-width: min(520px, calc(100% - 40px));
+  color: rgba(239, 247, 247, 0.58);
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+}
+
+.public-hero-credit:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .public-industry-photo-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

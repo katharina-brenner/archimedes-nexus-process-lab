@@ -3,6 +3,23 @@
 The following files are sourced from Wikimedia Commons and are used on the
 Axion Process OS public website:
 
+- `basf-ludwigshafen-verbund.jpg`
+  - Source: https://commons.wikimedia.org/wiki/File:LudwigshafenBASF2017-07-29-12-44-06.jpg
+  - Author: Rolf Kickuth
+  - License: CC BY-SA 4.0
+  - Context: Independent scale reference. No BASF endorsement or affiliation is implied.
+
+- `bayway-refinery-aerial.jpg`
+  - Source: https://commons.wikimedia.org/wiki/File:Bayway_Refinery,_New_Jersey.jpg
+  - Author: Quintin Soloviev
+  - License: CC BY 4.0
+  - Context: Independent industrial reference. No operator endorsement or affiliation is implied.
+
+- `industrial-factory-complex-aerial.jpg`
+  - Source: https://commons.wikimedia.org/wiki/File:An_aerial_shot_of_a_factory_complex.jpg
+  - Author: Matthew Henry
+  - License: CC0 1.0
+
 - `weihenstephan-brewery-aerial.jpg`
   - Source: https://commons.wikimedia.org/wiki/File:Luftaufnahme_der_Bayerischen_Staatsbrauerei_Weihenstephan,_Fr%C3%BChling_2024.jpg
   - Author: Ferdinand Schurig / Bayerische Staatsbrauerei Weihenstephan
