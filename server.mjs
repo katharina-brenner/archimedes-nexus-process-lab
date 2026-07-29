@@ -132,8 +132,9 @@ const defaultDb = {
 
 function backendFeatures() {
   return [
-    "2,400 EUR professional individual license checkout",
-    "Stripe Checkout hosted payment flow",
+    "2,400 EUR annual Professional subscription checkout",
+    "Stripe-hosted subscription payment flow",
+    "Customer billing portal for invoices, payment methods and cancellation",
     "Automatic license-key generation after successful payment",
     "Stripe webhook activation",
     "Checkout-session verification fallback",

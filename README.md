@@ -128,7 +128,7 @@ The backend readiness payload now marks which missing systems require account-ow
 - `GET /api/production-readiness` returns a secret-safe setup checklist for Supabase, Stripe, Google, email, deployment, CFD worker and CI
 - `GET /api/professional-readiness` returns the public-safe professional SaaS gap analysis used by the Readiness page
 - `GET /api/product` lists product and backend configuration
-- `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR Professional Individual annual licence
+- `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR annual Professional subscription
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
 - `POST /api/stripe/webhook` receives Stripe checkout payment events and activates paid orders
 - `POST /api/billing/portal` creates an authenticated Stripe customer-portal session for subscription and invoice management
