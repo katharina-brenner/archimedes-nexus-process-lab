@@ -18,7 +18,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/basf-ludwigshafen-verbund.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/basf-ludwigshafen-verbund.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260729-growth-billing-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260729-industrial-studio-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1326,26 +1326,26 @@
         </button>
 
         <nav class="suite-nav" aria-label="Main pages">
-          <span class="suite-nav-label">Create</span>
-          <button class="suite-link active" data-view="start">New Model</button>
-          <button class="suite-link" data-view="projects">Projects</button>
-          <button class="suite-link" data-view="overview">Overview</button>
-          <span class="suite-nav-label">Build</span>
-          <button class="suite-link" data-view="flowsheet">Process Builder</button>
+          <span class="suite-nav-label">Model</span>
+          <button class="suite-link active" data-view="start">Model Brief</button>
+          <button class="suite-link" data-view="projects">Project Space</button>
+          <button class="suite-link" data-view="overview">Plant Overview</button>
+          <span class="suite-nav-label">Process Model</span>
+          <button class="suite-link" data-view="flowsheet">Flowsheet Studio</button>
           <button class="suite-link" data-view="equipment">Equipment Register</button>
           <button class="suite-link" data-view="streams">Stream Table</button>
-          <button class="suite-link" data-view="equations">Equations</button>
-          <span class="suite-nav-label">Simulate</span>
-          <button class="suite-link" data-view="simulation">Simulation</button>
-          <button class="suite-link" data-view="cfd">Bioreactor CFD</button>
-          <button class="suite-link" data-view="ai">Boundaries + AI</button>
-          <button class="suite-link" data-view="standards">Standards</button>
-          <span class="suite-nav-label">Review</span>
+          <button class="suite-link" data-view="equations">Model Equations</button>
+          <span class="suite-nav-label">Analyze</span>
+          <button class="suite-link" data-view="simulation">Dynamic Simulation</button>
+          <button class="suite-link" data-view="cfd">Reactor CFD</button>
+          <button class="suite-link" data-view="ai">Constraints + AI</button>
+          <button class="suite-link" data-view="standards">Standards Check</button>
+          <span class="suite-nav-label">Review + Handoff</span>
           <button class="suite-link" data-view="sources">Data & Sources</button>
           <button class="suite-link" data-view="recommendations">Readiness Roadmap</button>
-          <button class="suite-link" data-view="twin">Twin OS</button>
-          <button class="suite-link" data-view="economics">Economics</button>
-          <button class="suite-link" data-view="reports">Downloads</button>
+          <button class="suite-link" data-view="twin">Factory Twin</button>
+          <button class="suite-link" data-view="economics">TEA + LCA</button>
+          <button class="suite-link" data-view="reports">Reports + Exports</button>
         </nav>
 
         <section class="control-group template-internal">
@@ -1404,27 +1404,35 @@
         <header class="topbar">
           <div class="topbar-main">
             <div>
+              <span class="workspace-path">AXION / ACTIVE MODEL</span>
               <p class="eyebrow" id="processEyebrow">Cultured meat production</p>
               <h2 id="pageTitle">Start</h2>
             </div>
-            <div class="profile-menu">
-              <button id="profileButton" class="profile-button" type="button" aria-expanded="false" aria-controls="profilePanel">
-                <span id="profileInitials">AX</span>
-                <strong id="profileName">Profile</strong>
-              </button>
-              <div id="profilePanel" class="profile-panel" hidden></div>
+            <div class="model-status" title="The active model is ready for editing and local calculations">
+              <i aria-hidden="true"></i>
+              <span>
+                <strong>Model ready</strong>
+                <small>Editable workspace</small>
+              </span>
             </div>
           </div>
           <div class="actions">
-            <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Auto Layout</span></button>
-            <button id="fitCanvas" class="action-button primary" title="Fit the whole flowsheet into view" aria-label="Fit full process"><span>Fit Process</span></button>
+            <button id="autoLayout" class="action-button" title="Arrange the full process automatically" aria-label="Auto layout"><span>Arrange</span></button>
+            <button id="fitCanvas" class="action-button primary" title="Fit the whole flowsheet into view" aria-label="Fit full process"><span>Fit</span></button>
             <button id="zoomOut" class="icon-button" title="Zoom out" aria-label="Zoom out">-</button>
             <button id="zoomReset" class="action-button compact" title="Reset zoom" aria-label="Reset zoom"><span>100%</span></button>
             <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
-            <button id="copySelected" class="action-button" title="Duplicate the selected unit" aria-label="Duplicate selected unit"><span>Duplicate Unit</span></button>
-            <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect Selected</span></button>
-            <button id="downloadSummaryCsv" class="action-button" title="Download a process summary table" aria-label="Download process summary CSV"><span>Download Summary</span></button>
-            <button id="resetScenario" class="text-button">Reset Scenario</button>
+            <button id="copySelected" class="action-button" title="Duplicate the selected unit" aria-label="Duplicate selected unit"><span>Duplicate</span></button>
+            <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect</span></button>
+            <button id="downloadSummaryCsv" class="action-button" title="Download a process summary table" aria-label="Download process summary CSV"><span>Export</span></button>
+            <button id="resetScenario" class="text-button">Reset model</button>
+          </div>
+          <div class="profile-menu">
+            <button id="profileButton" class="profile-button" type="button" aria-expanded="false" aria-controls="profilePanel">
+              <span id="profileInitials">AX</span>
+              <strong id="profileName">Profile</strong>
+            </button>
+            <div id="profilePanel" class="profile-panel" hidden></div>
           </div>
         </header>
 
@@ -1628,6 +1636,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js?v=20260729-growth-billing-v1"></script>
+    <script type="module" src="./app.js?v=20260729-industrial-studio-v1"></script>
   </body>
 </html>

@@ -11338,23 +11338,23 @@ function renderReportsBoard() {
 
 function pageTitle(view) {
   return {
-    start: "New Model Briefing",
-    projects: "Projects",
-    overview: "Overview",
-    flowsheet: "Process Builder",
+    start: "Model Brief",
+    projects: "Project Space",
+    overview: "Plant Overview",
+    flowsheet: "Flowsheet Studio",
     equipment: "Equipment Register",
     streams: "Input / Output Streams",
-    equations: "Equation Library",
-    simulation: "Simulation Functions",
-    cfd: "Bioreactor CFD",
-    ai: "Boundaries + AI",
-    standards: "Standards",
+    equations: "Model Equations",
+    simulation: "Dynamic Simulation",
+    cfd: "Reactor CFD",
+    ai: "Constraints + AI",
+    standards: "Standards Check",
     sources: "Data & Sources",
     recommendations: "Readiness Roadmap",
-    twin: "Twin OS",
-    economics: "Economics",
-    reports: "Downloads",
-  }[view] || "New Model Briefing";
+    twin: "Factory Twin",
+    economics: "TEA + LCA",
+    reports: "Reports + Exports",
+  }[view] || "Model Brief";
 }
 
 function renderOverview() {
@@ -11739,9 +11739,8 @@ function setView(view) {
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   if (els.pageTitle) els.pageTitle.textContent = pageTitle(view);
   target.classList.add("active");
-  document.querySelector(".workspace")?.scrollTo({ left: 0, top: document.querySelector(".workspace")?.scrollTop || 0, behavior: "auto" });
+  document.querySelector(".workspace")?.scrollTo({ left: 0, top: 0, behavior: "auto" });
   if (view === "flowsheet") openProcessCanvas();
-  else window.requestAnimationFrame(() => target.scrollIntoView({ block: "start", behavior: "smooth" }));
 }
 
 function jumpToView(view) {
@@ -11753,7 +11752,16 @@ function jumpToView(view) {
 function openProcessCanvas() {
   window.requestAnimationFrame(() => {
     fitCanvas(true);
-    document.querySelector("#flowsheetView")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    const workspace = document.querySelector(".workspace");
+    const target = document.querySelector("#flowsheetView");
+    const topbar = document.querySelector(".topbar");
+    if (workspace && target) {
+      workspace.scrollTo({
+        left: 0,
+        top: Math.max(0, target.offsetTop - (topbar?.offsetHeight || 0) - 10),
+        behavior: "auto",
+      });
+    }
     els.canvas?.focus?.({ preventScroll: true });
     showToast("Process canvas opened");
   });
