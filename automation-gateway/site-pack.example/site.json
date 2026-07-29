@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "siteId": "REPLACE_WITH_CONTROLLED_SITE_ID",
+  "projectId": "REPLACE_WITH_AXION_PROJECT_ID",
+  "environment": "production",
+  "opcua": {
+    "endpoint": "opc.tcp://REPLACE_WITH_APPROVED_OT_HOST:4840",
+    "securityMode": "SignAndEncrypt",
+    "securityPolicy": "Basic256Sha256"
+  },
+  "network": {
+    "gatewayZone": "Industrial DMZ",
+    "publicInbound": false,
+    "backendEgress": "https://REPLACE_WITH_AXION_BACKEND",
+    "owner": "REPLACE_WITH_SITE_NETWORK_OWNER",
+    "changeRecord": "REPLACE_WITH_CHANGE_RECORD"
+  },
+  "certificates": {
+    "clientCertificate": "/run/secrets/opcua/client-cert.pem",
+    "privateKey": "/run/secrets/opcua/client-key.pem",
+    "trustedServerCertificatesDir": "/run/secrets/opcua/trusted"
+  },
+  "approvalsManifest": "approvals.json"
+}

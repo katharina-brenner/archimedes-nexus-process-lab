@@ -24242,6 +24242,67 @@ body:not(.locked) .help-panel #askHelp {
   gap: 10px;
 }
 
+.automation-site-handoff {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.automation-site-handoff > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(30, 74, 80, 0.12);
+  border-radius: 11px;
+  background: #f3f7f6;
+}
+
+.automation-site-handoff i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #9aa9ae;
+}
+
+.automation-site-handoff .pass i {
+  background: #2cad92;
+}
+
+.automation-site-handoff .blocked i {
+  background: #a64e58;
+}
+
+.automation-site-handoff span,
+.automation-site-handoff strong,
+.automation-site-handoff small {
+  display: block;
+  min-width: 0;
+}
+
+.automation-site-handoff strong {
+  color: #173039;
+  font-size: 12px;
+}
+
+.automation-site-handoff small {
+  margin-top: 3px;
+  color: #61747c;
+  font-size: 10px;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.automation-site-handoff b {
+  grid-column: 2;
+  color: #526970;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
 .automation-commissioning-summary > div {
   display: grid;
   gap: 3px;
@@ -24567,6 +24628,7 @@ body:not(.locked) .help-panel #askHelp {
   .automation-form,
   .automation-live-grid,
   .automation-commissioning-summary,
+  .automation-site-handoff,
   .automation-check-grid {
     grid-template-columns: 1fr;
   }

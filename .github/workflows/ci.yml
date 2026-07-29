@@ -36,6 +36,14 @@ jobs:
       - name: Backend API tests
         run: pnpm test
 
+      - name: OT site-pack and container policy checks
+        run: |
+          pnpm gateway:site:check -- --source automation-gateway/site-pack.example --template
+          pnpm gateway:container:check
+
+      - name: Build automation edge image
+        run: docker build -f Dockerfile.automation-gateway -t axion-automation-gateway:ci .
+
       - name: Production doctor expected local failure
         run: |
           set +e

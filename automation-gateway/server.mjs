@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { timingSafeEqual, randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertPhysicalCommissioning, inspectSitePack } from "./site-pack.mjs";
 
 const gatewayDir = dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +38,9 @@ const config = {
   securityPolicy: process.env.OPCUA_SECURITY_POLICY || "Basic256Sha256",
   certificateFile: process.env.OPCUA_CERTIFICATE_FILE || "",
   privateKeyFile: process.env.OPCUA_PRIVATE_KEY_FILE || "",
+  trustedCertificatesDir: process.env.OPCUA_TRUSTED_CERTIFICATES_DIR || "",
+  siteManifestPath: process.env.AUTOMATION_SITE_MANIFEST || "",
+  approvalsManifestPath: process.env.AUTOMATION_APPROVALS_MANIFEST || "",
 };
 
 function safeCompare(leftValue, rightValue) {
@@ -65,6 +69,17 @@ const tagMap = readTagMap();
 const tagByName = new Map(tagMap.tags.map((entry) => [entry.tag, entry]));
 const simulatorOverrides = new Map();
 const gatewayAudit = [];
+const commissioning = inspectSitePack({
+  manifestPath: config.siteManifestPath,
+  approvalsPath: config.approvalsManifestPath,
+  tagMap,
+  certificateFile: config.certificateFile,
+  privateKeyFile: config.privateKeyFile,
+  trustedCertificatesDir: config.trustedCertificatesDir,
+  configuredProjectId: config.projectId,
+  configuredEndpoint: config.defaultEndpoint,
+  writesEnabled: config.writesEnabled,
+});
 
 function json(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -170,6 +185,7 @@ function userIdentity(opcua, credential) {
 }
 
 async function withOpcuaSession(connection, action) {
+  assertPhysicalCommissioning(commissioning);
   const opcua = await opcuaModule();
   if (!String(connection.endpoint).startsWith("opc.tcp://")) throw new Error("OPC UA endpoint must begin with opc.tcp://.");
   if (connection.securityMode !== "None" && (!config.certificateFile || !config.privateKeyFile)) {
@@ -220,6 +236,7 @@ async function writeValue(connection, tag, value) {
     return { acknowledgement: `sim-${randomUUID()}`, simulated: true };
   }
   if (connection.kind !== "opcua-edge") throw new Error(`${connection.kind} requires a site-specific write adapter.`);
+  assertPhysicalCommissioning(commissioning, { forWrite: true });
   return withOpcuaSession(connection, async ({ opcua, session }) => {
     const status = await session.write({
       nodeId: tag.nodeId,
@@ -234,11 +251,29 @@ async function writeValue(connection, tag, value) {
 async function testConnection(body) {
   const connection = connectionOptions(body);
   if (connection.kind === "simulation") {
-    return { ok: true, status: "connected", detail: `Simulator returned ${tagMap.tags.length} quality-coded tags.`, tagCount: tagMap.tags.length };
+    return {
+      ok: true,
+      status: "connected",
+      detail: `Simulator returned ${tagMap.tags.length} quality-coded tags.`,
+      tagCount: tagMap.tags.length,
+      commissioning: {
+        status: "simulator",
+        readyForRead: true,
+        readyForWrite: false,
+        checks: [],
+      },
+    };
   }
+  assertPhysicalCommissioning(commissioning);
   const samples = await readSnapshot(connection);
   const good = samples.filter((sample) => sample.quality === "Good").length;
-  return { ok: good > 0, status: good > 0 ? "connected" : "bad-quality", detail: `${good}/${samples.length} mapped tags returned Good quality.`, tagCount: samples.length };
+  return {
+    ok: good > 0,
+    status: good > 0 ? "connected" : "bad-quality",
+    detail: `${good}/${samples.length} mapped tags returned Good quality.`,
+    tagCount: samples.length,
+    commissioning,
+  };
 }
 
 async function publishTelemetry() {
@@ -267,6 +302,37 @@ async function publishTelemetry() {
   }
 }
 
+async function publishCommissioningStatus() {
+  if (!config.backendUrl || !config.backendToken || !config.backendOwner || !config.projectId || !config.connectionId) return;
+  try {
+    const response = await fetch(`${config.backendUrl}/api/automation/edge-status`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.backendToken}`,
+        "content-type": "application/json",
+        "x-axion-automation-owner": config.backendOwner,
+      },
+      body: JSON.stringify({
+        projectId: config.projectId,
+        connectionId: config.connectionId,
+        commissioning,
+        gateway: {
+          mode: config.defaultKind,
+          tagCount: tagMap.tags.length,
+          writesEnabled: config.writesEnabled,
+          reportedAt: new Date().toISOString(),
+        },
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `Axion edge-status ingest returned ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Automation commissioning publish failed: ${error.message}`);
+  }
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   if (req.method === "GET" && url.pathname === "/health") {
@@ -277,6 +343,11 @@ const server = createServer(async (req, res) => {
       tagCount: tagMap.tags.length,
       writesEnabled: config.writesEnabled,
       backendPublishing: Boolean(config.backendUrl && config.backendToken && config.backendOwner),
+      commissioning: {
+        status: config.defaultKind === "simulation" ? "simulator" : commissioning.status,
+        readyForRead: config.defaultKind === "simulation" || commissioning.readyForRead,
+        readyForWrite: config.defaultKind === "simulation" ? false : commissioning.readyForWrite,
+      },
     });
     return;
   }
@@ -286,7 +357,11 @@ const server = createServer(async (req, res) => {
   }
   try {
     if (req.method === "GET" && url.pathname === "/v1/tag-map") {
-      json(res, 200, { ...tagMap, writesEnabled: config.writesEnabled });
+      json(res, 200, { ...tagMap, writesEnabled: config.writesEnabled, commissioning });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/v1/commissioning/status") {
+      json(res, 200, commissioning);
       return;
     }
     if (req.method === "POST" && url.pathname === "/v1/connections/test") {
@@ -354,7 +429,11 @@ server.listen(config.port, config.host, () => {
 });
 
 if (config.backendUrl && config.backendToken && config.backendOwner) {
-  const timer = setInterval(publishTelemetry, config.publishIntervalMs);
+  const timer = setInterval(() => {
+    publishCommissioningStatus();
+    publishTelemetry();
+  }, config.publishIntervalMs);
   timer.unref();
+  publishCommissioningStatus();
   publishTelemetry();
 }

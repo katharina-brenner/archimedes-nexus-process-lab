@@ -1,0 +1,43 @@
+services:
+  axion-automation-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.automation-gateway
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    ports:
+      - "127.0.0.1:8921:8921"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8921
+      AUTOMATION_CONNECTION_KIND: opcua-edge
+      AUTOMATION_CONNECTION_ENDPOINT: ${AUTOMATION_CONNECTION_ENDPOINT}
+      AUTOMATION_SITE_MANIFEST: /run/site-pack/site.json
+      AUTOMATION_APPROVALS_MANIFEST: /run/site-pack/approvals.json
+      AUTOMATION_TAG_MAP: /run/site-pack/tag-map.json
+      AUTOMATION_GATEWAY_TOKEN: ${AUTOMATION_GATEWAY_TOKEN}
+      AUTOMATION_GATEWAY_WRITES_ENABLED: "false"
+      AXION_BACKEND_URL: ${AXION_BACKEND_URL}
+      AXION_AUTOMATION_INGEST_TOKEN: ${AXION_AUTOMATION_INGEST_TOKEN}
+      AXION_AUTOMATION_INGEST_OWNER: ${AXION_AUTOMATION_INGEST_OWNER}
+      AXION_AUTOMATION_PROJECT_ID: ${AXION_AUTOMATION_PROJECT_ID}
+      AXION_AUTOMATION_CONNECTION_ID: ${AXION_AUTOMATION_CONNECTION_ID}
+      OPCUA_CERTIFICATE_FILE: /run/secrets/opcua/client-cert.pem
+      OPCUA_PRIVATE_KEY_FILE: /run/secrets/opcua/client-key.pem
+      OPCUA_TRUSTED_CERTIFICATES_DIR: /run/secrets/opcua/trusted
+    volumes:
+      - ${AXION_SITE_PACK_PATH}:/run/site-pack:ro
+      - ${AXION_OPCUA_SECRETS_PATH}:/run/secrets/opcua:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8921/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

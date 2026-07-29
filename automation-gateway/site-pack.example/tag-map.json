@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "equipmentId": "REPLACE_WITH_PLANT_EQUIPMENT_ID",
+  "description": "Replace every Node ID with the exported and independently reviewed plant namespace.",
+  "tags": [
+    { "tag": "BR101.PV.DO", "nodeId": "ns=2;s=BR101.PV.DO", "label": "Dissolved oxygen", "unit": "%", "dataType": "Double", "min": 0, "max": 100, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.SP.DO", "nodeId": "ns=2;s=BR101.SP.DO", "label": "DO setpoint", "unit": "%", "dataType": "Double", "min": 10, "max": 80, "writable": true, "criticality": "CPP" },
+    { "tag": "BR101.PV.PH", "nodeId": "ns=2;s=BR101.PV.PH", "label": "pH", "unit": "pH", "dataType": "Double", "min": 6, "max": 8, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.PV.TEMP", "nodeId": "ns=2;s=BR101.PV.TEMP", "label": "Temperature", "unit": "degC", "dataType": "Double", "min": 20, "max": 45, "writable": false, "criticality": "CPP" },
+    { "tag": "BR101.MV.AGITATION", "nodeId": "ns=2;s=BR101.MV.AGITATION", "label": "Agitation command", "unit": "rpm", "dataType": "Double", "min": 20, "max": 160, "writable": true, "criticality": "CMA" },
+    { "tag": "BR101.PV.LEVEL", "nodeId": "ns=2;s=BR101.PV.LEVEL", "label": "Working volume", "unit": "%", "dataType": "Double", "min": 0, "max": 85, "writable": false, "criticality": "CPP" },
+    { "tag": "BATCH.PHASE", "nodeId": "ns=2;s=BATCH.PHASE", "label": "Batch phase", "unit": "state", "dataType": "Int32", "min": 0, "max": 8, "writable": false, "criticality": "context" }
+  ]
+}

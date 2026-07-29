@@ -6,7 +6,12 @@ COPY automation-gateway/package.json ./package.json
 RUN npm install --omit=dev
 
 COPY automation-gateway/server.mjs ./server.mjs
+COPY automation-gateway/site-pack.mjs ./site-pack.mjs
 COPY automation-gateway/tag-map.json ./tag-map.json
+
+RUN addgroup -g 10001 axion \
+    && adduser -D -H -u 10001 -G axion axion \
+    && chown -R axion:axion /app
 
 ENV HOST=0.0.0.0
 ENV PORT=8921
@@ -14,5 +19,7 @@ ENV AUTOMATION_TAG_MAP=/app/tag-map.json
 ENV AUTOMATION_GATEWAY_WRITES_ENABLED=false
 
 EXPOSE 8921
+
+USER 10001:10001
 
 CMD ["node", "server.mjs"]

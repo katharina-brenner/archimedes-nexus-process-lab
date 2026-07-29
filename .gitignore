@@ -9,3 +9,8 @@ nextjs-bff/.next/
 .env
 .env.local
 .axion-runtime-env.json
+automation-gateway/site-pack/
+*.pem
+*.key
+*.p12
+*.pfx

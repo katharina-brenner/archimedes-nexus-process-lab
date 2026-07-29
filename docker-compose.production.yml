@@ -13,10 +13,8 @@ services:
       PORT: 8899
       AXION_REQUIRE_PRODUCTION_CONFIG: "true"
       CFD_WORKER_URL: http://axion-cfd-worker:8787
-      AUTOMATION_GATEWAY_URL: http://axion-automation-gateway:8921
     depends_on:
       - axion-cfd-worker
-      - axion-automation-gateway
 
   axion-cfd-worker:
     build:
@@ -35,22 +33,6 @@ services:
       AXION_CFD_DRY_RUN: "true"
     volumes:
       - axion-cfd-jobs:/data/cfd-jobs
-
-  axion-automation-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile.automation-gateway
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      HOST: 0.0.0.0
-      PORT: 8921
-      AXION_BACKEND_URL: http://axion-api:8899
-      AUTOMATION_GATEWAY_WRITES_ENABLED: "false"
-      AUTOMATION_CONNECTION_KIND: simulation
-    volumes:
-      - ./automation-gateway/tag-map.json:/app/tag-map.json:ro
 
 volumes:
   axion-cfd-jobs:

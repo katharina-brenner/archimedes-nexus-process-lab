@@ -5,7 +5,7 @@ import test from "node:test";
 const nodeBin = process.execPath;
 const rootDir = new URL("..", import.meta.url).pathname;
 
-async function startGateway({ writesEnabled = false } = {}) {
+async function startGateway({ writesEnabled = false, kind = "simulation" } = {}) {
   const port = 10400 + Math.floor(Math.random() * 500);
   const token = `gateway-test-${port}`;
   const child = spawn(nodeBin, ["automation-gateway/server.mjs"], {
@@ -16,7 +16,10 @@ async function startGateway({ writesEnabled = false } = {}) {
       PORT: String(port),
       AUTOMATION_GATEWAY_TOKEN: token,
       AUTOMATION_GATEWAY_WRITES_ENABLED: writesEnabled ? "true" : "false",
-      AUTOMATION_CONNECTION_KIND: "simulation",
+      AUTOMATION_CONNECTION_KIND: kind,
+      AUTOMATION_CONNECTION_ENDPOINT: kind === "simulation" ? "axion://verified-simulator" : "opc.tcp://approved-plant.local:4840",
+      AUTOMATION_SITE_MANIFEST: "",
+      AUTOMATION_APPROVALS_MANIFEST: "",
       AXION_BACKEND_URL: "",
       AXION_AUTOMATION_INGEST_TOKEN: "",
       AXION_AUTOMATION_INGEST_OWNER: "",
@@ -76,6 +79,11 @@ test("automation edge gateway enforces auth, tag map, write lock, limits and aud
     assert.equal(connection.response.status, 200);
     assert.equal(connection.payload.ok, true);
     assert.equal(connection.payload.tagCount, 16);
+
+    const commissioning = await gatewayFetch(locked, "/v1/commissioning/status");
+    assert.equal(commissioning.response.status, 200);
+    assert.equal(commissioning.payload.status, "blocked");
+    assert.equal(commissioning.payload.readyForRead, false);
 
     const snapshot = await gatewayFetch(locked, "/v1/telemetry/snapshot", {
       method: "POST",
@@ -148,5 +156,28 @@ test("automation edge gateway enforces auth, tag map, write lock, limits and aud
     assert.equal(audit.payload.events[0].approvedBy, "test engineer");
   } finally {
     await stopGateway(enabled);
+  }
+});
+
+test("physical OPC UA is blocked before network access when the controlled site pack is absent", async () => {
+  const gateway = await startGateway({ kind: "opcua-edge" });
+  try {
+    const health = await fetch(`${gateway.baseUrl}/health`).then((response) => response.json());
+    assert.equal(health.commissioning.status, "blocked");
+    assert.equal(health.commissioning.readyForRead, false);
+
+    const result = await gatewayFetch(gateway, "/v1/connections/test", {
+      method: "POST",
+      body: {
+        kind: "opcua-edge",
+        endpoint: "opc.tcp://approved-plant.local:4840",
+        securityMode: "SignAndEncrypt",
+      },
+    });
+    assert.equal(result.response.status, 502);
+    assert.match(result.payload.error, /commissioning gate/i);
+    assert.match(result.payload.error, /Site manifest/i);
+  } finally {
+    await stopGateway(gateway);
   }
 });

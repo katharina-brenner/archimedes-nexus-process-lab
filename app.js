@@ -11928,6 +11928,9 @@ function automationTrendSvg(automation) {
 function renderAutomationCockpit() {
   const automation = activeAutomationState();
   const connections = automation.connections || [];
+  const physicalConnection = connections.find((item) => item.kind !== "simulation");
+  const siteCommissioning = physicalConnection?.commissioning;
+  const siteChecks = new Map((siteCommissioning?.checks || []).map((item) => [item.key, item]));
   const latest = automation.latest || [];
   const importantTags = ["BR101.PV.DO", "BR101.PV.PH", "BR101.PV.TEMP", "BR101.PV.LEVEL", "BR101.PV.AMMONIUM", "BR101.PV.LACTATE"];
   const definitionMap = new Map((automation.tagDefinitions || []).map((item) => [item.tag, item]));
@@ -11974,7 +11977,7 @@ function renderAutomationCockpit() {
           <div class="automation-panel-title">
             <span>01 · Connect</span>
             <h4>Plant data source</h4>
-            <p>Use the simulator now, or connect an OT edge gateway. Plant credentials stay on the backend and are never returned to the browser.</p>
+            <p>Use the simulator now, or register an OT edge gateway. OPC UA credentials, certificates and private keys stay on the edge host and are never sent to this public application.</p>
           </div>
           <div class="automation-form">
             <label><span>Name</span><input id="automationConnectionName" type="text" value="BR-101 production cell" /></label>
@@ -11993,7 +11996,6 @@ function renderAutomationCockpit() {
                 <option value="read-write">Read/write after OT approval</option>
               </select>
             </label>
-            <label class="automation-secret"><span>Gateway credential</span><input id="automationConnectionSecret" type="password" autocomplete="new-password" placeholder="Stored encrypted on backend" /></label>
             <label class="automation-write-check"><input id="automationConnectionWrite" type="checkbox" ${automation.gateway?.writesEnabled ? "" : "disabled"} /><span>Request physical write permission</span></label>
             <button data-automation-connect type="button">Add connection</button>
           </div>
@@ -12040,8 +12042,28 @@ function renderAutomationCockpit() {
       <article class="automation-commissioning-panel">
         <div class="automation-panel-title">
           <span>03 · Commission</span>
-          <h4>Read-only FAT/SAT gate</h4>
-          <p>Verify the connection, mapped namespace, signal quality, timestamps, engineering limits, historian continuity and write lock before any closed-loop release.</p>
+          <h4>OT site handoff and read-only FAT/SAT gate</h4>
+          <p>The public Axion host never connects directly to the PLC. A local edge gateway in the OT network or Industrial DMZ must pass every site, trust and safety gate first.</p>
+        </div>
+        <div class="automation-site-handoff">
+          ${[
+            ["project", "Project ID", "Axion model and plant release refer to the same controlled project."],
+            ["endpoint", "OPC UA endpoint", "The gateway uses the endpoint approved by site automation."],
+            ["nodes", "Plant Node IDs", "Exported namespace mappings replace all simulator Node IDs."],
+            ["certificate", "Client identity", "Client certificate and private key are installed only at the edge."],
+            ["trust", "Server trust", "The OPC UA server certificate is pinned in the local trust list."],
+            ["documents", "Trips + interlocks", "Controlled cause-and-effect, interlock, trip-test and rollback evidence is approved."],
+          ].map(([key, label, description]) => {
+            const item = siteChecks.get(key);
+            const status = physicalConnection ? (item?.status || "blocked") : "pending";
+            return `
+              <div class="${escapeAttr(status)}">
+                <i></i>
+                <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(item?.evidence || description)}</small></span>
+                <b>${physicalConnection ? escapeHtml(status) : "site input"}</b>
+              </div>
+            `;
+          }).join("")}
         </div>
         <div class="automation-commissioning-summary">
           <div>
@@ -12049,8 +12071,8 @@ function renderAutomationCockpit() {
             <span>mapped tags</span>
           </div>
           <div>
-            <strong>${automation.commissioningRuns?.[0]?.status || "not run"}</strong>
-            <span>latest gate status</span>
+            <strong>${physicalConnection ? (siteCommissioning?.status || "awaiting edge") : "site input required"}</strong>
+            <span>edge readiness</span>
           </div>
           <button data-automation-commission type="button">Run commissioning checks</button>
         </div>
@@ -12162,12 +12184,11 @@ async function createAutomationConnectionFromUi() {
   const name = document.querySelector("#automationConnectionName")?.value.trim() || "Production cell";
   const endpoint = document.querySelector("#automationConnectionEndpoint")?.value.trim() || "";
   const mode = document.querySelector("#automationConnectionMode")?.value || "read-only";
-  const secret = document.querySelector("#automationConnectionSecret")?.value || "";
   const writeEnabled = Boolean(document.querySelector("#automationConnectionWrite")?.checked);
   try {
     const payload = await apiRequest("/api/automation/connections", {
       method: "POST",
-      body: JSON.stringify({ projectId: state.currentProjectId || "", kind, name, endpoint, mode, secret, writeEnabled, securityMode: "SignAndEncrypt" }),
+      body: JSON.stringify({ projectId: state.currentProjectId || "", kind, name, endpoint, mode, writeEnabled, securityMode: "SignAndEncrypt" }),
     });
     state.automationState = payload.state;
     renderTwinWorkspace();

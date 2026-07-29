@@ -219,13 +219,14 @@ function publicConfig() {
       automationStateEndpoint: "/api/automation/state",
       automationConnectionEndpoint: "/api/automation/connections",
       automationTelemetryEndpoint: "/api/automation/telemetry",
+      automationEdgeStatusEndpoint: "/api/automation/edge-status",
       automationControlEndpoint: "/api/automation/control-loops",
       automationCommissioningEndpoint: "/api/automation/commissioning/run",
       billingPortalEndpoint: "/api/billing/portal",
       nextjsBffUrl: config.nextjsBffUrl || "",
       inviteEmailConfigured: emailConfigured(),
       aiCommandPlanner: Boolean(config.openaiApiKey),
-      automationGateway: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      automationGateway: Boolean((config.automationGatewayUrl && config.automationGatewayToken) || (config.automationIngestToken && config.automationIngestOwner)),
       automationMachineIngest: Boolean(config.automationIngestToken && config.automationIngestOwner),
       physicalAutomationWrites: config.automationWritesEnabled,
     },
@@ -345,8 +346,8 @@ function productionReadiness() {
     {
       key: "automation-gateway",
       label: "PLC/SCADA edge gateway",
-      ready: Boolean(config.automationGatewayUrl && config.automationGatewayToken && config.automationIngestToken && config.automationIngestOwner),
-      missing: ["AUTOMATION_GATEWAY_URL", "AUTOMATION_GATEWAY_TOKEN", "AXION_AUTOMATION_INGEST_TOKEN", "AXION_AUTOMATION_INGEST_OWNER"].filter((key) => !process.env[key]),
+      ready: Boolean(config.automationIngestToken && config.automationIngestOwner),
+      missing: ["AXION_AUTOMATION_INGEST_TOKEN", "AXION_AUTOMATION_INGEST_OWNER"].filter((key) => !process.env[key]),
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
       ownerAction: "Deploy an OT-network edge gateway with trusted OPC UA certificates, read-only tags first, outbound TLS, and a reviewed allowlist before enabling any physical write.",
@@ -3764,6 +3765,7 @@ function sanitizeAutomationConnection(connection) {
     lastTestedAt: connection.lastTestedAt || "",
     lastConnectedAt: connection.lastConnectedAt || "",
     error: connection.error || "",
+    commissioning: connection.commissioning || null,
   };
 }
 
@@ -3866,7 +3868,7 @@ function automationSnapshot(db, session, projectId = "") {
   return {
     projectId,
     gateway: {
-      configured: Boolean(config.automationGatewayUrl && config.automationGatewayToken),
+      configured: Boolean((config.automationGatewayUrl && config.automationGatewayToken) || (config.automationIngestToken && config.automationIngestOwner)),
       writesEnabled: config.automationWritesEnabled,
       physicalWritePolicy: config.automationWritesEnabled ? "approved closed-loop writes only" : "physical writes locked",
     },
@@ -3922,6 +3924,9 @@ async function createAutomationConnection(req, res) {
     updatedAt: now,
     lastConnectedAt: kind === "simulation" ? now : "",
     error: "",
+    commissioning: kind === "simulation"
+      ? { status: "simulator", readyForRead: true, readyForWrite: false, checks: [] }
+      : { status: "blocked", readyForRead: false, readyForWrite: false, checks: [] },
   };
   db.automationConnections.unshift(connection);
   db.audit.unshift({ at: now, type: "automation.connection.created", projectId, connectionId: connection.id, kind, by: owner });
@@ -3937,7 +3942,14 @@ async function testAutomationConnection(req, res, connectionId) {
   const connection = db.automationConnections.find((item) => item.id === connectionId && item.owner === owner);
   if (!connection) return json(res, 404, { error: "Automation connection not found" });
   const now = new Date().toISOString();
-  let result = { ok: false, status: "gateway-required", detail: "Configure AUTOMATION_GATEWAY_URL and AUTOMATION_GATEWAY_TOKEN on the backend." };
+  let result = {
+    ok: true,
+    status: connection.commissioning?.readyForRead ? "edge-ready" : "awaiting-edge",
+    detail: connection.commissioning?.readyForRead
+      ? "The private edge gateway has reported a valid read-only commissioning release."
+      : "Waiting for the private OT/DMZ edge gateway to report its commissioning status over outbound HTTPS.",
+    commissioning: connection.commissioning || null,
+  };
   if (connection.kind === "simulation") {
     result = { ok: true, status: "connected", detail: "Axion verified simulator is producing quality-coded telemetry." };
   } else if (config.automationGatewayUrl && config.automationGatewayToken) {
@@ -3958,11 +3970,17 @@ async function testAutomationConnection(req, res, connectionId) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || payload.message || `Gateway test failed with ${response.status}`);
-      result = { ok: true, status: "connected", detail: payload.detail || "Edge gateway accepted the connection contract." };
+      result = {
+        ok: true,
+        status: "connected",
+        detail: payload.detail || "Edge gateway accepted the connection contract.",
+        commissioning: payload.commissioning || null,
+      };
     } catch (error) {
       result = { ok: false, status: "error", detail: String(error.message || error).slice(0, 500) };
     }
   }
+  if (result.commissioning) connection.commissioning = result.commissioning;
   connection.status = result.status;
   connection.error = result.ok ? "" : result.detail;
   connection.lastTestedAt = now;
@@ -4029,6 +4047,54 @@ async function ingestAutomationTelemetry(req, res) {
   json(res, 201, { accepted: accepted.length, rejected: samples.length - accepted.length, state: automationSnapshot(db, session, projectId) });
 }
 
+async function ingestAutomationEdgeStatus(req, res) {
+  const token = getBearer(req);
+  if (!config.automationIngestToken || !config.automationIngestOwner || !safeCompare(token, config.automationIngestToken)) {
+    return json(res, 401, { error: "Machine edge-status authentication failed" });
+  }
+  const body = await parseBody(req);
+  const db = ensureDbShape(await loadDb());
+  const owner = config.automationIngestOwner;
+  const projectId = String(body.projectId || "").slice(0, 200);
+  const connectionId = String(body.connectionId || "").slice(0, 200);
+  const session = { username: owner, role: "automation-gateway" };
+  if (!automationProjectAllowed(db, session, projectId)) return json(res, 404, { error: "Project not found" });
+  const connection = db.automationConnections.find((item) => item.id === connectionId && item.owner === owner && item.projectId === projectId);
+  if (!connection) return json(res, 404, { error: "Automation connection not found" });
+  const commissioning = body.commissioning && typeof body.commissioning === "object" ? body.commissioning : {};
+  const checks = Array.isArray(commissioning.checks) ? commissioning.checks.slice(0, 30).map((item) => ({
+    key: String(item.key || "").slice(0, 80),
+    label: String(item.label || "").slice(0, 160),
+    status: item.status === "pass" ? "pass" : "blocked",
+    evidence: String(item.evidence || "").slice(0, 500),
+    required: item.required !== false,
+  })) : [];
+  connection.commissioning = {
+    status: ["blocked", "read-only-ready", "write-ready"].includes(commissioning.status) ? commissioning.status : "blocked",
+    readyForRead: Boolean(commissioning.readyForRead),
+    readyForWrite: Boolean(commissioning.readyForWrite),
+    siteId: String(commissioning.siteId || "").slice(0, 160),
+    projectId: String(commissioning.projectId || "").slice(0, 200),
+    tagCount: Number(commissioning.tagCount || 0),
+    certificatesInstalled: Boolean(commissioning.certificatesInstalled),
+    writeReleaseApproved: Boolean(commissioning.writeReleaseApproved),
+    checks,
+  };
+  connection.status = connection.commissioning.readyForRead ? "edge-ready" : "edge-blocked";
+  connection.lastTestedAt = new Date().toISOString();
+  connection.error = connection.commissioning.readyForRead ? "" : "The OT commissioning gate is incomplete.";
+  db.audit.unshift({
+    at: connection.lastTestedAt,
+    type: "automation.edge-status.ingested",
+    projectId,
+    connectionId,
+    status: connection.commissioning.status,
+    by: `edge:${owner}`,
+  });
+  await saveDb(db);
+  json(res, 201, { accepted: true, commissioning: connection.commissioning });
+}
+
 function commissioningCheck(key, label, status, evidence, required = true) {
   return { key, label, status, evidence, required };
 }
@@ -4054,6 +4120,9 @@ async function runAutomationCommissioning(req, res) {
     return !definition || (Number(item.value) >= definition.min && Number(item.value) <= definition.max);
   });
   const physical = connection && connection.kind !== "simulation";
+  const edgeChecks = new Map((connection?.commissioning?.checks || []).map((item) => [item.key, item]));
+  const edgeStatus = (key, fallback = "review") => edgeChecks.get(key)?.status === "pass" ? "pass" : fallback;
+  const edgeEvidence = (key, fallback) => edgeChecks.get(key)?.evidence || fallback;
   const checks = [
     commissioningCheck(
       "connection",
@@ -4076,8 +4145,8 @@ async function runAutomationCommissioning(req, res) {
     commissioningCheck(
       "namespace",
       "Plant namespace review",
-      physical ? "review" : "pass",
-      physical ? "Replace template ns=2 node IDs with the exported and independently reviewed PLC namespace." : "Template namespace is valid for the simulator.",
+      physical ? edgeStatus("nodes", "fail") : "pass",
+      physical ? edgeEvidence("nodes", "Replace template Node IDs with the exported and independently reviewed PLC namespace.") : "Template namespace is valid for the simulator.",
     ),
     commissioningCheck(
       "quality",
@@ -4106,8 +4175,29 @@ async function runAutomationCommissioning(req, res) {
     commissioningCheck(
       "interlocks",
       "PLC interlocks and independent trips",
-      physical ? "site-evidence" : "not-applicable",
-      physical ? "Attach approved cause-and-effect, interlock and trip test evidence before closed-loop release." : "Not applicable to the verified simulator.",
+      physical ? edgeStatus("documents", "site-evidence") : "not-applicable",
+      physical ? edgeEvidence("documents", "Attach approved cause-and-effect, interlock and trip test evidence before closed-loop release.") : "Not applicable to the verified simulator.",
+      physical,
+    ),
+    commissioningCheck(
+      "site-pack",
+      "OT site and project binding",
+      physical ? (edgeStatus("manifest", "fail") === "pass" && edgeStatus("project", "fail") === "pass" ? "pass" : "fail") : "not-applicable",
+      physical ? `${edgeEvidence("manifest", "Site manifest missing")} ${edgeEvidence("project", "Project binding missing")}` : "Not applicable to the verified simulator.",
+      physical,
+    ),
+    commissioningCheck(
+      "ot-network",
+      "Industrial DMZ network path",
+      physical ? edgeStatus("network", "site-evidence") : "not-applicable",
+      physical ? edgeEvidence("network", "Approved OT/DMZ placement evidence missing.") : "Not applicable to the verified simulator.",
+      physical,
+    ),
+    commissioningCheck(
+      "opcua-trust",
+      "OPC UA certificate trust",
+      physical && edgeStatus("security", "fail") === "pass" && edgeStatus("certificate", "fail") === "pass" && edgeStatus("trust", "fail") === "pass" ? "pass" : physical ? "fail" : "not-applicable",
+      physical ? `${edgeEvidence("security", "Security profile missing")} ${edgeEvidence("certificate", "Client certificate missing")} ${edgeEvidence("trust", "Server trust missing")}` : "Not applicable to the verified simulator.",
       physical,
     ),
     commissioningCheck(
@@ -5304,6 +5394,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "POST" && pathname === "/api/automation/telemetry") {
     await ingestAutomationTelemetry(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/automation/edge-status") {
+    await ingestAutomationEdgeStatus(req, res);
     return;
   }
   if (req.method === "POST" && pathname === "/api/automation/commissioning/run") {

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "documents": [
+    { "kind": "cause-and-effect", "id": "REPLACE", "revision": "REPLACE", "sha256": "sha256:REPLACE_WITH_64_HEX_CHARACTERS" },
+    { "kind": "interlock-matrix", "id": "REPLACE", "revision": "REPLACE", "sha256": "sha256:REPLACE_WITH_64_HEX_CHARACTERS" },
+    { "kind": "trip-test", "id": "REPLACE", "revision": "REPLACE", "sha256": "sha256:REPLACE_WITH_64_HEX_CHARACTERS" },
+    { "kind": "rollback-plan", "id": "REPLACE", "revision": "REPLACE", "sha256": "sha256:REPLACE_WITH_64_HEX_CHARACTERS" }
+  ],
+  "signoffs": [
+    { "role": "site-automation-owner", "approved": false, "approvedBy": "", "approvedAt": "" },
+    { "role": "process-safety-owner", "approved": false, "approvedBy": "", "approvedAt": "" },
+    { "role": "quality-owner", "approved": false, "approvedBy": "", "approvedAt": "" },
+    { "role": "cybersecurity-owner", "approved": false, "approvedBy": "", "approvedAt": "" }
+  ],
+  "readOnlyRelease": { "approved": false, "approvedBy": "", "approvedAt": "", "changeRecord": "" },
+  "writeRelease": { "approved": false, "approvedBy": "", "approvedAt": "", "changeRecord": "" }
+}

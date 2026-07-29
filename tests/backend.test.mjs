@@ -307,6 +307,43 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(automationConnectionTest.response.status, 200);
     assert.equal(automationConnectionTest.payload.result.ok, true);
 
+    const physicalConnection = await jsonFetch(server.baseUrl, "/api/automation/connections", {
+      token,
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        name: "Plant edge gateway",
+        kind: "opcua-edge",
+        endpoint: "opc.tcp://br101-ot.local:4840",
+        mode: "read-only",
+      },
+    });
+    assert.equal(physicalConnection.response.status, 201);
+
+    const edgeStatus = await jsonFetch(server.baseUrl, "/api/automation/edge-status", {
+      token: "automation-ingest-test-token",
+      method: "POST",
+      body: {
+        projectId: created.payload.project.id,
+        connectionId: physicalConnection.payload.connection.id,
+        commissioning: {
+          status: "read-only-ready",
+          readyForRead: true,
+          readyForWrite: false,
+          siteId: "site-test",
+          projectId: created.payload.project.id,
+          tagCount: 16,
+          certificatesInstalled: true,
+          checks: [
+            { key: "project", label: "Project binding", status: "pass", evidence: "Matched", required: true },
+            { key: "documents", label: "Interlock / trip evidence", status: "pass", evidence: "4/4 approved", required: true },
+          ],
+        },
+      },
+    });
+    assert.equal(edgeStatus.response.status, 201);
+    assert.equal(edgeStatus.payload.commissioning.readyForRead, true);
+
     const automationState = await jsonFetch(
       server.baseUrl,
       `/api/automation/state?projectId=${created.payload.project.id}`,
@@ -317,6 +354,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(automationState.payload.loops.length, 3);
     assert.ok(automationState.payload.latest.some((sample) => sample.tag === "BR101.PV.DO"));
     assert.equal(automationState.payload.tagMap.length, automationState.payload.tagDefinitions.length);
+    assert.equal(automationState.payload.connections.find((item) => item.id === physicalConnection.payload.connection.id).status, "edge-ready");
     const doLoop = automationState.payload.loops.find((loop) => loop.key === "do-cascade");
     assert.ok(doLoop);
 
