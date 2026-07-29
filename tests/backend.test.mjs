@@ -167,6 +167,23 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(commandPlan.payload.commandPlan.status, "planned");
     assert.ok(commandPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "setParam" && operation.key === "workingVolume"));
 
+    const mediaCostPlan = await jsonFetch(server.baseUrl, "/api/commands/plan", {
+      token,
+      method: "POST",
+      body: {
+        prompt: "How can I reduce media cost by 20% without lowering viable cell density?",
+        context: {
+          template: "culturedMeat",
+          scale: "pilot",
+          params: { mediaCostPerL: 42, cellDensity: 18 },
+          topLevel: { titer: 4.2, recovery: 74 },
+        },
+      },
+    });
+    assert.equal(mediaCostPlan.response.status, 201);
+    assert.ok(mediaCostPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "setParam" && operation.key === "mediaCostPerL" && operation.value === 33.6));
+    assert.ok(mediaCostPlan.payload.commandPlan.plan.operations.some((operation) => operation.op === "holdParam" && operation.key === "cellDensity" && operation.value === 18));
+
     const created = await jsonFetch(server.baseUrl, "/api/projects", {
       token,
       method: "POST",

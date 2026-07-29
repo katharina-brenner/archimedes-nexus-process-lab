@@ -1538,6 +1538,7 @@ function commandPlanSchema() {
     riskLevel: "low|medium|high",
     operations: [
       { op: "setParam", key: "workingVolume", value: 70, reason: "why" },
+      { op: "holdParam", key: "cellDensity", value: 18, reason: "protected constraint" },
       { op: "setCfd", key: "cfdNutrientInlet", value: "feed-ring", reason: "why" },
       { op: "startCfd", reason: "why" },
     ],
@@ -1548,7 +1549,7 @@ function commandPlanSchema() {
 
 function normalizeOperation(operation = {}) {
   const op = String(operation.op || "").trim();
-  const allowed = new Set(["setParam", "setTopLevel", "setCfd", "addUnit", "addPreset", "setCanvas", "setView", "fitCanvas", "startCfd", "openDownloads", "saveVersion"]);
+  const allowed = new Set(["setParam", "holdParam", "setTopLevel", "setCfd", "addUnit", "addPreset", "setCanvas", "setView", "fitCanvas", "startCfd", "openDownloads", "saveVersion"]);
   if (!allowed.has(op)) return null;
   const normalized = {
     op,
@@ -1565,7 +1566,26 @@ function deterministicCommandPlan(prompt, context = {}) {
   const lower = String(prompt || "").toLowerCase();
   const operations = [];
   const notes = [];
+  const params = context.params || context.modelState?.params || {};
+  const topLevel = context.topLevel || context.modelState || context;
   let targetView = "flowsheet";
+  const parameterDefaults = {
+    workingVolume: 72,
+    kla: 65,
+    aeration: 0.35,
+    doSetpoint: 40,
+    feedRate: 18,
+    perfusionRate: 1,
+    mediaCostPerL: 42,
+    feedSupplementCostPerL: 180,
+    materialLossFactor: 18,
+    cellDensity: 18,
+  };
+  const currentValue = (key, scope = "params") => {
+    const source = scope === "topLevel" ? topLevel : params;
+    const value = Number(source?.[key]);
+    return Number.isFinite(value) ? value : Number(parameterDefaults[key] ?? 0);
+  };
   const numberNear = (terms) => {
     const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
     const match = lower.match(new RegExp(`(?:${escaped})[^0-9]{0,28}([0-9]+(?:[.,][0-9]+)?)|([0-9]+(?:[.,][0-9]+)?)[^a-z0-9]{0,12}(?:${escaped})`, "i"));
@@ -1574,10 +1594,74 @@ function deterministicCommandPlan(prompt, context = {}) {
   };
   const add = (op) => {
     const normalized = normalizeOperation(op);
-    if (normalized) operations.push(normalized);
+    if (!normalized) return;
+    const existing = operations.findIndex((item) => item.op === normalized.op && item.key === normalized.key);
+    if (existing >= 0) operations[existing] = normalized;
+    else operations.push(normalized);
   };
+  const relativePercent = (terms) => {
+    const escaped = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const decrease = "reduce|decrease|lower|cut|senke|senken|reduziere|reduzieren|verringere|verringern";
+    const increase = "increase|raise|improve|grow|erhöhe|erhöhen|steigere|steigern";
+    const patterns = [
+      new RegExp(`\\b(${decrease}|${increase})\\b[^.]{0,60}(?:${escaped})[^0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\\s*%`, "i"),
+      new RegExp(`\\b(${decrease}|${increase})\\b[^0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\\s*%[^.]{0,16}(?:${escaped})`, "i"),
+    ];
+    const match = patterns.map((pattern) => lower.match(pattern)).find(Boolean);
+    if (!match) return null;
+    const percent = Math.max(0, Math.min(95, Number(String(match[2]).replace(",", "."))));
+    if (!Number.isFinite(percent)) return null;
+    return {
+      percent,
+      direction: new RegExp(`^(?:${decrease})$`, "i").test(match[1]) ? -1 : 1,
+    };
+  };
+  const relativeParameters = [
+    { key: "mediaCostPerL", terms: ["media cost", "medium cost", "medium price", "medienkosten", "mediumkosten"], target: "economics" },
+    { key: "feedSupplementCostPerL", terms: ["feed supplement cost", "supplement cost", "feedkosten"], target: "economics" },
+    { key: "materialLossFactor", terms: ["material loss", "materialverlust"], target: "economics" },
+    { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand", "fill level"], target: "cfd" },
+    { key: "kla", terms: ["kla", "k la", "oxygen transfer", "sauerstofftransfer"], target: "cfd" },
+    { key: "aeration", terms: ["aeration", "gas flow", "air flow", "begasung"], target: "cfd" },
+    { key: "feedRate", terms: ["feed rate", "feeding rate", "zufuhrrate"], target: "cfd" },
+    { key: "perfusionRate", terms: ["perfusion rate", "perfusion", "bleed rate"], target: "cfd" },
+    { key: "doSetpoint", terms: ["dissolved oxygen", "do setpoint", "sauerstoffsollwert"], target: "cfd" },
+    { key: "cellDensity", terms: ["viable cell density", "cell density", "zelldichte", "vcd"], target: "simulation" },
+  ];
+  const relativeKeys = new Set();
+  relativeParameters.forEach((parameter) => {
+    const directive = relativePercent(parameter.terms);
+    if (!directive) return;
+    const before = currentValue(parameter.key);
+    const after = before * (1 + directive.direction * directive.percent / 100);
+    add({
+      op: "setParam",
+      key: parameter.key,
+      value: Number(after.toFixed(Math.abs(after) < 10 ? 3 : 2)),
+      reason: `${directive.direction < 0 ? "Reduced" : "Increased"} ${parameter.terms[0]} by ${directive.percent}% from the current model value.`,
+    });
+    relativeKeys.add(parameter.key);
+    targetView = parameter.target;
+  });
+  const protectedParameters = [
+    { key: "cellDensity", terms: ["viable cell density", "cell density", "zelldichte", "vcd"] },
+    { key: "titer", terms: ["titer", "titre"], scope: "topLevel" },
+    { key: "recovery", terms: ["recovery", "yield", "ausbeute"], scope: "topLevel" },
+    { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand"] },
+  ];
+  protectedParameters.forEach((parameter) => {
+    const mentioned = parameter.terms.some((term) => lower.includes(term));
+    const protectedClause = /\bwithout\b|\bkeep\b|\bmaintain\b|\bdo not change\b|\bnicht (?:senken|verändern|reduzieren)\b|\bkonstant\b/i.test(lower);
+    if (!mentioned || !protectedClause || relativeKeys.has(parameter.key)) return;
+    add({
+      op: "holdParam",
+      key: parameter.key,
+      value: currentValue(parameter.key, parameter.scope),
+      reason: `${parameter.terms[0]} is a protected constraint and remains at its current value.`,
+    });
+  });
   const workingVolume = numberNear(["working volume", "arbeitsvolumen", "füllstand", "fill level"]);
-  if (workingVolume !== null) {
+  if (workingVolume !== null && !relativeKeys.has("workingVolume")) {
     add({ op: "setParam", key: "workingVolume", value: Math.max(30, Math.min(80, workingVolume)), reason: "Working volume was explicitly requested; Axion keeps STR screening below the 80% headspace boundary." });
     targetView = "cfd";
   } else if (lower.includes("too full") || lower.includes("weniger voll") || lower.includes("not completely full")) {
@@ -1585,7 +1669,7 @@ function deterministicCommandPlan(prompt, context = {}) {
     targetView = "cfd";
   }
   const kla = numberNear(["kla", "k la", "oxygen transfer", "sauerstofftransfer"]);
-  if (kla !== null) add({ op: "setParam", key: "kla", value: kla, reason: "kLa was explicitly requested for oxygen-transfer screening." });
+  if (kla !== null && !relativeKeys.has("kla")) add({ op: "setParam", key: "kla", value: kla, reason: "kLa was explicitly requested for oxygen-transfer screening." });
   if (lower.includes("oxygen") || lower.includes("sauerstoff") || lower.includes("kla")) {
     add({ op: "setParam", key: "doSetpoint", value: 45, reason: "Maintains a conservative minimum DO target for oxygen-transfer review." });
     add({ op: "setCfd", key: "cfdLayer", value: "oxygen", reason: "Show dissolved oxygen field after the change." });
@@ -1632,6 +1716,7 @@ function deterministicCommandPlan(prompt, context = {}) {
     operations,
     expectedImpacts: [
       ...(operations.some((operation) => operation.op === "setParam") ? ["Parameters, KPIs, balances and TEA/LCA exports will recalculate."] : []),
+      ...(operations.some((operation) => operation.op === "holdParam") ? ["Protected process constraints remain fixed and are included in the before/after review."] : []),
       ...(targetView === "cfd" ? ["CFD screening inputs and selected field layer will update."] : []),
       ...(operations.some((operation) => operation.op === "addUnit" || operation.op === "addPreset") ? ["Equipment count, streams and scheduling assumptions may change."] : []),
     ],
@@ -1674,7 +1759,7 @@ async function aiCommandPlan(prompt, context = {}) {
       input: [
         {
           role: "system",
-          content: "You are Axion Process OS command planner. Return only valid JSON. Never return code. Only use safe operations from this list: setParam, setTopLevel, setCfd, addUnit, addPreset, setCanvas, setView, fitCanvas, startCfd, openDownloads. Bound numeric bioprocess edits to plausible screening ranges. Do not invent proprietary simulator content.",
+          content: "You are Axion Process OS command planner. Return only valid JSON. Never return code. Only use safe operations from this list: setParam, holdParam, setTopLevel, setCfd, addUnit, addPreset, setCanvas, setView, fitCanvas, startCfd, openDownloads. Use holdParam for values the user explicitly says must not decrease or change. Calculate relative percentage edits from the supplied current values. Bound numeric bioprocess edits to plausible screening ranges. Do not invent proprietary simulator content.",
         },
         {
           role: "user",
@@ -1686,6 +1771,8 @@ async function aiCommandPlan(prompt, context = {}) {
               scale: context.scale,
               selectedId: context.selectedId,
               summary: context.summary,
+              params: context.params,
+              topLevel: context.topLevel,
             },
             schema: commandPlanSchema(),
           }),
@@ -1696,7 +1783,11 @@ async function aiCommandPlan(prompt, context = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error?.message || `OpenAI planner failed with ${response.status}`);
   const raw = extractOpenAiJson(payload);
-  const operations = Array.isArray(raw.operations) ? raw.operations.map(normalizeOperation).filter(Boolean).slice(0, 12) : fallback.operations;
+  const aiOperations = Array.isArray(raw.operations) ? raw.operations.map(normalizeOperation).filter(Boolean) : [];
+  const operations = [...fallback.operations];
+  aiOperations.forEach((operation) => {
+    if (!operations.some((item) => item.op === operation.op && item.key === operation.key)) operations.push(operation);
+  });
   return {
     title: String(raw.title || fallback.title).slice(0, 120),
     summary: String(raw.summary || fallback.summary).slice(0, 800),

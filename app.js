@@ -13099,6 +13099,21 @@ function commandSetParam(key, value, changes, reason = "") {
   });
 }
 
+function commandHoldParam(key, value, changes, reason = "") {
+  const meta = commandParamMeta(key);
+  const before = Number(state.params[key] ?? meta.value ?? 0);
+  const protectedValue = commandClampParam(key, Number.isFinite(Number(value)) ? Number(value) : before);
+  state.params[key] = Number(protectedValue.toFixed(Math.abs(protectedValue) < 10 ? 2 : 1));
+  const formatted = `${formatNumber(state.params[key], 2)} ${meta.unit || ""}`.trim();
+  changes.push({
+    type: "constraint",
+    where: `Protected · ${meta.label}`,
+    before: formatted,
+    after: `${formatted} · held`,
+    reason: reason || `${meta.label} remains fixed as a protected constraint.`,
+  });
+}
+
 function commandSetTopLevel(key, value, changes, label, unit = "") {
   const before = Number(state[key]);
   const after = Number(value);
@@ -13121,7 +13136,63 @@ function commandNumberNear(lower, terms) {
   return raw ? Number(raw.replace(",", ".")) : null;
 }
 
-function commandApplyExplicitNumbers(lower, changes) {
+function commandRelativePercent(lower, terms) {
+  const joined = terms.join("|");
+  const decrease = "reduce|decrease|lower|cut|senke|senken|reduziere|reduzieren|verringere|verringern";
+  const increase = "increase|raise|improve|grow|erhöhe|erhöhen|steigere|steigern";
+  const patterns = [
+    new RegExp(`\\b(${decrease}|${increase})\\b[^.]{0,60}(?:${joined})[^0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\\s*%`, "i"),
+    new RegExp(`\\b(${decrease}|${increase})\\b[^0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\\s*%[^.]{0,16}(?:${joined})`, "i"),
+  ];
+  const match = patterns.map((pattern) => lower.match(pattern)).find(Boolean);
+  if (!match) return null;
+  const percent = Math.max(0, Math.min(95, Number(match[2].replace(",", "."))));
+  if (!Number.isFinite(percent)) return null;
+  return {
+    percent,
+    direction: new RegExp(`^(?:${decrease})$`, "i").test(match[1]) ? -1 : 1,
+  };
+}
+
+function commandApplyRelativeChanges(lower, changes) {
+  const mappings = [
+    { key: "mediaCostPerL", terms: ["media cost", "medium cost", "medium price", "medienkosten", "mediumkosten"] },
+    { key: "feedSupplementCostPerL", terms: ["feed supplement cost", "supplement cost", "feedkosten"] },
+    { key: "materialLossFactor", terms: ["material loss", "materialverlust"] },
+    { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand", "fill level"] },
+    { key: "kla", terms: ["kla", "k la", "oxygen transfer", "sauerstofftransfer"] },
+    { key: "aeration", terms: ["aeration", "gas flow", "air flow", "begasung"] },
+    { key: "feedRate", terms: ["feed rate", "feeding rate", "zufuhrrate"] },
+    { key: "perfusionRate", terms: ["perfusion rate", "perfusion", "bleed rate"] },
+    { key: "doSetpoint", terms: ["dissolved oxygen", "do setpoint", "sauerstoffsollwert"] },
+    { key: "cellDensity", terms: ["viable cell density", "cell density", "zelldichte", "vcd"] },
+  ];
+  const changed = new Set();
+  mappings.forEach((mapping) => {
+    const directive = commandRelativePercent(lower, mapping.terms);
+    if (!directive) return;
+    const meta = commandParamMeta(mapping.key);
+    const before = Number(state.params[mapping.key] ?? meta.value ?? 0);
+    const after = before * (1 + directive.direction * directive.percent / 100);
+    commandSetParam(mapping.key, after, changes, `${directive.direction < 0 ? "Reduced" : "Increased"} ${meta.label} by ${directive.percent}% from the active model value.`);
+    changed.add(mapping.key);
+  });
+  const protectedParameters = [
+    { key: "cellDensity", terms: ["viable cell density", "cell density", "zelldichte", "vcd"] },
+    { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand"] },
+  ];
+  const protectedClause = /\bwithout\b|\bkeep\b|\bmaintain\b|\bdo not change\b|\bnicht (?:senken|verändern|reduzieren)\b|\bkonstant\b/i.test(lower);
+  if (protectedClause) {
+    protectedParameters.forEach((parameter) => {
+      if (!changed.has(parameter.key) && parameter.terms.some((term) => lower.includes(term))) {
+        commandHoldParam(parameter.key, state.params[parameter.key], changes, "Protected by the command and held at the active model value.");
+      }
+    });
+  }
+  return changed;
+}
+
+function commandApplyExplicitNumbers(lower, changes, relativeKeys = new Set()) {
   const mappings = [
     { key: "workingVolume", terms: ["working volume", "arbeitsvolumen", "füllstand", "fill level"] },
     { key: "kla", terms: ["kla", "k la", "oxygen transfer", "sauerstofftransfer"] },
@@ -13136,6 +13207,7 @@ function commandApplyExplicitNumbers(lower, changes) {
     { key: "cellDensity", terms: ["cell density", "zelldichte", "vcd"] },
   ];
   mappings.forEach((mapping) => {
+    if (relativeKeys.has(mapping.key)) return;
     const value = commandNumberNear(lower, mapping.terms);
     if (value !== null) commandSetParam(mapping.key, value, changes, "Set from the exact number in the command.");
   });
@@ -13179,6 +13251,44 @@ function commandAddUnit(type, changes, reason) {
   return [added.id];
 }
 
+function commandComparison(before, after) {
+  return [
+    {
+      label: "Direct cost",
+      before: `$${formatNumber(before.directCost, 0)}/kg`,
+      after: `$${formatNumber(after.directCost, 0)}/kg`,
+      changed: Math.abs(before.directCost - after.directCost) > 0.01,
+    },
+    {
+      label: "Annual output",
+      before: `${formatNumber(before.annualKg / 1000, 2)} t`,
+      after: `${formatNumber(after.annualKg / 1000, 2)} t`,
+      changed: Math.abs(before.annualKg - after.annualKg) > 0.01,
+    },
+    {
+      label: "Plant utilization",
+      before: `${formatNumber(before.utilization, 1)}%`,
+      after: `${formatNumber(after.utilization, 1)}%`,
+      changed: Math.abs(before.utilization - after.utilization) > 0.1,
+    },
+  ];
+}
+
+function commandSnapshotChanges(before, after, reason) {
+  return Array.from(new Set([...Object.keys(before.params || {}), ...Object.keys(after.params || {})]))
+    .filter((key) => Math.abs(Number(before.params?.[key] || 0) - Number(after.params?.[key] || 0)) > 1e-9)
+    .map((key) => {
+      const meta = commandParamMeta(key);
+      return {
+        type: "parameter",
+        where: `Parameters · ${meta.label}`,
+        before: `${formatNumber(Number(before.params?.[key] || 0), 2)} ${meta.unit || ""}`.trim(),
+        after: `${formatNumber(Number(after.params?.[key] || 0), 2)} ${meta.unit || ""}`.trim(),
+        reason,
+      };
+    });
+}
+
 function commandRecord(prompt, guide, before) {
   const after = commandSnapshot();
   const impacts = new Set(guide.impacts || []);
@@ -13187,6 +13297,7 @@ function commandRecord(prompt, guide, before) {
   if (before.units !== after.units) impacts.add(`Equipment count ${before.units} -> ${after.units}`);
   if (before.streams !== after.streams) impacts.add(`Stream count ${before.streams} -> ${after.streams}`);
   guide.impacts = Array.from(impacts);
+  guide.comparison = commandComparison(before, after);
   const entry = {
     id: `cmd-${Date.now()}`,
     time: new Date().toISOString(),
@@ -13231,7 +13342,8 @@ function applySystemCommand(prompt) {
     needsRender = true;
   }
 
-  commandApplyExplicitNumbers(lower, changes);
+  const relativeKeys = commandApplyRelativeChanges(lower, changes);
+  commandApplyExplicitNumbers(lower, changes, relativeKeys);
   if (changes.some((item) => item.type === "parameter" || item.type === "model")) {
     applied.push("Applied numeric model edits from the command.");
     steps.push("KPIs, balances, CFD screening inputs, economics and exports were recalculated from the edited values.");
@@ -13318,7 +13430,9 @@ function applySystemCommand(prompt) {
   }
 
   if (lower.includes("material") || lower.includes("media cost") || lower.includes("medium cost")) {
-    if (lower.includes("reduce") || lower.includes("lower") || lower.includes("senk") || lower.includes("optim")) {
+    if (relativeKeys.has("mediaCostPerL")) {
+      applied.push("Applied the requested relative media-cost change while preserving protected process constraints.");
+    } else if (lower.includes("reduce") || lower.includes("lower") || lower.includes("senk") || lower.includes("optim")) {
       commandSetParam("mediaCostPerL", Math.max(0.1, (state.params.mediaCostPerL || 42) * 0.82), changes, "Applied a media-price improvement scenario.");
       commandSetParam("materialLossFactor", Math.max(0, (state.params.materialLossFactor || 18) - 4), changes, "Reduced material-loss assumption for the optimization scenario.");
       commandSetParam("recycleFraction", Math.min(95, Math.max(state.params.recycleFraction || 0, 45)), changes, "Raised recycle fraction as a media/material mitigation lever.");
@@ -13473,6 +13587,19 @@ function renderHelpResult(payload) {
   els.helpResult.innerHTML = `
     <strong>${guide.title || "Recommended next steps"}</strong>
     ${(guide.applied || []).length ? `<div class="command-applied">${guide.applied.map((item) => `<span class="applied-change">${escapeHtml(item)}</span>`).join("")}</div>` : ""}
+    ${(guide.comparison || []).length ? `
+      <section class="command-comparison" aria-label="Before and after model summary">
+        <header><b>Before</b><b>After</b></header>
+        ${(guide.comparison || []).map((item) => `
+          <article class="${item.changed ? "changed" : "unchanged"}">
+            <small>${escapeHtml(item.label)}</small>
+            <span>${escapeHtml(item.before)}</span>
+            <i aria-hidden="true">→</i>
+            <strong>${escapeHtml(item.after)}</strong>
+          </article>
+        `).join("")}
+      </section>
+    ` : ""}
     ${(guide.changes || []).length ? `
       <section class="command-change-list" aria-label="Applied model changes">
         ${(guide.changes || []).map((change) => `
@@ -13497,6 +13624,7 @@ function renderHelpResult(payload) {
       </section>
     ` : ""}
   `;
+  els.helpResult.scrollTop = 0;
 }
 
 function localProjectStore() {
@@ -13867,6 +13995,13 @@ function commandModelSummary() {
     directCost: data.directCost,
     annualKg: data.annualKg,
     utilization: data.utilization,
+    params: clone(state.params),
+    topLevel: {
+      batchSize: state.batchSize,
+      batchCount: state.batchCount,
+      titer: state.titer,
+      recovery: state.recovery,
+    },
   };
 }
 
@@ -13905,6 +14040,10 @@ function applyCommandPlanOperations(prompt, commandPlan) {
       needsRender = true;
       impacts.add("Parameters");
       impacts.add("Mass and energy balances");
+    }
+    if (op === "holdParam") {
+      commandHoldParam(operation.key, operation.value, changes, operation.reason);
+      impacts.add("Protected constraints");
     }
     if (op === "setTopLevel") {
       const labels = {
@@ -13971,7 +14110,7 @@ function applyCommandPlanOperations(prompt, commandPlan) {
   }
   if (needsFit) window.requestAnimationFrame(() => fitCanvas(true));
   const guide = {
-    title: plan.title || "AI command applied",
+    title: changes.length ? "Change implemented" : (plan.title || "No model change applied"),
     applied,
     changes,
     impacts: Array.from(impacts),
@@ -14011,12 +14150,25 @@ async function undoLastCommand() {
     return null;
   }
   try {
+    const before = commandSnapshot();
     const payload = await apiRequest("/api/commands/undo", {
       method: "POST",
       body: JSON.stringify({ projectId: state.currentProjectId }),
     });
     importModelState(payload.model?.modelState || {});
     renderAll();
+    const after = commandSnapshot();
+    renderHelpResult({
+      title: "Change undone",
+      applied: ["Restored the model version saved immediately before the last command."],
+      changes: commandSnapshotChanges(before, after, "Restored from the automatic pre-change project version."),
+      comparison: commandComparison(before, after),
+      impacts: ["Project model", "Calculated KPIs", "Mass and energy balances", "TEA/LCA outputs"],
+      steps: ["The previous parameter set is active again. You can refine the command and apply a new version."],
+      targetView: document.body.dataset.activeView || "overview",
+      assumptions: ["Undo source: automatic project version", "Status: restored"],
+      commands: ["show full PFD and fit canvas", "improve oxygen transfer", "open LCA and TEA downloads"],
+    });
     showToast("Last backend command undone");
     return payload;
   } catch (error) {
