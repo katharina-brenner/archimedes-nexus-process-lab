@@ -6712,33 +6712,114 @@ function renderMetrics() {
 function renderProcessLanes(stage, stageHeight) {
   stage.insertAdjacentHTML("beforeend", processLanes
     .filter((item) => item.top < stageHeight - 40)
-    .map((item) => `
+    .map((item, index) => `
       <div class="process-lane lane-${item.tone}" style="top:${item.top}px;height:${item.height}px">
-        <span>${item.label}</span>
+        <span><b>${String(index + 1).padStart(2, "0")}</b>${item.label}</span>
       </div>
     `).join(""));
 }
 
-function streamGeometry(from, to) {
+function roundedOrthogonalPath(points, radius = 10) {
+  if (points.length < 2) return "";
+  const compact = points.filter((point, index) => {
+    if (!index) return true;
+    const previous = points[index - 1];
+    return point.x !== previous.x || point.y !== previous.y;
+  });
+  if (compact.length < 2) return "";
+  let path = `M ${compact[0].x} ${compact[0].y}`;
+  for (let index = 1; index < compact.length - 1; index += 1) {
+    const previous = compact[index - 1];
+    const current = compact[index];
+    const next = compact[index + 1];
+    const incoming = Math.hypot(current.x - previous.x, current.y - previous.y);
+    const outgoing = Math.hypot(next.x - current.x, next.y - current.y);
+    const corner = Math.min(radius, incoming / 2, outgoing / 2);
+    const before = {
+      x: current.x - Math.sign(current.x - previous.x) * corner,
+      y: current.y - Math.sign(current.y - previous.y) * corner,
+    };
+    const after = {
+      x: current.x + Math.sign(next.x - current.x) * corner,
+      y: current.y + Math.sign(next.y - current.y) * corner,
+    };
+    path += ` L ${before.x} ${before.y} Q ${current.x} ${current.y} ${after.x} ${after.y}`;
+  }
+  const end = compact[compact.length - 1];
+  return `${path} L ${end.x} ${end.y}`;
+}
+
+function longestHorizontalSegment(points) {
+  const segments = points.slice(1).map((point, index) => ({
+    from: points[index],
+    to: point,
+    length: Math.abs(point.x - points[index].x),
+  })).filter((segment) => segment.from.y === segment.to.y);
+  return segments.sort((a, b) => b.length - a.length)[0] || {
+    from: points[0],
+    to: points[points.length - 1],
+  };
+}
+
+function streamGeometry(from, to, kind = "main", streamIndex = 0) {
   const x1 = from.x + unitWidth(from);
   const y1 = unitMidline(from);
   const x2 = to.x;
   const y2 = unitMidline(to);
-  const forward = x2 > x1 + 72;
-  const elbowX = forward ? Math.round((x1 + x2) / 2) : Math.max(x1, x2) + 88;
-  const pad = 18;
-  const minX = Math.min(x1, x2, elbowX) - pad;
-  const maxX = Math.max(x1, x2, elbowX) + pad;
-  const minY = Math.min(y1, y2) - pad;
-  const maxY = Math.max(y1, y2) + pad;
+  const stub = isMinorUnit(from) || isMinorUnit(to) ? 16 : 24;
+  const forward = x2 > x1 + stub * 2;
+  const sameLine = Math.abs(y2 - y1) < 12;
+  let points;
+
+  if (sameLine && forward) {
+    points = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+  } else if (forward) {
+    const laneOffset = kind === "utility" ? 12 : kind === "qc" ? -12 : 0;
+    const crossStage = Math.abs(y2 - y1) > 96;
+    const elbowX = crossStage
+      ? Math.min(x2 - stub - 18, x1 + stub + 30 + (streamIndex % 3) * 12) + laneOffset
+      : Math.round((x1 + x2) / 2) + laneOffset;
+    points = [
+      { x: x1, y: y1 },
+      { x: x1 + stub, y: y1 },
+      { x: elbowX, y: y1 },
+      { x: elbowX, y: y2 },
+      { x: x2 - stub, y: y2 },
+      { x: x2, y: y2 },
+    ];
+  } else {
+    const routeAbove = kind === "qc" || (y1 + y2) / 2 > 260;
+    const corridorOffset = 42 + (streamIndex % 4) * 12;
+    const corridorY = routeAbove
+      ? Math.max(28, Math.min(y1, y2) - corridorOffset)
+      : Math.max(y1, y2) + corridorOffset;
+    const bypassX = Math.max(x1, x2) + 72 + (streamIndex % 3) * 16;
+    points = [
+      { x: x1, y: y1 },
+      { x: x1 + stub, y: y1 },
+      { x: bypassX, y: y1 },
+      { x: bypassX, y: corridorY },
+      { x: x2 - stub, y: corridorY },
+      { x: x2 - stub, y: y2 },
+      { x: x2, y: y2 },
+    ];
+  }
+
+  const pad = 22;
+  const minX = Math.min(...points.map((point) => point.x)) - pad;
+  const maxX = Math.max(...points.map((point) => point.x)) + pad;
+  const minY = Math.min(...points.map((point) => point.y)) - pad;
+  const maxY = Math.max(...points.map((point) => point.y)) + pad;
+  const localPoints = points.map((point) => ({ x: point.x - minX, y: point.y - minY }));
+  const labelSegment = longestHorizontalSegment(points);
   return {
     left: minX,
     top: minY,
     width: Math.max(36, maxX - minX),
     height: Math.max(36, maxY - minY),
-    d: `M ${x1 - minX} ${y1 - minY} H ${elbowX - minX} V ${y2 - minY} H ${x2 - minX}`,
-    labelX: forward ? elbowX : Math.max(x1, x2) + 44,
-    labelY: Math.abs(y2 - y1) > 48 ? Math.round((y1 + y2) / 2) : y1,
+    d: roundedOrthogonalPath(localPoints, 10),
+    labelX: Math.round((labelSegment.from.x + labelSegment.to.x) / 2),
+    labelY: labelSegment.from.y,
   };
 }
 
@@ -6815,12 +6896,30 @@ function renderCanvas() {
 
   stage.dataset.focus = state.canvasFocus;
   stage.dataset.flowDetail = state.flowDetail;
+  stage.dataset.mode = state.mode;
+  stage.dataset.connecting = state.connectFrom ? "true" : "false";
   const reaction = document.querySelector("#processReaction");
   if (reaction) reaction.textContent = processReactionSummary();
+  const selectedVisibleUnit = visibleUnits.find((item) => item.id === state.selectedId);
+  const selectedVisibleStream = visibleStreams.find((item) => item.id === state.selectedId);
+  const selectionLabel = selectedVisibleUnit
+    ? `${selectedVisibleUnit.id} · ${selectedVisibleUnit.name}`
+    : selectedVisibleStream
+      ? `${selectedVisibleStream.id} · ${selectedVisibleStream.composition}`
+      : state.connectFrom
+        ? `${state.connectFrom} selected as stream source`
+        : "No object selected";
   stage.insertAdjacentHTML("beforeend", `
     <div class="canvas-focus-note">
-      <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
-      <span>${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}</span>
+      <i aria-hidden="true"></i>
+      <span>
+        <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
+        <small>${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}</small>
+      </span>
+    </div>
+    <div class="canvas-selection-note">
+      <span>${state.mode === "connect" ? "Connect mode" : "Selection"}</span>
+      <b>${selectionLabel}</b>
     </div>
   `);
 
@@ -6837,7 +6936,7 @@ function renderCanvas() {
     if (!from || !to) return;
     const line = document.createElement("button");
     const kind = streamKind(item, from, to);
-    const geometry = streamGeometry(from, to);
+    const geometry = streamGeometry(from, to, kind, streamIndex);
     line.className = `stream-line stream-${kind}`;
     line.dataset.streamId = item.id;
     line.dataset.tooltip = streamTooltip(item, from, to, kind);
@@ -6859,7 +6958,7 @@ function renderCanvas() {
     const selected = state.selectedId === item.id;
     const shouldLabel = selected
       || state.flowDetail !== "standard"
-      || (kind === "main" && !isMinorUnit(from) && !isMinorUnit(to) && streamIndex % 2 === 0);
+      || (kind === "main" && !isMinorUnit(from) && !isMinorUnit(to) && streamIndex % 3 === 0);
     if (shouldLabel) {
       const labelPosition = placeStreamLabel(geometry.labelX, geometry.labelY, occupiedLabels, selected || state.flowDetail === "full");
       if (!labelPosition) return;
@@ -6900,7 +6999,7 @@ function renderCanvas() {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const layer = unitLayer(item);
-    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
+    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.mode === "connect" ? " connect-ready" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
     node.style.left = `${item.x}px`;
     node.style.top = `${item.y}px`;
     node.style.borderLeftColor = item.color;
@@ -6982,14 +7081,14 @@ function wireUnitNode(node, item) {
 }
 
 function redrawStreamsOnly() {
-  els.canvas.querySelectorAll(".canvas-stage .stream-line").forEach((line) => {
+  els.canvas.querySelectorAll(".canvas-stage .stream-line").forEach((line, streamIndex) => {
     const streamItem = state.streams.find((item) => item.id === line.dataset.streamId);
     if (!streamItem) return;
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
     if (!line || !from || !to) return;
-    const geometry = streamGeometry(from, to);
     const kind = streamKind(streamItem, from, to);
+    const geometry = streamGeometry(from, to, kind, streamIndex);
     line.style.left = `${geometry.left}px`;
     line.style.top = `${geometry.top}px`;
     line.style.width = `${geometry.width}px`;
@@ -12447,13 +12546,35 @@ function fitCanvas(silent = false) {
 }
 
 function autoLayout() {
-  const columns = 6;
-  state.units.forEach((item, index) => {
-    item.x = 45 + (index % columns) * 265;
-    item.y = 85 + Math.floor(index / columns) * 185;
+  const laneIndexForUnit = (item) => {
+    const layer = unitLayer(item);
+    const focus = unitFocusLevel(item);
+    if (layer === "waste") return 5;
+    if (["cleaning", "recycle", "heat"].includes(layer)) return 4;
+    if (layer === "quality" || focus === "quality") return 3;
+    if (focus === "downstream" || ["Finishing", "Packaging"].includes(item.cls)) return item.cls === "Packaging" ? 3 : 2;
+    if (focus === "upstream" && item.cls === "Bioreactor") return 1;
+    if (focus === "upstream" || layer === "support") return 0;
+    if (layer === "main") return item.cls === "Bioreactor" ? 1 : 2;
+    return 6;
+  };
+  const lanes = new Map();
+  state.units.forEach((item) => {
+    const laneIndex = laneIndexForUnit(item);
+    if (!lanes.has(laneIndex)) lanes.set(laneIndex, []);
+    lanes.get(laneIndex).push(item);
+  });
+  lanes.forEach((items, laneIndex) => {
+    items.sort((a, b) => a.x - b.x || a.id.localeCompare(b.id));
+    let cursorX = 88;
+    items.forEach((item) => {
+      item.x = snapToCanvasGrid(cursorX);
+      item.y = snapToCanvasGrid((processLanes[laneIndex]?.top || 1162) + ((processLanes[laneIndex]?.height || 126) - unitHeight(item)) / 2);
+      cursorX += unitWidth(item) + (isMinorUnit(item) ? 52 : 76);
+    });
   });
   renderCanvas();
-  showToast("Layout updated");
+  showToast("Process stages aligned");
 }
 
 function downloadSummaryCsv() {
@@ -15761,6 +15882,7 @@ function bindEvents() {
     const surface = event.target.closest(".clickable-surface, .unit, .stream-line, .stream-label");
     const control = event.target.closest("button, a, input, textarea, select");
     if (!surface || surface.closest(".detail-drawer") || (control && !surface.matches(".unit, .stream-line, .stream-label"))) return;
+    if (state.mode === "connect" && surface.matches(".unit")) return;
     showExploreDetails(surface);
   });
 
