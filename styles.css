@@ -24846,7 +24846,11 @@ body:not(.locked) .canvas-options > summary small {
   font-size: 9px;
 }
 
-body:not(.locked) .canvas-options .canvas-assist {
+body:not(.locked) .canvas-options:not([open]) .canvas-assist {
+  display: none !important;
+}
+
+body:not(.locked) .canvas-options[open] .canvas-assist {
   display: grid !important;
   grid-template-columns: minmax(300px, 1.4fr) repeat(2, minmax(180px, 0.85fr)) !important;
   gap: 8px !important;
@@ -25980,6 +25984,25 @@ body:not(.locked) #flowsheetView .canvas-focus-note .router-status {
 
 body:not(.locked) #flowsheetView .canvas-focus-note .router-status.router-warning {
   color: #e1bf7c;
+}
+
+body:not(.locked) #flowsheetView .canvas-focus-note .router-status.router-pending {
+  color: #a6d8d0;
+}
+
+body:not(.locked) #flowsheetView .canvas-focus-note .router-status.router-pending::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #8dd9cc;
+  animation: router-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes router-pulse {
+  from { opacity: 0.35; transform: scale(0.75); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 body:not(.locked) #flowsheetView .canvas-selection-note {

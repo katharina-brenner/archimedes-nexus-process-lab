@@ -7,7 +7,7 @@ const checkoutReturn = params.has("checkout") || params.has("session_id");
 let workspacePromise;
 
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260730-global-router-v6");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260730-global-router-v9");
   return workspacePromise;
 }
 

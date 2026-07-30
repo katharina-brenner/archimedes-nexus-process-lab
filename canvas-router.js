@@ -325,7 +325,7 @@ function routePriority(stream) {
   }[stream.kind] ?? 4;
 }
 
-export function buildCrossingAwareRoutePlan({
+function buildRoutePass({
   units,
   streams,
   width,
@@ -333,8 +333,11 @@ export function buildCrossingAwareRoutePlan({
   grid = DEFAULT_GRID,
   clearance = DEFAULT_CLEARANCE,
   maxIterations = 90000,
+  priorityIds = [],
+  orderVariant = "distance",
 }) {
   const unitMap = new Map(units.map((unit) => [unit.id, unit]));
+  const priorityRank = new Map(priorityIds.map((id, index) => [id, index]));
   const bounds = {
     minX: 0,
     minY: 0,
@@ -354,12 +357,17 @@ export function buildCrossingAwareRoutePlan({
     .sort((left, right) => {
       const priorityDifference = routePriority(left) - routePriority(right);
       if (priorityDifference) return priorityDifference;
+      const leftRank = priorityRank.get(left.id) ?? Number.POSITIVE_INFINITY;
+      const rightRank = priorityRank.get(right.id) ?? Number.POSITIVE_INFINITY;
+      if (leftRank !== rightRank) return leftRank - rightRank;
       const leftFrom = unitMap.get(left.from);
       const leftTo = unitMap.get(left.to);
       const rightFrom = unitMap.get(right.from);
       const rightTo = unitMap.get(right.to);
       const leftDistance = leftFrom && leftTo ? Math.abs(leftTo.x - leftFrom.x) + Math.abs(leftTo.y - leftFrom.y) : 0;
       const rightDistance = rightFrom && rightTo ? Math.abs(rightTo.x - rightFrom.x) + Math.abs(rightTo.y - rightFrom.y) : 0;
+      if (orderVariant === "stable") return left.sourceIndex - right.sourceIndex;
+      if (orderVariant === "reverse") return right.sourceIndex - left.sourceIndex;
       return rightDistance - leftDistance || left.sourceIndex - right.sourceIndex;
     });
 
@@ -433,6 +441,68 @@ export function buildCrossingAwareRoutePlan({
       sharedEdges,
       fallback,
       fallbackIds,
+    },
+  };
+}
+
+function routePlanScore(plan) {
+  const routeValues = Object.values(plan.routes);
+  const bends = routeValues.reduce((total, points) => total + Math.max(0, points.length - 2), 0);
+  const length = routeValues.reduce((total, points) => total + routeSegments(points).reduce(
+    (routeTotal, segment) => routeTotal
+      + Math.abs(segment.to.x - segment.from.x)
+      + Math.abs(segment.to.y - segment.from.y),
+    0,
+  ), 0);
+  return plan.stats.fallback * 1_000_000_000
+    + plan.stats.crossings * 10_000_000
+    + bends * 200
+    + length
+    + plan.stats.sharedEdges * 10;
+}
+
+function conflictPriority(plan) {
+  const weights = new Map();
+  plan.stats.crossingPairs.forEach((pair) => {
+    weights.set(pair.left, (weights.get(pair.left) || 0) + pair.count);
+    weights.set(pair.right, (weights.get(pair.right) || 0) + pair.count);
+  });
+  plan.stats.fallbackIds.forEach((id) => {
+    weights.set(id, (weights.get(id) || 0) + 1000);
+  });
+  return [...weights.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([id]) => id);
+}
+
+export function buildCrossingAwareRoutePlan(options) {
+  const maxPasses = Math.max(1, Math.min(5, options.maxPasses ?? 3));
+  let bestPlan = buildRoutePass(options);
+  let bestScore = routePlanScore(bestPlan);
+  let passes = 1;
+
+  while (passes < maxPasses && (bestPlan.stats.crossings > 0 || bestPlan.stats.fallback > 0)) {
+    const priorityIds = conflictPriority(bestPlan);
+    const candidate = buildRoutePass({
+      ...options,
+      priorityIds: passes % 2 ? priorityIds : [...priorityIds].reverse(),
+      orderVariant: passes % 2 ? "stable" : "reverse",
+    });
+    const candidateScore = routePlanScore(candidate);
+    passes += 1;
+    if (candidateScore < bestScore) {
+      bestPlan = candidate;
+      bestScore = candidateScore;
+    }
+  }
+
+  return {
+    ...bestPlan,
+    stats: {
+      ...bestPlan.stats,
+      passes,
+      optimized: passes > 1,
+      score: bestScore,
     },
   };
 }

@@ -37,6 +37,7 @@ test("global router creates a deterministic orthogonal route", () => {
 
   assert.equal(plan.stats.routed, 1);
   assert.equal(plan.stats.fallback, 0);
+  assert.equal(plan.stats.passes, 1);
   assert.deepEqual(plan.routes.S1, buildCrossingAwareRoutePlan({
     units: [unit("A", 48, 96), unit("B", 520, 96)],
     streams: [stream("S1", "A", "B")],
@@ -47,6 +48,22 @@ test("global router creates a deterministic orthogonal route", () => {
     const previous = plan.routes.S1[index];
     assert.ok(previous.x === point.x || previous.y === point.y, "route contains a diagonal segment");
   });
+});
+
+test("global router retries conflicted plans with deterministic rerouting passes", () => {
+  const plan = buildCrossingAwareRoutePlan({
+    units: [unit("A", 48, 96), unit("B", 720, 360)],
+    streams: [stream("S1", "A", "B")],
+    width: 980,
+    height: 560,
+    maxIterations: 1,
+    maxPasses: 3,
+  });
+
+  assert.equal(plan.stats.fallback, 1);
+  assert.equal(plan.stats.passes, 3);
+  assert.equal(plan.stats.optimized, true);
+  assert.ok(Number.isFinite(plan.stats.score));
 });
 
 test("global router avoids equipment occupying the direct corridor", () => {

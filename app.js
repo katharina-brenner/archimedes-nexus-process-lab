@@ -1,4 +1,4 @@
-import { buildCrossingAwareRoutePlan } from "./canvas-router.js?v=20260730-global-router-v6";
+import { buildCrossingAwareRoutePlan } from "./canvas-router.js?v=20260730-global-router-v9";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -6619,6 +6619,13 @@ function renderCanvasFocus() {
       ${item.label}
     </button>
   `).join("");
+  els.canvasFocus.querySelectorAll("[data-canvas-focus]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.canvasFocus = button.dataset.canvasFocus;
+      renderCanvasFocus();
+      renderCanvas();
+    });
+  });
 }
 
 function renderFlowDetail() {
@@ -6627,6 +6634,13 @@ function renderFlowDetail() {
       ${item.label}
     </button>
   `).join("");
+  els.flowDetail.querySelectorAll("[data-flow-detail]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.flowDetail = button.dataset.flowDetail;
+      renderFlowDetail();
+      renderCanvas();
+    });
+  });
 }
 
 function renderSectionPresets() {
@@ -6829,10 +6843,69 @@ function streamGeometry(from, to, kind = "main", streamIndex = 0) {
   return streamGeometryFromPoints(points);
 }
 
+const GLOBAL_ROUTER_WORKER_THRESHOLD = 80;
+let canvasRouterWorker = null;
 let canvasRouteCache = {
   signature: "",
   plan: null,
+  pending: false,
+  input: null,
 };
+
+function pendingCanvasRoutePlan(streamCount) {
+  return {
+    routes: {},
+    stats: {
+      routed: 0,
+      crossings: 0,
+      crossingPairs: [],
+      sharedEdges: 0,
+      fallback: 0,
+      fallbackIds: [],
+      passes: 0,
+      optimized: false,
+      pending: true,
+      streamCount,
+    },
+  };
+}
+
+function ensureCanvasRouterWorker() {
+  if (canvasRouterWorker || typeof Worker === "undefined") return canvasRouterWorker;
+  canvasRouterWorker = new Worker(new URL("./canvas-router-worker.js", import.meta.url), { type: "module" });
+  canvasRouterWorker.addEventListener("message", (event) => {
+    const { signature, plan, error } = event.data || {};
+    if (signature !== canvasRouteCache.signature || !canvasRouteCache.pending) return;
+    if (plan) {
+      canvasRouteCache = {
+        signature,
+        plan,
+        pending: false,
+        input: null,
+      };
+    } else if (error && canvasRouteCache.input) {
+      canvasRouteCache = {
+        signature,
+        plan: buildCrossingAwareRoutePlan(canvasRouteCache.input),
+        pending: false,
+        input: null,
+      };
+    }
+    window.requestAnimationFrame(() => renderCanvas());
+  });
+  canvasRouterWorker.addEventListener("error", () => {
+    if (!canvasRouteCache.pending || !canvasRouteCache.input) return;
+    const { signature, input } = canvasRouteCache;
+    canvasRouteCache = {
+      signature,
+      plan: buildCrossingAwareRoutePlan(input),
+      pending: false,
+      input: null,
+    };
+    window.requestAnimationFrame(() => renderCanvas());
+  });
+  return canvasRouterWorker;
+}
 
 function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) {
   const normalizedUnits = visibleUnits.map((item) => ({
@@ -6857,15 +6930,32 @@ function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) 
     streams: normalizedStreams,
   });
   if (canvasRouteCache.signature !== signature) {
-    canvasRouteCache = {
-      signature,
-      plan: buildCrossingAwareRoutePlan({
-        units: normalizedUnits,
-        streams: normalizedStreams,
-        width: stageWidth,
-        height: stageHeight,
-      }),
+    const input = {
+      units: normalizedUnits,
+      streams: normalizedStreams,
+      width: stageWidth,
+      height: stageHeight,
+      maxPasses: normalizedStreams.length >= GLOBAL_ROUTER_WORKER_THRESHOLD ? 5 : 3,
     };
+    const worker = normalizedStreams.length >= GLOBAL_ROUTER_WORKER_THRESHOLD
+      ? ensureCanvasRouterWorker()
+      : null;
+    if (worker) {
+      canvasRouteCache = {
+        signature,
+        plan: pendingCanvasRoutePlan(normalizedStreams.length),
+        pending: true,
+        input,
+      };
+      worker.postMessage({ signature, input });
+    } else {
+      canvasRouteCache = {
+        signature,
+        plan: buildCrossingAwareRoutePlan(input),
+        pending: false,
+        input: null,
+      };
+    }
   }
   return canvasRouteCache.plan;
 }
@@ -6946,7 +7036,7 @@ function renderCanvas() {
   stage.dataset.flowDetail = state.flowDetail;
   stage.dataset.mode = state.mode;
   stage.dataset.connecting = state.connectFrom ? "true" : "false";
-  stage.dataset.router = "global";
+  stage.dataset.router = routePlan.stats.pending ? "optimizing" : "global";
   const reaction = document.querySelector("#processReaction");
   if (reaction) reaction.textContent = processReactionSummary();
   const selectedVisibleUnit = visibleUnits.find((item) => item.id === state.selectedId);
@@ -6965,8 +7055,10 @@ function renderCanvas() {
         <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
         <small>
           ${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}
-          <em class="router-status${routePlan.stats.fallback ? " router-warning" : ""}">
-            Global routing · ${routePlan.stats.crossings} crossings${routePlan.stats.fallback ? ` · ${routePlan.stats.fallback} fallback` : ""}
+          <em class="router-status${routePlan.stats.fallback ? " router-warning" : ""}${routePlan.stats.pending ? " router-pending" : ""}">
+            ${routePlan.stats.pending
+              ? `Optimizing ${routePlan.stats.streamCount} streams...`
+              : `Global routing · ${routePlan.stats.crossings} crossings${routePlan.stats.fallback ? ` · ${routePlan.stats.fallback} fallback` : ""}${routePlan.stats.passes > 1 ? ` · ${routePlan.stats.passes} passes` : ""}`}
           </em>
         </small>
       </span>
@@ -6995,7 +7087,7 @@ function renderCanvas() {
       ? streamGeometryFromPoints(routePoints)
       : streamGeometry(from, to, kind, streamIndex);
     line.className = `stream-line stream-${kind}`;
-    if (routePlan.stats.fallbackIds.includes(item.id)) line.classList.add("route-fallback");
+    if ((routePlan.stats.fallbackIds || []).includes(item.id)) line.classList.add("route-fallback");
     line.dataset.streamId = item.id;
     line.dataset.tooltip = streamTooltip(item, from, to, kind);
     line.style.left = `${geometry.left}px`;
@@ -16202,22 +16294,6 @@ function bindEvents() {
     state.paletteGroup = button.dataset.paletteGroup;
     renderPaletteGroups();
     renderPalette();
-  });
-
-  els.canvasFocus.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-canvas-focus]");
-    if (!button) return;
-    state.canvasFocus = button.dataset.canvasFocus;
-    renderCanvasFocus();
-    renderCanvas();
-  });
-
-  els.flowDetail.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-flow-detail]");
-    if (!button) return;
-    state.flowDetail = button.dataset.flowDetail;
-    renderFlowDetail();
-    renderCanvas();
   });
 
   els.sectionPresets.addEventListener("click", (event) => {

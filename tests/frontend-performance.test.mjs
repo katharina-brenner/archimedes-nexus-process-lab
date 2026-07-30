@@ -20,3 +20,15 @@ test("production assets use durable caching without caching HTML", async () => {
   assert.match(server, /public, max-age=31536000, immutable/);
   assert.match(server, /htmlDocument[\s\S]+no-cache/);
 });
+
+test("large process graphs are routed outside the UI thread", async () => {
+  const [app, worker] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../canvas-router-worker.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /GLOBAL_ROUTER_WORKER_THRESHOLD = 80/);
+  assert.match(app, /new Worker\(new URL\("\.\/canvas-router-worker\.js"/);
+  assert.match(app, /worker\.postMessage\(\{ signature, input \}\)/);
+  assert.match(worker, /buildCrossingAwareRoutePlan\(input\)/);
+});
