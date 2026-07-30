@@ -25966,6 +25966,22 @@ body:not(.locked) #flowsheetView .canvas-focus-note small {
   font-size: 7px;
 }
 
+body:not(.locked) #flowsheetView .canvas-focus-note .router-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(117, 209, 193, 0.2);
+  color: #8dd9cc;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+body:not(.locked) #flowsheetView .canvas-focus-note .router-status.router-warning {
+  color: #e1bf7c;
+}
+
 body:not(.locked) #flowsheetView .canvas-selection-note {
   left: 220px;
   display: grid;

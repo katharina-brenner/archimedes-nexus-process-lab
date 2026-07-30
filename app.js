@@ -1,3 +1,5 @@
+import { buildCrossingAwareRoutePlan } from "./canvas-router.js?v=20260730-global-router-v6";
+
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
   { type: "wfi", label: "WFI Generation", isoName: "Water for injection generation system", cls: "Utilities", icon: "WFI", color: "#277da1", residence: 2, power: 5.2, standards: ["USP <1231>", "EU GMP Annex 1", "ISPE Baseline"] },
@@ -6761,6 +6763,25 @@ function longestHorizontalSegment(points) {
   };
 }
 
+function streamGeometryFromPoints(points) {
+  const pad = 22;
+  const minX = Math.min(...points.map((point) => point.x)) - pad;
+  const maxX = Math.max(...points.map((point) => point.x)) + pad;
+  const minY = Math.min(...points.map((point) => point.y)) - pad;
+  const maxY = Math.max(...points.map((point) => point.y)) + pad;
+  const localPoints = points.map((point) => ({ x: point.x - minX, y: point.y - minY }));
+  const labelSegment = longestHorizontalSegment(points);
+  return {
+    left: minX,
+    top: minY,
+    width: Math.max(36, maxX - minX),
+    height: Math.max(36, maxY - minY),
+    d: roundedOrthogonalPath(localPoints, 10),
+    labelX: Math.round((labelSegment.from.x + labelSegment.to.x) / 2),
+    labelY: labelSegment.from.y,
+  };
+}
+
 function streamGeometry(from, to, kind = "main", streamIndex = 0) {
   const x1 = from.x + unitWidth(from);
   const y1 = unitMidline(from);
@@ -6805,22 +6826,48 @@ function streamGeometry(from, to, kind = "main", streamIndex = 0) {
     ];
   }
 
-  const pad = 22;
-  const minX = Math.min(...points.map((point) => point.x)) - pad;
-  const maxX = Math.max(...points.map((point) => point.x)) + pad;
-  const minY = Math.min(...points.map((point) => point.y)) - pad;
-  const maxY = Math.max(...points.map((point) => point.y)) + pad;
-  const localPoints = points.map((point) => ({ x: point.x - minX, y: point.y - minY }));
-  const labelSegment = longestHorizontalSegment(points);
-  return {
-    left: minX,
-    top: minY,
-    width: Math.max(36, maxX - minX),
-    height: Math.max(36, maxY - minY),
-    d: roundedOrthogonalPath(localPoints, 10),
-    labelX: Math.round((labelSegment.from.x + labelSegment.to.x) / 2),
-    labelY: labelSegment.from.y,
-  };
+  return streamGeometryFromPoints(points);
+}
+
+let canvasRouteCache = {
+  signature: "",
+  plan: null,
+};
+
+function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) {
+  const normalizedUnits = visibleUnits.map((item) => ({
+    id: item.id,
+    x: item.x,
+    y: item.y,
+    width: unitWidth(item),
+    height: unitHeight(item),
+  }));
+  const unitMap = new Map(visibleUnits.map((item) => [item.id, item]));
+  const normalizedStreams = visibleStreams.map((item, index) => ({
+    id: item.id,
+    from: item.from,
+    to: item.to,
+    kind: streamKind(item, unitMap.get(item.from), unitMap.get(item.to)),
+    index,
+  }));
+  const signature = JSON.stringify({
+    width: stageWidth,
+    height: stageHeight,
+    units: normalizedUnits,
+    streams: normalizedStreams,
+  });
+  if (canvasRouteCache.signature !== signature) {
+    canvasRouteCache = {
+      signature,
+      plan: buildCrossingAwareRoutePlan({
+        units: normalizedUnits,
+        streams: normalizedStreams,
+        width: stageWidth,
+        height: stageHeight,
+      }),
+    };
+  }
+  return canvasRouteCache.plan;
 }
 
 function streamPathMarkup(item, kind, geometry) {
@@ -6884,6 +6931,7 @@ function renderCanvas() {
   const stagePaddingY = 420;
   const stageWidth = Math.max(1800, ...visibleUnits.map((item) => item.x + unitWidth(item) + stagePaddingX));
   const stageHeight = Math.max(1120, ...visibleUnits.map((item) => item.y + unitHeight(item) + stagePaddingY));
+  const routePlan = canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight);
   const stage = document.createElement("div");
   stage.className = "canvas-stage";
   stage.style.width = `${stageWidth}px`;
@@ -6898,6 +6946,7 @@ function renderCanvas() {
   stage.dataset.flowDetail = state.flowDetail;
   stage.dataset.mode = state.mode;
   stage.dataset.connecting = state.connectFrom ? "true" : "false";
+  stage.dataset.router = "global";
   const reaction = document.querySelector("#processReaction");
   if (reaction) reaction.textContent = processReactionSummary();
   const selectedVisibleUnit = visibleUnits.find((item) => item.id === state.selectedId);
@@ -6914,7 +6963,12 @@ function renderCanvas() {
       <i aria-hidden="true"></i>
       <span>
         <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
-        <small>${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}</small>
+        <small>
+          ${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}
+          <em class="router-status${routePlan.stats.fallback ? " router-warning" : ""}">
+            Global routing · ${routePlan.stats.crossings} crossings${routePlan.stats.fallback ? ` · ${routePlan.stats.fallback} fallback` : ""}
+          </em>
+        </small>
       </span>
     </div>
     <div class="canvas-selection-note">
@@ -6936,8 +6990,12 @@ function renderCanvas() {
     if (!from || !to) return;
     const line = document.createElement("button");
     const kind = streamKind(item, from, to);
-    const geometry = streamGeometry(from, to, kind, streamIndex);
+    const routePoints = routePlan.routes[item.id];
+    const geometry = routePoints?.length > 1
+      ? streamGeometryFromPoints(routePoints)
+      : streamGeometry(from, to, kind, streamIndex);
     line.className = `stream-line stream-${kind}`;
+    if (routePlan.stats.fallbackIds.includes(item.id)) line.classList.add("route-fallback");
     line.dataset.streamId = item.id;
     line.dataset.tooltip = streamTooltip(item, from, to, kind);
     line.style.left = `${geometry.left}px`;
