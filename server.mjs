@@ -5526,12 +5526,22 @@ function serveStatic(req, res, pathname) {
   }
   if (!existsSync(filePath)) {
     const fallback = join(staticRootDir, "index.html");
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache",
+    });
     createReadStream(fallback).pipe(res);
     return;
   }
+  const immutableAsset = /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(requested);
+  const htmlDocument = extname(filePath) === ".html";
   res.writeHead(200, {
     "content-type": staticTypes.get(extname(filePath)) || "application/octet-stream",
+    "cache-control": immutableAsset
+      ? "public, max-age=31536000, immutable"
+      : htmlDocument
+        ? "no-cache"
+        : "public, max-age=3600",
   });
   createReadStream(filePath).pipe(res);
 }
