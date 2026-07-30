@@ -1,4 +1,4 @@
-import { buildCrossingAwareRoutePlan } from "./canvas-router.js";
+import { buildCrossingAwareRoutePlan } from "./canvas-router.js?v=20260730-hierarchical-router-v2";
 
 self.addEventListener("message", (event) => {
   const { signature, input } = event.data || {};

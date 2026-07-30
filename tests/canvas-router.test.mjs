@@ -140,6 +140,38 @@ test("global router protects exact port stubs in a dense parallel-reactor layout
   assert.equal(plan.stats.crossings, 0);
 });
 
+test("locked stream corridors remain fixed while other streams reroute around them", () => {
+  const units = [
+    unit("A", 48, 72),
+    unit("B", 640, 72),
+    unit("C", 48, 300),
+    unit("D", 640, 300),
+  ];
+  const lockedRoute = [
+    { x: 168, y: 108 },
+    { x: 224, y: 108 },
+    { x: 224, y: 236 },
+    { x: 584, y: 236 },
+    { x: 584, y: 108 },
+    { x: 640, y: 108 },
+  ];
+  const plan = buildCrossingAwareRoutePlan({
+    units,
+    streams: [
+      stream("LOCKED", "A", "B", "main", 0),
+      stream("AUTO", "C", "D", "main", 1),
+    ],
+    lockedRoutes: { LOCKED: lockedRoute },
+    width: 980,
+    height: 560,
+  });
+
+  assert.equal(plan.stats.locked, 1);
+  assert.deepEqual(plan.stats.lockedIds, ["LOCKED"]);
+  assert.deepEqual(plan.routes.LOCKED, lockedRoute);
+  assert.ok(plan.routes.AUTO.length >= 2);
+});
+
 test("global router handles a plant-scale graph with more than one hundred streams", () => {
   const units = [];
   for (let row = 0; row < 8; row += 1) {
@@ -173,4 +205,30 @@ test("global router handles a plant-scale graph with more than one hundred strea
   assert.equal(plan.stats.routed, streams.length);
   assert.equal(Object.keys(plan.routes).length, streams.length);
   assert.ok(duration < 5000, `large route plan took ${Math.round(duration)} ms`);
+});
+
+test("hierarchical router scales to one thousand streams without quadratic crossing scans", () => {
+  const units = [
+    unit("SOURCE", 48, 96),
+    unit("TARGET", 900, 96),
+  ];
+  const streams = Array.from({ length: 1000 }, (_, index) => (
+    stream(`S-${index}`, "SOURCE", "TARGET", index % 5 ? "main" : "utility", index)
+  ));
+  const startedAt = performance.now();
+  const plan = buildCrossingAwareRoutePlan({
+    units,
+    streams,
+    width: 1200,
+    height: 480,
+    hierarchical: true,
+    maxIterations: 1,
+    maxPasses: 1,
+  });
+  const duration = performance.now() - startedAt;
+
+  assert.equal(plan.stats.routed, 1000);
+  assert.equal(plan.stats.strategy, "hierarchical");
+  assert.ok(plan.stats.zones >= 1);
+  assert.ok(duration < 3000, `hierarchical route plan took ${Math.round(duration)} ms`);
 });

@@ -111,39 +111,71 @@ function between(value, a, b, strict = false) {
   return strict ? value > min && value < max : value >= min && value <= max;
 }
 
-export function routeCrossingPairs(routes) {
-  const entries = Object.entries(routes);
-  const pairs = [];
-  for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
-    const leftSegments = routeSegments(entries[leftIndex][1]);
-    for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
-      const rightSegments = routeSegments(entries[rightIndex][1]);
-      let pairCrossings = 0;
-      leftSegments.forEach((left) => {
-        rightSegments.forEach((right) => {
-          const leftOrientation = orientation(left.from, left.to);
-          const rightOrientation = orientation(right.from, right.to);
-          if (leftOrientation === rightOrientation) return;
-          const horizontal = leftOrientation === "h" ? left : right;
-          const vertical = leftOrientation === "v" ? left : right;
-          const x = vertical.from.x;
-          const y = horizontal.from.y;
-          if (
-            between(x, horizontal.from.x, horizontal.to.x, true)
-            && between(y, vertical.from.y, vertical.to.y, true)
-          ) pairCrossings += 1;
-        });
-      });
-      if (pairCrossings) {
-        pairs.push({
-          left: entries[leftIndex][0],
-          right: entries[rightIndex][0],
-          count: pairCrossings,
-        });
-      }
-    }
+function segmentCells(segment, bucketSize = 256) {
+  const minX = Math.floor(Math.min(segment.from.x, segment.to.x) / bucketSize);
+  const maxX = Math.floor(Math.max(segment.from.x, segment.to.x) / bucketSize);
+  const minY = Math.floor(Math.min(segment.from.y, segment.to.y) / bucketSize);
+  const maxY = Math.floor(Math.max(segment.from.y, segment.to.y) / bucketSize);
+  const cells = [];
+  for (let x = minX; x <= maxX; x += 1) {
+    for (let y = minY; y <= maxY; y += 1) cells.push(`${x},${y}`);
   }
-  return pairs;
+  return cells;
+}
+
+class SegmentSpatialIndex {
+  constructor(bucketSize = 256) {
+    this.bucketSize = bucketSize;
+    this.horizontal = new Map();
+    this.vertical = new Map();
+    this.nextId = 1;
+  }
+
+  insert(segment, meta = {}) {
+    const item = { ...segment, ...meta, spatialId: this.nextId++ };
+    const index = orientation(segment.from, segment.to) === "h" ? this.horizontal : this.vertical;
+    segmentCells(segment, this.bucketSize).forEach((cell) => {
+      const entries = index.get(cell) || [];
+      entries.push(item);
+      index.set(cell, entries);
+    });
+  }
+
+  crossingSegments(segment) {
+    const opposite = orientation(segment.from, segment.to) === "h" ? this.vertical : this.horizontal;
+    const seen = new Set();
+    const crossings = [];
+    segmentCells(segment, this.bucketSize).forEach((cell) => {
+      (opposite.get(cell) || []).forEach((candidate) => {
+        if (seen.has(candidate.spatialId)) return;
+        seen.add(candidate.spatialId);
+        if (segmentsCross(segment, candidate)) crossings.push(candidate);
+      });
+    });
+    return crossings;
+  }
+}
+
+export function routeCrossingPairs(routes) {
+  const index = new SegmentSpatialIndex();
+  const pairCounts = new Map();
+  Object.entries(routes).forEach(([routeId, points]) => {
+    routeSegments(points).forEach((segment, segmentIndex) => {
+      index.crossingSegments(segment).forEach((candidate) => {
+        if (candidate.routeId === routeId) return;
+        const ids = [routeId, candidate.routeId].sort();
+        const key = `${ids[0]}\u0000${ids[1]}`;
+        pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+      });
+      index.insert(segment, { routeId, segmentIndex });
+    });
+  });
+  return [...pairCounts.entries()]
+    .map(([key, count]) => {
+      const [left, right] = key.split("\u0000");
+      return { left, right, count };
+    })
+    .sort((left, right) => left.left.localeCompare(right.left) || left.right.localeCompare(right.right));
 }
 
 export function countRouteCrossings(routes) {
@@ -200,7 +232,7 @@ function findGridPath({
   grid,
   edgeUsage,
   nodeUsage,
-  reservedSegments,
+  reservedSegmentIndex,
   maxIterations,
 }) {
   const queue = new MinHeap();
@@ -234,10 +266,10 @@ function findGridPath({
       const usedEdge = edgeUsage.get(edgeKey(current.point, next));
       const usedNode = nodeUsage.get(pointKey(next));
       const crossing = usedNode && usedNode.orientations.has(next.direction === "h" ? "v" : "h");
-      const exactCrossings = reservedSegments.filter((segment) => segmentsCross({
+      const exactCrossings = reservedSegmentIndex.crossingSegments({
         from: current.point,
         to: next,
-      }, segment)).length;
+      }).length;
       const sameCorridor = usedEdge?.kinds.has(kind);
       const foreignCorridor = usedEdge && !sameCorridor;
       let moveCost = 1;
@@ -325,6 +357,47 @@ function routePriority(stream) {
   }[stream.kind] ?? 4;
 }
 
+function unitZone(unit, zoneSize) {
+  return `${Math.floor((unit.x + unit.width / 2) / zoneSize)},${Math.floor((unit.y + unit.height / 2) / zoneSize)}`;
+}
+
+function streamHierarchy(stream, unitMap, zoneSize) {
+  const from = unitMap.get(stream.from);
+  const to = unitMap.get(stream.to);
+  if (!from || !to) return { local: true, key: "missing" };
+  const fromZone = unitZone(from, zoneSize);
+  const toZone = unitZone(to, zoneSize);
+  return {
+    local: fromZone === toZone,
+    key: [fromZone, toZone].sort().join(">"),
+  };
+}
+
+function lockedRoutePoints(points, from, to) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const numeric = points
+    .map((point) => ({ x: Number(point?.x), y: Number(point?.y) }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (numeric.length < 2) return null;
+  const route = compactOrthogonalPoints(numeric);
+  const startPort = { x: from.x + from.width, y: from.y + from.height / 2 };
+  const endPort = { x: to.x, y: to.y + to.height / 2 };
+  const originalStart = route[0];
+  const originalEnd = route[route.length - 1];
+  route[0] = startPort;
+  route[route.length - 1] = endPort;
+  if (route[1]) {
+    if (originalStart.y === route[1].y) route[1].y = startPort.y;
+    else route[1].x = startPort.x;
+  }
+  if (route.length > 2) {
+    const beforeEnd = route[route.length - 2];
+    if (originalEnd.y === beforeEnd.y) beforeEnd.y = endPort.y;
+    else beforeEnd.x = endPort.x;
+  }
+  return compactOrthogonalPoints(route);
+}
+
 function buildRoutePass({
   units,
   streams,
@@ -335,6 +408,9 @@ function buildRoutePass({
   maxIterations = 90000,
   priorityIds = [],
   orderVariant = "distance",
+  lockedRoutes = {},
+  hierarchical = false,
+  zoneSize = 512,
 }) {
   const unitMap = new Map(units.map((unit) => [unit.id, unit]));
   const priorityRank = new Map(priorityIds.map((id, index) => [id, index]));
@@ -347,16 +423,36 @@ function buildRoutePass({
   const blocked = buildBlockedCells(units, grid, clearance, bounds);
   const edgeUsage = new Map();
   const nodeUsage = new Map();
-  const reservedSegments = [];
+  const reservedSegmentIndex = new SegmentSpatialIndex(Math.max(128, zoneSize / 2));
   const routes = {};
+  const lockedIds = [];
   let fallback = 0;
   const fallbackIds = [];
 
+  streams.forEach((stream) => {
+    const from = unitMap.get(stream.from);
+    const to = unitMap.get(stream.to);
+    const points = from && to ? lockedRoutePoints(lockedRoutes[stream.id], from, to) : null;
+    if (!points) return;
+    routes[stream.id] = points;
+    lockedIds.push(stream.id);
+    reserveRoute(points, stream.kind, edgeUsage, nodeUsage, grid);
+    routeSegments(points).forEach((segment) => reservedSegmentIndex.insert(segment, { routeId: stream.id }));
+  });
+
   const orderedStreams = streams
+    .filter((stream) => !routes[stream.id])
     .map((stream, index) => ({ ...stream, sourceIndex: stream.index ?? index }))
     .sort((left, right) => {
       const priorityDifference = routePriority(left) - routePriority(right);
       if (priorityDifference) return priorityDifference;
+      if (hierarchical) {
+        const leftHierarchy = streamHierarchy(left, unitMap, zoneSize);
+        const rightHierarchy = streamHierarchy(right, unitMap, zoneSize);
+        if (leftHierarchy.local !== rightHierarchy.local) return leftHierarchy.local ? 1 : -1;
+        const hierarchyDifference = leftHierarchy.key.localeCompare(rightHierarchy.key);
+        if (hierarchyDifference) return hierarchyDifference;
+      }
       const leftRank = priorityRank.get(left.id) ?? Number.POSITIVE_INFINITY;
       const rightRank = priorityRank.get(right.id) ?? Number.POSITIVE_INFINITY;
       if (leftRank !== rightRank) return leftRank - rightRank;
@@ -405,14 +501,17 @@ function buildRoutePass({
       grid,
       edgeUsage,
       nodeUsage,
-      reservedSegments,
+      reservedSegmentIndex,
       maxIterations,
     });
 
     if (!gridPath) {
-      routes[stream.id] = fallbackRoute(from, to, stream.sourceIndex);
+      const points = fallbackRoute(from, to, stream.sourceIndex);
+      routes[stream.id] = points;
       fallback += 1;
       fallbackIds.push(stream.id);
+      reserveRoute(points, stream.kind, edgeUsage, nodeUsage, grid);
+      routeSegments(points).forEach((segment) => reservedSegmentIndex.insert(segment, { routeId: stream.id }));
       return;
     }
 
@@ -427,11 +526,12 @@ function buildRoutePass({
     ]);
     routes[stream.id] = points;
     reserveRoute(gridPath, stream.kind, edgeUsage, nodeUsage, grid);
-    reservedSegments.push(...routeSegments(points));
+    routeSegments(points).forEach((segment) => reservedSegmentIndex.insert(segment, { routeId: stream.id }));
   });
 
   const sharedEdges = [...edgeUsage.values()].filter((edge) => edge.count > 1).length;
   const crossingPairs = routeCrossingPairs(routes);
+  const zones = new Set(units.map((unit) => unitZone(unit, zoneSize)));
   return {
     routes,
     stats: {
@@ -441,6 +541,10 @@ function buildRoutePass({
       sharedEdges,
       fallback,
       fallbackIds,
+      locked: lockedIds.length,
+      lockedIds,
+      strategy: hierarchical ? "hierarchical" : "global",
+      zones: zones.size,
     },
   };
 }
@@ -463,9 +567,10 @@ function routePlanScore(plan) {
 
 function conflictPriority(plan) {
   const weights = new Map();
+  const lockedIds = new Set(plan.stats.lockedIds || []);
   plan.stats.crossingPairs.forEach((pair) => {
-    weights.set(pair.left, (weights.get(pair.left) || 0) + pair.count);
-    weights.set(pair.right, (weights.get(pair.right) || 0) + pair.count);
+    if (!lockedIds.has(pair.left)) weights.set(pair.left, (weights.get(pair.left) || 0) + pair.count);
+    if (!lockedIds.has(pair.right)) weights.set(pair.right, (weights.get(pair.right) || 0) + pair.count);
   });
   plan.stats.fallbackIds.forEach((id) => {
     weights.set(id, (weights.get(id) || 0) + 1000);
@@ -476,15 +581,17 @@ function conflictPriority(plan) {
 }
 
 export function buildCrossingAwareRoutePlan(options) {
-  const maxPasses = Math.max(1, Math.min(5, options.maxPasses ?? 3));
-  let bestPlan = buildRoutePass(options);
+  const hierarchical = options.hierarchical ?? options.streams.length >= 400;
+  const normalizedOptions = { ...options, hierarchical };
+  const maxPasses = Math.max(1, Math.min(hierarchical ? 3 : 5, options.maxPasses ?? (hierarchical ? 2 : 3)));
+  let bestPlan = buildRoutePass(normalizedOptions);
   let bestScore = routePlanScore(bestPlan);
   let passes = 1;
 
   while (passes < maxPasses && (bestPlan.stats.crossings > 0 || bestPlan.stats.fallback > 0)) {
     const priorityIds = conflictPriority(bestPlan);
     const candidate = buildRoutePass({
-      ...options,
+      ...normalizedOptions,
       priorityIds: passes % 2 ? priorityIds : [...priorityIds].reverse(),
       orderVariant: passes % 2 ? "stable" : "reverse",
     });
@@ -503,6 +610,7 @@ export function buildCrossingAwareRoutePlan(options) {
       passes,
       optimized: passes > 1,
       score: bestScore,
+      strategy: hierarchical ? "hierarchical" : "global",
     },
   };
 }

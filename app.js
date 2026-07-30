@@ -1,5 +1,3 @@
-import { buildCrossingAwareRoutePlan } from "./canvas-router.js?v=20260730-global-router-v9";
-
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
   { type: "wfi", label: "WFI Generation", isoName: "Water for injection generation system", cls: "Utilities", icon: "WFI", color: "#277da1", residence: 2, power: 5.2, standards: ["USP <1231>", "EU GMP Annex 1", "ISPE Baseline"] },
@@ -2072,6 +2070,7 @@ const state = {
   cfdBackendJob: null,
   commandHistory: [],
   commandHighlights: [],
+  lockedRoutes: {},
 };
 
 const els = {
@@ -2556,6 +2555,7 @@ function loadTemplate(key, preserveScale = false) {
   state.nextStream = 900;
   state.activeRoute = "primary";
   state.recipeOverrides = {};
+  state.lockedRoutes = {};
   state.canvasFocus = "main";
   state.flowDetail = "standard";
   state.zoom = 0.68;
@@ -2594,7 +2594,7 @@ function currentModelSummary() {
 
 function exportCurrentModelState() {
   return {
-    appVersion: "route-optimizer-v1",
+    appVersion: "route-optimizer-v2",
     projectName: state.projectName,
     template: state.template,
     scale: state.scale,
@@ -2623,6 +2623,7 @@ function exportCurrentModelState() {
     plantDataBindings: clone(state.plantDataBindings || []),
     dataApplicationHistory: clone(state.dataApplicationHistory || []),
     commandHistory: clone(state.commandHistory || []),
+    lockedRoutes: clone(state.lockedRoutes || {}),
     automationState: state.automationState ? clone({
       connections: state.automationState.connections || [],
       loops: state.automationState.loops || [],
@@ -2662,6 +2663,9 @@ function importModelState(modelState = {}) {
   state.plantDataBindings = Array.isArray(modelState.plantDataBindings) ? clone(modelState.plantDataBindings) : [];
   state.dataApplicationHistory = Array.isArray(modelState.dataApplicationHistory) ? clone(modelState.dataApplicationHistory) : [];
   state.commandHistory = Array.isArray(modelState.commandHistory) ? clone(modelState.commandHistory).slice(0, 20) : [];
+  state.lockedRoutes = modelState.lockedRoutes && typeof modelState.lockedRoutes === "object"
+    ? clone(modelState.lockedRoutes)
+    : {};
   state.automationState = modelState.automationState && typeof modelState.automationState === "object" ? clone(modelState.automationState) : null;
   state.commandHighlights = [];
   syncInputs();
@@ -6844,7 +6848,9 @@ function streamGeometry(from, to, kind = "main", streamIndex = 0) {
 }
 
 const GLOBAL_ROUTER_WORKER_THRESHOLD = 80;
+const HIERARCHICAL_ROUTER_THRESHOLD = 400;
 let canvasRouterWorker = null;
+let canvasRouterModulePromise = null;
 let canvasRouteCache = {
   signature: "",
   plan: null,
@@ -6866,13 +6872,50 @@ function pendingCanvasRoutePlan(streamCount) {
       optimized: false,
       pending: true,
       streamCount,
+      locked: 0,
+      lockedIds: [],
+      strategy: streamCount >= HIERARCHICAL_ROUTER_THRESHOLD ? "hierarchical" : "global",
+      zones: 0,
     },
   };
 }
 
+function loadCanvasRouterModule() {
+  if (!canvasRouterModulePromise) {
+    canvasRouterModulePromise = import("./canvas-router.js?v=20260730-hierarchical-router-v2");
+  }
+  return canvasRouterModulePromise;
+}
+
+function finishCanvasRouteFallback(signature, input) {
+  loadCanvasRouterModule()
+    .then(({ buildCrossingAwareRoutePlan }) => {
+      if (signature !== canvasRouteCache.signature || !canvasRouteCache.pending) return;
+      canvasRouteCache = {
+        signature,
+        plan: buildCrossingAwareRoutePlan(input),
+        pending: false,
+        input: null,
+      };
+      window.requestAnimationFrame(() => renderCanvas());
+    })
+    .catch(() => {
+      if (signature !== canvasRouteCache.signature) return;
+      const plan = pendingCanvasRoutePlan(input.streams.length);
+      plan.stats.pending = false;
+      canvasRouteCache = {
+        signature,
+        plan,
+        pending: false,
+        input: null,
+      };
+      window.requestAnimationFrame(() => renderCanvas());
+    });
+}
+
 function ensureCanvasRouterWorker() {
   if (canvasRouterWorker || typeof Worker === "undefined") return canvasRouterWorker;
-  canvasRouterWorker = new Worker(new URL("./canvas-router-worker.js", import.meta.url), { type: "module" });
+  canvasRouterWorker = new Worker(new URL("./canvas-router-worker.js?v=20260730-hierarchical-router-v2", import.meta.url), { type: "module" });
   canvasRouterWorker.addEventListener("message", (event) => {
     const { signature, plan, error } = event.data || {};
     if (signature !== canvasRouteCache.signature || !canvasRouteCache.pending) return;
@@ -6884,25 +6927,15 @@ function ensureCanvasRouterWorker() {
         input: null,
       };
     } else if (error && canvasRouteCache.input) {
-      canvasRouteCache = {
-        signature,
-        plan: buildCrossingAwareRoutePlan(canvasRouteCache.input),
-        pending: false,
-        input: null,
-      };
+      finishCanvasRouteFallback(signature, canvasRouteCache.input);
+      return;
     }
     window.requestAnimationFrame(() => renderCanvas());
   });
   canvasRouterWorker.addEventListener("error", () => {
     if (!canvasRouteCache.pending || !canvasRouteCache.input) return;
     const { signature, input } = canvasRouteCache;
-    canvasRouteCache = {
-      signature,
-      plan: buildCrossingAwareRoutePlan(input),
-      pending: false,
-      input: null,
-    };
-    window.requestAnimationFrame(() => renderCanvas());
+    finishCanvasRouteFallback(signature, input);
   });
   return canvasRouterWorker;
 }
@@ -6928,6 +6961,7 @@ function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) 
     height: stageHeight,
     units: normalizedUnits,
     streams: normalizedStreams,
+    lockedRoutes: state.lockedRoutes || {},
   });
   if (canvasRouteCache.signature !== signature) {
     const input = {
@@ -6935,11 +6969,15 @@ function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) 
       streams: normalizedStreams,
       width: stageWidth,
       height: stageHeight,
-      maxPasses: normalizedStreams.length >= GLOBAL_ROUTER_WORKER_THRESHOLD ? 5 : 3,
+      maxPasses: normalizedStreams.length >= HIERARCHICAL_ROUTER_THRESHOLD
+        ? 2
+        : normalizedStreams.length >= GLOBAL_ROUTER_WORKER_THRESHOLD
+          ? 5
+          : 3,
+      hierarchical: normalizedStreams.length >= HIERARCHICAL_ROUTER_THRESHOLD,
+      lockedRoutes: clone(state.lockedRoutes || {}),
     };
-    const worker = normalizedStreams.length >= GLOBAL_ROUTER_WORKER_THRESHOLD
-      ? ensureCanvasRouterWorker()
-      : null;
+    const worker = normalizedStreams.length ? ensureCanvasRouterWorker() : null;
     if (worker) {
       canvasRouteCache = {
         signature,
@@ -6951,10 +6989,11 @@ function canvasRoutePlan(visibleUnits, visibleStreams, stageWidth, stageHeight) 
     } else {
       canvasRouteCache = {
         signature,
-        plan: buildCrossingAwareRoutePlan(input),
-        pending: false,
-        input: null,
+        plan: pendingCanvasRoutePlan(normalizedStreams.length),
+        pending: true,
+        input,
       };
+      finishCanvasRouteFallback(signature, input);
     }
   }
   return canvasRouteCache.plan;
@@ -6969,6 +7008,7 @@ function streamPathMarkup(item, kind, geometry) {
           <path d="M0,0 L8,4 L0,8 Z" class="stream-path-arrow"></path>
         </marker>
       </defs>
+      <path class="stream-path-hit" d="${geometry.d}"></path>
       <path class="stream-path-base" d="${geometry.d}"></path>
       <path class="stream-path-flow" d="${geometry.d}" marker-end="url(#${markerId})"></path>
     </svg>
@@ -7012,6 +7052,115 @@ function placeStreamLabel(x, y, occupied, force = false) {
   return fallback;
 }
 
+function lockStreamRoute(streamId) {
+  const points = canvasRouteCache.plan?.routes?.[streamId];
+  if (!points?.length || canvasRouteCache.plan?.stats?.pending) {
+    showToast("Wait for route optimization to finish");
+    return;
+  }
+  state.lockedRoutes = {
+    ...(state.lockedRoutes || {}),
+    [streamId]: clone(points),
+  };
+  canvasRouteCache.signature = "";
+  renderCanvas();
+  showStreamDetails(state.streams.find((item) => item.id === streamId));
+  showToast(`${streamId} route locked`);
+}
+
+function unlockStreamRoute(streamId) {
+  if (!state.lockedRoutes?.[streamId]) return;
+  const next = { ...state.lockedRoutes };
+  delete next[streamId];
+  state.lockedRoutes = next;
+  canvasRouteCache.signature = "";
+  renderCanvas();
+  showStreamDetails(state.streams.find((item) => item.id === streamId));
+  showToast(`${streamId} returned to global routing`);
+}
+
+function compactLockedRoute(points) {
+  return points.filter((point, index, list) => {
+    if (!index || index === list.length - 1) return true;
+    const previous = list[index - 1];
+    const next = list[index + 1];
+    return !((previous.x === point.x && point.x === next.x) || (previous.y === point.y && point.y === next.y));
+  });
+}
+
+function renderLockedRouteHandles(stage, stream, points) {
+  if (state.selectedId !== stream.id || !state.lockedRoutes?.[stream.id] || points.length < 4) return;
+  const segments = points.slice(1).map((to, index) => ({
+    index,
+    from: points[index],
+    to,
+    orientation: points[index].y === to.y ? "horizontal" : "vertical",
+  }));
+  let editable = segments.filter((segment) => segment.index >= 2 && segment.index <= points.length - 4);
+  if (!editable.length) editable = segments.filter((segment) => segment.index >= 1 && segment.index <= points.length - 3);
+  editable.forEach((segment) => {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = `route-segment-handle route-segment-${segment.orientation}`;
+    handle.dataset.streamId = stream.id;
+    handle.dataset.segmentIndex = String(segment.index);
+    handle.setAttribute("aria-label", `Move ${stream.id} ${segment.orientation} route corridor`);
+    handle.dataset.tooltip = segment.orientation === "horizontal"
+      ? "Drag vertically to move this locked horizontal corridor."
+      : "Drag horizontally to move this locked vertical corridor.";
+    handle.style.left = `${(segment.from.x + segment.to.x) / 2}px`;
+    handle.style.top = `${(segment.from.y + segment.to.y) / 2}px`;
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      let delta = 0;
+      handle.setPointerCapture(event.pointerId);
+      const move = (moveEvent) => {
+        const rawDelta = segment.orientation === "horizontal"
+          ? (moveEvent.clientY - startY) / state.zoom
+          : (moveEvent.clientX - startX) / state.zoom;
+        delta = Math.round(rawDelta / 16) * 16;
+        handle.style.transform = segment.orientation === "horizontal"
+          ? `translate(-50%, calc(-50% + ${delta * state.zoom}px))`
+          : `translate(calc(-50% + ${delta * state.zoom}px), -50%)`;
+      };
+      const finish = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        if (delta) {
+          const route = clone(state.lockedRoutes[stream.id]);
+          const fromPoint = route[segment.index];
+          const toPoint = route[segment.index + 1];
+          if (segment.orientation === "horizontal") {
+            const y = Math.max(24, fromPoint.y + delta);
+            fromPoint.y = y;
+            toPoint.y = y;
+          } else {
+            const x = Math.max(24, fromPoint.x + delta);
+            fromPoint.x = x;
+            toPoint.x = x;
+          }
+          state.lockedRoutes = {
+            ...state.lockedRoutes,
+            [stream.id]: compactLockedRoute(route),
+          };
+          canvasRouteCache.signature = "";
+          renderCanvas();
+          showStreamDetails(stream);
+          showToast(`${stream.id} corridor moved`);
+        }
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+    });
+    stage.appendChild(handle);
+  });
+}
+
 function renderCanvas() {
   els.canvas.innerHTML = "";
   const visibleUnits = state.units.filter(isUnitVisible);
@@ -7036,7 +7185,7 @@ function renderCanvas() {
   stage.dataset.flowDetail = state.flowDetail;
   stage.dataset.mode = state.mode;
   stage.dataset.connecting = state.connectFrom ? "true" : "false";
-  stage.dataset.router = routePlan.stats.pending ? "optimizing" : "global";
+  stage.dataset.router = routePlan.stats.pending ? "optimizing" : (routePlan.stats.strategy || "global");
   const reaction = document.querySelector("#processReaction");
   if (reaction) reaction.textContent = processReactionSummary();
   const selectedVisibleUnit = visibleUnits.find((item) => item.id === state.selectedId);
@@ -7058,7 +7207,7 @@ function renderCanvas() {
           <em class="router-status${routePlan.stats.fallback ? " router-warning" : ""}${routePlan.stats.pending ? " router-pending" : ""}">
             ${routePlan.stats.pending
               ? `Optimizing ${routePlan.stats.streamCount} streams...`
-              : `Global routing · ${routePlan.stats.crossings} crossings${routePlan.stats.fallback ? ` · ${routePlan.stats.fallback} fallback` : ""}${routePlan.stats.passes > 1 ? ` · ${routePlan.stats.passes} passes` : ""}`}
+              : `${routePlan.stats.strategy === "hierarchical" ? "Hierarchical" : "Global"} routing · ${routePlan.stats.crossings} crossings${routePlan.stats.locked ? ` · ${routePlan.stats.locked} locked` : ""}${routePlan.stats.fallback ? ` · ${routePlan.stats.fallback} fallback` : ""}${routePlan.stats.passes > 1 ? ` · ${routePlan.stats.passes} passes` : ""}`}
           </em>
         </small>
       </span>
@@ -7088,6 +7237,7 @@ function renderCanvas() {
       : streamGeometry(from, to, kind, streamIndex);
     line.className = `stream-line stream-${kind}`;
     if ((routePlan.stats.fallbackIds || []).includes(item.id)) line.classList.add("route-fallback");
+    if (state.lockedRoutes?.[item.id]) line.classList.add("route-locked");
     line.dataset.streamId = item.id;
     line.dataset.tooltip = streamTooltip(item, from, to, kind);
     line.style.left = `${geometry.left}px`;
@@ -7123,10 +7273,12 @@ function renderCanvas() {
       label.innerHTML = compact ? `
         <span class="stream-label-head"><b>${item.id}</b><em>${item.phase}</em></span>
         <code class="stream-chemistry">${chemistry}</code>
+        ${state.lockedRoutes?.[item.id] ? `<small class="route-lock-badge">Locked route</small>` : ""}
       ` : `
         <span class="stream-label-head"><b>${item.id} → ${to.id}</b><em>${item.phase}</em></span>
         <code class="stream-chemistry">${chemistry}</code>
         <span class="stream-flow-value">${streamFlow(item)} · ${item.composition}</span>
+        ${state.lockedRoutes?.[item.id] ? `<small class="route-lock-badge">Locked route</small>` : ""}
       `;
       label.addEventListener("pointerdown", (event) => {
         event.preventDefault();
@@ -7143,6 +7295,7 @@ function renderCanvas() {
       });
       stage.appendChild(label);
     }
+    renderLockedRouteHandles(stage, item, routePoints || []);
   });
 
   visibleUnits.forEach((item) => {
@@ -9643,8 +9796,49 @@ function exploreContext(item) {
   return { view: "overview", label: "Open overview", note: "This is connected to the active model, its assumptions, visuals, downloads, and next-step tools." };
 }
 
+function showStreamDetails(stream) {
+  if (!els.detailDrawer || !stream) return;
+  const from = state.units.find((item) => item.id === stream.from);
+  const to = state.units.find((item) => item.id === stream.to);
+  const locked = Boolean(state.lockedRoutes?.[stream.id]);
+  const points = state.lockedRoutes?.[stream.id] || canvasRouteCache.plan?.routes?.[stream.id] || [];
+  els.detailDrawer.innerHTML = `
+    <div class="detail-card stream-route-detail">
+      <button class="detail-close" data-close-detail type="button" aria-label="Close details">Close</button>
+      <span>Process stream · ${locked ? "Route locked" : "Automatic routing"}</span>
+      <h3>${escapeHtml(stream.id)} · ${escapeHtml(stream.composition)}</h3>
+      <p>${escapeHtml(from?.id || stream.from)} → ${escapeHtml(to?.id || stream.to)}. ${escapeHtml(stream.phase || "Liquid")} stream with ${points.length} route points.</p>
+      <dl>
+        <dt>Source</dt><dd>${escapeHtml(from?.name || stream.from)}</dd>
+        <dt>Destination</dt><dd>${escapeHtml(to?.name || stream.to)}</dd>
+        <dt>Flow</dt><dd>${escapeHtml(streamFlow(stream))}</dd>
+        <dt>Routing</dt><dd>${locked ? "Manual corridor protected from global rerouting" : "Crossing-aware global optimization"}</dd>
+      </dl>
+      <div class="route-lock-explainer">
+        <strong>${locked ? "Manual corridor active" : "Lock the current engineering route"}</strong>
+        <small>${locked
+          ? "Drag the visible segment handles on the selected stream. Horizontal corridors move vertically; vertical corridors move horizontally."
+          : "Locking stores the current orthogonal path in this model, its versions, branches, and exports."}</small>
+      </div>
+      <div class="detail-actions">
+        ${locked
+          ? `<button data-unlock-stream-route="${escapeAttr(stream.id)}" type="button">Unlock and optimize</button>`
+          : `<button data-lock-stream-route="${escapeAttr(stream.id)}" type="button">Lock current route</button>`}
+        <button data-detail-jump="streams" type="button">Open stream table</button>
+      </div>
+    </div>
+  `;
+  els.detailDrawer.classList.add("open");
+}
+
 function showExploreDetails(item) {
   if (!els.detailDrawer) return;
+  const streamId = item.dataset.streamId;
+  const processStream = streamId ? state.streams.find((candidate) => candidate.id === streamId) : null;
+  if (processStream) {
+    showStreamDetails(processStream);
+    return;
+  }
   const projectCardId = item.dataset.projectCard;
   const versionCardId = item.dataset.versionCard;
   const inviteCardId = item.dataset.inviteCard;
@@ -16009,6 +16203,16 @@ function bindEvents() {
     const closeButton = event.target.closest("[data-close-detail]");
     if (closeButton) {
       els.detailDrawer?.classList.remove("open");
+      return;
+    }
+    const lockRouteButton = event.target.closest("[data-lock-stream-route]");
+    if (lockRouteButton) {
+      lockStreamRoute(lockRouteButton.dataset.lockStreamRoute);
+      return;
+    }
+    const unlockRouteButton = event.target.closest("[data-unlock-stream-route]");
+    if (unlockRouteButton) {
+      unlockStreamRoute(unlockRouteButton.dataset.unlockStreamRoute);
       return;
     }
     const jumpButton = event.target.closest("[data-detail-jump]");
