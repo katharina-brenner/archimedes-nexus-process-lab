@@ -1,5 +1,12 @@
 import { OPERATION_MODES, normalizeOperationMode, operationModeProfile as buildOperationModeProfile } from "./operation-modes.js";
 import { solveAxialTransportPde, solveBioprocessOde } from "./bioprocess-solver.js";
+import {
+  auditFlowsheetConnectivity,
+  connectionStateForUnit,
+  createBoundaryStream,
+  isBoundaryStream,
+  retargetStream,
+} from "./flowsheet-connectivity.js";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -2023,6 +2030,7 @@ const state = {
   mode: "select",
   selectedId: null,
   connectFrom: null,
+  connectTo: null,
   zoom: 0.78,
   nextUnit: 900,
   nextStream: 900,
@@ -2100,6 +2108,7 @@ const els = {
   canvasFocus: document.querySelector("#canvasFocus"),
   flowDetail: document.querySelector("#flowDetail"),
   equationSpotlight: document.querySelector("#equationSpotlight"),
+  canvasWorkbench: document.querySelector("#canvasWorkbench"),
   palette: document.querySelector("#palette"),
   canvas: document.querySelector("#flowsheetCanvas"),
   processEyebrow: document.querySelector("#processEyebrow"),
@@ -2198,8 +2207,8 @@ function unit(id, type, x, y, customName) {
   };
 }
 
-function stream(id, from, to, composition, phase) {
-  return { id, from, to, composition, phase };
+function stream(id, from, to, composition, phase, options = {}) {
+  return { id, from, to, composition, phase, ...options };
 }
 
 function eq(name, category, formula, note) {
@@ -2247,13 +2256,19 @@ function escapeAttr(value) {
 
 function equipmentTooltip(item) {
   const ics = icsCodeForUnit(item);
-  return `${item.id} - ${item.name}. ${item.isoName || item.name}. ICS ${ics.code}: ${ics.label}. Role: ${unitLayerLabel(unitLayer(item))}. Size: ${unitSize(item)}; duty: ${unitPower(item)}. Standards: ${(item.standards || []).slice(0, 3).join(", ")}.`;
+  const connections = connectionStateForUnit(state.streams, item.id);
+  const connectionNote = connections.isolated
+    ? "No streams are attached yet."
+    : `${connections.incoming.length} input and ${connections.outgoing.length} output streams attached.`;
+  return `${item.id} - ${item.name}. ${item.isoName || item.name}. ${connectionNote} ICS ${ics.code}: ${ics.label}. Role: ${unitLayerLabel(unitLayer(item))}. Size: ${unitSize(item)}; duty: ${unitPower(item)}. Standards: ${(item.standards || []).slice(0, 3).join(", ")}.`;
 }
 
 function streamTooltip(item, from, to, kind) {
   const solved = solveMassBalance().streamMap[item.id];
   const componentNote = solved?.componentText ? ` Components: ${solved.componentText}.` : "";
-  return `${item.id}: ${item.composition}. ${from?.id || item.from} to ${to?.id || item.to}. Type: ${streamLabel(kind)}. Solved flow: ${streamFlow(item)}.${componentNote}`;
+  const source = from?.id || item.from || item.boundaryLabel || "External source";
+  const destination = to?.id || item.to || item.boundaryLabel || "External destination";
+  return `${item.id}: ${item.composition}. ${source} to ${destination}. Type: ${streamLabel(kind)}. Solved flow: ${streamFlow(item)}.${componentNote}`;
 }
 
 function activeTemplate() {
@@ -2442,6 +2457,7 @@ function isMinorUnit(item) {
 }
 
 function streamKind(item, from, to) {
+  if (["main", "utility", "waste", "qc"].includes(item.kind)) return item.kind;
   const text = `${item.id} ${item.composition} ${item.phase} ${from?.cls || ""} ${to?.cls || ""}`.toLowerCase();
   if (text.includes("waste") || text.includes("spent") || text.includes("raffinate") || text.includes("bottoms")) return "waste";
   if (item.phase === "Gas" || ["Utilities", "Piping"].includes(from?.cls) || ["Utilities", "Piping"].includes(to?.cls) || text.includes("cip") || text.includes("steam") || text.includes("solvent")) return "utility";
@@ -2639,9 +2655,44 @@ function relevantEquations() {
   return equations.filter((item) => categories.includes(item.category)).slice(0, 4);
 }
 
+function addTemplateBoundaryStreams() {
+  state.units.forEach((unitItem) => {
+    const connections = connectionStateForUnit(state.streams, unitItem.id);
+    if (connections.isolated) return;
+    if (connections.missingInlet) {
+      const kind = ["support", "cleaning"].includes(unitLayer(unitItem)) ? "utility" : "main";
+      const defaults = boundaryStreamDefaults(unitItem, "inlet", kind);
+      state.streams.push(createBoundaryStream({
+        id: `EXT-IN-${unitItem.id}`,
+        unitId: unitItem.id,
+        direction: "inlet",
+        kind,
+        composition: defaults.composition,
+        phase: defaults.phase,
+        boundaryLabel: defaults.label,
+      }));
+    }
+    if (connections.missingOutlet) {
+      const layer = unitLayer(unitItem);
+      const kind = layer === "waste" ? "waste" : layer === "quality" ? "qc" : "main";
+      const defaults = boundaryStreamDefaults(unitItem, "outlet", kind);
+      state.streams.push(createBoundaryStream({
+        id: `EXT-OUT-${unitItem.id}`,
+        unitId: unitItem.id,
+        direction: "outlet",
+        kind,
+        composition: defaults.composition,
+        phase: defaults.phase,
+        boundaryLabel: defaults.label,
+      }));
+    }
+  });
+}
+
 function loadTemplate(key, preserveScale = false) {
   const template = templates[key];
   if (!template) return;
+  state.mode = "select";
   state.template = key;
   state.inferredTemplate = key;
   state.operationMode = defaultOperationModeForTemplate(key);
@@ -2650,9 +2701,11 @@ function loadTemplate(key, preserveScale = false) {
     if (item.cls === "Bioreactor") item.operationMode = state.operationMode;
   });
   state.streams = clone(template.streams);
+  addTemplateBoundaryStreams();
   state.costs = clone(template.costs);
   state.selectedId = state.units[0]?.id || null;
   state.connectFrom = null;
+  state.connectTo = null;
   state.nextUnit = 900;
   state.nextStream = 900;
   state.activeRoute = "primary";
@@ -2698,7 +2751,7 @@ function currentModelSummary() {
 
 function exportCurrentModelState() {
   return {
-    appVersion: "operation-modes-ode-pde-v1",
+    appVersion: "flowsheet-workbench-v4",
     projectName: state.projectName,
     template: state.template,
     scale: state.scale,
@@ -2772,6 +2825,8 @@ function importModelState(modelState = {}) {
   state.lockedRoutes = modelState.lockedRoutes && typeof modelState.lockedRoutes === "object"
     ? clone(modelState.lockedRoutes)
     : {};
+  state.connectFrom = null;
+  state.connectTo = null;
   state.automationState = modelState.automationState && typeof modelState.automationState === "object" ? clone(modelState.automationState) : null;
   state.commandHighlights = [];
   syncInputs();
@@ -2991,7 +3046,7 @@ function massBalanceCacheKey() {
     state.recovery,
     processParameters.map((item) => `${item.key}:${state.params[item.key]}`).join(","),
     state.units.map((item) => `${item.id}:${item.type}:${item.name}:${item.cls}:${item.residence}:${item.powerFactor}:${item.x}:${item.y}:${item.status}`).join("|"),
-    state.streams.map((item) => `${item.id}:${item.from}:${item.to}:${item.composition}:${item.phase}`).join("|"),
+    state.streams.map((item) => `${item.id}:${item.from}:${item.to}:${item.composition}:${item.phase}:${item.kind || ""}:${item.boundary || ""}:${item.boundaryLabel || ""}`).join("|"),
   ].join("||");
 }
 
@@ -3242,6 +3297,30 @@ function solveMassBalance() {
   const convergenceHistory = [];
   const tolerance = Math.max(0.0005, (state.params.zeroFlowThreshold || 0.1) / Math.max(1, state.batchSize));
   let iterationCount = 0;
+
+  const boundaryInputsByUnit = state.streams
+    .filter((streamItem) => !streamItem.from && streamItem.to)
+    .reduce((groups, streamItem) => {
+      groups[streamItem.to] = groups[streamItem.to] || [];
+      groups[streamItem.to].push(streamItem);
+      return groups;
+    }, {});
+  Object.entries(boundaryInputsByUnit).forEach(([unitId, boundaryStreams]) => {
+    const targetUnit = state.units.find((unitItem) => unitItem.id === unitId);
+    if (!targetUnit) return;
+    const sourceComponents = scaleVector(sourceVectorForUnit(targetUnit), 1 / Math.max(1, boundaryStreams.length));
+    boundaryStreams.forEach((streamItem) => {
+      streamMap[streamItem.id] = {
+        ...streamItem,
+        role: streamLabel(streamKind(streamItem, null, targetUnit)),
+        massFlow: vectorMass(sourceComponents),
+        annualMass: vectorMass(sourceComponents) * annualCycleEquivalent(),
+        components: clone(sourceComponents),
+        componentText: componentSummary(sourceComponents),
+        solverStatus: "Boundary input",
+      };
+    });
+  });
 
   for (let pass = 0; pass < 28; pass += 1) {
     let passMaxDelta = 0;
@@ -6129,12 +6208,32 @@ function plantSimulationSvg() {
     return `M${svgNum(x1)} ${svgNum(y1)} H${svgNum(escapeX)} V${svgNum(top)} H${svgNum(toBox.x - 20)} V${svgNum(y2)} H${svgNum(x2)}`;
   };
   const visibleStreamRows = state.streams
-    .filter((item) => layout.has(item.from) && layout.has(item.to))
-    .sort((a, b) => (indexById[a.from] - indexById[b.from]) || (indexById[a.to] - indexById[b.to]))
+    .filter((item) => (
+      (layout.has(item.from) && layout.has(item.to))
+      || (!item.from && layout.has(item.to))
+      || (!item.to && layout.has(item.from))
+    ))
+    .sort((a, b) => ((indexById[a.from] ?? indexById[a.to] ?? 0) - (indexById[b.from] ?? indexById[b.to] ?? 0)))
     .slice(0, 80);
   const streams = visibleStreamRows.map((item, index) => {
     const from = state.units.find((unitItem) => unitItem.id === item.from);
     const to = state.units.find((unitItem) => unitItem.id === item.to);
+    if (isBoundaryStream(item)) {
+      const unitItem = from || to;
+      const box = layout.get(unitItem?.id);
+      if (!box) return "";
+      const incoming = !item.from;
+      const layer = streamKind(item, from, to);
+      const color = layer === "waste" ? "#596a64" : layer === "utility" ? "#6f8794" : layer === "qc" ? "#8a6f3d" : "#0f5a52";
+      const y = box.y + box.h / 2;
+      const startX = incoming ? Math.max(60, box.x - 72) : box.x + box.w;
+      const finishX = incoming ? box.x : Math.min(width - 60, box.x + box.w + 72);
+      const labelX = incoming ? startX : finishX - 58;
+      return `
+        <path d="M${svgNum(startX)} ${svgNum(y)} H${svgNum(finishX)}" fill="none" stroke="${color}" stroke-width="2.6" marker-end="url(#arrow${layer === "main" ? "Main" : ""})"/>
+        <text x="${svgNum(labelX)}" y="${svgNum(y - 8)}" fill="#435964" font-family="Arial, sans-serif" font-size="8">${svgEscape(item.id)} · ${svgEscape(item.boundaryLabel || (incoming ? "IN" : "OUT"))}</text>
+      `;
+    }
     if (!from || !to) return "";
     const fromBox = layout.get(from.id);
     const toBox = layout.get(to.id);
@@ -6263,6 +6362,8 @@ function streamFlow(item) {
 }
 
 function streamDirection(item) {
+  if (!item.from && item.to) return "Input";
+  if (item.from && !item.to) return "Output";
   const from = state.units.find((candidate) => candidate.id === item.from);
   const to = state.units.find((candidate) => candidate.id === item.to);
   const incoming = state.streams.some((candidate) => candidate.to === item.from);
@@ -6324,10 +6425,10 @@ function streamRows() {
       lcaFlowType: classification.flowType,
       lcaCompartment: classification.compartment,
       teaDisposition: classification.teaDisposition,
-      from: item.from,
-      fromName: from?.name || "",
-      to: item.to,
-      toName: to?.name || "",
+      from: item.from || "PLANT-IN",
+      fromName: from?.name || item.boundaryLabel || "External source",
+      to: item.to || "PLANT-OUT",
+      toName: to?.name || item.boundaryLabel || "External destination",
       flow: streamFlow(item),
       massFlowKgBatch,
       annualMassKg,
@@ -6876,6 +6977,179 @@ function renderQuickAdd() {
   }).join("");
 }
 
+function selectedStream() {
+  return state.streams.find((item) => item.id === state.selectedId);
+}
+
+function boundaryStreamDefaults(unitItem, direction, kind = "main") {
+  const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
+  if (kind === "utility") {
+    return {
+      composition: text.includes("steam") ? "Clean steam supply" : text.includes("gas") ? "Process gas supply" : "WFI / clean utility",
+      phase: text.includes("steam") || text.includes("gas") ? "Gas" : "Liquid",
+      label: "Utility header",
+    };
+  }
+  if (kind === "waste") {
+    return {
+      composition: text.includes("gas") || text.includes("vent") ? "Process off-gas" : "Waste / spent process material",
+      phase: text.includes("gas") || text.includes("vent") ? "Gas" : "Liquid",
+      label: text.includes("gas") || text.includes("vent") ? "Vent / abatement" : "Waste treatment",
+    };
+  }
+  if (direction === "inlet") {
+    if (unitItem.cls === "Bioreactor") return { composition: "Sterile medium / inoculum feed", phase: "Liquid", label: "Plant feed" };
+    if (unitItem.cls === "Preparation") return { composition: "Raw material / process water", phase: "Liquid", label: "Raw materials" };
+    if (unitItem.cls === "Utilities") return { composition: "Site utility supply", phase: "Liquid", label: "Utility header" };
+    return { composition: "Process feed", phase: "Liquid", label: "External source" };
+  }
+  if (["Packaging", "Finishing"].includes(unitItem.cls)) return { composition: "Released product", phase: "Liquid", label: "Product dispatch" };
+  if (["Waste", "Environmental", "Air pollution"].includes(unitItem.cls)) return { composition: "Treated discharge", phase: "Liquid", label: "Plant discharge" };
+  if (unitItem.cls === "Quality") return { composition: "Sample / analytical result", phase: "Data", label: "QC / data system" };
+  return { composition: "Process outlet", phase: "Liquid", label: "External destination" };
+}
+
+function addBoundaryStreamToUnit(unitId, direction, kind = "main") {
+  const unitItem = state.units.find((item) => item.id === unitId);
+  if (!unitItem) return;
+  const defaults = boundaryStreamDefaults(unitItem, direction, kind);
+  const item = createBoundaryStream({
+    id: `S-${state.nextStream++}`,
+    unitId,
+    direction,
+    kind,
+    composition: defaults.composition,
+    phase: defaults.phase,
+    boundaryLabel: defaults.label,
+  });
+  state.streams.push(item);
+  state.selectedId = item.id;
+  state.connectFrom = null;
+  state.connectTo = null;
+  massBalanceCache = { key: "", value: null };
+  renderAll();
+  showToast(`${direction === "inlet" ? "Inlet to" : "Outlet from"} ${unitId} added`);
+}
+
+function endpointOptionsMarkup(selectedValue, boundaryLabel) {
+  return `
+    <option value="" ${selectedValue ? "" : "selected"}>${boundaryLabel}</option>
+    ${state.units.map((item) => `<option value="${escapeAttr(item.id)}" ${selectedValue === item.id ? "selected" : ""}>${escapeHtml(item.id)} · ${escapeHtml(item.name)}</option>`).join("")}
+  `;
+}
+
+function renderCanvasWorkbench() {
+  if (!els.canvasWorkbench) return;
+  const unitItem = selectedUnit();
+  const streamItem = selectedStream();
+  const audit = auditFlowsheetConnectivity(state.units, state.streams);
+  const connectionPrompt = state.connectFrom
+    ? `<div class="connection-prompt"><span>Choose destination</span><strong>${escapeHtml(state.connectFrom)} → ?</strong><button type="button" data-canvas-action="cancel-connect">Cancel</button></div>`
+    : state.connectTo
+      ? `<div class="connection-prompt"><span>Choose source</span><strong>? → ${escapeHtml(state.connectTo)}</strong><button type="button" data-canvas-action="cancel-connect">Cancel</button></div>`
+      : "";
+
+  if (streamItem) {
+    const kind = streamKind(
+      streamItem,
+      state.units.find((item) => item.id === streamItem.from),
+      state.units.find((item) => item.id === streamItem.to),
+    );
+    els.canvasWorkbench.innerHTML = `
+      ${connectionPrompt}
+      <section class="workbench-selection">
+        <div class="workbench-title">
+          <span>Selected stream</span>
+          <strong>${escapeHtml(streamItem.id)}</strong>
+          <small>${isBoundaryStream(streamItem) ? "Plant boundary stream" : "Equipment-to-equipment stream"}</small>
+        </div>
+        <form class="stream-editor" data-stream-edit="${escapeAttr(streamItem.id)}">
+          <label><span>From</span><select name="from">${endpointOptionsMarkup(streamItem.from, "External source")}</select></label>
+          <label><span>To</span><select name="to">${endpointOptionsMarkup(streamItem.to, "External destination")}</select></label>
+          <label class="stream-editor-wide"><span>Material / signal</span><input name="composition" value="${escapeAttr(streamItem.composition)}" /></label>
+          <label><span>Phase</span>
+            <select name="phase">
+              ${["Liquid", "Slurry", "Solid", "Gas", "Data"].map((phase) => `<option ${streamItem.phase === phase ? "selected" : ""}>${phase}</option>`).join("")}
+            </select>
+          </label>
+          <label><span>Stream class</span>
+            <select name="kind">
+              ${[
+                ["main", "Material / product"],
+                ["utility", "Utility / service"],
+                ["waste", "Waste / side stream"],
+                ["qc", "Sample / signal"],
+              ].map(([value, label]) => `<option value="${value}" ${kind === value ? "selected" : ""}>${label}</option>`).join("")}
+            </select>
+          </label>
+          <div class="stream-editor-actions">
+            <button class="primary" type="submit">Apply stream changes</button>
+            <button type="button" data-canvas-action="reverse-stream">Reverse direction</button>
+            ${isBoundaryStream(streamItem) ? "" : `<button type="button" data-canvas-action="${state.lockedRoutes?.[streamItem.id] ? "unlock-route" : "lock-route"}">${state.lockedRoutes?.[streamItem.id] ? "Use automatic routing" : "Lock current route"}</button>`}
+            <button class="danger-text" type="button" data-canvas-action="delete-stream">Delete stream</button>
+          </div>
+        </form>
+      </section>
+      <aside class="workbench-audit">
+        <span>Model connectivity</span>
+        <strong>${audit.complete.length}/${state.units.length} units have both sides connected</strong>
+        <button type="button" data-canvas-action="next-open-unit">${audit.attention.length ? `Review ${audit.attention.length} open units` : "All units reviewed"}</button>
+      </aside>
+    `;
+    return;
+  }
+
+  if (unitItem) {
+    const connections = connectionStateForUnit(state.streams, unitItem.id);
+    const attached = [...connections.incoming, ...connections.outgoing];
+    const status = connections.isolated ? "Unconnected" : connections.complete ? "Connected" : "Open port";
+    els.canvasWorkbench.innerHTML = `
+      ${connectionPrompt}
+      <section class="workbench-selection">
+        <div class="workbench-title">
+          <span>Selected equipment</span>
+          <strong>${escapeHtml(unitItem.id)} · ${escapeHtml(unitItem.name)}</strong>
+          <small class="connection-status status-${connections.complete ? "complete" : connections.isolated ? "isolated" : "open"}">${status} · ${connections.incoming.length} in · ${connections.outgoing.length} out</small>
+        </div>
+        <div class="unit-stream-actions" aria-label="Create equipment streams">
+          <button type="button" data-canvas-action="add-inlet"><b>+ Inlet</b><span>External feed into ${escapeHtml(unitItem.id)}</span></button>
+          <button type="button" data-canvas-action="connect-to"><b>Connect into</b><span>Choose upstream equipment</span></button>
+          <button type="button" data-canvas-action="connect-from"><b>Connect onward</b><span>Choose downstream equipment</span></button>
+          <button type="button" data-canvas-action="add-outlet"><b>+ Outlet</b><span>External product or discharge</span></button>
+          <button type="button" data-canvas-action="add-utility"><b>+ Utility inlet</b><span>WFI, steam, gas, or service</span></button>
+          <button type="button" data-canvas-action="add-waste"><b>+ Waste outlet</b><span>Waste, spent material, or off-gas</span></button>
+        </div>
+        <div class="attached-streams">
+          <span>Attached streams</span>
+          ${attached.length ? attached.map((item) => {
+            const incoming = item.to === unitItem.id;
+            const other = incoming ? (item.from || item.boundaryLabel || "Plant inlet") : (item.to || item.boundaryLabel || "Plant outlet");
+            return `<button type="button" data-select-stream="${escapeAttr(item.id)}"><b>${incoming ? "IN" : "OUT"} · ${escapeHtml(item.id)}</b><span>${escapeHtml(other)} · ${escapeHtml(item.composition)}</span></button>`;
+          }).join("") : `<p>No stream is attached yet. This unit is not part of the transfer graph until you add or connect a stream.</p>`}
+        </div>
+      </section>
+      <aside class="workbench-audit">
+        <span>Connection check</span>
+        <strong>${connections.complete ? "Both ports are represented" : connections.isolated ? "No transfer path exists" : `${connections.missingInlet ? "Inlet" : "Outlet"} still open`}</strong>
+        <button type="button" data-canvas-action="complete-boundaries" ${connections.complete ? "disabled" : ""}>${connections.complete ? "No open ports" : "Add missing plant boundaries"}</button>
+      </aside>
+    `;
+    return;
+  }
+
+  els.canvasWorkbench.innerHTML = `
+    ${connectionPrompt}
+    <section class="workbench-empty">
+      <div>
+        <span>Connection workbench</span>
+        <strong>Select equipment or a stream on the canvas</strong>
+        <p>Equipment opens inlet, outlet, utility, waste, and connection actions. Streams open an editor for source, destination, material, phase, and class.</p>
+      </div>
+      <button type="button" data-canvas-action="next-open-unit">${audit.attention.length ? `Review ${audit.attention.length} units with open ports` : "All units are connected"}</button>
+    </section>
+  `;
+}
+
 function renderEquationSpotlight() {
   const context = state.streams.find((item) => item.id === state.selectedId) ? "Selected stream equations" : selectedUnit() ? `${selectedUnit().cls} equations` : "Live model equations";
   els.equationSpotlight.innerHTML = `
@@ -7061,6 +7335,49 @@ function streamGeometry(from, to, kind = "main", streamIndex = 0) {
   }
 
   return streamGeometryFromPoints(points);
+}
+
+function boundaryStreamGeometry(streamItem, unitItem, streamIndex = 0) {
+  const incoming = !streamItem.from;
+  const portX = incoming ? unitItem.x : unitItem.x + unitWidth(unitItem);
+  const portY = unitMidline(unitItem);
+  const laneOffset = ((streamIndex % 3) - 1) * 24;
+  const compactTopInlet = incoming && unitItem.x < 220;
+  const boundaryY = compactTopInlet ? Math.max(32, unitItem.y - 48) : Math.max(32, portY + laneOffset);
+  const boundaryX = compactTopInlet
+    ? unitItem.x + 128
+    : incoming
+      ? Math.max(160, unitItem.x - 48 - (streamIndex % 2) * 24)
+      : unitItem.x + unitWidth(unitItem) + 48 + (streamIndex % 2) * 24;
+  const elbowX = incoming ? Math.max(18, unitItem.x - 28) : unitItem.x + unitWidth(unitItem) + 30;
+  const points = compactTopInlet
+    ? [
+        { x: boundaryX, y: boundaryY },
+        { x: elbowX, y: boundaryY },
+        { x: elbowX, y: portY },
+        { x: portX, y: portY },
+      ]
+    : incoming
+      ? [
+          { x: boundaryX, y: boundaryY },
+          { x: elbowX, y: boundaryY },
+          { x: elbowX, y: portY },
+          { x: portX, y: portY },
+        ]
+      : [
+          { x: portX, y: portY },
+          { x: elbowX, y: portY },
+          { x: elbowX, y: boundaryY },
+          { x: boundaryX, y: boundaryY },
+        ];
+  return {
+    ...streamGeometryFromPoints(points),
+    incoming,
+    boundaryX,
+    boundaryY,
+    nodeLeft: incoming ? boundaryX - 128 : boundaryX,
+    nodeTop: boundaryY - 24,
+  };
 }
 
 const GLOBAL_ROUTER_WORKER_THRESHOLD = 80;
@@ -7280,7 +7597,6 @@ function lockStreamRoute(streamId) {
   };
   canvasRouteCache.signature = "";
   renderCanvas();
-  showStreamDetails(state.streams.find((item) => item.id === streamId));
   showToast(`${streamId} route locked`);
 }
 
@@ -7291,7 +7607,6 @@ function unlockStreamRoute(streamId) {
   state.lockedRoutes = next;
   canvasRouteCache.signature = "";
   renderCanvas();
-  showStreamDetails(state.streams.find((item) => item.id === streamId));
   showToast(`${streamId} returned to global routing`);
 }
 
@@ -7365,7 +7680,6 @@ function renderLockedRouteHandles(stage, stream, points) {
           };
           canvasRouteCache.signature = "";
           renderCanvas();
-          showStreamDetails(stream);
           showToast(`${stream.id} corridor moved`);
         }
       };
@@ -7378,10 +7692,16 @@ function renderLockedRouteHandles(stage, stream, points) {
 }
 
 function renderCanvas() {
+  renderCanvasWorkbench();
   els.canvas.innerHTML = "";
   const visibleUnits = state.units.filter(isUnitVisible);
   const visibleUnitIds = new Set(visibleUnits.map((item) => item.id));
   const visibleStreams = state.streams.filter((item) => visibleUnitIds.has(item.from) && visibleUnitIds.has(item.to));
+  const visibleBoundaryStreams = state.streams.filter((item) => (
+    (!item.from && visibleUnitIds.has(item.to))
+    || (!item.to && visibleUnitIds.has(item.from))
+  ));
+  const allVisibleStreams = [...visibleStreams, ...visibleBoundaryStreams];
   const stagePaddingX = 520;
   const stagePaddingY = 420;
   const stageWidth = Math.max(1800, ...visibleUnits.map((item) => item.x + unitWidth(item) + stagePaddingX));
@@ -7400,26 +7720,28 @@ function renderCanvas() {
   stage.dataset.focus = state.canvasFocus;
   stage.dataset.flowDetail = state.flowDetail;
   stage.dataset.mode = state.mode;
-  stage.dataset.connecting = state.connectFrom ? "true" : "false";
+  stage.dataset.connecting = state.connectFrom || state.connectTo ? "true" : "false";
   stage.dataset.router = routePlan.stats.pending ? "optimizing" : (routePlan.stats.strategy || "global");
   const reaction = document.querySelector("#processReaction");
   if (reaction) reaction.textContent = processReactionSummary();
   const selectedVisibleUnit = visibleUnits.find((item) => item.id === state.selectedId);
-  const selectedVisibleStream = visibleStreams.find((item) => item.id === state.selectedId);
+  const selectedVisibleStream = allVisibleStreams.find((item) => item.id === state.selectedId);
   const selectionLabel = selectedVisibleUnit
     ? `${selectedVisibleUnit.id} · ${selectedVisibleUnit.name}`
     : selectedVisibleStream
       ? `${selectedVisibleStream.id} · ${selectedVisibleStream.composition}`
       : state.connectFrom
         ? `${state.connectFrom} selected as stream source`
-        : "No object selected";
+        : state.connectTo
+          ? `${state.connectTo} selected as stream destination`
+          : "No object selected";
   stage.insertAdjacentHTML("beforeend", `
     <div class="canvas-focus-note">
       <i aria-hidden="true"></i>
       <span>
         <b>${canvasFocusOptions.find((item) => item.key === state.canvasFocus)?.label || "All"}</b>
         <small>
-          ${visibleUnits.length} units · ${visibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}
+          ${visibleUnits.length} units · ${allVisibleStreams.length} streams · ${flowDetailOptions.find((item) => item.key === state.flowDetail)?.label || "Standard"}
           <em class="router-status${routePlan.stats.fallback ? " router-warning" : ""}${routePlan.stats.pending ? " router-pending" : ""}">
             ${routePlan.stats.pending
               ? `Optimizing ${routePlan.stats.streamCount} streams...`
@@ -7465,7 +7787,7 @@ function renderCanvas() {
     line.addEventListener("click", () => {
       state.selectedId = item.id;
       renderEquationSpotlight();
-      showExploreDetails(line);
+      els.detailDrawer?.classList.remove("open");
       renderCanvas();
     });
     if (state.selectedId === item.id) line.classList.add("selected");
@@ -7506,7 +7828,7 @@ function renderCanvas() {
       label.addEventListener("click", () => {
         state.selectedId = item.id;
         renderEquationSpotlight();
-        showExploreDetails(label);
+        els.detailDrawer?.classList.remove("open");
         renderCanvas();
       });
       stage.appendChild(label);
@@ -7514,11 +7836,54 @@ function renderCanvas() {
     renderLockedRouteHandles(stage, item, routePoints || []);
   });
 
+  visibleBoundaryStreams.forEach((item, boundaryIndex) => {
+    const unitItem = state.units.find((candidate) => candidate.id === (item.from || item.to));
+    if (!unitItem) return;
+    const kind = streamKind(item, item.from ? unitItem : null, item.to ? unitItem : null);
+    const geometry = boundaryStreamGeometry(item, unitItem, boundaryIndex);
+    const line = document.createElement("button");
+    line.className = `stream-line stream-${kind} boundary-stream${state.selectedId === item.id ? " selected" : ""}`;
+    line.dataset.streamId = item.id;
+    line.dataset.tooltip = streamTooltip(item, item.from ? unitItem : null, item.to ? unitItem : null, kind);
+    line.style.left = `${geometry.left}px`;
+    line.style.top = `${geometry.top}px`;
+    line.style.width = `${geometry.width}px`;
+    line.style.height = `${geometry.height}px`;
+    line.innerHTML = streamPathMarkup(item, kind, geometry);
+    line.addEventListener("click", () => {
+      state.selectedId = item.id;
+      renderEquationSpotlight();
+      renderCanvas();
+    });
+    stage.appendChild(line);
+
+    const endpoint = document.createElement("button");
+    endpoint.className = `boundary-node boundary-${geometry.incoming ? "inlet" : "outlet"} boundary-${kind}${state.selectedId === item.id ? " selected" : ""}`;
+    endpoint.dataset.streamId = item.id;
+    endpoint.dataset.boundaryStreamId = item.id;
+    endpoint.dataset.tooltip = streamTooltip(item, item.from ? unitItem : null, item.to ? unitItem : null, kind);
+    endpoint.style.left = `${geometry.nodeLeft}px`;
+    endpoint.style.top = `${geometry.nodeTop}px`;
+    endpoint.innerHTML = `
+      <span>${geometry.incoming ? "IN" : "OUT"}</span>
+      <b>${escapeHtml(item.boundaryLabel || (geometry.incoming ? "Plant inlet" : "Plant outlet"))}</b>
+      <small>${escapeHtml(item.id)} · ${escapeHtml(item.composition)}</small>
+    `;
+    endpoint.addEventListener("click", () => {
+      state.selectedId = item.id;
+      renderEquationSpotlight();
+      renderCanvas();
+    });
+    stage.appendChild(endpoint);
+  });
+
   visibleUnits.forEach((item) => {
     const node = document.createElement("button");
     const className = item.cls.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const layer = unitLayer(item);
-    node.className = `unit unit-${className} unit-layer-${layer}${isMinorUnit(item) ? " unit-minor" : ""}${state.mode === "connect" ? " connect-ready" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id ? " connecting" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
+    const connections = connectionStateForUnit(state.streams, item.id);
+    const connectionClass = connections.isolated ? " unit-disconnected" : connections.complete ? " unit-connected" : " unit-open-port";
+    node.className = `unit unit-${className} unit-layer-${layer}${connectionClass}${isMinorUnit(item) ? " unit-minor" : ""}${state.mode === "connect" ? " connect-ready" : ""}${state.selectedId === item.id ? " selected" : ""}${state.connectFrom === item.id || state.connectTo === item.id ? " connecting" : ""}${(state.commandHighlights || []).includes(item.id) ? " command-highlight" : ""}`;
     node.style.left = `${item.x}px`;
     node.style.top = `${item.y}px`;
     node.style.borderLeftColor = item.color;
@@ -7528,8 +7893,8 @@ function renderCanvas() {
     const ics = icsCodeForUnit(item);
     const showEquipmentMeta = ["equipment", "full"].includes(state.flowDetail);
     node.innerHTML = `
-      <i class="unit-port port-in" title="Input port"></i>
-      <i class="unit-port port-out" title="Output port"></i>
+      <i class="unit-port port-in ${connections.missingInlet ? "port-open" : "port-used"}" title="${connections.incoming.length} input stream${connections.incoming.length === 1 ? "" : "s"}"></i>
+      <i class="unit-port port-out ${connections.missingOutlet ? "port-open" : "port-used"}" title="${connections.outgoing.length} output stream${connections.outgoing.length === 1 ? "" : "s"}"></i>
       <span class="unit-icon" style="--symbol-color:${item.color}">
         ${pfdSymbolMarkup(item)}
       </span>
@@ -7543,6 +7908,7 @@ function renderCanvas() {
         ${showEquipmentMeta ? `<small class="unit-ics">${ics.code} · ${item.cls}</small>` : ""}
       </span>
       <em class="unit-pfd-tag">${pfdSymbolType(item).replace("-", " ")}</em>
+      <span class="unit-connection-count" title="Connected streams">${connections.incoming.length} in · ${connections.outgoing.length} out</span>
     `;
     wireUnitNode(node, item);
     stage.appendChild(node);
@@ -7567,7 +7933,7 @@ function wireUnitNode(node, item) {
     }
     state.selectedId = item.id;
     renderEquationSpotlight();
-    showExploreDetails(node);
+    els.detailDrawer?.classList.remove("open");
     renderCanvas();
   });
 
@@ -7605,7 +7971,25 @@ function redrawStreamsOnly() {
     if (!streamItem) return;
     const from = state.units.find((item) => item.id === streamItem.from);
     const to = state.units.find((item) => item.id === streamItem.to);
-    if (!line || !from || !to) return;
+    if (!line) return;
+    if (isBoundaryStream(streamItem)) {
+      const unitItem = from || to;
+      if (!unitItem) return;
+      const kind = streamKind(streamItem, from, to);
+      const geometry = boundaryStreamGeometry(streamItem, unitItem, streamIndex);
+      line.style.left = `${geometry.left}px`;
+      line.style.top = `${geometry.top}px`;
+      line.style.width = `${geometry.width}px`;
+      line.style.height = `${geometry.height}px`;
+      line.innerHTML = streamPathMarkup(streamItem, kind, geometry);
+      const endpoint = els.canvas.querySelector(`[data-boundary-stream-id="${CSS.escape(streamItem.id)}"]`);
+      if (endpoint) {
+        endpoint.style.left = `${geometry.nodeLeft}px`;
+        endpoint.style.top = `${geometry.nodeTop}px`;
+      }
+      return;
+    }
+    if (!from || !to) return;
     const kind = streamKind(streamItem, from, to);
     const geometry = streamGeometry(from, to, kind, streamIndex);
     line.style.left = `${geometry.left}px`;
@@ -7617,19 +8001,50 @@ function redrawStreamsOnly() {
 }
 
 function handleConnectClick(id) {
+  if (state.connectTo) {
+    if (state.connectTo === id) {
+      state.connectTo = null;
+      showToast("Connection cancelled");
+    } else {
+      connectEquipmentUnits(id, state.connectTo);
+    }
+    renderCanvas();
+    return;
+  }
   if (!state.connectFrom) {
     state.connectFrom = id;
+    state.connectTo = null;
     showToast(`Connect from ${id}`);
   } else if (state.connectFrom === id) {
     state.connectFrom = null;
     showToast("Connection cancelled");
   } else {
-    state.streams.push(stream(`S-${state.nextStream++}`, state.connectFrom, id, "Process intermediate", "Liquid"));
-    state.connectFrom = null;
-    renderAll();
-    showToast("Stream connected");
+    connectEquipmentUnits(state.connectFrom, id);
   }
   renderCanvas();
+}
+
+function connectEquipmentUnits(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) {
+    showToast("Choose two different equipment items");
+    return false;
+  }
+  const duplicate = state.streams.find((item) => item.from === fromId && item.to === toId);
+  if (duplicate) {
+    state.selectedId = duplicate.id;
+    state.connectFrom = null;
+    state.connectTo = null;
+    showToast(`${duplicate.id} already connects these units`);
+    return false;
+  }
+  state.streams.push(stream(`S-${state.nextStream++}`, fromId, toId, "Process intermediate", "Liquid", { kind: "main" }));
+  state.selectedId = state.streams.at(-1).id;
+  state.connectFrom = null;
+  state.connectTo = null;
+  massBalanceCache = { key: "", value: null };
+  renderAll();
+  showToast(`${fromId} connected to ${toId}`);
+  return true;
 }
 
 function addUnitFromPalette(type, x, y) {
@@ -7637,8 +8052,10 @@ function addUnitFromPalette(type, x, y) {
   const newUnit = unit(nextUnitId(base), type, snapToCanvasGrid(x), snapToCanvasGrid(y));
   state.units.push(newUnit);
   state.selectedId = newUnit.id;
+  state.connectFrom = null;
+  state.connectTo = null;
   renderAll();
-  showToast(`${base.label} added`);
+  showToast(`${base.label} added · choose an inlet, outlet, or equipment connection`);
 }
 
 function nextUnitId(base) {
@@ -7674,6 +8091,28 @@ function addSectionPreset(key) {
   added.slice(1).forEach((item, index) => {
     state.streams.push(stream(`S-${state.nextStream++}`, added[index].id, item.id, preset.composition, preset.phase));
   });
+  if (added.length) {
+    const inletDefaults = boundaryStreamDefaults(added[0], "inlet", "main");
+    const outletDefaults = boundaryStreamDefaults(added.at(-1), "outlet", "main");
+    state.streams.push(createBoundaryStream({
+      id: `S-${state.nextStream++}`,
+      unitId: added[0].id,
+      direction: "inlet",
+      kind: "main",
+      composition: inletDefaults.composition,
+      phase: inletDefaults.phase,
+      boundaryLabel: inletDefaults.label,
+    }));
+    state.streams.push(createBoundaryStream({
+      id: `S-${state.nextStream++}`,
+      unitId: added.at(-1).id,
+      direction: "outlet",
+      kind: "main",
+      composition: outletDefaults.composition,
+      phase: outletDefaults.phase,
+      boundaryLabel: outletDefaults.label,
+    }));
+  }
 
   state.selectedId = added[0]?.id || state.selectedId;
   state.canvasFocus = "all";
@@ -7722,15 +8161,174 @@ function connectFromSelectedUnit() {
   }
   state.mode = "connect";
   state.connectFrom = current.id;
+  state.connectTo = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === "connect"));
   els.modeHint.textContent = `Now click the destination unit for ${current.id}.`;
   renderCanvas();
   showToast(`Connecting from ${current.id}`);
 }
 
+function connectToSelectedUnit() {
+  const current = selectedUnit();
+  if (!current) {
+    showToast("Select a unit first");
+    return;
+  }
+  state.mode = "connect";
+  state.connectFrom = null;
+  state.connectTo = current.id;
+  document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === "connect"));
+  els.modeHint.textContent = `Now click the upstream source for ${current.id}.`;
+  renderCanvas();
+  showToast(`Choose equipment feeding ${current.id}`);
+}
+
+function selectNextOpenUnit() {
+  const audit = auditFlowsheetConnectivity(state.units, state.streams);
+  if (!audit.attention.length) {
+    showToast("All equipment has an inlet and an outlet");
+    return;
+  }
+  const currentIndex = audit.attention.findIndex((row) => row.unit.id === state.selectedId);
+  const next = audit.attention[(currentIndex + 1) % audit.attention.length];
+  state.selectedId = next.unit.id;
+  state.mode = "select";
+  state.connectFrom = null;
+  state.connectTo = null;
+  renderEquationSpotlight();
+  renderCanvas();
+  showToast(`${next.unit.id}: ${next.missingInlet ? "inlet open" : ""}${next.missingInlet && next.missingOutlet ? " · " : ""}${next.missingOutlet ? "outlet open" : ""}`);
+}
+
+function addMissingBoundariesForSelectedUnit() {
+  const current = selectedUnit();
+  if (!current) return;
+  const connections = connectionStateForUnit(state.streams, current.id);
+  const added = [];
+  if (connections.missingInlet) {
+    const defaults = boundaryStreamDefaults(current, "inlet", "main");
+    const inlet = createBoundaryStream({
+      id: `S-${state.nextStream++}`,
+      unitId: current.id,
+      direction: "inlet",
+      kind: "main",
+      composition: defaults.composition,
+      phase: defaults.phase,
+      boundaryLabel: defaults.label,
+    });
+    state.streams.push(inlet);
+    added.push(inlet.id);
+  }
+  if (connections.missingOutlet) {
+    const defaults = boundaryStreamDefaults(current, "outlet", unitLayer(current) === "waste" ? "waste" : "main");
+    const outlet = createBoundaryStream({
+      id: `S-${state.nextStream++}`,
+      unitId: current.id,
+      direction: "outlet",
+      kind: unitLayer(current) === "waste" ? "waste" : "main",
+      composition: defaults.composition,
+      phase: defaults.phase,
+      boundaryLabel: defaults.label,
+    });
+    state.streams.push(outlet);
+    added.push(outlet.id);
+  }
+  if (!added.length) {
+    showToast(`${current.id} has no open plant boundary`);
+    return;
+  }
+  massBalanceCache = { key: "", value: null };
+  renderAll();
+  showToast(`${added.length} plant boundary stream${added.length === 1 ? "" : "s"} added to ${current.id}`);
+}
+
+function deleteSelectedStream() {
+  const current = selectedStream();
+  if (!current) return;
+  state.streams = state.streams.filter((item) => item.id !== current.id);
+  if (state.lockedRoutes?.[current.id]) {
+    const nextLocks = { ...state.lockedRoutes };
+    delete nextLocks[current.id];
+    state.lockedRoutes = nextLocks;
+  }
+  state.selectedId = current.from || current.to || state.units[0]?.id || null;
+  massBalanceCache = { key: "", value: null };
+  canvasRouteCache.signature = "";
+  renderAll();
+  showToast(`${current.id} deleted`);
+}
+
+function reverseSelectedStream() {
+  const current = selectedStream();
+  if (!current) return;
+  try {
+    const next = retargetStream(current, {
+      from: current.to,
+      to: current.from,
+      composition: current.composition,
+      phase: current.phase,
+      kind: current.kind || streamKind(current),
+    });
+    if (isBoundaryStream(next)) {
+      const unitItem = state.units.find((item) => item.id === (next.from || next.to));
+      const defaults = boundaryStreamDefaults(unitItem, next.from ? "outlet" : "inlet", next.kind);
+      next.boundaryLabel = defaults.label;
+    }
+    state.streams = state.streams.map((item) => item.id === current.id ? next : item);
+    state.lockedRoutes = { ...state.lockedRoutes };
+    delete state.lockedRoutes[current.id];
+    massBalanceCache = { key: "", value: null };
+    canvasRouteCache.signature = "";
+    renderAll();
+    showToast(`${current.id} direction reversed`);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function applyStreamEditor(form) {
+  const current = state.streams.find((item) => item.id === form.dataset.streamEdit);
+  if (!current) return;
+  const values = new FormData(form);
+  const from = String(values.get("from") || "");
+  const to = String(values.get("to") || "");
+  if (from && !state.units.some((item) => item.id === from)) {
+    showToast("Choose a valid source equipment item");
+    return;
+  }
+  if (to && !state.units.some((item) => item.id === to)) {
+    showToast("Choose a valid destination equipment item");
+    return;
+  }
+  try {
+    const next = retargetStream(current, {
+      from,
+      to,
+      composition: values.get("composition"),
+      phase: values.get("phase"),
+      kind: values.get("kind"),
+    });
+    if (isBoundaryStream(next)) {
+      const unitItem = state.units.find((item) => item.id === (next.from || next.to));
+      const defaults = boundaryStreamDefaults(unitItem, next.from ? "outlet" : "inlet", next.kind);
+      next.boundaryLabel = defaults.label;
+    }
+    state.streams = state.streams.map((item) => item.id === current.id ? next : item);
+    state.lockedRoutes = { ...state.lockedRoutes };
+    delete state.lockedRoutes[current.id];
+    massBalanceCache = { key: "", value: null };
+    canvasRouteCache.signature = "";
+    renderAll();
+    showToast(`${current.id} updated`);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 function renderTables() {
   els.equipmentTable.innerHTML = state.units.map((item) => {
     const ics = icsCodeForUnit(item);
+    const connections = connectionStateForUnit(state.streams, item.id);
     return `
       <tr>
         <td>${item.id}</td>
@@ -7742,6 +8340,7 @@ function renderTables() {
         <td>${formatNumber(item.residence, 1)} h</td>
         <td>${unitPower(item)}</td>
         <td>${(item.standards || []).slice(0, 3).join(", ")}</td>
+        <td><span class="table-connection-status status-${connections.complete ? "complete" : connections.isolated ? "isolated" : "open"}">${connections.incoming.length} in · ${connections.outgoing.length} out</span></td>
         <td>${item.status}</td>
       </tr>
     `;
@@ -13105,10 +13704,11 @@ function renderEconomics() {
 function setMode(mode) {
   state.mode = mode;
   state.connectFrom = null;
+  state.connectTo = null;
   document.querySelectorAll(".tool").forEach((tool) => tool.classList.toggle("active", tool.dataset.mode === mode));
   const hints = {
-    select: "Select & Move Units: click equipment or streams to highlight them, drag units to reposition, and use Duplicate or Connect from the top actions.",
-    connect: "Draw Process Stream: click the source equipment first, then click the destination. Animated streams show process direction.",
+    select: "Select equipment to add plant inlets, outlets, utilities, waste streams, or equipment connections. Select a stream to edit its endpoints and material data.",
+    connect: "Connect equipment: click the source first, then the destination. Use the connection workbench for a specific inlet or outlet direction.",
   };
   els.modeHint.textContent = hints[mode];
   renderCanvas();
@@ -13131,6 +13731,7 @@ function setView(view) {
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   if (els.pageTitle) els.pageTitle.textContent = pageTitle(view);
   target.classList.add("active");
+  if (view === "flowsheet") els.detailDrawer?.classList.remove("open");
   document.querySelector(".workspace")?.scrollTo({ left: 0, top: 0, behavior: "auto" });
   if (view === "flowsheet") openProcessCanvas();
 }
@@ -16540,6 +17141,7 @@ function bindEvents() {
     const control = event.target.closest("button, a, input, textarea, select");
     if (!surface || surface.closest(".detail-drawer") || (control && !surface.matches(".unit, .stream-line, .stream-label"))) return;
     if (state.mode === "connect" && surface.matches(".unit")) return;
+    if (document.body.dataset.activeView === "flowsheet" && surface.matches(".unit, .stream-line, .stream-label")) return;
     showExploreDetails(surface);
   });
 
@@ -16837,6 +17439,62 @@ function bindEvents() {
     const item = event.target.closest("[data-type]");
     if (!item) return;
     addUnitFromButton(item.dataset.type);
+  });
+
+  els.canvasWorkbench.addEventListener("submit", (event) => {
+    const form = event.target.closest("[data-stream-edit]");
+    if (!form) return;
+    event.preventDefault();
+    applyStreamEditor(form);
+  });
+
+  els.canvasWorkbench.addEventListener("click", (event) => {
+    const streamButton = event.target.closest("[data-select-stream]");
+    if (streamButton) {
+      state.selectedId = streamButton.dataset.selectStream;
+      renderEquationSpotlight();
+      renderCanvas();
+      return;
+    }
+    const actionButton = event.target.closest("[data-canvas-action]");
+    if (!actionButton || actionButton.disabled) return;
+    const action = actionButton.dataset.canvasAction;
+    const current = selectedUnit();
+    if (action === "cancel-connect") {
+      setMode("select");
+      showToast("Connection cancelled");
+      return;
+    }
+    if (action === "next-open-unit") {
+      selectNextOpenUnit();
+      return;
+    }
+    if (action === "delete-stream") {
+      deleteSelectedStream();
+      return;
+    }
+    if (action === "reverse-stream") {
+      reverseSelectedStream();
+      return;
+    }
+    if (action === "lock-route") {
+      const streamItem = selectedStream();
+      if (streamItem) lockStreamRoute(streamItem.id);
+      return;
+    }
+    if (action === "unlock-route") {
+      const streamItem = selectedStream();
+      if (streamItem) unlockStreamRoute(streamItem.id);
+      return;
+    }
+    if (!current) return;
+    if (action === "add-inlet") addBoundaryStreamToUnit(current.id, "inlet", "main");
+    if (action === "add-outlet") addBoundaryStreamToUnit(current.id, "outlet", "main");
+    if (action === "add-utility") addBoundaryStreamToUnit(current.id, "inlet", "utility");
+    if (action === "add-waste") addBoundaryStreamToUnit(current.id, "outlet", "waste");
+    if (action === "connect-from") connectFromSelectedUnit();
+    if (action === "connect-to") connectToSelectedUnit();
+    if (action === "complete-boundaries") addMissingBoundariesForSelectedUnit();
   });
 
   els.equationSpotlight.addEventListener("click", (event) => {

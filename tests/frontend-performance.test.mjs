@@ -68,3 +68,26 @@ test("production modes and numerical solvers are connected to the workspace", as
   assert.match(styles, /\.operation-mode-panel/);
   assert.match(styles, /\.numerical-solver-panel/);
 });
+
+test("flowsheet workbench supports equipment connections and plant boundary streams", async () => {
+  const [app, indexHtml, styles] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(indexHtml, /id="canvasWorkbench"/);
+  assert.match(indexHtml, /Connect equipment/);
+  assert.match(app, /createBoundaryStream\(/);
+  assert.match(app, /addBoundaryStreamToUnit\(/);
+  assert.match(app, /applyStreamEditor\(/);
+  assert.match(app, /data-canvas-action="add-inlet"/);
+  assert.match(app, /data-canvas-action="add-outlet"/);
+  assert.match(app, /data-canvas-action="connect-to"/);
+  assert.match(app, /visibleBoundaryStreams/);
+  assert.match(app, /document\.body\.dataset\.activeView === "flowsheet"/);
+  assert.match(styles, /\.canvas-workbench/);
+  assert.match(styles, /#flowsheetView \.canvas-workbench/);
+  assert.match(styles, /\.boundary-node/);
+  assert.match(styles, /\.unit-disconnected/);
+});

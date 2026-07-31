@@ -7,7 +7,7 @@ const checkoutReturn = params.has("checkout") || params.has("session_id");
 let workspacePromise;
 
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260730-modes-ode-pde-v1");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260731-flowsheet-workbench-v4");
   return workspacePromise;
 }
 

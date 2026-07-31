@@ -18,7 +18,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260730-modes-ode-pde-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260731-flowsheet-workbench-v4" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1533,7 +1533,7 @@
             <button id="zoomReset" class="action-button compact" title="Reset zoom" aria-label="Reset zoom"><span>100%</span></button>
             <button id="zoomIn" class="icon-button" title="Zoom in" aria-label="Zoom in">+</button>
             <button id="copySelected" class="action-button" title="Duplicate the selected unit" aria-label="Duplicate selected unit"><span>Duplicate</span></button>
-            <button id="connectSelected" class="action-button" title="Start a connection from the selected unit" aria-label="Connect from selected unit"><span>Connect</span></button>
+            <button id="connectSelected" class="action-button" title="Draw an outgoing stream from the selected equipment" aria-label="Start stream from selected equipment"><span>Start stream</span></button>
             <button id="downloadSummaryCsv" class="action-button" title="Download a process summary table" aria-label="Download process summary CSV"><span>Export</span></button>
             <button id="resetScenario" class="text-button">Reset model</button>
           </div>
@@ -1611,13 +1611,13 @@
                 <strong>Build and connect the plant</strong>
               </div>
               <div class="canvas-mode-switch" role="group" aria-label="Editing mode">
-                <button class="tool active" data-mode="select"><b>1 · Select</b><span>Move or inspect equipment</span></button>
-                <button class="tool" data-mode="connect"><b>2 · Connect</b><span>Choose source, then destination</span></button>
+                <button class="tool active" data-mode="select"><b>Select + move</b><span>Edit equipment or streams</span></button>
+                <button class="tool" data-mode="connect"><b>Connect equipment</b><span>Click source, then destination</span></button>
               </div>
               <ol class="canvas-guide" aria-label="How to edit the flowsheet">
-                <li><b>Add</b><span>Drag a PFD symbol from the library.</span></li>
-                <li><b>Connect</b><span>Create the material or utility stream.</span></li>
-                <li><b>Inspect</b><span>Select a tag to open balances and equations.</span></li>
+                <li><b>1</b><span>Add equipment.</span></li>
+                <li><b>2</b><span>Select it.</span></li>
+                <li><b>3</b><span>Add inlet, outlet, or connection below.</span></li>
               </ol>
               <div class="canvas-chemistry" aria-label="Active process chemistry">
                 <span>Biochemical shorthand</span>
@@ -1625,6 +1625,7 @@
               </div>
               <span id="modeHint">Select a PFD symbol to move it or inspect its model.</span>
             </div>
+            <div id="canvasWorkbench" class="canvas-workbench" aria-live="polite"></div>
             <details class="canvas-options">
               <summary>
                 <span>View and placement options</span>
@@ -1668,7 +1669,7 @@
         <section id="equipmentView" class="view data-view">
           <table>
             <thead>
-              <tr><th>Tag</th><th>Operation</th><th>ICS 71.120</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Status</th></tr>
+              <tr><th>Tag</th><th>Operation</th><th>ICS 71.120</th><th>ISO/PFD name</th><th>Class</th><th>Size</th><th>Residence</th><th>Power</th><th>Standards</th><th>Connections</th><th>Status</th></tr>
             </thead>
             <tbody id="equipmentTable"></tbody>
           </table>
@@ -1768,6 +1769,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260730-modes-ode-pde-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260731-flowsheet-workbench-v4"></script>
   </body>
 </html>
