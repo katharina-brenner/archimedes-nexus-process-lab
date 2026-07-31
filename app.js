@@ -8,7 +8,7 @@ import {
   retargetStream,
 } from "./flowsheet-connectivity.js";
 import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
-import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js";
+import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v2";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -3434,6 +3434,9 @@ function solveMassBalance() {
         equations: unitReactions(unitItem).map((item) => item.title).join("; "),
         componentsIn: componentSummary(inputVector),
         componentsOut: componentSummary(solvedUnit.output),
+        componentVectorIn: clone(inputVector),
+        componentVectorMainOut: clone(solvedUnit.output),
+        componentVectorWasteOut: clone(solvedUnit.wasteVector),
         solverStatus: usedSource ? "Source estimated" : "Solved",
         warnings: solvedUnit.warnings.join("; "),
       };
@@ -12663,6 +12666,12 @@ function workbookReadmeRows(report) {
     { section: "Model validity", item: "Screening outputs", value: readiness.screeningOutputs.length, status: "count", interpretation: readiness.screeningOutputs.map((item) => item.title).join(" | ") || "None" },
     { section: "Model validity", item: "Blocked outputs", value: readiness.blockedOutputs.length, status: "count", interpretation: readiness.blockedOutputs.map((item) => item.title).join(" | ") || "None" },
     { section: "Use", item: "Excel filters", value: "Enabled on every sheet", status: "ready", interpretation: "Freeze panes, sort, filter and pivot the detailed records" },
+    { section: "Use", item: "Workbook index", value: "Clickable navigation", status: "ready", interpretation: "Open any engineering table directly and see its purpose, record count and CSV filename" },
+    { section: "Use", item: "Data dictionary", value: "Field-level definitions", status: "ready", interpretation: "Every exported column has a type, unit, definition, example and source basis" },
+    { section: "Use", item: "QA summary", value: "Completeness formulas", status: "ready", interpretation: "Review populated cells, blanks and flagged records before handing data to another team" },
+    { section: "Use", item: "Functional units", value: "batch · year · kg product", status: "ready", interpretation: "Material, energy, cost and environmental values are normalized for operational, TEA and LCA use" },
+    { section: "Use", item: "Component ledgers", value: `${state.streams.length * balanceComponents.length} stream-component rows minimum`, status: "ready", interpretation: "Each material class is exposed separately for every stream and equipment balance" },
+    { section: "Use", item: "Calculation audit", value: "Formula and current inputs", status: "ready", interpretation: "Key outputs expose their equation, model layer, active inputs and validation requirement" },
     { section: "Use", item: "Intervals", value: "P10 / base P50 / P90", status: "screening", interpretation: "Replace with approved project distributions" },
     { section: "Use", item: "Sensitivity", value: "One-at-a-time 7-point sweep", status: "screening", interpretation: "Use for driver ranking; use Monte Carlo or Sobol analysis for global uncertainty" },
     { section: "Use", item: "Process canvas", value: `${state.units.length} equipment · ${state.streams.length} streams`, status: "included", interpretation: "Full editable model JSON and high-resolution SVG are included in the ZIP package" },
@@ -12699,54 +12708,364 @@ function equipmentExportRows() {
   });
 }
 
-function engineeringExportPackageData() {
-  const report = comprehensiveReport();
+function engineeringParameterRegisterRows() {
+  const intervals = new Map(engineeringIntervalRows().map((item) => [item.key, item]));
+  const globalParameters = [
+    { key: "batchSize", label: "Working volume", value: state.batchSize, unit: "L", min: 10, max: 250000, step: 10, group: "Global production basis", custom: false },
+    { key: "batchCount", label: operationProfile().countLabel, value: state.batchCount, unit: `${operationProfile().cycleLabel}s/yr`, min: 1, max: 1000, step: 1, group: "Global production basis", custom: false },
+    { key: "titer", label: "Titer", value: state.titer, unit: "g/L", min: 0.01, max: 250, step: 0.01, group: "Global production basis", custom: false },
+    { key: "recovery", label: "Overall recovery", value: state.recovery, unit: "%", min: 1, max: 99, step: 0.1, group: "Global production basis", custom: false },
+  ];
+  const modelParameters = processParameters.map((item) => ({
+    ...item,
+    value: state.params[item.key],
+    group: parameterGroup(item),
+  }));
+  return [...globalParameters, ...modelParameters].map((item, index) => {
+    const interval = intervals.get(item.key) || {};
+    return {
+      parameterNo: index + 1,
+      group: item.group,
+      key: item.key,
+      label: item.label,
+      activeValue: item.value,
+      unit: item.unit || "",
+      hardMinimum: item.min,
+      p10Low: interval.p10Low ?? "",
+      baseP50: interval.baseP50 ?? item.value,
+      p90High: interval.p90High ?? "",
+      hardMaximum: item.max,
+      increment: item.step,
+      editable: "yes",
+      customParameter: item.custom ? "yes" : "no",
+      sensitivityCoverage: interval.sensitivityIncluded || "available for extended sweep",
+      sourceClass: interval.sourceClass || "Active process model",
+      evidenceNeeded: interval.evidenceNeeded || "Project-specific measurement, supplier data, or approved engineering assumption",
+      approvalStatus: item.custom ? "user supplied - review provenance" : "default - calibrate before design freeze",
+    };
+  });
+}
+
+function engineeringKpiRows(report, sensitivityRows) {
+  const data = report.metrics;
+  const lcaClimate = report.lcaImpacts.find((item) => item.indicator === "Climate screening total")?.perKgProduct || 0;
+  const values = [
+    { key: "annualProductKg", label: "Annual product", value: data.annualKg, unit: "kg/yr", field: "annualProductKg", formula: "effective harvest volume x effective titer x process yield x annual cycles" },
+    { key: "productPerCycleKg", label: `Product per ${operationProfile().cycleLabel}`, value: data.productPerBatchKg, unit: "kg/cycle", field: "productPerCycleKg", formula: "effective harvest volume x effective titer x process yield" },
+    { key: "effectiveTiterGL", label: "Effective titer", value: data.effectiveTiter, unit: "g/L", field: "effectiveTiterGL", formula: "nominal titer adjusted for operation-mode productivity" },
+    { key: "processYieldPct", label: "Process yield", value: data.processYield * 100, unit: "%", field: "processYieldPct", formula: "product recovered / gross product generated" },
+    { key: "directCostUsdKg", label: "Direct cost", value: data.directCost, unit: "USD/kg product", field: "directCostUsdKg", formula: "annualized CAPEX + facility + materials + labor + QA/QC + utilities + waste, divided by annual product" },
+    { key: "utilitiesMwhYr", label: "Total utilities", value: data.utilities, unit: "MWh/yr", field: "utilitiesMwhYr", formula: "sum of equipment, thermal, cleaning, separation and support utility demand" },
+    { key: "utilizationPct", label: "Plant utilization", value: data.utilization, unit: "%", field: "utilizationPct", formula: "finite-capacity occupied resource time / available operating time" },
+    { key: "batchDurationH", label: "Cycle duration", value: data.batchDuration, unit: "h", field: "batchDurationH", formula: "setup + process + transfer + cleaning/release on active route" },
+    { key: "massClosurePct", label: "Mass-balance closure", value: report.solver.totals.closurePct, unit: "%", formula: "100 - absolute mass residual / total mass entering and generated" },
+    { key: "netHeatKwhCycle", label: "Net heat demand", value: report.solver.totals.netHeatDuty, unit: "kWh/cycle", formula: "gross sensible + reaction + mechanical + separation energy - recovered heat" },
+    { key: "feasibleBatchesYr", label: "Finite-capacity output", value: report.schedule.feasibleAnnualBatches, unit: "batches/yr", formula: "annual operating window / constrained release pitch" },
+    { key: "climateKgCo2eKg", label: "Climate screening result", value: lcaClimate, unit: "kg CO2e/kg product", formula: "sum of inventory quantities x screening emission factors / annual product" },
+  ];
+  return values.map((item) => {
+    const scenarios = item.field ? sensitivityRows.map((row) => Number(row[item.field])).filter(Number.isFinite) : [];
+    const low = scenarios.length ? Math.min(...scenarios) : item.value;
+    const high = scenarios.length ? Math.max(...scenarios) : item.value;
+    return {
+      kpi: item.label,
+      key: item.key,
+      baseValue: item.value,
+      lowSensitivityCase: low,
+      highSensitivityCase: high,
+      unit: item.unit,
+      calculationBasis: item.formula,
+      scenario: `${activeTemplate().label} - ${state.scale} - ${operationProfile().label}`,
+      modelStatus: report.modelReadiness.status,
+      interpretation: scenarios.length ? "Range is the minimum and maximum observed across the exported one-at-a-time sweep." : "Current deterministic base case; add a project distribution for probabilistic intervals.",
+      validationNeed: "Reconcile against measured batches, supplier sizing, site utilities and approved cost/LCA datasets before decision use.",
+    };
+  });
+}
+
+function streamComponentRows() {
+  const solved = solveMassBalance();
+  const annualProductKg = Math.max(1, metrics().annualKg);
+  return state.streams.flatMap((streamItem) => {
+    const solvedStream = solved.streamMap[streamItem.id];
+    const components = solvedStream?.components || zeroVector();
+    const totalMass = Math.max(0, vectorMass(components));
+    const from = state.units.find((item) => item.id === streamItem.from);
+    const to = state.units.find((item) => item.id === streamItem.to);
+    return balanceComponents.map((component) => {
+      const componentMass = Number(components[component] || 0);
+      const properties = solved.properties?.[component] || {};
+      return {
+        streamId: streamItem.id,
+        streamDirection: streamDirection(streamItem),
+        streamRole: streamLabel(streamKind(streamItem, from, to)),
+        fromUnit: streamItem.from || "PLANT-IN",
+        toUnit: streamItem.to || "PLANT-OUT",
+        phase: streamItem.phase,
+        component,
+        componentLabel: properties.label || component,
+        componentMassKgBatch: componentMass,
+        massFractionPct: totalMass ? componentMass / totalMass * 100 : 0,
+        annualComponentMassKg: componentMass * annualCycleEquivalent(),
+        componentKgPerKgProduct: componentMass * annualCycleEquivalent() / annualProductKg,
+        mixtureMassKgBatch: totalMass,
+        cpKjKgK: properties.cp ?? "",
+        densityKgM3: properties.density ?? "",
+        viscosityCp: properties.viscosity ?? "",
+        osmoticIndex: properties.osmotic ?? "",
+        solverStatus: solvedStream?.solverStatus || "Estimated",
+        sourceBasis: properties.source || "Aggregate property class and process mass-balance solver",
+      };
+    });
+  });
+}
+
+function streamHydraulicRows() {
+  const solved = solveMassBalance();
+  const annualHours = Math.max(1, state.params.annualOperatingTime || 7200);
+  return streamRows().map((row) => {
+    const streamItem = state.streams.find((item) => item.id === row.id);
+    const sourceUnit = state.units.find((item) => item.id === streamItem?.from);
+    const transferWindowH = Math.max(0.05, Math.min(24, Number(sourceUnit?.residence || 1)));
+    const density = Math.max(1, Number(row.densityKgM3 || 1000));
+    const volumeM3Batch = Number(row.massFlowKgBatch || 0) / density;
+    return {
+      streamId: row.id,
+      fromUnit: row.from,
+      toUnit: row.to,
+      phase: row.phase,
+      role: row.role,
+      massKgBatch: row.massFlowKgBatch,
+      densityKgM3: density,
+      volumeM3Batch,
+      transferWindowH,
+      designMassFlowKgH: Number(row.massFlowKgBatch || 0) / transferWindowH,
+      designVolumetricFlowM3H: volumeM3Batch / transferWindowH,
+      annualAverageMassFlowKgH: Number(row.annualMassKg || 0) / annualHours,
+      viscosityCp: row.viscosityCp,
+      osmoticIndex: row.osmoticIndex,
+      hydraulicBasis: "Screening conversion from solved batch mass, mixture density and source-unit transfer window",
+      validationNeed: "Replace with pump curve, line size, pressure drop, valve Cv, hold-up and transfer-sequence data.",
+      solverStatus: solved.streamMap[row.id]?.solverStatus || row.solverStatus,
+    };
+  });
+}
+
+function unitComponentLedgerRows() {
+  const solved = solveMassBalance();
+  const annualProductKg = Math.max(1, metrics().annualKg);
+  return solved.units.flatMap((unitItem) => balanceComponents.map((component) => {
+    const componentIn = Number(unitItem.componentVectorIn?.[component] || 0);
+    const mainOut = Number(unitItem.componentVectorMainOut?.[component] || 0);
+    const wasteOut = Number(unitItem.componentVectorWasteOut?.[component] || 0);
+    const totalOut = mainOut + wasteOut;
+    const apparentGeneration = Math.max(0, totalOut - componentIn);
+    const apparentConsumption = Math.max(0, componentIn - totalOut);
+    return {
+      unitTag: unitItem.tag,
+      operation: unitItem.operation,
+      equipmentClass: unitItem.class,
+      component,
+      componentInKgBatch: componentIn,
+      mainProductPathOutKgBatch: mainOut,
+      wastePathOutKgBatch: wasteOut,
+      totalComponentOutKgBatch: totalOut,
+      apparentGenerationKgBatch: apparentGeneration,
+      apparentConsumptionKgBatch: apparentConsumption,
+      netChangeKgBatch: totalOut - componentIn,
+      annualComponentInKg: componentIn * annualCycleEquivalent(),
+      annualComponentOutKg: totalOut * annualCycleEquivalent(),
+      componentInKgPerKgProduct: componentIn * annualCycleEquivalent() / annualProductKg,
+      componentOutKgPerKgProduct: totalOut * annualCycleEquivalent() / annualProductKg,
+      equationBasis: "component in + apparent generation = main-path out + waste-path out + apparent consumption",
+      solverStatus: unitItem.solverStatus,
+      warning: unitItem.warnings,
+    };
+  }));
+}
+
+function calculationAuditRows(report) {
+  const data = report.metrics;
+  return [
+    { calculation: "Annual product", outputValue: data.annualKg, unit: "kg/yr", formula: "m_product,annual = V_harvest x C_product x Y_process x N_cycles", inputs: `V=${state.batchSize} L; titer=${state.titer} g/L; recovery=${state.recovery}%; cycles=${state.batchCount}`, modelLayer: "Mass balance / production basis" },
+    { calculation: "Direct cost", outputValue: data.directCost, unit: "USD/kg product", formula: "COG = (annualized CAPEX + fixed facility + materials + labor + QA/QC + utilities + waste) / annual product", inputs: `${costRows().filter((item) => item.aggregationRole === "summable cost line").length} summable annual cost lines`, modelLayer: "TEA" },
+    { calculation: "Mass closure", outputValue: report.solver.totals.closurePct, unit: "%", formula: "closure = 100 x (1 - abs(sum residuals)/(mass in + generation))", inputs: `${report.solver.units.length} unit balances; ${report.solver.streams.length} solved streams`, modelLayer: "Mass balance solver" },
+    { calculation: "Net heat", outputValue: report.solver.totals.netHeatDuty, unit: "kWh/cycle", formula: "Q_net = Q_sensible + Q_reaction + Q_mechanical + Q_separation - Q_recovered", inputs: `gross=${report.solver.totals.grossHeatDuty}; recovered=${report.solver.totals.recoveredHeat}`, modelLayer: "Energy balance" },
+    { calculation: "Plant utilization", outputValue: data.utilization, unit: "%", formula: "utilization = constrained occupied time / available plant time", inputs: `${report.schedule.operations.length} scheduled operations; ${report.schedule.resourceRows.length} resources`, modelLayer: "Finite-capacity scheduling" },
+    { calculation: "Climate screening", outputValue: report.lcaImpacts.find((item) => item.indicator === "Climate screening total")?.perKgProduct || 0, unit: "kg CO2e/kg product", formula: "GWP = sum(activity quantity x emission factor) / annual product", inputs: `${report.lcaInventory.length} inventory lines`, modelLayer: "LCA screening" },
+    { calculation: "Oxygen transfer", outputValue: (state.params.kla * Math.max(1, state.params.doSetpoint) / 100) / Math.max(0.1, state.params.our || 1), unit: "margin index", formula: "transfer margin = kLa x C-driving-force proxy / OUR", inputs: `kLa=${state.params.kla} 1/h; DO=${state.params.doSetpoint}%; OUR=${state.params.our}`, modelLayer: "Bioreactor / CFD screening" },
+    { calculation: "Finite annual batches", outputValue: report.schedule.feasibleAnnualBatches, unit: "batches/yr", formula: "N_feasible = floor(annual operating time / constrained release pitch)", inputs: `pitch=${report.schedule.plannedPitchH} h; annual time=${state.params.annualOperatingTime} h`, modelLayer: "Scheduling" },
+  ].map((row) => ({
+    ...row,
+    sourceBasis: "Transparent Axion screening calculation",
+    auditStatus: "formula exposed - validate project inputs",
+    validationNeed: "Reconcile formula, units, boundary conditions and source data against the approved project calculation specification.",
+  }));
+}
+
+function projectBranchRows() {
+  const versionsByBranch = (state.projectVersions || []).reduce((map, version) => {
+    const key = version.branchId || "main";
+    map[key] = (map[key] || 0) + 1;
+    return map;
+  }, {});
+  const branches = state.projectBranches?.length ? state.projectBranches : [{ id: "main", name: "main", headVersionId: state.projectVersions?.[0]?.id || "" }];
+  return branches.map((branch) => ({
+    branchId: branch.id,
+    branchName: branch.name,
+    projectId: branch.projectId || state.currentProjectId || "local-project",
+    headVersionId: branch.headVersionId || "",
+    savedVersions: versionsByBranch[branch.id] || versionsByBranch[branch.name] || 0,
+    createdAt: branch.createdAt || "",
+    updatedAt: branch.updatedAt || "",
+    status: branch.headVersionId ? "versioned" : "working branch",
+  }));
+}
+
+function engineeringExportPackageData(existingReport = null) {
+  const report = existingReport || comprehensiveReport();
   const sensitivity = report.sensitivityAnalysis;
   const intervals = report.parameterIntervals;
   const driverRows = report.sensitivityDrivers;
   const summary = metrics();
-  const tables = [
-    { sheet: "00 Read me", file: "00-read-me.csv", description: "Package scope, model validity and use instructions", rows: workbookReadmeRows(report) },
-    { sheet: "01 Model summary", file: "01-model-summary.csv", description: "Active production scenario and headline results", rows: Object.entries({ template: activeTemplate().label, product: activeTemplate().product, scale: state.scale, operationMode: operationProfile().label, workingVolumeL: state.batchSize, requestedCyclesYr: state.batchCount, titerGL: state.titer, recoveryPct: state.recovery, annualProductKg: summary.annualKg, directCostUsdKg: summary.directCost, utilitiesMwhYr: summary.utilities, utilizationPct: summary.utilization, equipmentCount: state.units.length, streamCount: state.streams.length }).map(([metric, value]) => ({ metric, value })) },
-    { sheet: "02 Readiness", file: "02-output-readiness.csv", description: "Output-specific evidence gates and missing modelling tasks", rows: report.modelReadinessRows },
-    { sheet: "03 Sensitivity sweep", file: "03-sensitivity-sweep.csv", description: "Seven-point one-at-a-time sensitivity results", rows: sensitivity },
-    { sheet: "04 Driver ranking", file: "04-sensitivity-driver-ranking.csv", description: "Ranked direct-cost sensitivity drivers", rows: driverRows },
-    { sheet: "05 Parameter intervals", file: "05-parameter-intervals.csv", description: "Low, base and high input intervals", rows: intervals },
-    { sheet: "06 Parameters", file: "06-all-parameters.csv", description: "Complete active parameter register", rows: processParameters.map((item) => ({ group: parameterGroup(item), key: item.key, label: item.label, value: state.params[item.key], unit: item.unit, minimum: item.min, maximum: item.max, step: item.step, custom: item.custom ? "yes" : "no" })) },
-    { sheet: "07 Equipment", file: "07-equipment-register.csv", description: "Detailed equipment register with connections and model confidence", rows: equipmentExportRows() },
-    { sheet: "08 Streams", file: "08-stream-register.csv", description: "All plant inlet, outlet and internal process streams", rows: report.streams },
-    { sheet: "09 Unit balances", file: "09-unit-mass-energy-balances.csv", description: "Component, mass and energy balances by unit", rows: report.balances },
-    { sheet: "10 TEA detail", file: "10-tea-cost-detail.csv", description: "Detailed cost model with uncertainty intervals", rows: report.tea },
-    { sheet: "11 LCA inventory", file: "11-lca-inventory.csv", description: "Detailed plant-gate LCA inventory", rows: report.lcaInventory },
-    { sheet: "12 LCA impacts", file: "12-lca-impact-screening.csv", description: "Impact and physical-flow screening indicators", rows: report.lcaImpacts },
-    { sheet: "13 Dynamic ODE", file: "13-dynamic-ode-profile.csv", description: "Time-resolved dynamic bioprocess states", rows: dynamicProfileRows() },
-    { sheet: "14 PDE transport", file: "14-pde-transport-field.csv", description: "Distributed axial oxygen and nutrient fields", rows: report.axialTransportPde },
-    { sheet: "15 Schedule operations", file: "15-schedule-operations.csv", description: "Full finite-capacity operation schedule", rows: report.schedule.operations },
-    { sheet: "16 Gantt tasks", file: "16-gantt-tasks.csv", description: "Schedule handoff tasks", rows: scheduleGanttRows(report.schedule) },
-    { sheet: "17 Schedule resources", file: "17-schedule-resources.csv", description: "Equipment, room, operator, cleaning and QC occupancy", rows: report.schedule.resourceRows },
-    { sheet: "18 Utility demand", file: "18-scheduled-utility-demand.csv", description: "Utility demand by schedule bucket", rows: report.scheduleUtilityDemand },
-    { sheet: "19 Editable recipe", file: "19-editable-recipe.csv", description: "Unit procedure timing and route assumptions", rows: report.recipe },
-    { sheet: "20 Physical boundaries", file: "20-physical-chemical-boundaries.csv", description: "Operating limits, actions and validation gaps", rows: report.physicalBoundaries },
-    { sheet: "21 CFD field", file: "21-cfd-field.csv", description: "Transient CFD screening field cells", rows: report.cfdField },
-    { sheet: "22 CFD time series", file: "22-cfd-time-series.csv", description: "Bioreactor CFD screening time series", rows: report.cfdTimeSeries },
-    { sheet: "23 CFD geometry", file: "23-cfd-geometry.csv", description: "Reactor geometry and internals", rows: report.cfdGeometry },
-    { sheet: "24 CFD boundary cond", file: "24-cfd-boundary-conditions.csv", description: "Solver boundary conditions and source terms", rows: report.cfdBoundaryConditions },
-    { sheet: "25 Equations", file: "25-equation-library.csv", description: "Chemical, kinetic, balance and economic equations", rows: report.equations },
-    { sheet: "26 Unit equations", file: "26-unit-equations.csv", description: "Equation packages mapped to equipment", rows: report.unitEquations.flatMap((item) => item.equations.map((equation, index) => ({
+  const tables = [];
+  const addTable = (category, sheet, description, rows, fileSlug = sheet) => {
+    const index = tables.length;
+    const prefix = String(index).padStart(2, "0");
+    const slug = String(fileSlug).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    tables.push({ category, sheet: `${prefix} ${sheet}`, file: `${prefix}-${slug}.csv`, description, rows: rows || [] });
+  };
+
+  addTable("Guide", "Read me", "Package scope, model validity, handoff instructions and explicit limitations.", workbookReadmeRows(report));
+  addTable("Summary", "Model summary", "Active production scenario and headline model results.", Object.entries({
+    template: activeTemplate().label,
+    product: activeTemplate().product,
+    scale: state.scale,
+    operationMode: operationProfile().label,
+    workingVolumeL: state.batchSize,
+    requestedCyclesYr: state.batchCount,
+    titerGL: state.titer,
+    recoveryPct: state.recovery,
+    annualProductKg: summary.annualKg,
+    productPerCycleKg: summary.productPerBatchKg,
+    effectiveTiterGL: summary.effectiveTiter,
+    processYieldPct: summary.processYield * 100,
+    directCostUsdKg: summary.directCost,
+    utilitiesMwhYr: summary.utilities,
+    utilizationPct: summary.utilization,
+    batchDurationH: summary.batchDuration,
+    massClosurePct: report.solver.totals.closurePct,
+    feasibleAnnualBatches: report.schedule.feasibleAnnualBatches,
+    equipmentCount: state.units.length,
+    streamCount: state.streams.length,
+  }).map(([metric, value]) => ({ metric, value, scenario: activeTemplate().label, generatedAt: report.generatedAt })));
+  addTable("Summary", "KPI register", "Decision outputs with base values, observed sensitivity range, units, formula basis and validation need.", engineeringKpiRows(report, sensitivity));
+  addTable("Summary", "Calculation audit", "Transparent calculation equations, current inputs, outputs and validation requirements.", calculationAuditRows(report));
+  addTable("Evidence", "Output readiness", "Output-specific evidence gates and missing modelling tasks.", report.modelReadinessRows);
+  addTable("Inputs", "Parameter register", "All editable global, biochemical, physical, scale-up and economic parameters with limits and provenance.", engineeringParameterRegisterRows());
+  addTable("Inputs", "Parameter intervals", "Hard limits and P10/base P50/P90 screening intervals for uncertainty work.", intervals);
+  addTable("Uncertainty", "Sensitivity sweep", "Seven-point one-at-a-time sensitivity results across production, cost, utility and utilization outputs.", sensitivity);
+  addTable("Uncertainty", "Driver ranking", "Ranked direct-cost sensitivity drivers and response magnitudes.", driverRows);
+  addTable("Thermophysical", "Property detail", "Component-level density, heat capacity, viscosity, osmotic, vapor-pressure, Henry and solubility data.", report.detailedPropertyPackage);
+  addTable("Thermophysical", "Property aggregates", "Aggregate property package used by material classes in the solver.", aggregatePropertyRows());
+  addTable("Equipment", "Equipment register", "Detailed equipment register with ISO names, sizes, connections, standards and model confidence.", equipmentExportRows());
+  addTable("Equipment", "Unit models", "Mechanistic model, equations, inputs, outputs, warnings and recommendations for every unit.", mechanisticModelRows());
+  addTable("Balances", "Stream register", "All plant inlet, outlet and internal streams with solved mass, annual and functional-unit values.", report.streams);
+  addTable("Balances", "Stream components", "Long-form component breakdown for every stream with batch, annual and per-product quantities.", streamComponentRows());
+  addTable("Balances", "Stream hydraulics", "Screening volumetric flow, transfer window, flow rate and hydraulic evidence needs.", streamHydraulicRows());
+  addTable("Balances", "Unit balances", "Unit-level mass and energy balances, closure, temperature and mixture properties.", report.balances);
+  addTable("Balances", "Unit component ledger", "Long-form component in, main-path out, waste-path out, generation and consumption by unit.", unitComponentLedgerRows());
+  addTable("Equations", "Equation library", "Chemical, kinetic, thermodynamic, balance, separation and economic equations.", report.equations);
+  addTable("Equations", "Unit equations", "Equation packages mapped to individual equipment.", report.unitEquations.flatMap((item) => item.equations.map((equation, index) => ({
       tag: item.tag,
       operation: item.name,
       equationIndex: index + 1,
       equationTitle: equation.title || `Equation ${index + 1}`,
       formula: equation.formula || "",
       note: equation.note || "",
-    }))) },
-    { sheet: "27 Scientific sources", file: "27-scientific-sources.csv", description: "Source and standards register", rows: report.sources },
-    { sheet: "28 Company datasets", file: "28-company-datasets.csv", description: "Uploaded plant-data registry", rows: report.companyDatasets },
-    { sheet: "29 Route optimizer", file: "29-route-optimizer.csv", description: "Alternative route ranking", rows: report.routeOptimization },
-    { sheet: "30 Factory states", file: "30-equipment-state-machines.csv", description: "Reusable equipment states and transitions", rows: report.equipmentStateMachines },
-    { sheet: "31 Project versions", file: "31-project-versions.csv", description: "Saved versions and branches", rows: (state.projectVersions || []).map((item) => ({ ...item, snapshot: item.snapshot ? JSON.stringify(item.snapshot) : "" })) },
-  ];
-  return { report, sensitivity, intervals, driverRows, tables };
+    }))));
+  addTable("Safety", "Physical boundaries", "Operating limits, operator signals, corrective actions, evidence basis and validation gaps.", report.physicalBoundaries);
+  addTable("Dynamics", "Dynamic ODE", "Time-resolved volume, biomass, substrate, product, oxygen, lactate, ammonium and energy states.", dynamicProfileRows());
+  addTable("Dynamics", "PDE transport", "Distributed axial oxygen and nutrient fields with residuals and transport groups.", report.axialTransportPde);
+  addTable("Dynamics", "Equation solver workflow", "Equation-oriented dynamic solution workflow including ICs, BCs, discretization and validation.", report.gpromsAlgorithm);
+  addTable("Dynamics", "PVSD parameters", "Convective-dispersive and particle-volume-distribution model parameter basis.", report.pvsdParameters);
+
+  addTable("TEA", "TEA detail", "Annual, per-product and uncertainty cost values with allocation and source basis.", report.tea);
+  addTable("TEA", "Cost register", "CAPEX, facility, media, materials, labor, QA/QC, utilities, waste and direct-cost lines.", report.costs);
+  addTable("LCA", "LCA inventory", "Plant-gate life-cycle inventory with batch, annual, functional-unit and factor fields.", report.lcaInventory);
+  addTable("LCA", "LCA impacts", "Impact and physical-flow screening indicators with calculation methods and data quality.", report.lcaImpacts);
+  addTable("LCA", "Emissions workbook", "Off-gas, vent, solvent, wastewater, waste-treatment, abatement and monitoring records.", report.emissionsWorkbook);
+
+  addTable("Scheduling", "Schedule operations", "Full finite-capacity operation schedule with setup, process, transfer, cleaning and reuse timing.", report.schedule.operations);
+  addTable("Scheduling", "Scheduled streams", "Transfer-line slots, flushing, availability and line-wait details for each stream.", scheduleStreamRows());
+  addTable("Scheduling", "Equipment reuse cycles", "Reusable equipment sequence from setup through process, transfer, cleaning and release.", scheduleCycleRows());
+  addTable("Scheduling", "Gantt tasks", "Detailed Gantt handoff tasks with resources, predecessors and critical status.", scheduleGanttRows(report.schedule));
+  addTable("Scheduling", "Batch releases", "Batch completion and QC release timing with release pitch.", scheduleBatchReleaseRows(report.schedule));
+  addTable("Scheduling", "Schedule resources", "Equipment, room, operator, cleaning and QC occupancy.", report.schedule.resourceRows);
+  addTable("Scheduling", "Utilization matrix", "Resource-by-time-bucket occupancy for heatmap and capacity review.", scheduleUtilizationMatrixRows(report.schedule));
+  addTable("Scheduling", "Schedule time buckets", "Plant-wide operations, active batches, resources and utility load over time.", report.scheduleBuckets);
+  addTable("Scheduling", "Equipment occupancy", "Setup, process, transfer, cleaning, waiting and idle time by equipment.", report.scheduleEquipmentOccupancy);
+  addTable("Scheduling", "Room occupancy", "Cleanroom and suite occupancy, concurrent batches and bottleneck signals.", report.scheduleRoomOccupancy);
+  addTable("Scheduling", "Utility demand", "WFI, clean steam, cooling, gas, operator and QC demand by time bucket.", report.scheduleUtilityDemand);
+  addTable("Scheduling", "Schedule scenarios", "Finite-capacity what-if scenarios, utilization, bottleneck and implementation action.", report.scheduleScenarios);
+  addTable("Scheduling", "Schedule bottlenecks", "Ranked resource bottlenecks with capacity impact and mitigation actions.", report.scheduleBottlenecks);
+  addTable("Scheduling", "MS Project handoff", "Task, duration, predecessor and resource export for project-planning tools.", scheduleMsProjectRows(report.schedule));
+  addTable("Scheduling", "Editable recipe", "Unit procedure timing, predecessor, route, active-state and parallel-equipment assumptions.", report.recipe);
+  addTable("Routing", "Route comparison", "Primary, intensified and lean process-route comparison.", report.routeComparison);
+  addTable("Routing", "Route topology", "Branch, merge, predecessor and shared-step topology.", report.routeTopology);
+  addTable("Routing", "Route optimizer", "Alternative route ranking by capacity, economics, readiness and sustainability.", report.routeOptimization);
+
+  addTable("APS", "Planning horizons", "Strategic, tactical and detailed planning horizons and decisions.", apsHorizonRows());
+  addTable("APS", "Capacity plan", "Finite-capacity plan by resource and horizon.", apsCapacityRows());
+  addTable("APS", "Delivery plan", "Delivery promises, availability and service-risk signals.", apsDeliveryRows());
+  addTable("APS", "Inventory plan", "Raw material, WIP, product and safety-stock planning values.", apsInventoryRows());
+  addTable("APS", "Sequencing plan", "Campaign sequencing, setup reduction and constraint logic.", apsSequencingRows());
+  addTable("APS", "Planning roles", "Planning collaboration, ownership and decision roles.", apsCollaborationRows());
+  addTable("APS", "Planning optimization", "Optimization objectives, variables, constraints and recommended actions.", apsOptimizationRows());
+
+  addTable("CFD", "CFD field", "Transient cell-level oxygen, nutrient, velocity, shear and risk screening field.", report.cfdField);
+  addTable("CFD", "CFD time series", "Bioreactor oxygen, nutrient, mixing, shear and transfer diagnostics over time.", report.cfdTimeSeries);
+  addTable("CFD", "CFD geometry", "Reactor geometry, impellers, baffles, sparger and probe locations.", report.cfdGeometry);
+  addTable("CFD", "CFD boundary conditions", "Gas inlet, feed inlet, walls, headspace, impeller and uptake conditions.", report.cfdBoundaryConditions);
+  addTable("CFD", "OpenFOAM case", "Case files, dictionaries, fields and solver configuration required for a CFD worker.", report.cfdOpenFoamCase);
+  addTable("CFD", "CFD residuals", "Continuity, momentum, turbulence and scalar residual diagnostics.", report.cfdResiduals);
+  addTable("CFD", "CFD mesh", "Mesh region, cell size, quality, refinement and convergence evidence.", report.cfdMesh);
+  addTable("CFD", "CFD flow paths", "Resolved circulation-loop and feed/plume path diagnostics.", report.cfdFlowPaths);
+  addTable("CFD", "Biology kinetics", "Biomass, substrate, oxygen and uptake kinetics coupled to the reactor screen.", report.cfdBiologyKinetics);
+  addTable("CFD", "Turbulence model", "Turbulence closure, rotating zone, transport and validation basis.", report.cfdTurbulence);
+
+  addTable("Factory twin", "Factory objects", "Object-oriented plant, room, equipment, buffer and logistics model.", report.plantSimulationObjects);
+  addTable("Factory twin", "Factory hierarchy", "Factory-building-room-equipment hierarchy.", plantSimulationHierarchyRows());
+  addTable("Factory twin", "Factory rooms", "Room classification, equipment allocation and occupancy basis.", report.factoryRooms);
+  addTable("Factory twin", "Moving batches", "Batch location, route progress, state and next event.", report.movingBatches);
+  addTable("Factory twin", "Personnel plan", "Operator roles, shifts, task load and staffing gaps.", report.personnelPlan);
+  addTable("Factory twin", "Inventory levels", "Material, WIP and finished-goods inventory over the modeled campaign.", report.inventoryLevels);
+  addTable("Factory twin", "Equipment states", "Reusable equipment states and transition logic.", report.equipmentStateMachines);
+  addTable("Factory twin", "Factory live state", "Current equipment, room, batch and resource state snapshot.", report.factoryLiveState);
+  addTable("Factory twin", "Factory timeline", "Time-resolved factory events and state transitions.", report.factoryTimeline);
+  addTable("Factory twin", "Factory dispatch", "Dispatch recommendations and prioritized actions.", report.factoryDispatch);
+  addTable("Factory twin", "Factory optimization", "Capacity, CIP, staffing, WIP and sustainability optimization candidates.", report.factoryOptimization);
+  addTable("Factory twin", "Plant value stream", "Value-added, waiting, transfer and release time across the plant.", plantSimulationValueStreamRows(report.schedule));
+  addTable("Integrations", "Simulation interfaces", "JSON, CSV, CAD, MQTT, OPC UA, SQL, REST, Python, optimizer and MES connectors.", report.plantSimulationInterfaces);
+  addTable("Factory twin", "Simulation experiments", "Optimization-ready plant scenarios and experiment outputs.", report.plantSimulationExperiments);
+
+  addTable("Engineering", "Procedure workbook", "Charge, transform, transfer, clean/release, I/O, batch-sheet and equation detail.", report.procedureWorkbook);
+  addTable("Engineering", "Resource inventory", "Equipment, material, utility, cleaning, schedule, cost and sizing resource basis.", report.resourceInventory);
+  addTable("Engineering", "Debottleneck workbook", "Equipment-time, size, heat, power, cleaning, line and scale-up review actions.", report.debottleneckWorkbook);
+  addTable("Data", "Databank workbook", "Equipment, component, property, parameter, cost and CIP/SIP project libraries.", report.databankWorkbook);
+  addTable("Data", "Exchange workbook", "Structured handoff map for spreadsheets, APIs, historians, CFD, LCA, TEA and QMS.", report.exchangeWorkbook);
+  addTable("Evidence", "Scientific sources", "Scientific source and standards register used by the current model.", report.sources);
+  addTable("Evidence", "Source readiness", "Source-ingestion coverage, extracted data and remaining implementation work.", report.sourceIngestionReadiness);
+  addTable("Data", "Company datasets", "Uploaded company data, column roles, quality flags, calibration targets and model use.", report.companyDatasets);
+  addTable("Evidence", "Standards register", "Applicable standards, scope, model implementation and compliance evidence need.", report.standards);
+  addTable("Evidence", "Recommendations", "Prioritized simulation-readiness and engineering actions.", report.recommendations);
+  addTable("Evidence", "Attached source pack", "Implementation map for the attached technical source documents.", report.attachedSourceModelPack);
+  addTable("Scale-up", "Cultured meat scale", "Source-backed cell-culture scale boundaries, working-volume and cost-pressure assumptions.", report.culturedMeatSourceScale);
+  addTable("Factory twin", "Simulation functions", "Factory simulation feature, input, output, implementation and remaining validation.", report.plantSimulationFunctions);
+  addTable("Versioning", "Project versions", "Saved model versions with branch, author, time and serialized snapshot.", (state.projectVersions || []).map((item) => ({ ...item, snapshot: item.snapshot ? JSON.stringify(item.snapshot) : "" })));
+  addTable("Versioning", "Project branches", "Branch heads, saved-version counts and current branch status.", projectBranchRows());
+
+  return { report, sensitivity, intervals, driverRows, tables, workbookSheetCount: tables.length + 3 };
 }
 
 function svgEscape(value) {
@@ -13107,7 +13426,7 @@ async function downloadEngineeringWorkbook() {
   downloadBlob(`${exportFilenameBase()}-complete-engineering-workbook.xlsx`, new Blob([bytes], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   }));
-  showToast(`${packageData.tables.length}-sheet workbook downloaded`);
+  showToast(`${packageData.workbookSheetCount}-sheet workbook downloaded`);
 }
 
 async function downloadCompleteEngineeringPackage() {
@@ -13118,8 +13437,8 @@ async function downloadCompleteEngineeringPackage() {
   const base = exportFilenameBase();
   const manifest = {
     metadata,
-    packageVersion: "engineering-handoff-v1",
-    workbookSheets: packageData.tables.length,
+    packageVersion: "engineering-handoff-v2",
+    workbookSheets: packageData.workbookSheetCount,
     csvTables: packageData.tables.map((table) => ({ file: table.file, sheet: table.sheet, description: table.description, rows: table.rows.length })),
     visualizations: ["full process canvas", "process architecture", "sensitivity tornado", "TEA intervals", "TEA stack", "LCA flow", "LCA impacts", "campaign Gantt", "factory layout"],
     modelFiles: ["editable-model.json", "complete-report.json"],
@@ -13127,7 +13446,7 @@ async function downloadCompleteEngineeringPackage() {
   };
   const files = [
     { path: `${base}-complete-engineering-workbook.xlsx`, data: workbook },
-    { path: "README.txt", data: `AXION PROCESS OS - COMPLETE ENGINEERING PACKAGE\n\nScenario: ${metadata.scenario}\nGenerated: ${metadata.exportDate}\n\nCONTENTS\n- One formatted Excel workbook with ${packageData.tables.length} filterable worksheets\n- ${packageData.tables.length} individual CSV tables\n- Full process canvas and engineering visualizations as scalable SVG\n- Editable model state and complete report as JSON\n- Low/base/high intervals and seven-point one-at-a-time sensitivity analysis\n\nIMPORTANT\nThis package exposes the current model basis and missing evidence. Screening results require project-specific validation before regulated, investment, scale-up or equipment-design decisions.\n` },
+    { path: "README.txt", data: `AXION PROCESS OS - COMPLETE ENGINEERING PACKAGE\n\nScenario: ${metadata.scenario}\nGenerated: ${metadata.exportDate}\n\nCONTENTS\n- One formatted Excel workbook with ${packageData.workbookSheetCount} worksheets, including index, data dictionary and QA summary\n- ${packageData.tables.length} individual CSV engineering tables\n- Long-form component ledgers for every stream and unit operation\n- Full process canvas and engineering visualizations as scalable SVG\n- Editable model state and complete report as JSON\n- Low/base/high intervals and seven-point one-at-a-time sensitivity analysis\n\nIMPORTANT\nThis package exposes the current model basis and missing evidence. Screening results require project-specific validation before regulated, investment, scale-up or equipment-design decisions.\n` },
     { path: "manifest.json", data: JSON.stringify(manifest, null, 2) },
     { path: "model/editable-model.json", data: JSON.stringify({ metadata, model: exportCurrentModelState() }, null, 2) },
     { path: "model/complete-report.json", data: JSON.stringify({ metadata, ...packageData.report }, null, 2) },
@@ -13256,20 +13575,8 @@ function renderReportsBoard() {
   const sensitivity = report.sensitivityAnalysis;
   const sensitivityDrivers = report.sensitivityDrivers;
   const intervals = report.parameterIntervals;
-  const detailedRowCount = [
-    report.balances,
-    report.streams,
-    report.tea,
-    report.lcaInventory,
-    report.dynamicProfile.points,
-    report.axialTransportPde,
-    report.schedule.operations,
-    report.schedule.resourceRows,
-    report.cfdField,
-    report.cfdTimeSeries,
-    sensitivity,
-    intervals,
-  ].reduce((sum, rows) => sum + (rows?.length || 0), 0);
+  const packageData = engineeringExportPackageData(report);
+  const detailedRowCount = packageData.tables.reduce((sum, table) => sum + (table.rows?.length || 0), 0);
   els.reportsBoard.innerHTML = `
     <section class="reports-hero">
       <div>
@@ -13293,7 +13600,7 @@ function renderReportsBoard() {
         </div>
       </div>
       <div class="export-package-stats">
-        <article><strong>32</strong><span>Excel sheets</span><small>Filterable, frozen headers, formatted intervals</small></article>
+        <article><strong>${packageData.workbookSheetCount}</strong><span>Excel sheets</span><small>Index, data dictionary, QA, filters, units and formatted intervals</small></article>
         <article><strong>${formatNumber(detailedRowCount, 0)}</strong><span>Detailed rows</span><small>Balances, streams, ODE/PDE, schedule, CFD, TEA and LCA</small></article>
         <article><strong>${sensitivity.length}</strong><span>Sensitivity runs</span><small>${sensitivityDrivers.length} parameters · seven points each</small></article>
         <article><strong>9</strong><span>Large SVGs</span><small>Canvas, economics, LCA, sensitivity, schedule and factory</small></article>
@@ -13324,7 +13631,7 @@ function renderReportsBoard() {
     </section>
     <section class="reports-grid">
       <article class="report-readiness-card"><span>Output readiness register</span><strong>${report.modelReadiness.score}%</strong><p>${report.modelReadiness.missing.length} explicit evidence or modelling gaps across balances, dynamics, scheduling, TEA, LCA, CFD and GMP. Every row states what the current result is useful for and what must still be modelled.</p><button data-download-report="model-readiness-csv" type="button">Download readiness CSV</button><button data-jump-view="recommendations" type="button">Open roadmap</button></article>
-      <article><span>Complete engineering workbook</span><strong>32 sheets</strong><p>Long Excel tables for model summary, readiness, intervals, sensitivity, equipment, streams, balances, TEA, LCA, ODE/PDE, scheduling, CFD, equations, sources and versions.</p><button data-download-report="engineering-workbook" type="button">Download XLSX</button></article>
+      <article><span>Complete engineering workbook</span><strong>${packageData.workbookSheetCount} sheets</strong><p>Long-form component ledgers, KPI and formula audit, inputs, properties, balances, TEA/LCA, ODE/PDE, scheduling, APS, CFD, factory twin, evidence and version history. An index, data dictionary and QA summary keep the package navigable.</p><button data-download-report="engineering-workbook" type="button">Download XLSX</button></article>
       <article><span>Parameter intervals</span><strong>${intervals.length}</strong><p>Every global, biochemical, scale-up and economic input with hard limits plus low P10, active base P50 and high P90 screening values.</p><button data-download-report="parameter-intervals-csv" type="button">Intervals CSV</button><button data-download-report="tea-intervals-svg" type="button">TEA interval graph</button></article>
       <article><span>Sensitivity analysis</span><strong>${sensitivity.length} runs</strong><p>Seven-point one-at-a-time sweeps across ${sensitivityDrivers.length} key drivers, with calculated effects on cost, throughput, utilities, utilization, duration, titer and yield.</p><button data-download-report="sensitivity-csv" type="button">All runs CSV</button><button data-download-report="sensitivity-svg" type="button">Tornado SVG</button></article>
       <article><span>Complete process canvas</span><strong>${state.units.length} / ${state.streams.length}</strong><p>All equipment and all internal, inlet, outlet, utility, cleaning, recycle, waste and quality streams as one full-resolution vector flowsheet.</p><button data-download-report="full-canvas-svg" type="button">Download full SVG</button><button data-download-report="comprehensive-json" type="button">Model JSON</button></article>

@@ -5638,11 +5638,12 @@ function serveStatic(req, res, pathname) {
   }
   const immutableAsset = /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(requested);
   const htmlDocument = extname(filePath) === ".html";
+  const unbundledDevelopmentSource = staticRootDir === rootDir;
   res.writeHead(200, {
     "content-type": staticTypes.get(extname(filePath)) || "application/octet-stream",
     "cache-control": immutableAsset
       ? "public, max-age=31536000, immutable"
-      : htmlDocument
+      : htmlDocument || unbundledDevelopmentSource
         ? "no-cache"
         : "public, max-age=3600",
   });
