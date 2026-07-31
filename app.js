@@ -452,6 +452,33 @@ const scientificSources = [
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC2995142/",
   },
   {
+    group: "Paper",
+    title: "Dynamic mammalian-cell batch and fed-batch balances",
+    appliesTo: ["production-reactor", "seed-reactor", "fermenter", "media", "feed-tank", "simulation"],
+    benchmark: "Viable-cell density, nutrients, metabolites, and product are represented through time-dependent specific growth, consumption, and formation rates.",
+    modelUse: "Nine-state ODE model, mode-specific concentration balances, growth and death rates, glucose/glutamine uptake, lactate/ammonium formation, and product kinetics.",
+    source: "Biotechnology and Bioengineering - Computer programs for modeling mammalian cell batch and fed-batch cultures",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3397109/",
+  },
+  {
+    group: "Paper",
+    title: "Fed-batch nutrient control and metabolic burden",
+    appliesTo: ["production-reactor", "seed-reactor", "feed-tank", "media", "simulation"],
+    benchmark: "Balanced glucose and glutamine feeding can reduce lactate and ammonium formation while sustaining high viable-cell density.",
+    modelUse: "Independent glucose and glutamine feed concentrations, configurable feed start, inhibition kinetics, and metabolite boundary warnings.",
+    source: "Cytotechnology - Alteration of mammalian cell metabolism by dynamic nutrient feeding",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3449580/",
+  },
+  {
+    group: "Paper",
+    title: "Perfusion mass balance with harvest, bleed, and cell retention",
+    appliesTo: ["production-reactor", "perfusion", "cell-retention", "harvest", "simulation"],
+    benchmark: "Constant perfusion volume requires feed to equal clarified harvest plus bleed; viable-cell removal depends separately on bleed and retention-device breakthrough.",
+    modelUse: "Perfusion hydraulic constraint, explicit bleed, cell-retention efficiency, soluble-product harvest, cell removal, and campaign productivity.",
+    source: "Frontiers in Bioengineering and Biotechnology - Model-based intensification of CHO cell cultures",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC9443430/",
+  },
+  {
     group: "Industry",
     title: "20,000 L mammalian bioreactor scale reference",
     appliesTo: ["production-reactor", "seed-reactor", "perfusion"],
@@ -613,7 +640,13 @@ const processParameters = [
   { key: "agitation", label: "Agitation P/V", unit: "W/L", min: 0.01, max: 12, step: 0.01, value: 0.9 },
   { key: "aeration", label: "Aeration", unit: "vvm", min: 0.01, max: 2.5, step: 0.01, value: 0.35 },
   { key: "feedRate", label: "Feed rate", unit: "% vol/day", min: 0, max: 80, step: 1, value: 18 },
+  { key: "fedBatchFeedStart", label: "Fed-batch feed start", unit: "h", min: 0, max: 120, step: 1, value: 18 },
+  { key: "glucoseFeedConcentration", label: "Feed glucose", unit: "g/L", min: 1, max: 600, step: 1, value: 20 },
+  { key: "glutamineFeedConcentration", label: "Feed glutamine", unit: "mM", min: 0, max: 120, step: 1, value: 8 },
   { key: "perfusionRate", label: "Perfusion rate", unit: "VVD", min: 0, max: 8, step: 0.1, value: 1 },
+  { key: "perfusionBleed", label: "Perfusion bleed", unit: "% of feed", min: 0, max: 30, step: 0.5, value: 5 },
+  { key: "cellRetentionEfficiency", label: "Cell retention", unit: "%", min: 80, max: 100, step: 0.1, value: 99.5 },
+  { key: "baseDeathRate", label: "Base cell death rate", unit: "1/h", min: 0.0001, max: 0.05, step: 0.0001, value: 0.003 },
   { key: "harvestRecovery", label: "Harvest recovery", unit: "%", min: 40, max: 99, step: 1, value: 88 },
   { key: "clarificationYield", label: "Clarification yield", unit: "%", min: 40, max: 99, step: 1, value: 92 },
   { key: "chromYield", label: "Chromatography yield", unit: "%", min: 35, max: 99, step: 1, value: 82 },
@@ -1635,12 +1668,17 @@ const equations = [
   eq("Logistic growth", "kinetics", "dX/dt = mu * X * (1 - X / X_max)", "Density-limited biomass growth."),
   eq("Product formation", "kinetics", "dP/dt = alpha * dX/dt + beta * X", "Luedeking-Piret model for growth-associated and non-growth-associated product."),
   eq("Substrate uptake", "mass", "dS/dt = -(1 / Y_XS) * dX/dt - m_s * X", "Substrate consumption from biomass formation and maintenance."),
+  eq("Viable and dead cells", "kinetics", "dX_v/dt = (mu-k_d)X_v - D_cell,out*X_v - X_v*(dV/dt)/V; dX_d/dt = k_d*X_v-k_lysis*X_d-D_cell,out*X_d-X_d*(dV/dt)/V", "Coupled viable/dead-cell balance including death, lysis, hydraulic dilution, bleed, and retention-device breakthrough."),
+  eq("Dual nutrient growth", "kinetics", "mu = mu_max*S/(K_S+S)*Gln/(K_Gln+Gln)*DO/(K_O+DO)*f_inhibition", "Growth depends jointly on glucose, glutamine, dissolved oxygen, density, lactate, and ammonium."),
+  eq("Metabolite inhibition", "kinetics", "f_inhibition = 1/(1+(L/L_lim)^2) * 1/(1+(NH4/NH4_lim)^2)", "Continuous lactate and ammonium inhibition factor used in the dynamic cell-culture model."),
+  eq("Glutamine and ammonium", "mass", "d(Gln*V)/dt = F_feed*Gln_feed - F_out*Gln - q_Gln*X_v*V; r_NH4 = Y_NH4,Gln*q_Gln*X_v", "Glutamine consumption and ammonium formation with mode-specific inlet and outlet terms."),
+  eq("Dissolved oxygen state", "mass", "d(DO*V)/dt = kLa*(DO_star-DO)*V - q_O2*X_v*V + F_in*DO_in - F_out*DO", "Dynamic dissolved-oxygen balance coupled to oxygen transfer, cellular uptake, and hydraulic exchange."),
   eq("Batch reactor balance", "mass", "d(C_i*V)/dt = r_i*V; F_in = F_out = 0", "Closed cultivation balance after the initial charge and before harvest."),
   eq("Fed-batch volume", "mass", "dV/dt = F_feed", "Working volume rises with controlled feed addition while no bulk harvest leaves the reactor."),
   eq("Fed-batch substrate", "mass", "d(SV)/dt = F_in*S_in - q_s*X*V", "Dynamic substrate balance with feed addition."),
   eq("Perfusion dilution rate", "mass", "D = F_perfusion / V", "Daily medium-exchange rate for a constant-volume perfusion bioreactor."),
   eq("Perfusion cell retention", "mass", "d(XV)/dt = mu*X*V - F_bleed*X - (1-R_cell)*F_harvest*X", "Viable-cell balance with retention efficiency, controlled bleed, and clarified harvest."),
-  eq("Perfusion component balance", "mass", "d(C_iV)/dt = F_in*C_i,in - F_h*C_i + r_i*V", "Continuous nutrient, metabolite, and product balance at constant working volume."),
+  eq("Perfusion component balance", "mass", "d(C_iV)/dt = F_feed*C_i,feed - (F_harvest + F_bleed)*C_i + r_i*V", "Continuous soluble-component balance with feed, clarified harvest, bleed, and constant working volume."),
   eq("Oxygen transfer", "mass", "OTR = kLa * (C*_O2 - C_O2)", "Oxygen transfer rate from gas to liquid."),
   eq("Oxygen uptake", "mass", "OUR = q_O2 * X * V", "Biological oxygen demand."),
   eq("Carbon dioxide evolution", "mass", "CER = q_CO2 * X * V", "CO2 generation from cell respiration."),
@@ -2308,7 +2346,10 @@ function operationProfile() {
     batchSize: state.batchSize,
     batchCount: state.batchCount,
     feedRate: state.params.feedRate,
+    feedStartH: state.params.fedBatchFeedStart,
     perfusionRate: state.params.perfusionRate,
+    perfusionBleedPct: state.params.perfusionBleed,
+    cellRetentionEfficiencyPct: state.params.cellRetentionEfficiency,
     annualOperatingTime: state.params.annualOperatingTime,
     equipmentUptime: state.params.equipmentUptime,
     productionResidenceH: productionResidenceHours(),
@@ -2322,6 +2363,20 @@ function annualCycleEquivalent() {
 
 function operationModePickerMarkup(context = "simulation") {
   const selected = operationProfile();
+  const hydraulicMetrics = state.operationMode === "batch"
+    ? [
+        { label: "Cultivation boundary", value: "Closed vessel" },
+        { label: "Feed / harvest flow", value: "0 / 0 L/day" },
+      ]
+    : state.operationMode === "fedBatch"
+      ? [
+          { label: "Initial / final volume", value: `${formatNumber(selected.startVolumeFraction * state.batchSize, 0)} / ${formatNumber(state.batchSize, 0)} L` },
+          { label: "Controlled feed", value: `${formatNumber(selected.feedFlowLDay, 0)} L/day from ${formatNumber(selected.feedStartH, 0)} h` },
+        ]
+      : [
+          { label: "Feed / harvest / bleed", value: `${formatNumber(selected.feedFlowLDay, 0)} / ${formatNumber(selected.harvestFlowLDay, 0)} / ${formatNumber(selected.bleedFlowLDay, 0)} L/day` },
+          { label: "Cell retention", value: `${formatNumber(selected.cellRetentionEfficiencyPct, 1)}%` },
+        ];
   return `
     <section class="operation-mode-panel" data-operation-mode-context="${context}">
       <div class="operation-mode-copy">
@@ -2343,6 +2398,7 @@ function operationModePickerMarkup(context = "simulation") {
         <article><span>${selected.cycleLabel === "campaign" ? "Campaign harvest" : "Harvest / batch"}</span><strong>${formatNumber(selected.harvestVolumePerCycleL, 0)} L</strong></article>
         <article><span>Annual harvest basis</span><strong>${formatNumber(selected.annualHarvestVolumeL / 1000, 1)} m3</strong></article>
         <article><span>${selected.cycleLabel === "campaign" ? "Feasible annual campaigns" : selected.countLabel}</span><strong>${selected.targetCycles}</strong></article>
+        ${hydraulicMetrics.map((item) => `<article><span>${item.label}</span><strong>${item.value}</strong></article>`).join("")}
       </div>
     </section>
   `;
@@ -2393,9 +2449,14 @@ function materialCostBreakdown(data, profile, learningCredit) {
   const lossFactor = 1 + (p.materialLossFactor || 0) / 100 + (1 - data.processYield) * 0.65;
   const coldChainFactor = 1 + (p.coldChainMaterialFactor || 0) / 100;
   const purchasing = profile.purchasingPower * learningCredit;
-  const mediaVolumeL = (state.operationMode === "batch" ? batchVolumeL * batches : annualBrothL) * materialProfile.media;
+  const mediaBasisL = state.operationMode === "batch"
+    ? batchVolumeL * batches
+    : state.operationMode === "fedBatch"
+      ? batchVolumeL * mode.startVolumeFraction * batches
+      : mode.feedFlowLDay * mode.effectiveAotH / 24;
+  const mediaVolumeL = mediaBasisL * materialProfile.media;
   const feedVolumeL = state.operationMode === "fedBatch"
-    ? batchVolumeL * batches * mode.feedFraction * materialProfile.feed
+    ? mode.feedVolumePerCycleL * batches * materialProfile.feed
     : state.operationMode === "perfusion"
       ? annualBrothL * 0.08 * materialProfile.feed
       : 0;
@@ -2953,6 +3014,8 @@ const propertyDatabase = {
 };
 const componentProperties = aggregateComponentProperties();
 let massBalanceCache = { key: "", value: null };
+let dynamicProfileCache = { key: "", value: null };
+let axialTransportCache = { key: "", value: null };
 
 function propertyAtTemperature(record, temperatureC = state.params.temperature || 25) {
   const delta = temperatureC - 25;
@@ -3492,6 +3555,8 @@ function solveMassBalance() {
 }
 
 function dynamicBatchProfile() {
+  const cacheKey = `dynamic||${massBalanceCacheKey()}`;
+  if (dynamicProfileCache.key === cacheKey && dynamicProfileCache.value) return dynamicProfileCache.value;
   const data = metrics();
   const solved = solveMassBalance();
   const p = state.params;
@@ -3508,11 +3573,16 @@ function dynamicBatchProfile() {
     startVolumeFraction: mode.startVolumeFraction,
     endVolumeFraction: mode.endVolumeFraction,
     feedRatePctPerDay: p.feedRate,
+    feedStartH: p.fedBatchFeedStart,
     perfusionRateVvd: mode.dilutionRatePerDay,
     bleedFraction: mode.bleedFraction,
+    cellRetentionEfficiencyPct: mode.cellRetentionEfficiencyPct,
     muMax: p.specificGrowth,
+    deathRatePerH: p.baseDeathRate,
     substrateInitialGL: p.glucose,
-    substrateFeedGL: Math.max(40, p.glucose * 30),
+    substrateFeedGL: p.glucoseFeedConcentration,
+    glutamineInitialMm: p.glutamine,
+    glutamineFeedMm: p.glutamineFeedConcentration,
     biomassInitialMCellsMl: Math.max(0.05, (p.cellDensity || 18) * (p.inoculation || 10) / 100),
     biomassCapacityMCellsMl: p.cellDensity,
     doSetpointPct: p.doSetpoint,
@@ -3521,7 +3591,6 @@ function dynamicBatchProfile() {
     lactateLimitGL: p.lactate,
     ammoniaLimitMm: p.ammonia,
     targetTiterGL: data.effectiveTiter,
-    glutamineMm: p.glutamine,
   });
   const finalOdeProduct = Math.max(1e-9, ode.points.at(-1)?.totalProductKg || ode.points.at(-1)?.productKg || 0);
   const rows = ode.points.map((point) => {
@@ -3540,8 +3609,16 @@ function dynamicBatchProfile() {
       phase,
       volumeL: point.volumeL,
       viableDensityMCellsMl: point.biomassMCellsMl,
+      deadDensityMCellsMl: point.deadCellsMCellsMl,
+      totalDensityMCellsMl: point.totalCellsMCellsMl,
+      viabilityPct: point.viabilityPct,
       substrateGL: point.substrateGL,
+      glucoseGL: point.glucoseGL,
+      glutamineMm: point.glutamineMm,
+      productConcentrationGL: point.productGL,
       productKg: grossProductTargetKg * normalizedProduct,
+      modelProductKg: point.productKg,
+      generatedProductKg: point.generatedProductKg,
       recoveredProductKg: grossProductTargetKg * data.processYield * normalizedProduct,
       biomassKg: biomassTarget * biomassProgress,
       dissolvedOxygenPct: point.dissolvedOxygenPct,
@@ -3550,16 +3627,35 @@ function dynamicBatchProfile() {
       heatLoadKw: heatKw,
       cumulativeEnergyKwh: solved.totals.netHeatDuty * progress,
       recoveryPct: data.processYield * normalizedProduct * 100,
+      feedFlowLDay: point.feedFlowLDay,
       harvestFlowLDay: point.harvestFlowLDay,
+      bleedFlowLDay: point.bleedFlowLDay,
+      dilutionRatePerH: point.dilutionRatePerH,
+      cellRemovalRatePerH: point.cellRemovalRatePerH,
+      growthRatePerH: point.growthRatePerH,
+      deathRatePerH: point.deathRatePerH,
+      glucoseUptakeGLh: point.glucoseUptakeGLh,
+      glutamineUptakeMmh: point.glutamineUptakeMmh,
+      productFormationGLh: point.productFormationGLh,
+      oxygenDemandPctH: point.oxygenDemandPctH,
+      oxygenTransferPctH: point.oxygenTransferPctH,
+      cumulativeFeedL: point.cumulativeFeedL,
+      cumulativeHarvestL: point.cumulativeHarvestL,
+      cumulativeBleedL: point.cumulativeBleedL,
       cumulativeHarvestProductKg: point.harvestProductKg,
+      volumeBalanceResidualL: point.volumeBalanceResidualL,
+      glucoseBalanceResidualG: point.glucoseBalanceResidualG,
+      productBalanceResidualG: point.productBalanceResidualG,
+      balanceResidualPct: point.balanceResidualPct,
     };
   });
   const warnings = [
     rows.some((row) => row.dissolvedOxygenPct < 20) ? "DO falls below 20% during the simulated production window." : "",
     rows.some((row) => row.ammoniaMm > Math.max(0.2, p.ammonia || 2)) ? `Ammonium crosses the configured ${formatNumber(p.ammonia || 2, 1)} mM boundary.` : "",
     rows.some((row) => row.lactateGL > Math.max(0.2, p.lactate || 2)) ? `Lactate crosses the configured ${formatNumber(p.lactate || 2, 1)} g/L boundary.` : "",
+    rows.some((row) => row.viabilityPct < 80) ? "Viability falls below 80% during the simulated production window." : "",
   ].filter(Boolean);
-  return {
+  const result = {
     basis: `coupled nonlinear ODE · ${mode.label}`,
     operationMode: state.operationMode,
     mode,
@@ -3573,15 +3669,24 @@ function dynamicBatchProfile() {
       stepH: ode.stepH,
       integrationSteps: ode.integrationSteps,
       maxStepResidual: ode.maxStepResidual,
+      maxBalanceResidualPct: ode.maxBalanceResidualPct,
+      bookkeepingStates: ode.bookkeepingStates,
+      assumptions: ode.assumptions,
     },
     peakHeatKw: Math.max(...rows.map((row) => row.heatLoadKw)),
     minDoPct: Math.min(...rows.map((row) => row.dissolvedOxygenPct)),
     maxAmmoniaMm: Math.max(...rows.map((row) => row.ammoniaMm)),
+    maxLactateGL: Math.max(...rows.map((row) => row.lactateGL)),
+    minViabilityPct: Math.min(...rows.map((row) => row.viabilityPct)),
     finalRecoveredKg: rows.at(-1)?.recoveredProductKg || 0,
   };
+  dynamicProfileCache = { key: cacheKey, value: result };
+  return result;
 }
 
 function axialTransportProfiles(dynamic = dynamicBatchProfile()) {
+  const cacheKey = `transport||${massBalanceCacheKey()}`;
+  if (axialTransportCache.key === cacheKey && axialTransportCache.value) return axialTransportCache.value;
   const p = state.params;
   const mode = operationProfile();
   const reactorLengthM = Math.max(1.2, Math.pow(Math.max(1, state.batchSize) / 1000, 1 / 3) * 1.8);
@@ -3596,21 +3701,36 @@ function axialTransportProfiles(dynamic = dynamicBatchProfile()) {
     dispersionM2h,
     snapshotCount: 7,
   };
+  const dynamicPointAt = (timeH) => {
+    const fraction = Math.max(0, Math.min(1, timeH / Math.max(0.001, common.durationH)));
+    return dynamic.points[Math.min(dynamic.points.length - 1, Math.round(fraction * (dynamic.points.length - 1)))] || finalPoint;
+  };
+  const axialDemandFactor = (_timeH, index) => 0.82 + 0.36 * index / Math.max(1, common.cells - 1);
   const oxygen = solveAxialTransportPde({
     ...common,
     inletConcentration: 1,
     initialConcentration: Math.max(0.05, Math.min(1, (dynamic.minDoPct || p.doSetpoint || 40) / 100)),
-    uptakePerH: Math.max(0.01, (p.our || 4.5) * Math.max(0.2, finalPoint.viableDensityMCellsMl || 1) / Math.max(20, (p.cellDensity || 18) * 35)),
-    sourcePerH: Math.max(0, (p.kla || 65) / 260),
+    uptakePerH: (timeH, index) => Math.max(0.005, (p.our || 4.5) * Math.max(0.2, dynamicPointAt(timeH).viableDensityMCellsMl || 1) / Math.max(20, (p.cellDensity || 18) * 35)) * axialDemandFactor(timeH, index),
+    sourcePerH: (_timeH, index) => Math.max(0, (p.kla || 65) / 260) * (1.45 - 0.75 * index / Math.max(1, common.cells - 1)),
   });
+  const initialNutrient = Math.max(0.03, Math.min(1, (dynamic.points[0]?.substrateGL || p.glucose || 4) / Math.max(0.1, p.glucose || 4)));
   const nutrient = solveAxialTransportPde({
     ...common,
-    inletConcentration: 1,
-    initialConcentration: Math.max(0.03, Math.min(1, (finalPoint.substrateGL || p.glucose || 4) / Math.max(0.1, p.glucose || 4))),
-    uptakePerH: Math.max(0.01, (p.specificGrowth || 0.05) * Math.max(0.2, finalPoint.viableDensityMCellsMl || 1) / Math.max(4, p.cellDensity || 18)),
-    sourcePerH: state.operationMode === "batch" ? 0 : Math.max(0.01, (mode.feedFraction || mode.dilutionRatePerDay) / 24),
+    velocityMph: state.operationMode === "batch" ? 0 : velocityMph,
+    inletConcentration: state.operationMode === "batch" ? initialNutrient : 1,
+    initialConcentration: initialNutrient,
+    uptakePerH: (timeH, index) => Math.max(0.005, (p.specificGrowth || 0.05) * Math.max(0.2, dynamicPointAt(timeH).viableDensityMCellsMl || 1) / Math.max(4, p.cellDensity || 18)) * axialDemandFactor(timeH, index),
+    sourcePerH: (timeH, index) => {
+      if (state.operationMode === "batch") return 0;
+      const point = dynamicPointAt(timeH);
+      const hydraulicRate = Math.max(0, point.feedFlowLDay || 0) / 24 / Math.max(1, point.volumeL || state.batchSize);
+      const feedPortFactor = index < Math.max(2, common.cells * 0.12) ? 1.8 : 0.15;
+      return hydraulicRate * feedPortFactor;
+    },
   });
-  return { oxygen, nutrient, reactorLengthM, velocityMph, dispersionM2h };
+  const result = { oxygen, nutrient, reactorLengthM, velocityMph, dispersionM2h, operationMode: state.operationMode };
+  axialTransportCache = { key: cacheKey, value: result };
+  return result;
 }
 
 function pdeProfileRows() {
@@ -3624,7 +3744,13 @@ function pdeProfileRows() {
     average: snapshot.average,
     outlet: snapshot.outlet,
     peclet: transport[field].peclet,
+    courant: transport[field].courant,
+    fourier: transport[field].fourier,
     residual: transport[field].maxResidual,
+    massBalanceResidual: snapshot.massBalanceResidual,
+    massBalanceResidualPct: snapshot.massBalanceResidualPct,
+    boundaryConditions: transport[field].boundaryConditions,
+    operationMode: transport.operationMode,
   }))));
 }
 
@@ -3634,15 +3760,41 @@ function dynamicProfileRows() {
     phase: row.phase,
     volumeL: row.volumeL,
     viableDensityMCellsMl: row.viableDensityMCellsMl,
+    deadDensityMCellsMl: row.deadDensityMCellsMl,
+    totalDensityMCellsMl: row.totalDensityMCellsMl,
+    viabilityPct: row.viabilityPct,
     substrateGL: row.substrateGL,
+    glucoseGL: row.glucoseGL,
+    glutamineMm: row.glutamineMm,
+    productConcentrationGL: row.productConcentrationGL,
     productKg: row.productKg,
+    modelProductKg: row.modelProductKg,
+    generatedProductKg: row.generatedProductKg,
     recoveredProductKg: row.recoveredProductKg,
     biomassKg: row.biomassKg,
     dissolvedOxygenPct: row.dissolvedOxygenPct,
     lactateGL: row.lactateGL,
     ammoniaMm: row.ammoniaMm,
+    feedFlowLDay: row.feedFlowLDay,
     harvestFlowLDay: row.harvestFlowLDay,
+    bleedFlowLDay: row.bleedFlowLDay,
+    dilutionRatePerH: row.dilutionRatePerH,
+    cellRemovalRatePerH: row.cellRemovalRatePerH,
+    growthRatePerH: row.growthRatePerH,
+    deathRatePerH: row.deathRatePerH,
+    glucoseUptakeGLh: row.glucoseUptakeGLh,
+    glutamineUptakeMmh: row.glutamineUptakeMmh,
+    productFormationGLh: row.productFormationGLh,
+    oxygenDemandPctH: row.oxygenDemandPctH,
+    oxygenTransferPctH: row.oxygenTransferPctH,
+    cumulativeFeedL: row.cumulativeFeedL,
+    cumulativeHarvestL: row.cumulativeHarvestL,
+    cumulativeBleedL: row.cumulativeBleedL,
     cumulativeHarvestProductKg: row.cumulativeHarvestProductKg,
+    volumeBalanceResidualL: row.volumeBalanceResidualL,
+    glucoseBalanceResidualG: row.glucoseBalanceResidualG,
+    productBalanceResidualG: row.productBalanceResidualG,
+    balanceResidualPct: row.balanceResidualPct,
     heatLoadKw: row.heatLoadKw,
     cumulativeEnergyKwh: row.cumulativeEnergyKwh,
     recoveryPct: row.recoveryPct,
@@ -6675,9 +6827,9 @@ function physicalBoundaryRows() {
 
 function parameterGroup(item) {
   if (item.custom) return "Custom user parameters";
-  if (["ph", "osmolality", "temperature", "viability", "cellDensity", "doublingTime", "specificGrowth", "biomassYield"].includes(item.key)) return "Cell physiology";
+  if (["ph", "osmolality", "temperature", "viability", "cellDensity", "doublingTime", "specificGrowth", "biomassYield", "glucose", "glutamine", "glucoseFeedConcentration", "glutamineFeedConcentration", "baseDeathRate"].includes(item.key)) return "Cell physiology";
   if (["kla", "doSetpoint", "agitation", "aeration", "oxygenUptake", "co2Removal", "viscosity", "density", "heatRecovery"].includes(item.key)) return "Transfer + rheology";
-  if (["perfusionRate", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
+  if (["feedRate", "fedBatchFeedStart", "perfusionRate", "perfusionBleed", "cellRetentionEfficiency", "dilutionRate", "harvestRecovery", "clarificationYield", "chromYield", "ufdfYield", "filterFlux", "resinCapacity"].includes(item.key)) return "Downstream + yield";
   if (["cipTime", "sipHold", "sterilityAssurance", "bioburden", "bioburdenLimit", "endotoxinLimit", "holdTimeLimit", "qcReleaseTime", "operatorShiftHours"].includes(item.key)) return "GMP + cleaning";
   if (["capitalScaleExponent", "labFixedBurden", "facilityPremium", "validationFactor", "automationLevel", "learningRate", "bottleneckUtil", "recycleFraction", "mediaCostPerL", "feedSupplementCostPerL", "bufferCostPerL", "resinCostPerL", "singleUseCostPerL", "qcConsumableCost", "materialLossFactor", "coldChainMaterialFactor", "materialInventoryDays"].includes(item.key)) return "Scale-up + economics";
   return "Environmental + utilities";
@@ -8472,6 +8624,12 @@ function renderSimulationBoard() {
     6,
     Math.min(92, Number(value || 0) / peakBucketOperationCount * 92),
   );
+  const terminalState = profileRows.at(-1) || {};
+  const modeBalanceEquation = state.operationMode === "batch"
+    ? "d(C_i V)/dt = r_i V; F_feed = F_harvest = F_bleed = 0"
+    : state.operationMode === "fedBatch"
+      ? "d(C_i V)/dt = F_feed C_i,feed + r_i V; dV/dt = F_feed"
+      : "F_feed = F_harvest + F_bleed; d(X_v V)/dt = (mu-k_d)X_vV - (F_bleed + (1-eta)F_harvest)X_v";
 
   els.simulationBoard.innerHTML = `
     ${outputValidityMarkup(dynamicReadiness, "Result validity · dynamic simulation")}
@@ -8503,7 +8661,7 @@ function renderSimulationBoard() {
         <div>
           <span>Numerical model</span>
           <h3>Coupled states and distributed transport</h3>
-          <p>The ODE system advances reactor states through time. The PDE system resolves axial oxygen and nutrient transport using convection, dispersion, source, and cellular uptake terms.</p>
+          <p>The mode-specific ODE system advances viable and dead cells, glucose, glutamine, product, oxygen, lactate, ammonium, and liquid volume. The PDE system resolves distributed oxygen and nutrient transport with explicit inlet, outlet, dispersion, source, and uptake terms.</p>
         </div>
         <div class="numerical-solver-actions">
           <button data-download-report="ode-profile-csv" type="button">ODE states CSV</button>
@@ -8511,10 +8669,23 @@ function renderSimulationBoard() {
         </div>
       </div>
       <div class="numerical-solver-grid">
+        <article class="mode-balance-card">
+          <span>${dynamic.mode.label} · hydraulic boundary</span>
+          <h4>Flows and volume closure</h4>
+          <code>${modeBalanceEquation}</code>
+          <dl>
+            <dt>Nominal feed</dt><dd>${formatNumber(dynamic.mode.feedFlowLDay || 0, 1)} L/day</dd>
+            <dt>Nominal harvest</dt><dd>${formatNumber(dynamic.mode.harvestFlowLDay || 0, 1)} L/day</dd>
+            <dt>Nominal bleed</dt><dd>${formatNumber(dynamic.mode.bleedFlowLDay || 0, 1)} L/day</dd>
+            <dt>Final volume</dt><dd>${formatNumber(terminalState.volumeL || 0, 1)} L</dd>
+            <dt>Final viability</dt><dd>${formatNumber(terminalState.viabilityPct || 0, 1)}%</dd>
+            <dt>Balance residual</dt><dd>${formatNumber(dynamic.solver.maxBalanceResidualPct, 5)}%</dd>
+          </dl>
+        </article>
         <article>
           <span>ODE · ${dynamic.solver.name}</span>
           <h4>${dynamic.solver.equations} coupled state equations</h4>
-          <code>dX/dt = μ(S,O₂)X − k<sub>d</sub>X − D<sub>bleed</sub>X</code>
+          <code>dX<sub>v</sub>/dt = (mu-k<sub>d</sub>)X<sub>v</sub> - D<sub>cell,out</sub>X<sub>v</sub> - X<sub>v</sub>(dV/dt)/V</code>
           <svg viewBox="0 0 420 112" role="img" aria-label="ODE biomass substrate and oxygen profile">
             <path d="${sparklinePath(profileRows, "viableDensityMCellsMl")}" fill="none" stroke="#43b8a8" stroke-width="4" />
             <path d="${sparklinePath(profileRows, "substrateGL")}" fill="none" stroke="#6f8793" stroke-width="3" />
@@ -8524,6 +8695,7 @@ function renderSimulationBoard() {
             <dt>Integration steps</dt><dd>${formatNumber(dynamic.solver.integrationSteps, 0)}</dd>
             <dt>Step width</dt><dd>${formatNumber(dynamic.solver.stepH, 4)} h</dd>
             <dt>Max relative step</dt><dd>${formatNumber(dynamic.solver.maxStepResidual, 4)}</dd>
+            <dt>Bookkeeping states</dt><dd>${dynamic.solver.bookkeepingStates}</dd>
           </dl>
         </article>
         <article>
@@ -8536,7 +8708,9 @@ function renderSimulationBoard() {
           <dl>
             <dt>Axial cells</dt><dd>${transport.oxygen.cells}</dd>
             <dt>Peclet number</dt><dd>${formatNumber(transport.oxygen.peclet, 1)}</dd>
+            <dt>Courant / Fourier</dt><dd>${formatNumber(transport.oxygen.courant, 3)} / ${formatNumber(transport.oxygen.fourier, 3)}</dd>
             <dt>Maximum residual</dt><dd>${formatNumber(transport.oxygen.maxResidual, 5)}</dd>
+            <dt>Balance residual</dt><dd>${formatNumber(transport.oxygen.massBalanceResidualPct, 3)}%</dd>
           </dl>
         </article>
         <article>
@@ -8550,6 +8724,7 @@ function renderSimulationBoard() {
             <dt>Reactor length</dt><dd>${formatNumber(transport.reactorLengthM, 2)} m</dd>
             <dt>Axial velocity</dt><dd>${formatNumber(transport.velocityMph, 2)} m/h</dd>
             <dt>Dispersion</dt><dd>${formatNumber(transport.dispersionM2h, 3)} m²/h</dd>
+            <dt>Balance residual</dt><dd>${formatNumber(transport.nutrient.massBalanceResidualPct, 3)}%</dd>
           </dl>
         </article>
       </div>
@@ -14868,6 +15043,10 @@ function downloadSummaryCsv() {
     { metric: "Working volume", value: state.batchSize, unit: "L" },
     { metric: data.operationMode.countLabel, value: data.operationMode.targetCycles, unit: `${data.operationMode.cycleLabel}s/yr` },
     { metric: "Annual harvest volume", value: data.annualHarvestVolumeL, unit: "L/yr" },
+    { metric: "Production feed flow", value: data.operationMode.feedFlowLDay, unit: "L/day" },
+    { metric: "Production harvest flow", value: data.operationMode.harvestFlowLDay, unit: "L/day" },
+    { metric: "Production bleed flow", value: data.operationMode.bleedFlowLDay, unit: "L/day" },
+    { metric: "Cell retention efficiency", value: data.operationMode.cellRetentionEfficiencyPct, unit: "%" },
     { metric: "Titer", value: state.titer, unit: "g/L" },
     { metric: "Recovery", value: state.recovery, unit: "%" },
     { metric: "Annual product", value: data.annualKg, unit: "kg/yr" },
@@ -14885,8 +15064,11 @@ function downloadSummaryCsv() {
     { metric: "Dynamic peak heat", value: dynamic.peakHeatKw, unit: "kW" },
     { metric: "Dynamic min DO", value: dynamic.minDoPct, unit: "%" },
     { metric: "Dynamic max ammonia", value: dynamic.maxAmmoniaMm, unit: "mM" },
+    { metric: "Dynamic max lactate", value: dynamic.maxLactateGL, unit: "g/L" },
+    { metric: "Dynamic minimum viability", value: dynamic.minViabilityPct, unit: "%" },
     { metric: "ODE integration steps", value: dynamic.solver.integrationSteps, unit: "steps" },
     { metric: "ODE maximum relative step", value: dynamic.solver.maxStepResidual, unit: "" },
+    { metric: "ODE maximum balance residual", value: dynamic.solver.maxBalanceResidualPct, unit: "%" },
     { metric: "PDE axial cells", value: axialTransportProfiles(dynamic).oxygen.cells, unit: "cells" },
     { metric: "Mechanistic unit models", value: unitModels.length, unit: "models" },
     { metric: "Mechanistic model review flags", value: unitModels.filter((item) => item.severity !== "ok").length, unit: "flags" },

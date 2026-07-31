@@ -28,17 +28,21 @@ test("fed-batch mode raises working volume through controlled feed", () => {
 
   assert.ok(profile.feedFraction > 0);
   assert.ok(profile.startVolumeFraction < profile.endVolumeFraction);
-  assert.ok(profile.harvestVolumePerCycleL > common.batchSize);
+  assert.equal(profile.harvestVolumePerCycleL, common.batchSize);
+  assert.ok(profile.feedVolumePerCycleL > 0);
+  assert.ok(Math.abs(profile.startVolumeFraction * common.batchSize + profile.feedVolumePerCycleL - common.batchSize) < 1e-9);
   assert.equal(profile.annualHarvestVolumeL, profile.harvestVolumePerCycleL * common.batchCount);
 });
 
 test("perfusion mode derives annual harvest from dilution and operating time", () => {
-  const profile = operationModeProfile({ ...common, mode: "perfusion", perfusionRate: 1.5 });
-  const expected = common.batchSize * 1.5 * profile.effectiveAotH / 24;
+  const profile = operationModeProfile({ ...common, mode: "perfusion", perfusionRate: 1.5, perfusionBleedPct: 5, cellRetentionEfficiencyPct: 99.5 });
+  const expected = common.batchSize * 1.5 * 0.95 * profile.effectiveAotH / 24;
 
   assert.equal(profile.dilutionRatePerDay, 1.5);
   assert.ok(profile.bleedFraction > 0);
-  assert.equal(profile.annualHarvestVolumeL, expected);
+  assert.ok(Math.abs(profile.annualHarvestVolumeL - expected) < 1e-9);
+  assert.ok(Math.abs(profile.feedFlowLDay - profile.harvestFlowLDay - profile.bleedFlowLDay) < 1e-9);
+  assert.equal(profile.cellRetentionEfficiencyPct, 99.5);
   assert.ok(profile.targetCycles <= profile.requestedCycles);
 });
 

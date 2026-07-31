@@ -21,7 +21,7 @@ export const OPERATION_MODES = Object.freeze({
     cycleLabel: "campaign",
     countLabel: "Annual campaigns",
     description: "Continuous medium exchange and harvest with cell retention, bleed, and campaign cleaning.",
-    balance: "d(C_i V)/dt = F_in C_i,in - F_h C_i + r_i V; D = F_in/V",
+    balance: "F_feed = F_harvest + F_bleed; d(C_i V)/dt = F_feed C_i,feed - (F_harvest + F_bleed)C_i + r_i V",
   }),
 });
 
@@ -36,7 +36,10 @@ export function operationModeProfile({
   batchSize = 1,
   batchCount = 1,
   feedRate = 0,
+  feedStartH = 18,
   perfusionRate = 0,
+  perfusionBleedPct = 5,
+  cellRetentionEfficiencyPct = 99.5,
   annualOperatingTime = 7920,
   equipmentUptime = 92,
   productionResidenceH = 120,
@@ -57,8 +60,14 @@ export function operationModeProfile({
       targetCycles: requestedCycles,
       effectiveAotH,
       feedFraction: 0,
+      feedVolumePerCycleL: 0,
+      feedFlowLDay: 0,
+      feedStartH: null,
+      harvestFlowLDay: 0,
+      bleedFlowLDay: 0,
       dilutionRatePerDay: 0,
       bleedFraction: 0,
+      cellRetentionEfficiencyPct: 0,
       startVolumeFraction: 1,
       endVolumeFraction: 1,
       harvestVolumePerCycleL: vesselVolumeL,
@@ -72,10 +81,12 @@ export function operationModeProfile({
   if (key === "perfusion") {
     const productionHours = clamp(residenceH, 168, Math.max(168, effectiveAotH));
     const dilutionRatePerDay = clamp(perfusionRate || 1, 0.05, 4);
-    const bleedFraction = clamp(0.03 + dilutionRatePerDay * 0.018, 0.03, 0.16);
+    const bleedFraction = clamp(perfusionBleedPct, 0, 50) / 100;
+    const harvestRatePerDay = dilutionRatePerDay * (1 - bleedFraction);
+    const cellRetention = clamp(cellRetentionEfficiencyPct, 0, 100);
     const campaignCapacity = Math.max(1, Math.floor(effectiveAotH / Math.max(168, productionHours + 16)));
     const targetCycles = Math.max(1, Math.min(requestedCycles, campaignCapacity));
-    const annualHarvestVolumeL = vesselVolumeL * dilutionRatePerDay * effectiveAotH / 24;
+    const annualHarvestVolumeL = vesselVolumeL * harvestRatePerDay * effectiveAotH / 24;
     return {
       ...definition,
       productionHours,
@@ -83,11 +94,17 @@ export function operationModeProfile({
       targetCycles,
       effectiveAotH,
       feedFraction: 1,
+      feedVolumePerCycleL: vesselVolumeL * dilutionRatePerDay * productionHours / 24,
+      feedFlowLDay: vesselVolumeL * dilutionRatePerDay,
+      feedStartH: 0,
+      harvestFlowLDay: vesselVolumeL * harvestRatePerDay,
+      bleedFlowLDay: vesselVolumeL * dilutionRatePerDay * bleedFraction,
       dilutionRatePerDay,
       bleedFraction,
+      cellRetentionEfficiencyPct: cellRetention,
       startVolumeFraction: 1,
       endVolumeFraction: 1,
-      harvestVolumePerCycleL: vesselVolumeL * dilutionRatePerDay * productionHours / 24,
+      harvestVolumePerCycleL: vesselVolumeL * harvestRatePerDay * productionHours / 24,
       annualHarvestVolumeL,
       annualOperatingHours: effectiveAotH,
       productivityFactor: 0.8 + Math.min(0.35, dilutionRatePerDay * 0.08),
@@ -96,8 +113,9 @@ export function operationModeProfile({
   }
 
   const productionHours = clamp(residenceH, 48, 336);
-  const feedFraction = clamp(Number(feedRate || 0) / 100 * productionHours / 24, 0.05, 0.85);
-  const harvestVolumePerCycleL = vesselVolumeL * (1 + feedFraction);
+  const feedFraction = clamp(Number(feedRate || 0) / 100 * productionHours / 24, 0.05, 0.3);
+  const feedVolumePerCycleL = vesselVolumeL * feedFraction;
+  const harvestVolumePerCycleL = vesselVolumeL;
   return {
     ...definition,
     productionHours,
@@ -105,8 +123,14 @@ export function operationModeProfile({
     targetCycles: requestedCycles,
     effectiveAotH,
     feedFraction,
+    feedVolumePerCycleL,
+    feedFlowLDay: vesselVolumeL * clamp(feedRate, 0, 100) / 100,
+    feedStartH: clamp(feedStartH, 0, productionHours),
+    harvestFlowLDay: 0,
+    bleedFlowLDay: 0,
     dilutionRatePerDay: 0,
     bleedFraction: 0,
+    cellRetentionEfficiencyPct: 0,
     startVolumeFraction: Math.max(0.55, 1 - feedFraction),
     endVolumeFraction: 1,
     harvestVolumePerCycleL,

@@ -27438,7 +27438,7 @@ body:not(.locked) #flowsheetView .stream-label.selected {
 .operation-mode-metrics {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
 }
 
@@ -27500,7 +27500,7 @@ body:not(.locked) #flowsheetView .stream-label.selected {
 
 .numerical-solver-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 12px;
 }
 
