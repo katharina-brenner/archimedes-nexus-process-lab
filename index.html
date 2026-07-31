@@ -18,7 +18,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260731-engineering-exports-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260731-monthly-pricing-v3" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -54,10 +54,12 @@
               "Project collaboration, branches and model history"
             ],
             "offers": {
-              "@type": "Offer",
-              "price": "2400",
+              "@type": "AggregateOffer",
+              "lowPrice": "149",
+              "highPrice": "6900",
+              "offerCount": "4",
               "priceCurrency": "EUR",
-              "category": "Annual professional subscription",
+              "category": "Monthly software subscriptions",
               "availability": "https://schema.org/OnlineOnly"
             },
             "publisher": {
@@ -1270,59 +1272,73 @@
           <section id="publicPricing" class="public-section public-pricing public-page" data-public-page="pricing">
             <div class="section-heading">
               <p>Pricing</p>
-              <h2>Choose the workspace that fits your team.</h2>
+              <h2>Monthly access for serious process engineering.</h2>
+              <span>Start with the model depth and collaboration level your work needs. Upgrade as the process moves from research to site deployment.</span>
             </div>
-            <div class="public-subpage-gallery public-pointer-scene" aria-label="Industrial use cases for Axion workspaces">
-              <figure class="public-photo-feature public-photo-wide">
-                <img src="./assets/axion-biomanufacturing-suite.png" alt="Autonomous industrial biomanufacturing facility representing enterprise-scale process engineering and governance" loading="lazy" />
-                <figcaption><span>Engineering teams</span><strong>A workspace that grows to site scale.</strong><p>Move from a focused study to shared plant models, governed data and cross-functional review.</p></figcaption>
-              </figure>
-              <figure class="public-photo-feature">
-                <img src="./assets/photography/industrial-fermenters-15000l.jpg" alt="Industrial stainless-steel fermentation plant with large vessels and site-wide operating infrastructure" loading="lazy" />
-                <figcaption><span>Industrial scope</span><strong>Pay for the collaboration and compute you need.</strong><p>Plans separate research use from professional modelling, team governance and enterprise deployment.</p></figcaption>
-              </figure>
+            <div class="pricing-billing-strip" aria-label="Billing terms">
+              <span><b>Monthly billing</b><small>Change or cancel from the billing portal.</small></span>
+              <span><b>Secure checkout</b><small>Payment details stay with Stripe.</small></span>
+              <span><b>Immediate access</b><small>Your workspace unlocks after verified payment.</small></span>
             </div>
             <div class="pricing-grid" aria-label="Axion pricing plans">
-              <article>
-                <span>Academic</span>
-                <h3>Research workspace</h3>
-                <strong class="pricing-price">Contact us</strong>
+              <article data-pricing-plan="academic">
+                <span>Research</span>
+                <h3>Research</h3>
+                <p>For an individual researcher building traceable process studies.</p>
+                <strong class="pricing-price" data-plan-price="academic">€149 / month</strong>
+                <small data-plan-note="academic">1 named seat · billed monthly</small>
                 <ul>
-                  <li>Process builder and simulation</li>
-                  <li>Examples and engineering exports</li>
-                  <li>Academic-use licence</li>
+                  <li>Flowsheet, simulation and equations</li>
+                  <li>Private research projects</li>
+                  <li>Academic engineering exports</li>
+                  <li>Scientific source library</li>
                 </ul>
+                <button class="pricing-plan-button" type="button" data-public-target="loginPanel" data-checkout-plan="academic">Choose Research</button>
               </article>
-              <article class="pricing-featured">
-                <span>Professional</span>
-                <h3>Private modelling workspace</h3>
-                <strong id="professionalPrice" class="pricing-price">€2,400 / year</strong>
-                <small id="professionalBillingNote">Annual subscription · secure Stripe Checkout</small>
+              <article class="pricing-featured" data-pricing-plan="professional">
+                <span>Recommended</span>
+                <h3>Professional</h3>
+                <p>For a process engineer owning complete design decisions.</p>
+                <strong class="pricing-price" data-plan-price="professional">€590 / month</strong>
+                <small data-plan-note="professional">1 named seat · billed monthly</small>
                 <ul>
                   <li>Full equipment and process library</li>
-                  <li>Balances, CFD, scheduling, TEA and LCA</li>
-                  <li>Private projects and downloadable reports</li>
+                  <li>Balances, ODE/PDE, CFD and scheduling</li>
+                  <li>TEA, LCA and sensitivity analysis</li>
+                  <li>Excel, SVG, CSV and complete ZIP exports</li>
                 </ul>
+                <button class="pricing-plan-button" type="button" data-public-target="loginPanel" data-checkout-plan="professional">Choose Professional</button>
               </article>
-              <article>
-                <span>Enterprise</span>
-                <h3>Team and site deployment</h3>
-                <strong class="pricing-price">Custom</strong>
+              <article data-pricing-plan="team">
+                <span>Team</span>
+                <h3>Engineering Team</h3>
+                <p>For multidisciplinary teams reviewing and evolving shared models.</p>
+                <strong class="pricing-price" data-plan-price="team">€2,490 / month</strong>
+                <small data-plan-note="team">5 named seats · billed monthly</small>
                 <ul>
-                  <li>Collaboration and model libraries</li>
-                  <li>Integrations, governance and support</li>
-                  <li>Private cloud or on-premise options</li>
+                  <li>Everything in Professional</li>
+                  <li>Collaboration, invites and comments</li>
+                  <li>Branches, versions and audit trail</li>
+                  <li>Shared model libraries and reports</li>
                 </ul>
+                <button class="pricing-plan-button" type="button" data-public-target="loginPanel" data-checkout-plan="team">Choose Team</button>
+              </article>
+              <article data-pricing-plan="enterprise">
+                <span>Site</span>
+                <h3>Enterprise Site</h3>
+                <p>For governed site-wide modelling, integration and deployment.</p>
+                <strong class="pricing-price" data-plan-price="enterprise">€6,900 / month</strong>
+                <small data-plan-note="enterprise">20 named seats · billed monthly</small>
+                <ul>
+                  <li>Everything in Engineering Team</li>
+                  <li>Company data and API connectors</li>
+                  <li>Enterprise identity and governance</li>
+                  <li>Priority onboarding and support</li>
+                </ul>
+                <button class="pricing-plan-button" type="button" data-public-target="loginPanel" data-checkout-plan="enterprise">Choose Enterprise</button>
               </article>
             </div>
-            <div class="payment-trust" aria-label="Payment and subscription features">
-              <span><b>Hosted checkout</b><small>Payment details stay on Stripe Checkout.</small></span>
-              <span><b>Automatic access</b><small>The workspace activates after verified payment.</small></span>
-              <span><b>Self-service billing</b><small>Manage invoices, payment methods, and subscription in the billing portal.</small></span>
-            </div>
-            <div class="pricing-note">
-              <button class="public-primary" type="button" data-public-target="loginPanel">Start secure checkout</button>
-            </div>
+            <p class="pricing-tax-note">Prices exclude applicable VAT. Compute-heavy validated CFD and private deployment infrastructure may be scoped separately.</p>
           </section>
 
           <section id="publicLegal" class="public-section public-legal public-page" data-public-page="legal">
@@ -1354,8 +1370,8 @@
               </article>
               <article>
                 <span>Subscription</span>
-                <h3>Annual professional access.</h3>
-                <p>Paid access renews annually until cancelled. Billing, invoices, payment methods, and cancellation are handled through secure Stripe-hosted pages when production billing is configured.</p>
+                <h3>Monthly workspace access.</h3>
+                <p>Paid access renews monthly until cancelled. Billing, invoices, payment methods, and cancellation are handled through secure Stripe-hosted pages when production billing is configured.</p>
               </article>
             </div>
           </section>
@@ -1396,10 +1412,19 @@
                 </div>
                 <p class="access-copy">Create a licensed workspace through secure checkout.</p>
                 <div class="checkout-summary">
-                  <strong>Axion Professional</strong>
-                  <span id="checkoutPrice">€2,400 / year</span>
-                  <small id="checkoutBillingMode">Annual subscription · renews until cancelled</small>
+                  <strong id="checkoutPlanName">Axion Professional</strong>
+                  <span id="checkoutPrice">€590 / month</span>
+                  <small id="checkoutBillingMode">Monthly subscription · 1 named seat · renews until cancelled</small>
                 </div>
+                <label>
+                  <span>Plan</span>
+                  <select id="checkoutPlan" name="plan">
+                    <option value="academic">Research · €149/month</option>
+                    <option value="professional" selected>Professional · €590/month</option>
+                    <option value="team">Engineering Team · €2,490/month</option>
+                    <option value="enterprise">Enterprise Site · €6,900/month</option>
+                  </select>
+                </label>
                 <label>
                   <span>Name</span>
                   <input id="checkoutName" autocomplete="name" placeholder="Customer name" />
@@ -1769,6 +1794,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260731-engineering-exports-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260731-monthly-pricing-v3"></script>
   </body>
 </html>

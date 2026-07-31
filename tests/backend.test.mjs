@@ -167,7 +167,9 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(product.response.status, 200);
     assert.equal(product.payload.payments.provider, "setup_required");
     assert.equal(product.payload.payments.billingMode, "subscription");
-    assert.equal(product.payload.payments.interval, "year");
+    assert.equal(product.payload.payments.interval, "month");
+    assert.equal(product.payload.plans.length, 4);
+    assert.equal(product.payload.plans.find((plan) => plan.id === "professional").amount, 590);
     assert.match(product.payload.backend.currentStorage, /local JSON/);
     assert.equal(product.payload.backend.professionalReadinessEndpoint, "/api/professional-readiness");
 
@@ -733,7 +735,7 @@ test("Stripe subscription checkout activates access and opens the billing portal
   const server = await startServer({
     STRIPE_API_BASE_URL: stripeMock.baseUrl,
     STRIPE_SECRET_KEY: "sk_test_axion",
-    STRIPE_PRICE_ID: "price_test_annual",
+    STRIPE_PRICE_TEAM_ID: "price_test_team_monthly",
     STRIPE_WEBHOOK_SECRET: "whsec_test_axion",
     AXION_BILLING_MODE: "subscription",
   });
@@ -744,13 +746,16 @@ test("Stripe subscription checkout activates access and opens the billing portal
         customerName: "Paid Test User",
         customerEmail: "paid@example.com",
         company: "Axion Test",
+        planId: "team",
       },
     });
     assert.equal(checkout.response.status, 201);
     assert.equal(checkout.payload.payment.billingMode, "subscription");
-    assert.equal(checkout.payload.payment.interval, "year");
+    assert.equal(checkout.payload.payment.interval, "month");
+    assert.equal(checkout.payload.payment.plan.id, "team");
+    assert.equal(checkout.payload.order.amount, 2490);
     assert.equal(stripeMock.received.checkout.mode, "subscription");
-    assert.equal(stripeMock.received.checkout["line_items[0][price]"], "price_test_annual");
+    assert.equal(stripeMock.received.checkout["line_items[0][price]"], "price_test_team_monthly");
     assert.equal(stripeMock.received.checkout.billing_address_collection, "required");
     assert.equal(stripeMock.received.checkout["tax_id_collection[enabled]"], "true");
 

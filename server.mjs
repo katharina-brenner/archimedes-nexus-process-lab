@@ -50,7 +50,10 @@ const config = {
   host: process.env.HOST || defaultHost,
   port: Number(process.env.PORT || 8899),
   productName: process.env.PRODUCT_NAME || "Axion Process OS",
-  priceCents: Number(process.env.AXION_PRICE_CENTS || 240000),
+  priceCents: Number(process.env.AXION_PROFESSIONAL_PRICE_CENTS || 59000),
+  academicPriceCents: Number(process.env.AXION_ACADEMIC_PRICE_CENTS || 14900),
+  teamPriceCents: Number(process.env.AXION_TEAM_PRICE_CENTS || 249000),
+  enterprisePriceCents: Number(process.env.AXION_ENTERPRISE_PRICE_CENTS || 690000),
   currency: process.env.AXION_CURRENCY || "EUR",
   sessionSecret: process.env.SESSION_SECRET || "axion-local-dev-secret",
   adminUser: (process.env.AXION_ADMIN_USER || "owner").toLowerCase(),
@@ -67,7 +70,10 @@ const config = {
     .filter(Boolean),
   appBaseUrl: process.env.APP_BASE_URL || `http://${process.env.HOST || defaultHost}:${process.env.PORT || 8899}`,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
-  stripePriceId: process.env.STRIPE_PRICE_ID || "",
+  stripeAcademicPriceId: process.env.STRIPE_PRICE_ACADEMIC_ID || "",
+  stripeProfessionalPriceId: process.env.STRIPE_PRICE_PROFESSIONAL_ID || "",
+  stripeTeamPriceId: process.env.STRIPE_PRICE_TEAM_ID || "",
+  stripeEnterprisePriceId: process.env.STRIPE_PRICE_ENTERPRISE_ID || "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   stripeApiBaseUrl: (process.env.STRIPE_API_BASE_URL || "https://api.stripe.com").replace(/\/+$/, ""),
   stripeBillingMode: process.env.AXION_BILLING_MODE === "payment" ? "payment" : "subscription",
@@ -97,6 +103,60 @@ const config = {
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
 };
+
+const billingPlans = Object.freeze([
+  {
+    id: "academic",
+    name: "Research",
+    audience: "Individual academic research",
+    priceCents: config.academicPriceCents,
+    seats: 1,
+    stripePriceId: config.stripeAcademicPriceId,
+    highlighted: false,
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    audience: "Professional process engineering",
+    priceCents: config.priceCents,
+    seats: 1,
+    stripePriceId: config.stripeProfessionalPriceId,
+    highlighted: true,
+  },
+  {
+    id: "team",
+    name: "Engineering Team",
+    audience: "Shared models and governed reviews",
+    priceCents: config.teamPriceCents,
+    seats: 5,
+    stripePriceId: config.stripeTeamPriceId,
+    highlighted: false,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise Site",
+    audience: "Site-wide engineering and integration",
+    priceCents: config.enterprisePriceCents,
+    seats: 20,
+    stripePriceId: config.stripeEnterprisePriceId,
+    highlighted: false,
+  },
+]);
+
+function billingPlan(planId = "professional") {
+  return billingPlans.find((plan) => plan.id === String(planId || "").toLowerCase()) || null;
+}
+
+function publicBillingPlans() {
+  return billingPlans.map(({ stripePriceId, ...plan }) => ({
+    ...plan,
+    amount: plan.priceCents / 100,
+    amountFormatted: new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency, maximumFractionDigits: 0 }).format(plan.priceCents / 100),
+    interval: "month",
+    checkoutConfigured: Boolean(config.stripeSecretKey),
+    providerPriceConfigured: Boolean(stripePriceId),
+  }));
+}
 
 const staticRootDir = process.env.AXION_STATIC_DIR
   ? resolve(process.env.AXION_STATIC_DIR)
@@ -142,7 +202,7 @@ const defaultDb = {
 
 function backendFeatures() {
   return [
-    "2,400 EUR annual Professional subscription checkout",
+    "Monthly Research, Professional, Engineering Team and Enterprise Site subscriptions",
     "Stripe-hosted subscription payment flow",
     "Customer billing portal for invoices, payment methods and cancellation",
     "Automatic license-key generation after successful payment",
@@ -186,8 +246,9 @@ function publicConfig() {
   return {
     productName: config.productName,
     amount,
-    amountFormatted: new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency }).format(amount),
+    amountFormatted: new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency, maximumFractionDigits: 0 }).format(amount),
     currency: config.currency,
+    plans: publicBillingPlans(),
     features: backendFeatures(),
     auth: {
       googleEnabled: Boolean(config.googleClientId),
@@ -197,7 +258,7 @@ function publicConfig() {
       stripeEnabled: Boolean(config.stripeSecretKey),
       automaticActivation: Boolean(config.stripeSecretKey),
       billingMode: config.stripeBillingMode,
-      interval: config.stripeBillingMode === "subscription" ? "year" : "one-time",
+      interval: config.stripeBillingMode === "subscription" ? "month" : "one-time",
       customerPortal: Boolean(config.stripeSecretKey),
       automaticTax: config.stripeAutomaticTax,
     },
@@ -246,7 +307,7 @@ function productionReadiness() {
   const sessionSecretReady = Boolean(config.sessionSecret && config.sessionSecret !== "axion-local-dev-secret" && config.sessionSecret.length >= 32);
   const adminPasswordReady = Boolean(config.adminPassword && config.adminPassword !== "owner-local-password" && config.adminPassword.length >= 12);
   const openAiReady = Boolean(config.openaiApiKey && /^sk-/.test(config.openaiApiKey));
-  const stripeReady = Boolean(config.stripeSecretKey && /^sk_(live|test)_/.test(config.stripeSecretKey) && config.stripePriceId && config.stripeWebhookSecret && isHttps);
+  const stripeReady = Boolean(config.stripeSecretKey && /^sk_(live|test)_/.test(config.stripeSecretKey) && config.stripeWebhookSecret && isHttps);
   const emailMissing = [];
   if (!config.inviteEmailFrom) emailMissing.push("INVITE_EMAIL_FROM");
   if (!config.resendApiKey && !(config.smtpHost && config.smtpUser && config.smtpPassword)) {
@@ -266,7 +327,7 @@ function productionReadiness() {
       key: "stripe",
       label: "Stripe Checkout + webhook",
       ready: stripeReady,
-      missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]).concat(config.stripeSecretKey && !/^sk_(live|test)_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must look like a Stripe secret key"] : []),
+      missing: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]).concat(config.stripeSecretKey && !/^sk_(live|test)_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must look like a Stripe secret key"] : []),
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
       ownerAction: "Create the Stripe product/price, enable live payments when ready, add the webhook endpoint, and store the keys only as backend secrets.",
@@ -403,7 +464,7 @@ function serviceStatusFromReadiness() {
         label: "Stripe Checkout/paywall",
         configured: byKey.get("stripe")?.ready || false,
         status: byKey.get("stripe")?.ready ? "ready" : "missing-secrets-or-https",
-        safeDetail: config.stripeSecretKey ? "Secret key is present; check STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and APP_BASE_URL." : "Set STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and public APP_BASE_URL.",
+        safeDetail: config.stripeSecretKey ? "Secret key is present; check STRIPE_WEBHOOK_SECRET and APP_BASE_URL. Plan-specific Stripe Price IDs are optional." : "Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and public APP_BASE_URL. Plan-specific Stripe Price IDs are optional.",
       },
       {
         key: "google",
@@ -691,7 +752,7 @@ function formBody(params) {
 
 async function stripeRequest(pathname, params = {}, method = "POST") {
   if (!config.stripeSecretKey) {
-    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY on the backend; add STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET and APP_BASE_URL for automatic SaaS checkout.");
+    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY on the backend; add STRIPE_WEBHOOK_SECRET and APP_BASE_URL for automatic SaaS checkout. Plan-specific Stripe Price IDs are optional.");
   }
   const response = await fetch(`${config.stripeApiBaseUrl}${pathname}`, {
     method,
@@ -1136,6 +1197,9 @@ function sanitizeOrder(order) {
     status: order.status,
     reference: order.reference,
     productName: order.productName,
+    planId: order.planId || "professional",
+    planName: order.planName || "Professional",
+    seats: order.seats || 1,
     amount: order.amount,
     currency: order.currency,
     customerName: order.customerName,
@@ -1157,6 +1221,9 @@ function sanitizeLicense(license) {
     customerName: license.customerName,
     company: license.company,
     orderId: license.orderId,
+    planId: license.planId || "professional",
+    planName: license.planName || "Professional",
+    seats: license.seats || 1,
     createdAt: license.createdAt,
     status: license.status,
     billingStatus: license.billingStatus || "",
@@ -1224,13 +1291,16 @@ async function sendInviteEmail(invite, project) {
 }
 
 function billingProfileForSession(session) {
-  const amount = config.priceCents / 100;
-  const amountFormatted = new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency }).format(amount);
+  const selectedPlan = billingPlan(session.planId) || billingPlan("professional");
+  const amount = selectedPlan.priceCents / 100;
+  const amountFormatted = new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency, maximumFractionDigits: 0 }).format(amount);
   const isCustomer = session.role === "customer";
   const isAdmin = session.role === "admin";
   const isExempt = Boolean(session.paymentExempt);
   return {
-    plan: isAdmin ? "Owner workspace" : isCustomer ? "Professional license" : isExempt ? "Workspace access" : "Private workspace",
+    plan: isAdmin ? "Owner workspace" : isCustomer ? `${session.planName || selectedPlan.name} license` : isExempt ? "Workspace access" : "Private workspace",
+    planId: isCustomer ? selectedPlan.id : "",
+    seats: isCustomer ? selectedPlan.seats : 1,
     paymentStatus: session.billingStatus || (isCustomer ? "paid active" : "workspace access"),
     amount,
     amountFormatted,
@@ -1244,7 +1314,7 @@ function billingProfileForSession(session) {
     stripeSubscriptionId: session.stripeSubscriptionId || "",
     currentPeriodEnd: session.currentPeriodEnd || "",
     billingPortalAvailable: Boolean(config.stripeSecretKey && session.stripeCustomerId),
-    renewal: config.stripeBillingMode === "subscription" ? "renews annually until cancelled" : "annual access",
+    renewal: config.stripeBillingMode === "subscription" ? "renews monthly until cancelled" : "one-time access",
   };
 }
 
@@ -1266,6 +1336,9 @@ function activatePaidOrder(db, order, {
       customerName: order.customerName,
       company: order.company,
       orderId: order.id,
+      planId: order.planId || "professional",
+      planName: order.planName || "Professional",
+      seats: order.seats || 1,
       createdAt: paidAt,
       status: "active",
     };
@@ -1273,6 +1346,9 @@ function activatePaidOrder(db, order, {
   }
   license ||= db.licenses.find((item) => item.key === order.licenseKey);
   if (license) {
+    license.planId = order.planId || license.planId || "professional";
+    license.planName = order.planName || license.planName || "Professional";
+    license.seats = order.seats || license.seats || 1;
     license.status = "active";
     license.billingStatus = subscriptionStatus || "active";
     license.stripeCustomerId = stripeCustomerId || license.stripeCustomerId || "";
@@ -1344,8 +1420,13 @@ async function createCheckout(req, res) {
   const customerName = String(body.customerName || "").trim();
   const customerEmail = String(body.customerEmail || "").trim().toLowerCase();
   const company = String(body.company || "").trim();
+  const selectedPlan = billingPlan(body.planId || "professional");
   if (!customerName || !customerEmail.includes("@")) {
     json(res, 400, { error: "Please enter a customer name and valid email address." });
+    return;
+  }
+  if (!selectedPlan) {
+    json(res, 400, { error: "Choose a valid Axion subscription plan." });
     return;
   }
   if (!config.stripeSecretKey) {
@@ -1354,7 +1435,7 @@ async function createCheckout(req, res) {
       setup: {
         provider: "Stripe Checkout",
         requiredEnv: ["STRIPE_SECRET_KEY"],
-        recommendedEnv: ["STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"],
+        recommendedEnv: ["STRIPE_WEBHOOK_SECRET", "APP_BASE_URL", "STRIPE_PRICE_ACADEMIC_ID", "STRIPE_PRICE_PROFESSIONAL_ID", "STRIPE_PRICE_TEAM_ID", "STRIPE_PRICE_ENTERPRISE_ID"],
       },
     });
     return;
@@ -1367,7 +1448,10 @@ async function createCheckout(req, res) {
     status: "pending_stripe_checkout",
     reference: makeReference(),
     productName: config.productName,
-    amount: config.priceCents / 100,
+    planId: selectedPlan.id,
+    planName: selectedPlan.name,
+    seats: selectedPlan.seats,
+    amount: selectedPlan.priceCents / 100,
     currency: config.currency,
     customerName,
     customerEmail,
@@ -1387,6 +1471,8 @@ async function createCheckout(req, res) {
     "metadata[orderId]": order.id,
     "metadata[reference]": order.reference,
     "metadata[customerEmail]": customerEmail,
+    "metadata[planId]": selectedPlan.id,
+    "metadata[planName]": selectedPlan.name,
     "automatic_payment_methods[enabled]": "true",
     billing_address_collection: "required",
     "tax_id_collection[enabled]": "true",
@@ -1398,18 +1484,20 @@ async function createCheckout(req, res) {
   if (config.stripeBillingMode === "subscription") {
     sessionParams["subscription_data[metadata][orderId]"] = order.id;
     sessionParams["subscription_data[metadata][reference]"] = order.reference;
+    sessionParams["subscription_data[metadata][planId]"] = selectedPlan.id;
   } else {
     sessionParams.customer_creation = "always";
     sessionParams["invoice_creation[enabled]"] = "true";
   }
-  if (config.stripePriceId) {
-    sessionParams["line_items[0][price]"] = config.stripePriceId;
+  if (selectedPlan.stripePriceId) {
+    sessionParams["line_items[0][price]"] = selectedPlan.stripePriceId;
   } else {
     sessionParams["line_items[0][price_data][currency]"] = config.currency.toLowerCase();
-    sessionParams["line_items[0][price_data][unit_amount]"] = config.priceCents;
-    sessionParams["line_items[0][price_data][product_data][name]"] = `${config.productName} annual access`;
+    sessionParams["line_items[0][price_data][unit_amount]"] = selectedPlan.priceCents;
+    sessionParams["line_items[0][price_data][product_data][name]"] = `${config.productName} · ${selectedPlan.name}`;
+    sessionParams["line_items[0][price_data][product_data][description]"] = `${selectedPlan.audience} · ${selectedPlan.seats} named seat${selectedPlan.seats === 1 ? "" : "s"}`;
     if (config.stripeBillingMode === "subscription") {
-      sessionParams["line_items[0][price_data][recurring][interval]"] = "year";
+      sessionParams["line_items[0][price_data][recurring][interval]"] = "month";
     }
   }
   const session = await stripeRequest("/v1/checkout/sessions", sessionParams);
@@ -1429,9 +1517,14 @@ async function createCheckout(req, res) {
       sessionId: session.id,
       automaticActivation: true,
       billingMode: config.stripeBillingMode,
-      interval: config.stripeBillingMode === "subscription" ? "year" : "one-time",
+      interval: config.stripeBillingMode === "subscription" ? "month" : "one-time",
+      plan: {
+        id: selectedPlan.id,
+        name: selectedPlan.name,
+        seats: selectedPlan.seats,
+      },
       instruction: config.stripeBillingMode === "subscription"
-        ? "Continue to secure checkout. Your annual subscription and workspace access activate automatically after successful payment."
+        ? `Continue to secure checkout. Your ${selectedPlan.name} monthly subscription and workspace access activate automatically after successful payment.`
         : "Continue to secure checkout. Your license activates automatically after successful payment.",
     },
   });
@@ -4897,6 +4990,8 @@ async function googleLogin(req, res) {
     name: user.name || profile.name || email,
     paymentExempt: Boolean(user.paymentExempt),
     licenseKey: license?.key || "",
+    planId: license?.planId || "",
+    planName: license?.planName || "",
     billingStatus: license?.billingStatus || "",
     stripeCustomerId: license?.stripeCustomerId || "",
     stripeSubscriptionId: license?.stripeSubscriptionId || "",
@@ -4919,6 +5014,8 @@ async function googleLogin(req, res) {
         name: user.name,
         paymentExempt: Boolean(user.paymentExempt),
         licenseKey: license?.key || "",
+        planId: license?.planId || "",
+        planName: license?.planName || "",
         billingStatus: license?.billingStatus || "",
         stripeCustomerId: license?.stripeCustomerId || "",
         stripeSubscriptionId: license?.stripeSubscriptionId || "",
@@ -4960,6 +5057,8 @@ async function login(req, res) {
       name: localUser.name,
       paymentExempt: Boolean(localUser.paymentExempt),
       licenseKey: localLicense?.key || "",
+      planId: localLicense?.planId || "",
+      planName: localLicense?.planName || "",
       billingStatus: localLicense?.billingStatus || "",
       stripeCustomerId: localLicense?.stripeCustomerId || "",
       stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
@@ -4982,6 +5081,8 @@ async function login(req, res) {
           name: localUser.name,
           paymentExempt: Boolean(localUser.paymentExempt),
           licenseKey: localLicense?.key || "",
+          planId: localLicense?.planId || "",
+          planName: localLicense?.planName || "",
           billingStatus: localLicense?.billingStatus || "",
           stripeCustomerId: localLicense?.stripeCustomerId || "",
           stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
@@ -5001,6 +5102,8 @@ async function login(req, res) {
       email: license.customerEmail,
       name: license.customerName,
       licenseKey: license.key,
+      planId: license.planId || "professional",
+      planName: license.planName || "Professional",
       billingStatus: license.billingStatus || "",
       stripeCustomerId: license.stripeCustomerId || "",
       stripeSubscriptionId: license.stripeSubscriptionId || "",

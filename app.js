@@ -2166,6 +2166,8 @@ const els = {
   checkoutEmail: document.querySelector("#checkoutEmail"),
   checkoutCompany: document.querySelector("#checkoutCompany"),
   checkoutTerms: document.querySelector("#checkoutTerms"),
+  checkoutPlan: document.querySelector("#checkoutPlan"),
+  checkoutPlanName: document.querySelector("#checkoutPlanName"),
   checkoutPrice: document.querySelector("#checkoutPrice"),
   checkoutBillingMode: document.querySelector("#checkoutBillingMode"),
   checkoutResult: document.querySelector("#checkoutResult"),
@@ -10236,7 +10238,7 @@ function fallbackProductionReadiness() {
     ready: false,
     checks: [
       { key: "postgres", label: "Supabase/Postgres database", ready: false, missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"], requiresOwnerAction: true, requiresPaymentApproval: true },
-      { key: "stripe", label: "Stripe Checkout + webhook", ready: false, missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL=https://..."], requiresOwnerAction: true, requiresPaymentApproval: true },
+      { key: "stripe", label: "Stripe Checkout + webhook", ready: false, missing: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL=https://..."], requiresOwnerAction: true, requiresPaymentApproval: true },
       { key: "google", label: "Google OAuth login", ready: false, missing: ["GOOGLE_CLIENT_ID", "authorized HTTPS domain"], requiresOwnerAction: true, requiresPaymentApproval: false },
       { key: "email", label: "Invite email delivery", ready: false, missing: ["INVITE_EMAIL_FROM", "RESEND_API_KEY"], requiresOwnerAction: true, requiresPaymentApproval: true },
       { key: "deployment", label: "Public HTTPS backend + domain", ready: false, missing: ["Render/Fly/Railway/Vercel backend", "custom domain/DNS"], requiresOwnerAction: true, requiresPaymentApproval: true },
@@ -10625,7 +10627,7 @@ const exploreSelector = [
 
 function enhanceInteractiveSurfaces() {
   document.querySelectorAll(exploreSelector).forEach((item) => {
-    if (item.closest(".detail-drawer") || item.matches("button, a, input, textarea, select")) return;
+    if (item.closest(".detail-drawer") || item.matches("button, a, input, textarea, select") || item.querySelector("button, a, input, textarea, select")) return;
     item.classList.add("clickable-surface");
     item.setAttribute("tabindex", "0");
     item.setAttribute("role", "button");
@@ -15257,6 +15259,53 @@ function renderProfileMenu() {
   `;
 }
 
+const fallbackBillingPlans = [
+  { id: "academic", name: "Research", amount: 149, amountFormatted: "€149", seats: 1, interval: "month" },
+  { id: "professional", name: "Professional", amount: 590, amountFormatted: "€590", seats: 1, interval: "month" },
+  { id: "team", name: "Engineering Team", amount: 2490, amountFormatted: "€2,490", seats: 5, interval: "month" },
+  { id: "enterprise", name: "Enterprise Site", amount: 6900, amountFormatted: "€6,900", seats: 20, interval: "month" },
+];
+
+function availableBillingPlans() {
+  return Array.isArray(state.productConfig?.plans) && state.productConfig.plans.length
+    ? state.productConfig.plans
+    : fallbackBillingPlans;
+}
+
+function billingPlanById(planId = "professional") {
+  return availableBillingPlans().find((plan) => plan.id === planId)
+    || availableBillingPlans().find((plan) => plan.id === "professional")
+    || fallbackBillingPlans[1];
+}
+
+function billingAmountLabel(plan) {
+  const formatted = String(plan.amountFormatted || new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency: state.productConfig?.currency || "EUR",
+    maximumFractionDigits: 0,
+  }).format(Number(plan.amount || 0))).replace(/\u00a0/g, " ");
+  return `${formatted} / month`;
+}
+
+function renderSelectedCheckoutPlan(planId = "professional") {
+  const plan = billingPlanById(planId);
+  if (els.checkoutPlan) els.checkoutPlan.value = plan.id;
+  if (els.checkoutPlanName) els.checkoutPlanName.textContent = `Axion ${plan.name}`;
+  if (els.checkoutPrice) els.checkoutPrice.textContent = billingAmountLabel(plan);
+  if (els.checkoutBillingMode) {
+    els.checkoutBillingMode.textContent = `Monthly subscription · ${plan.seats} named seat${Number(plan.seats) === 1 ? "" : "s"} · renews until cancelled`;
+  }
+  document.querySelectorAll("[data-pricing-plan]").forEach((card) => {
+    card.classList.toggle("pricing-selected", card.dataset.pricingPlan === plan.id);
+  });
+  return plan;
+}
+
+function selectCheckoutPlanFromElement(element) {
+  if (!element?.dataset.checkoutPlan) return;
+  renderSelectedCheckoutPlan(element.dataset.checkoutPlan);
+}
+
 function renderProductConfig(config) {
   state.productConfig = config || null;
   staticAccessMode = false;
@@ -15271,20 +15320,15 @@ function renderProductConfig(config) {
       ? "Backend online. Private process workspace ready."
       : "Backend online. Private workspace ready.";
   }
-  const amount = config?.amountFormatted || "€2,400";
-  const recurring = config?.payments?.billingMode === "subscription";
-  const intervalLabel = recurring ? "year" : "annual access";
-  const billingNote = recurring ? "Annual subscription · secure Stripe Checkout" : "Annual access · secure Stripe Checkout";
-  if (els.checkoutPrice) els.checkoutPrice.textContent = `${amount} / ${intervalLabel}`;
-  if (els.checkoutBillingMode) {
-    els.checkoutBillingMode.textContent = recurring
-      ? "Annual subscription · renews until cancelled"
-      : "One-time annual access";
-  }
-  const professionalPrice = document.querySelector("#professionalPrice");
-  const professionalBillingNote = document.querySelector("#professionalBillingNote");
-  if (professionalPrice) professionalPrice.textContent = `${amount} / ${intervalLabel}`;
-  if (professionalBillingNote) professionalBillingNote.textContent = billingNote;
+  availableBillingPlans().forEach((plan) => {
+    const price = document.querySelector(`[data-plan-price="${plan.id}"]`);
+    const note = document.querySelector(`[data-plan-note="${plan.id}"]`);
+    if (price) price.textContent = billingAmountLabel(plan);
+    if (note) note.textContent = `${plan.seats} named seat${Number(plan.seats) === 1 ? "" : "s"} · billed monthly`;
+    const option = els.checkoutPlan?.querySelector(`option[value="${plan.id}"]`);
+    if (option) option.textContent = `${plan.name} · ${billingAmountLabel(plan).replace(" / month", "/month")}`;
+  });
+  renderSelectedCheckoutPlan(els.checkoutPlan?.value || "professional");
   renderProfileMenu();
 }
 
@@ -15319,6 +15363,7 @@ function renderCheckoutResult(payload) {
   const paid = Boolean(payload.paid || order.status === "paid_active" || payload.licenseKey);
   const amount = payment.amount || order.amount || "";
   const currency = payment.currency || order.currency || state.productConfig?.currency || "EUR";
+  const planName = payment.plan?.name || order.planName || billingPlanById(order.planId || els.checkoutPlan?.value).name;
   const licenseKey = payload.licenseKey || order.licenseKey || "";
   if (paid) {
     els.checkoutResult.innerHTML = `
@@ -15326,6 +15371,7 @@ function renderCheckoutResult(payload) {
       <dl>
         <dt>Reference</dt><dd>${escapeHtml(order.reference || payment.reference || "paid checkout")}</dd>
         <dt>Billing email</dt><dd>${escapeHtml(payload.customerEmail || order.customerEmail || els.checkoutEmail?.value || "")}</dd>
+        <dt>Plan</dt><dd>${escapeHtml(planName)}</dd>
         <dt>License</dt><dd>${escapeHtml(licenseKey || "created")}</dd>
       </dl>
       <p>${escapeHtml(payload.instruction || "Payment confirmed. Axion is unlocking your workspace now.")}</p>
@@ -15337,8 +15383,9 @@ function renderCheckoutResult(payload) {
       <strong>Secure checkout ready</strong>
       <dl>
         <dt>Reference</dt><dd>${escapeHtml(order.reference || payment.reference || "")}</dd>
+        <dt>Plan</dt><dd>${escapeHtml(planName)}</dd>
         <dt>Amount</dt><dd>${escapeHtml(`${amount} ${currency}`)}</dd>
-        <dt>Billing</dt><dd>${payment.billingMode === "subscription" ? "annual subscription" : "annual access"}</dd>
+        <dt>Billing</dt><dd>${payment.billingMode === "subscription" ? "monthly subscription" : "one-time access"}</dd>
         <dt>Activation</dt><dd>automatic after verified payment</dd>
       </dl>
       <p>${escapeHtml(payment.instruction || "Continue to Stripe Checkout. Your license activates automatically after successful payment.")}</p>
@@ -15351,9 +15398,9 @@ function renderCheckoutResult(payload) {
     <dl>
       <dt>Provider</dt><dd>${escapeHtml(payment.provider || state.productConfig?.payments?.provider || "setup_required")}</dd>
       <dt>Required</dt><dd>STRIPE_SECRET_KEY</dd>
-      <dt>Recommended</dt><dd>STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET, APP_BASE_URL</dd>
+      <dt>Recommended</dt><dd>STRIPE_WEBHOOK_SECRET, APP_BASE_URL, optional plan price IDs</dd>
     </dl>
-    <p>${escapeHtml(payload.error || payment.instruction || "Set STRIPE_SECRET_KEY on the backend, add STRIPE_PRICE_ID for the hosted annual price, STRIPE_WEBHOOK_SECRET for automatic paid-event verification, and APP_BASE_URL for the correct success/cancel URLs.")}</p>
+    <p>${escapeHtml(payload.error || payment.instruction || "Set STRIPE_SECRET_KEY on the backend, STRIPE_WEBHOOK_SECRET for automatic paid-event verification, and APP_BASE_URL for the correct success and cancellation URLs. Plan-specific Stripe Price IDs are optional because the backend can create monthly price data securely.")}</p>
   `;
 }
 
@@ -15362,6 +15409,7 @@ async function createCheckoutOrder() {
   const customerName = els.checkoutName?.value.trim() || "";
   const customerEmail = els.checkoutEmail?.value.trim() || "";
   const company = els.checkoutCompany?.value.trim() || "";
+  const planId = els.checkoutPlan?.value || "professional";
   if (!customerName || !customerEmail.includes("@")) {
     els.checkoutResult.innerHTML = `
       <strong>Complete billing details</strong>
@@ -15383,7 +15431,7 @@ async function createCheckoutOrder() {
   try {
     const payload = await apiRequest("/api/checkout", {
       method: "POST",
-      body: JSON.stringify({ customerName, customerEmail, company }),
+      body: JSON.stringify({ customerName, customerEmail, company, planId }),
     });
     renderCheckoutResult(payload);
     const checkoutUrl = payload.payment?.checkoutUrl || payload.order?.checkoutUrl;
@@ -15788,7 +15836,7 @@ const publicPageMeta = {
   },
   pricing: {
     title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
-    description: "Explore annual Axion Process OS access for professional bioprocess modelling, private projects, balances, scheduling, CFD screening, TEA and LCA.",
+    description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
   },
   legal: {
     title: "Impressum, Privacy and Terms | Axion Process OS",
@@ -17560,6 +17608,7 @@ function bindAuth() {
         openPublicDetail(button.dataset.publicDetail);
         return;
       }
+      selectCheckoutPlanFromElement(button);
       routePublicAction(button.dataset.publicTarget, { focusLogin: button.dataset.publicTarget === "loginPanel" });
     });
   });
@@ -17572,6 +17621,7 @@ function bindAuth() {
       if (publicButton.dataset.publicDetail) {
         openPublicDetail(publicButton.dataset.publicDetail);
       } else {
+        selectCheckoutPlanFromElement(publicButton);
         routePublicAction(target, { focusLogin: target === "loginPanel" });
       }
       return;
@@ -17627,6 +17677,11 @@ function bindAuth() {
   els.checkoutForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     createCheckoutOrder();
+  });
+
+  els.checkoutPlan?.addEventListener("change", () => {
+    renderSelectedCheckoutPlan(els.checkoutPlan.value);
+    if (els.checkoutResult) els.checkoutResult.innerHTML = "";
   });
 
   els.profileButton?.addEventListener("click", () => {
@@ -17854,7 +17909,10 @@ function bindEvents() {
       event.preventDefault();
       const target = publicTargetButton.dataset.publicTarget;
       if (publicTargetButton.dataset.publicDetail) openPublicDetail(publicTargetButton.dataset.publicDetail);
-      else routePublicAction(target, { focusLogin: target === "loginPanel" });
+      else {
+        selectCheckoutPlanFromElement(publicTargetButton);
+        routePublicAction(target, { focusLogin: target === "loginPanel" });
+      }
       return;
     }
     const globalJumpButton = event.target.closest("[data-jump-view]");

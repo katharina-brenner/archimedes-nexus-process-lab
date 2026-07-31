@@ -35,8 +35,8 @@ const checks = [
   },
   {
     area: "Stripe checkout + webhook",
-    ready: has("STRIPE_SECRET_KEY") && /^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") && has("STRIPE_PRICE_ID") && has("STRIPE_WEBHOOK_SECRET") && isHttps,
-    missing: ["STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"].filter((key) => !has(key))
+    ready: has("STRIPE_SECRET_KEY") && /^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") && has("STRIPE_WEBHOOK_SECRET") && isHttps,
+    missing: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "APP_BASE_URL"].filter((key) => !has(key))
       .concat(has("STRIPE_SECRET_KEY") && !/^sk_(live|test)_/.test(process.env.STRIPE_SECRET_KEY || "") ? ["STRIPE_SECRET_KEY must look like sk_live_... or sk_test_..."] : [])
       .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]),
     requiresOwnerAction: true,

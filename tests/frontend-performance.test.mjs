@@ -12,6 +12,12 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.doesNotMatch(indexHtml, /<script[^>]+src="\.\/app\.js/);
   assert.match(bootstrap, /import\("\.\/app\.js\?v=/);
   assert.match(bootstrap, /session \|\| requestedPage !== "home" \|\| checkoutReturn/);
+  assert.match(bootstrap, /showRequestedPublicPageImmediately\(requestedPage\)/);
+  assert.match(indexHtml, /data-checkout-plan="academic"/);
+  assert.match(indexHtml, /data-checkout-plan="professional"/);
+  assert.match(indexHtml, /data-checkout-plan="team"/);
+  assert.match(indexHtml, /data-checkout-plan="enterprise"/);
+  assert.match(indexHtml, /id="checkoutPlan"/);
 });
 
 test("production assets use durable caching without caching HTML", async () => {

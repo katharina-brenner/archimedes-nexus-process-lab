@@ -19352,6 +19352,194 @@ body.locked .public-page:not(.active-public-page) {
   }
 }
 
+/* Monthly pricing: compact, selectable plans with a single checkout path. */
+#publicPricing.public-pricing {
+  width: min(1280px, calc(100% - 48px)) !important;
+  max-width: 1280px !important;
+}
+
+#publicPricing .section-heading {
+  max-width: 780px !important;
+}
+
+#publicPricing .section-heading > span {
+  display: block;
+  max-width: 690px;
+  margin-top: 14px;
+  color: #aec0cf;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.pricing-billing-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid rgba(148, 180, 190, 0.2);
+  border-radius: 22px;
+  background: rgba(9, 29, 42, 0.68);
+}
+
+.pricing-billing-strip > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 17px 20px;
+}
+
+.pricing-billing-strip > span + span {
+  border-left: 1px solid rgba(148, 180, 190, 0.16);
+}
+
+.pricing-billing-strip b {
+  color: #edf7f4;
+  font-size: 13px;
+}
+
+.pricing-billing-strip small {
+  color: #9fb2c1;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+#publicPricing .pricing-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+#publicPricing .pricing-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 470px;
+  padding: 24px !important;
+  border-color: rgba(148, 180, 190, 0.2);
+  border-radius: 26px !important;
+  background: linear-gradient(180deg, rgba(18, 45, 59, 0.92), rgba(8, 26, 39, 0.96));
+  box-shadow: 0 24px 70px rgba(2, 13, 22, 0.22);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+#publicPricing .pricing-grid article:hover,
+#publicPricing .pricing-grid article.pricing-selected {
+  transform: translateY(-4px);
+  border-color: rgba(112, 193, 177, 0.58);
+  box-shadow: 0 28px 78px rgba(2, 13, 22, 0.34);
+}
+
+#publicPricing .pricing-grid article.pricing-featured {
+  border-color: rgba(112, 193, 177, 0.7);
+  background: linear-gradient(180deg, rgba(20, 66, 64, 0.92), rgba(8, 31, 42, 0.98));
+}
+
+#publicPricing .pricing-grid h3 {
+  margin: 2px 0 0;
+  color: #f5faf8;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+#publicPricing .pricing-grid p {
+  min-height: 58px;
+  color: #afc0ce;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.48;
+}
+
+#publicPricing .pricing-price {
+  display: block;
+  margin-top: 2px;
+  color: #fff;
+  font-size: clamp(25px, 2.1vw, 31px);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+#publicPricing [data-plan-note] {
+  color: #8fa6b5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+#publicPricing .pricing-grid ul {
+  margin: 8px 0 18px;
+}
+
+.pricing-plan-button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: auto;
+  border: 1px solid rgba(151, 216, 202, 0.46);
+  border-radius: 999px;
+  color: #061b25;
+  background: #bfeee3;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.pricing-plan-button:hover,
+.pricing-plan-button:focus-visible {
+  transform: translateY(-1px);
+  background: #e0f8f1;
+  box-shadow: 0 12px 30px rgba(39, 133, 117, 0.24);
+}
+
+.pricing-tax-note {
+  margin: 0;
+  color: #8ea2b1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#checkoutPlan {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 42px 0 14px;
+  border: 1px solid rgba(151, 177, 193, 0.34);
+  border-radius: 14px;
+  color: #eaf4f1;
+  background: #122d3f;
+  font: inherit;
+}
+
+@media (max-width: 1150px) {
+  #publicPricing .pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #publicPricing .pricing-grid article {
+    min-height: 430px;
+  }
+}
+
+@media (max-width: 680px) {
+  #publicPricing.public-pricing {
+    width: min(100% - 28px, 1280px) !important;
+  }
+
+  .pricing-billing-strip,
+  #publicPricing .pricing-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pricing-billing-strip > span + span {
+    border-top: 1px solid rgba(148, 180, 190, 0.16);
+    border-left: 0;
+  }
+
+  #publicPricing .pricing-grid article {
+    min-height: 0;
+  }
+
+  #publicPricing .pricing-grid p {
+    min-height: 0;
+  }
+}
+
 /* Complete engineering export workspace */
 .export-command-center {
   display: grid;
@@ -27884,5 +28072,32 @@ body:not(.locked) #flowsheetView .unit-port.port-used {
     grid-column: 1;
     grid-row: auto;
     justify-self: start;
+  }
+}
+
+/* Keep the final pricing layout authoritative over legacy public-page rules. */
+#publicPricing.public-pricing {
+  width: min(1280px, calc(100% - 48px)) !important;
+  max-width: 1280px !important;
+}
+
+#publicPricing .pricing-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+@media (max-width: 1050px) {
+  #publicPricing .pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  #publicPricing.public-pricing {
+    width: min(100% - 28px, 1280px) !important;
+  }
+
+  #publicPricing .pricing-grid {
+    grid-template-columns: 1fr !important;
   }
 }

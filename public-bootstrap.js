@@ -7,8 +7,18 @@ const checkoutReturn = params.has("checkout") || params.has("session_id");
 let workspacePromise;
 
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260731-engineering-exports-v1");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260731-monthly-pricing-v3");
   return workspacePromise;
+}
+
+function showRequestedPublicPageImmediately(page) {
+  const target = document.querySelector(`.public-page[data-public-page="${CSS.escape(page)}"]`);
+  if (!target) return false;
+  document.querySelectorAll(".public-page").forEach((section) => {
+    section.classList.toggle("active-public-page", section === target);
+  });
+  publicGate?.scrollTo({ top: 0, behavior: "auto" });
+  return true;
 }
 
 function openPublicHome() {
@@ -42,6 +52,8 @@ function interceptPublicAction(event) {
   event.stopImmediatePropagation();
   handOffToWorkspace(target);
 }
+
+if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 
 if (session || requestedPage !== "home" || checkoutReturn) {
   loadWorkspace();

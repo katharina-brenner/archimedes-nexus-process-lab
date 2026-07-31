@@ -95,10 +95,10 @@ The paywall is backend-enforced. Do not use a static GitHub Pages deployment for
 
 1. Copy `.env.example` to `.env`.
 2. Set `SESSION_SECRET` to a long private random string.
-3. Set `AXION_PRICE_CENTS=240000`, `AXION_CURRENCY=EUR`, and `AXION_BILLING_MODE=subscription` for the Professional annual subscription.
-4. Create a recurring annual Stripe product/price, or let the backend create recurring inline price data from `AXION_PRICE_CENTS`.
+3. Set the monthly plan amounts with `AXION_ACADEMIC_PRICE_CENTS`, `AXION_PROFESSIONAL_PRICE_CENTS`, `AXION_TEAM_PRICE_CENTS`, and `AXION_ENTERPRISE_PRICE_CENTS`; keep `AXION_CURRENCY=EUR` and `AXION_BILLING_MODE=subscription`.
+4. Optionally create one recurring monthly Stripe Price per plan. Without dedicated Price IDs, the backend creates secure recurring monthly inline price data from the configured plan amounts.
 5. Set `STRIPE_SECRET_KEY`.
-6. Set the recurring `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET`; enable `STRIPE_AUTOMATIC_TAX=true` only after Stripe Tax is configured for the account.
+6. Set `STRIPE_WEBHOOK_SECRET`. Optional dedicated prices use `STRIPE_PRICE_ACADEMIC_ID`, `STRIPE_PRICE_PROFESSIONAL_ID`, `STRIPE_PRICE_TEAM_ID`, and `STRIPE_PRICE_ENTERPRISE_ID`; enable `STRIPE_AUTOMATIC_TAX=true` only after Stripe Tax is configured for the account.
 7. Set `APP_BASE_URL` to the public backend URL, for example `https://your-domain.com`.
 8. Activate and configure Stripe's hosted customer portal for invoice, payment-method, and subscription management.
 9. Start the backend with `npm run backend`.
@@ -110,8 +110,11 @@ For production Stripe activation on a public HTTPS backend, set:
 
 ```bash
 STRIPE_SECRET_KEY=sk_live_or_test_...
-STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ACADEMIC_ID=price_optional_...
+STRIPE_PRICE_PROFESSIONAL_ID=price_optional_...
+STRIPE_PRICE_TEAM_ID=price_optional_...
+STRIPE_PRICE_ENTERPRISE_ID=price_optional_...
 AXION_BILLING_MODE=subscription
 STRIPE_AUTOMATIC_TAX=false
 APP_BASE_URL=https://your-public-backend-domain.com
@@ -168,7 +171,7 @@ The backend readiness payload now marks which missing systems require account-ow
 - `GET /api/production-readiness` returns a secret-safe setup checklist for Supabase, Stripe, Google, email, deployment, CFD worker and CI
 - `GET /api/professional-readiness` returns the public-safe professional SaaS gap analysis used by the Readiness page
 - `GET /api/product` lists product and backend configuration
-- `POST /api/checkout` creates a Stripe Checkout session for the 2,400 EUR annual Professional subscription
+- `POST /api/checkout` creates a monthly Stripe Checkout session for the selected Research, Professional, Engineering Team, or Enterprise Site plan
 - `GET /api/checkout/session/:sessionId` verifies a completed checkout and returns the activated license
 - `POST /api/stripe/webhook` receives Stripe checkout payment events and activates paid orders
 - `POST /api/billing/portal` creates an authenticated Stripe customer-portal session for subscription and invoice management
