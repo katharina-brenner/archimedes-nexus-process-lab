@@ -49,3 +49,22 @@ test("manual route locks are persisted in project model state", async () => {
   assert.match(app, /class="stream-path-hit"/);
   assert.match(styles, /\.stream-path-hit[\s\S]+pointer-events:\s*stroke/);
 });
+
+test("production modes and numerical solvers are connected to the workspace", async () => {
+  const [app, indexHtml, styles] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /operationMode:\s*"perfusion"/);
+  assert.match(app, /operationMode:\s*state\.operationMode/);
+  assert.match(app, /solveBioprocessOde\(/);
+  assert.match(app, /solveAxialTransportPde\(/);
+  assert.match(app, /data-operation-mode/);
+  assert.match(app, /ode-profile-csv/);
+  assert.match(app, /pde-profile-csv/);
+  assert.match(indexHtml, /id="impressum"/);
+  assert.match(styles, /\.operation-mode-panel/);
+  assert.match(styles, /\.numerical-solver-panel/);
+});

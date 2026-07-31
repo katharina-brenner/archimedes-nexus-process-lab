@@ -18,7 +18,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260730-route-locks-v3" />
+    <link rel="stylesheet" href="./styles.css?v=20260730-modes-ode-pde-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -184,6 +184,7 @@
                   <a href="./?page=readiness" data-public-target="publicReadiness">Security</a>
                   <a href="./?page=legal#privacy" data-public-target="publicLegal">Privacy</a>
                   <a href="./?page=legal#terms" data-public-target="publicLegal">Terms</a>
+                  <a href="./?page=legal#impressum" data-public-target="publicLegal">Impressum</a>
                 </div>
                 <small>Industrial photography credits and licences are documented in the repository attribution file.</small>
               </footer>
@@ -330,6 +331,7 @@
               <div>
                 <a href="./?page=legal#privacy" data-public-target="publicLegal">Privacy</a>
                 <a href="./?page=legal#terms" data-public-target="publicLegal">Terms</a>
+                <a href="./?page=legal#impressum" data-public-target="publicLegal">Impressum</a>
               </div>
               <small>Photography: Bayerische Staatsbrauerei Weihenstephan, TECNIC Bioprocess Solutions, Marcelo Guarnieri and Crystal Kwok / Unsplash; CC1984USA / Wikimedia Commons. Licence details in the photography attribution file.</small>
             </footer>
@@ -1326,9 +1328,20 @@
           <section id="publicLegal" class="public-section public-legal public-page" data-public-page="legal">
             <div class="section-heading">
               <p>Legal</p>
-              <h2>Clear terms for an engineering workspace.</h2>
+              <h2>Provider information, privacy, and terms.</h2>
             </div>
             <div class="legal-grid">
+              <article id="impressum" class="legal-provider">
+                <span>Impressum</span>
+                <h3>neunzigzehn UG (haftungsbeschränkt)</h3>
+                <address>Franz-Joseph-Straße 11<br />80801 München<br />Deutschland</address>
+                <dl>
+                  <dt>Vertreten durch</dt><dd>Lukas Höcherl, Geschäftsführer</dd>
+                  <dt>Registergericht</dt><dd>Amtsgericht München</dd>
+                  <dt>Handelsregister</dt><dd>HRB 301734</dd>
+                  <dt>Legal Entity Identifier</dt><dd>984500DQ5DB7BC6D9154</dd>
+                </dl>
+              </article>
               <article id="privacy">
                 <span>Privacy</span>
                 <h3>Company data remains project data.</h3>
@@ -1458,12 +1471,12 @@
         <section class="control-group">
           <h2>Global Parameters</h2>
           <label class="slider-row">
-            <span>Batch volume</span>
+            <span id="batchSizeLabel">Working volume</span>
             <input id="batchSize" type="range" min="50" max="200000" step="50" value="4000" />
             <b id="batchSizeValue">4,000 L</b>
           </label>
           <label class="slider-row">
-            <span>Annual batches</span>
+            <span id="batchCountLabel">Annual batches</span>
             <input id="batchCount" type="range" min="5" max="330" step="5" value="120" />
             <b id="batchCountValue">120</b>
           </label>
@@ -1539,7 +1552,7 @@
             <strong id="annualProduct">0 t</strong>
           </article>
           <article>
-            <span>Batch duration</span>
+            <span id="batchDurationLabel">Batch duration</span>
             <strong id="batchDuration">0 h</strong>
           </article>
           <article>
@@ -1755,6 +1768,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260730-route-locks-v3"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260730-modes-ode-pde-v1"></script>
   </body>
 </html>

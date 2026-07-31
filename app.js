@@ -1,3 +1,6 @@
+import { OPERATION_MODES, normalizeOperationMode, operationModeProfile as buildOperationModeProfile } from "./operation-modes.js";
+import { solveAxialTransportPde, solveBioprocessOde } from "./bioprocess-solver.js";
+
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
   { type: "wfi", label: "WFI Generation", isoName: "Water for injection generation system", cls: "Utilities", icon: "WFI", color: "#277da1", residence: 2, power: 5.2, standards: ["USP <1231>", "EU GMP Annex 1", "ISPE Baseline"] },
@@ -1623,7 +1626,12 @@ const equations = [
   eq("Logistic growth", "kinetics", "dX/dt = mu * X * (1 - X / X_max)", "Density-limited biomass growth."),
   eq("Product formation", "kinetics", "dP/dt = alpha * dX/dt + beta * X", "Luedeking-Piret model for growth-associated and non-growth-associated product."),
   eq("Substrate uptake", "mass", "dS/dt = -(1 / Y_XS) * dX/dt - m_s * X", "Substrate consumption from biomass formation and maintenance."),
+  eq("Batch reactor balance", "mass", "d(C_i*V)/dt = r_i*V; F_in = F_out = 0", "Closed cultivation balance after the initial charge and before harvest."),
+  eq("Fed-batch volume", "mass", "dV/dt = F_feed", "Working volume rises with controlled feed addition while no bulk harvest leaves the reactor."),
   eq("Fed-batch substrate", "mass", "d(SV)/dt = F_in*S_in - q_s*X*V", "Dynamic substrate balance with feed addition."),
+  eq("Perfusion dilution rate", "mass", "D = F_perfusion / V", "Daily medium-exchange rate for a constant-volume perfusion bioreactor."),
+  eq("Perfusion cell retention", "mass", "d(XV)/dt = mu*X*V - F_bleed*X - (1-R_cell)*F_harvest*X", "Viable-cell balance with retention efficiency, controlled bleed, and clarified harvest."),
+  eq("Perfusion component balance", "mass", "d(C_iV)/dt = F_in*C_i,in - F_h*C_i + r_i*V", "Continuous nutrient, metabolite, and product balance at constant working volume."),
   eq("Oxygen transfer", "mass", "OTR = kLa * (C*_O2 - C_O2)", "Oxygen transfer rate from gas to liquid."),
   eq("Oxygen uptake", "mass", "OUR = q_O2 * X * V", "Biological oxygen demand."),
   eq("Carbon dioxide evolution", "mass", "CER = q_CO2 * X * V", "CO2 generation from cell respiration."),
@@ -2011,6 +2019,7 @@ const routeOptions = [
 const state = {
   template: "culturedMeat",
   scale: "pilot",
+  operationMode: "perfusion",
   mode: "select",
   selectedId: null,
   connectFrom: null,
@@ -2100,6 +2109,9 @@ const els = {
   recovery: document.querySelector("#recovery"),
   batchSizeValue: document.querySelector("#batchSizeValue"),
   batchCountValue: document.querySelector("#batchCountValue"),
+  batchSizeLabel: document.querySelector("#batchSizeLabel"),
+  batchCountLabel: document.querySelector("#batchCountLabel"),
+  batchDurationLabel: document.querySelector("#batchDurationLabel"),
   titerValue: document.querySelector("#titerValue"),
   recoveryValue: document.querySelector("#recoveryValue"),
   annualProduct: document.querySelector("#annualProduct"),
@@ -2248,6 +2260,87 @@ function activeTemplate() {
   return templates[state.template];
 }
 
+function defaultOperationModeForTemplate(templateKey) {
+  if (["culturedMeat", "cellTherapy"].includes(templateKey)) return "perfusion";
+  if (["antibody", "penicillin", "fermentation", "insulin", "plasmid", "biohydrogen"].includes(templateKey)) return "fedBatch";
+  return "batch";
+}
+
+function operationModeFromText(value, fallback = defaultOperationModeForTemplate(state.template)) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("perfusion") || text.includes("continuous culture") || text.includes("continuous harvest")) return "perfusion";
+  if (text.includes("fed-batch") || text.includes("fed batch") || text.includes("feeding strategy")) return "fedBatch";
+  if (/\bbatch\b/.test(text)) return "batch";
+  return normalizeOperationMode(fallback);
+}
+
+function productionResidenceHours() {
+  const productionReactors = state.units.filter((item) => {
+    const text = `${item.id} ${item.type} ${item.name}`.toLowerCase();
+    return item.cls === "Bioreactor" && !text.includes("seed") && !text.includes("inoculum");
+  });
+  const reactors = productionReactors.length ? productionReactors : state.units.filter((item) => item.cls === "Bioreactor");
+  return Math.max(24, ...reactors.map((item) => Number(item.residence) || 0));
+}
+
+function operationProfile() {
+  return buildOperationModeProfile({
+    mode: state.operationMode,
+    batchSize: state.batchSize,
+    batchCount: state.batchCount,
+    feedRate: state.params.feedRate,
+    perfusionRate: state.params.perfusionRate,
+    annualOperatingTime: state.params.annualOperatingTime,
+    equipmentUptime: state.params.equipmentUptime,
+    productionResidenceH: productionResidenceHours(),
+  });
+}
+
+function annualCycleEquivalent() {
+  const profile = operationProfile();
+  return Math.max(1, profile.annualHarvestVolumeL / Math.max(1, profile.harvestVolumePerCycleL));
+}
+
+function operationModePickerMarkup(context = "simulation") {
+  const selected = operationProfile();
+  return `
+    <section class="operation-mode-panel" data-operation-mode-context="${context}">
+      <div class="operation-mode-copy">
+        <span>Production system</span>
+        <h3>${selected.label}</h3>
+        <p>${selected.description}</p>
+        <code>${selected.balance}</code>
+      </div>
+      <div class="operation-mode-picker" role="group" aria-label="Choose production system">
+        ${Object.values(OPERATION_MODES).map((mode) => `
+          <button type="button" class="${state.operationMode === mode.key ? "active" : ""}" data-operation-mode="${mode.key}" aria-pressed="${state.operationMode === mode.key}">
+            <strong>${mode.label}</strong>
+            <small>${mode.description}</small>
+          </button>
+        `).join("")}
+      </div>
+      <div class="operation-mode-metrics">
+        <article><span>Production window</span><strong>${formatNumber(selected.productionHours, 0)} h</strong></article>
+        <article><span>${selected.cycleLabel === "campaign" ? "Campaign harvest" : "Harvest / batch"}</span><strong>${formatNumber(selected.harvestVolumePerCycleL, 0)} L</strong></article>
+        <article><span>Annual harvest basis</span><strong>${formatNumber(selected.annualHarvestVolumeL / 1000, 1)} m3</strong></article>
+        <article><span>${selected.cycleLabel === "campaign" ? "Feasible annual campaigns" : selected.countLabel}</span><strong>${selected.targetCycles}</strong></article>
+      </div>
+    </section>
+  `;
+}
+
+function applyOperationMode(value) {
+  const nextMode = normalizeOperationMode(value, state.operationMode);
+  state.operationMode = nextMode;
+  state.units.forEach((item) => {
+    if (item.cls === "Bioreactor") item.operationMode = nextMode;
+  });
+  massBalanceCache = { key: "", value: null };
+  syncInputs();
+  renderAll();
+  showToast(`${OPERATION_MODES[nextMode].label} production system applied`);
+}
+
 function scaleProfile() {
   const volume = Math.max(1, state.batchSize);
   if (volume < 250) return { key: "lab", label: "Lab / benchtop", fixedBurden: state.params.labFixedBurden, qaMultiplier: 6.8, laborMultiplier: 5.6, purchasingPower: 1.75, automationCredit: 0.05 };
@@ -2270,8 +2363,9 @@ function materialCostBreakdown(data, profile, learningCredit) {
   const p = state.params;
   const materialProfile = templateMaterialProfile();
   const batchVolumeL = Math.max(1, state.batchSize);
-  const batches = Math.max(1, state.batchCount);
-  const annualBrothL = batchVolumeL * batches;
+  const mode = data.operationMode || operationProfile();
+  const batches = Math.max(1, mode.targetCycles);
+  const annualBrothL = Math.max(batchVolumeL, data.annualHarvestVolumeL || mode.annualHarvestVolumeL);
   const productKg = Math.max(0.001, data.annualKg);
   const bioreactors = state.units.filter((item) => item.cls === "Bioreactor").length || 1;
   const chromatographyUnits = state.units.filter((item) => ["Purification", "Viral safety"].includes(item.cls)).length;
@@ -2280,8 +2374,12 @@ function materialCostBreakdown(data, profile, learningCredit) {
   const lossFactor = 1 + (p.materialLossFactor || 0) / 100 + (1 - data.processYield) * 0.65;
   const coldChainFactor = 1 + (p.coldChainMaterialFactor || 0) / 100;
   const purchasing = profile.purchasingPower * learningCredit;
-  const mediaVolumeL = annualBrothL * materialProfile.media * (1 + (p.perfusionRate || 0) * 0.16);
-  const feedVolumeL = annualBrothL * ((p.feedRate || 0) / 100) * materialProfile.feed;
+  const mediaVolumeL = (state.operationMode === "batch" ? batchVolumeL * batches : annualBrothL) * materialProfile.media;
+  const feedVolumeL = state.operationMode === "fedBatch"
+    ? batchVolumeL * batches * mode.feedFraction * materialProfile.feed
+    : state.operationMode === "perfusion"
+      ? annualBrothL * 0.08 * materialProfile.feed
+      : 0;
   const bufferVolumeL = annualBrothL * materialProfile.buffer * (1 + chromatographyUnits * 0.28 + filtrationUnits * 0.08);
   const wfiCleaningL = annualBrothL * (0.85 + cleaningUnits * 0.18 + filtrationUnits * 0.06);
   const mediaCost = mediaVolumeL * (p.mediaCostPerL || 42) * purchasing * lossFactor * coldChainFactor;
@@ -2317,7 +2415,7 @@ function scaleEconomics(data) {
   const p = state.params;
   const profile = scaleProfile();
   const volumeRatio = Math.max(0.001, state.batchSize / 10000);
-  const campaignRatio = Math.max(0.05, state.batchCount / 160);
+  const campaignRatio = Math.max(0.05, (data.operationMode?.targetCycles || state.batchCount) / 160);
   const exponent = p.capitalScaleExponent;
   const parallelUnits = Math.max(1, Math.ceil((p.bottleneckUtil / 100) * Math.pow(volumeRatio, 0.42)));
   const installedCapital = 3_800_000 * Math.pow(volumeRatio, exponent) * (0.72 + state.units.length * 0.035) * (1 + p.facilityPremium / 100) * Math.pow(parallelUnits, 0.78);
@@ -2546,7 +2644,11 @@ function loadTemplate(key, preserveScale = false) {
   if (!template) return;
   state.template = key;
   state.inferredTemplate = key;
+  state.operationMode = defaultOperationModeForTemplate(key);
   state.units = clone(template.units);
+  state.units.forEach((item) => {
+    if (item.cls === "Bioreactor") item.operationMode = state.operationMode;
+  });
   state.streams = clone(template.streams);
   state.costs = clone(template.costs);
   state.selectedId = state.units[0]?.id || null;
@@ -2579,6 +2681,8 @@ function currentModelSummary() {
     template: state.template,
     templateLabel: activeTemplate().label,
     scale: state.scale,
+    operationMode: state.operationMode,
+    operationModeLabel: operationProfile().label,
     batchSize: state.batchSize,
     batchCount: state.batchCount,
     titer: state.titer,
@@ -2594,10 +2698,11 @@ function currentModelSummary() {
 
 function exportCurrentModelState() {
   return {
-    appVersion: "route-optimizer-v2",
+    appVersion: "operation-modes-ode-pde-v1",
     projectName: state.projectName,
     template: state.template,
     scale: state.scale,
+    operationMode: state.operationMode,
     selectedId: state.selectedId,
     zoom: state.zoom,
     nextUnit: state.nextUnit,
@@ -2637,6 +2742,7 @@ function importModelState(modelState = {}) {
   const template = templates[modelState.template] ? modelState.template : state.template;
   state.template = template;
   state.scale = scalePresets[modelState.scale] ? modelState.scale : state.scale;
+  state.operationMode = normalizeOperationMode(modelState.operationMode, defaultOperationModeForTemplate(template));
   state.projectName = String(modelState.projectName || state.projectName || activeTemplate().label);
   state.units = Array.isArray(modelState.units) ? clone(modelState.units) : clone(templates[template].units);
   state.streams = Array.isArray(modelState.streams) ? clone(modelState.streams) : clone(templates[template].streams);
@@ -2686,27 +2792,51 @@ function applyScale(key) {
 
 function metrics() {
   const p = state.params;
+  const mode = operationProfile();
   const processYield = (state.recovery / 100) * (p.viability / 100) * (p.harvestRecovery / 100) * (p.clarificationYield / 100) * (p.chromYield / 100) * (p.ufdfYield / 100);
-  const effectiveTiter = state.titer * Math.min(1.35, Math.max(0.45, (p.viability / 92) * (p.cellDensity / 18) * (p.doSetpoint / 40) * (7.6 - Math.abs(p.ph - 7.1)) / 7.6));
-  const annualKg = state.batchSize * effectiveTiter * state.batchCount * processYield / 1000;
+  const effectiveTiter = state.titer
+    * Math.min(1.35, Math.max(0.45, (p.viability / 92) * (p.cellDensity / 18) * (p.doSetpoint / 40) * (7.6 - Math.abs(p.ph - 7.1)) / 7.6))
+    * mode.productivityFactor;
+  const annualKg = mode.annualHarvestVolumeL * effectiveTiter * processYield / 1000;
   const reactorCount = state.units.filter((item) => item.cls === "Bioreactor").length || 1;
   const downstreamCount = state.units.filter((item) => item.cls !== "Bioreactor").length || 1;
-  const bioAdjustment = Math.max(0.75, Math.min(1.6, p.doublingTime / 24 + p.perfusionRate * 0.03 - p.specificGrowth * 0.8));
-  const batchDuration = state.units.reduce((sum, item) => sum + item.residence, 0) * bioAdjustment + reactorCount * 5 + downstreamCount * 0.75;
+  const supportResidence = state.units.filter((item) => item.cls !== "Bioreactor").reduce((sum, item) => sum + (Number(item.residence) || 0), 0);
+  const seedResidence = state.units.filter((item) => {
+    const text = `${item.id} ${item.type} ${item.name}`.toLowerCase();
+    return item.cls === "Bioreactor" && (text.includes("seed") || text.includes("inoculum"));
+  }).reduce((sum, item) => sum + (Number(item.residence) || 0), 0);
+  const batchDuration = mode.productionHours + seedResidence * 0.35 + supportResidence * 0.18 + reactorCount * 3 + downstreamCount * 0.35;
   const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
   const availabilityFactor = Math.max(0.45, Math.min(0.86, (1 - (p.resourceSlack || 12) / 100) * 0.9));
   const cycleDuration = batchDuration + (p.setupTime || 0) + (p.turnaroundTime || 0);
-  const rawUtilization = state.batchCount * cycleDuration / Math.max(1, effectiveAot) * 100;
+  const annualBusyHours = state.operationMode === "perfusion"
+    ? mode.annualOperatingHours + mode.targetCycles * Math.max(0, cycleDuration - mode.productionHours)
+    : mode.targetCycles * cycleDuration;
+  const rawUtilization = annualBusyHours / Math.max(1, effectiveAot) * 100;
   const targetUtilization = Math.max(58, Math.min(82, (p.bottleneckUtil || 82) - (p.resourceSlack || 12) * 0.35));
   const impliedParallelTrains = Math.max(1, Math.ceil(rawUtilization / Math.max(35, targetUtilization)));
   const utilization = Math.min(targetUtilization, rawUtilization / impliedParallelTrains * availabilityFactor + targetUtilization * (1 - availabilityFactor));
-  const utilities = (state.units.reduce((sum, item) => sum + item.powerFactor, 0) + p.agitation * reactorCount + p.aeration * 8 + p.kla * 0.04) * batchDuration * state.batchCount / 1000;
-  const productPerBatchKg = state.batchSize * effectiveTiter * processYield / 1000;
-  const preliminary = { annualKg, batchDuration, utilization, utilities, productPerBatchKg, processYield, effectiveTiter };
+  const utilities = (state.units.reduce((sum, item) => sum + item.powerFactor, 0) + p.agitation * reactorCount + p.aeration * 8 + p.kla * 0.04) * annualBusyHours / 1000;
+  const productPerBatchKg = mode.harvestVolumePerCycleL * effectiveTiter * processYield / 1000;
+  const preliminary = { annualKg, annualHarvestVolumeL: mode.annualHarvestVolumeL, batchDuration, utilization, utilities, productPerBatchKg, processYield, effectiveTiter, operationMode: mode };
   const scale = scaleEconomics(preliminary);
   const directCost = scale.directCost;
 
-  return { annualKg, batchDuration, utilization, rawUtilization, impliedParallelTrains, directCost, utilities, productPerBatchKg, processYield, effectiveTiter, scale };
+  return {
+    annualKg,
+    annualHarvestVolumeL: mode.annualHarvestVolumeL,
+    batchDuration,
+    utilization,
+    rawUtilization,
+    impliedParallelTrains,
+    directCost,
+    utilities,
+    productPerBatchKg,
+    processYield,
+    effectiveTiter,
+    scale,
+    operationMode: mode,
+  };
 }
 
 function unitSize(item) {
@@ -2854,6 +2984,7 @@ function massBalanceCacheKey() {
   return [
     state.template,
     state.scale,
+    state.operationMode,
     state.batchSize,
     state.batchCount,
     state.titer,
@@ -3168,7 +3299,7 @@ function solveMassBalance() {
           ...streamItem,
           role: streamLabel(kind),
           massFlow: nextMass,
-          annualMass: nextMass * state.batchCount,
+          annualMass: nextMass * annualCycleEquivalent(),
           components,
           componentText: componentSummary(components),
           solverStatus: isRecycle ? "Relaxed recycle" : usedSource ? "Source estimated" : "Solved",
@@ -3249,7 +3380,8 @@ function solveMassBalance() {
   totals.recoveredHeat = units.reduce((sum, item) => sum + (item.recoveredHeat || 0), 0);
 
   const result = {
-    basis: "kg/batch",
+    basis: `kg/${operationProfile().cycleLabel}`,
+    operationMode: state.operationMode,
     streamMap,
     unitMap,
     units,
@@ -3277,73 +3409,137 @@ function dynamicBatchProfile() {
   const data = metrics();
   const solved = solveMassBalance();
   const p = state.params;
-  const duration = Math.max(24, data.batchDuration + (p.setupTime || 0) + (p.turnaroundTime || 0));
-  const points = 49;
-  const productionStart = duration * 0.22;
-  const productionEnd = duration * 0.72;
-  const downstreamEnd = duration * 0.9;
-  const productTarget = Math.max(0.001, data.productPerBatchKg);
+  const mode = data.operationMode || operationProfile();
+  const duration = mode.productionHours;
+  const grossProductTargetKg = Math.max(0.001, mode.harvestVolumePerCycleL * data.effectiveTiter / 1000);
   const biomassTarget = Math.max(0.1, state.batchSize * (p.cellDensity || 18) * 0.000004 * (p.viability || 90) / 100);
-  const feedBoost = Math.max(0, (p.feedRate || 0) / 100);
-  const baseSubstrate = Math.max(0.2, p.glucose || 4);
   const maxHeatKw = Math.max(1, solved.totals.netHeatDuty / duration);
-  const rows = Array.from({ length: points }, (_, index) => {
-    const timeH = duration * index / (points - 1);
-    const progress = Math.max(0, Math.min(1, (timeH - productionStart) / Math.max(1, productionEnd - productionStart)));
-    const productionCurve = 1 / (1 + Math.exp(-10 * (progress - 0.52)));
-    const normalizedProduct = progress <= 0 ? 0 : Math.min(1, productionCurve);
-    const downstreamProgress = Math.max(0, Math.min(1, (timeH - productionEnd) / Math.max(1, downstreamEnd - productionEnd)));
-    const finalRecovery = (state.recovery || 75) / 100;
-    const recoveredFraction = timeH <= productionEnd ? normalizedProduct * 0.35 : 0.35 + downstreamProgress * (finalRecovery - 0.35);
-    const cellGrowth = Math.min(1, Math.max(0, (1 / (1 + Math.exp(-9 * (progress - 0.35))))));
-    const decay = timeH > productionEnd ? Math.min(0.28, (timeH - productionEnd) / duration * 0.55) : 0;
-    const viableDensity = Math.max(0, (p.cellDensity || 18) * cellGrowth * (p.viability || 90) / 100 * (1 - decay));
-    const substrate = Math.max(0.05, baseSubstrate * (1 - 0.82 * normalizedProduct) + feedBoost * baseSubstrate * Math.max(0, Math.sin(progress * Math.PI)) * 0.5);
-    const doValue = Math.max(5, Math.min(95, (p.doSetpoint || 40) - normalizedProduct * Math.max(4, (p.our || 4.5) * 2.4) + (p.kla || 65) * 0.035));
-    const lactate = Math.max(0, (p.lactate || 2) * normalizedProduct * (1.08 - (p.perfusionRate || 0) * 0.04));
-    const ammonia = Math.max(0, (p.ammonia || 2) * normalizedProduct * (1.05 + (p.glutamine || 3) * 0.035 - (p.perfusionRate || 0) * 0.05));
-    const heatShape = Math.max(0.12, Math.sin(Math.PI * Math.min(1, Math.max(0, (timeH - productionStart * 0.5) / Math.max(1, productionEnd - productionStart * 0.5)))));
-    const heatKw = maxHeatKw * (0.35 + heatShape * 1.15 + normalizedProduct * 0.25);
-    const cumulativeEnergyKwh = Math.min(solved.totals.netHeatDuty, solved.totals.netHeatDuty * (timeH / duration) * (0.72 + normalizedProduct * 0.28));
-    const phase = timeH < productionStart
-      ? "setup_seed_train"
-      : timeH < productionEnd
-        ? "production"
-        : timeH < downstreamEnd
-          ? "downstream_recovery"
-          : "cleaning_turnaround";
+  const ode = solveBioprocessOde({
+    mode: state.operationMode,
+    durationH: duration,
+    points: 97,
+    volumeL: state.batchSize,
+    startVolumeFraction: mode.startVolumeFraction,
+    endVolumeFraction: mode.endVolumeFraction,
+    feedRatePctPerDay: p.feedRate,
+    perfusionRateVvd: mode.dilutionRatePerDay,
+    bleedFraction: mode.bleedFraction,
+    muMax: p.specificGrowth,
+    substrateInitialGL: p.glucose,
+    substrateFeedGL: Math.max(40, p.glucose * 30),
+    biomassInitialMCellsMl: Math.max(0.05, (p.cellDensity || 18) * (p.inoculation || 10) / 100),
+    biomassCapacityMCellsMl: p.cellDensity,
+    doSetpointPct: p.doSetpoint,
+    klaPerH: p.kla,
+    oxygenUptake: p.our,
+    lactateLimitGL: p.lactate,
+    ammoniaLimitMm: p.ammonia,
+    targetTiterGL: data.effectiveTiter,
+    glutamineMm: p.glutamine,
+  });
+  const finalOdeProduct = Math.max(1e-9, ode.points.at(-1)?.totalProductKg || ode.points.at(-1)?.productKg || 0);
+  const rows = ode.points.map((point) => {
+    const progress = Math.max(0, Math.min(1, point.timeH / Math.max(1, duration)));
+    const normalizedProduct = Math.max(0, Math.min(1, (point.totalProductKg || point.productKg || 0) / finalOdeProduct));
+    const biomassProgress = Math.max(0, Math.min(1.35, point.biomassMCellsMl / Math.max(0.01, p.cellDensity || 18)));
+    const heatShape = Math.max(0.12, Math.sin(Math.PI * progress));
+    const heatKw = maxHeatKw * (0.3 + heatShape + biomassProgress * 0.35);
+    const phase = progress < 0.06
+      ? "inoculation_adaptation"
+      : progress > 0.94
+        ? state.operationMode === "perfusion" ? "campaign_harvest" : "harvest_transition"
+        : `${state.operationMode}_production`;
     return {
-      timeH,
+      timeH: point.timeH,
       phase,
-      volumeL: state.batchSize * (0.72 + Math.min(0.28, feedBoost * progress)),
-      viableDensityMCellsMl: viableDensity,
-      substrateGL: substrate,
-      productKg: productTarget * normalizedProduct,
-      recoveredProductKg: productTarget * Math.max(0, Math.min(finalRecovery, recoveredFraction)),
-      biomassKg: biomassTarget * cellGrowth * (1 - decay),
-      dissolvedOxygenPct: doValue,
-      lactateGL: lactate,
-      ammoniaMm: ammonia,
+      volumeL: point.volumeL,
+      viableDensityMCellsMl: point.biomassMCellsMl,
+      substrateGL: point.substrateGL,
+      productKg: grossProductTargetKg * normalizedProduct,
+      recoveredProductKg: grossProductTargetKg * data.processYield * normalizedProduct,
+      biomassKg: biomassTarget * biomassProgress,
+      dissolvedOxygenPct: point.dissolvedOxygenPct,
+      lactateGL: point.lactateGL,
+      ammoniaMm: point.ammoniaMm,
       heatLoadKw: heatKw,
-      cumulativeEnergyKwh,
-      recoveryPct: Math.max(0, Math.min(100, recoveredFraction * 100)),
+      cumulativeEnergyKwh: solved.totals.netHeatDuty * progress,
+      recoveryPct: data.processYield * normalizedProduct * 100,
+      harvestFlowLDay: point.harvestFlowLDay,
+      cumulativeHarvestProductKg: point.harvestProductKg,
     };
   });
   const warnings = [
     rows.some((row) => row.dissolvedOxygenPct < 20) ? "DO falls below 20% during the simulated production window." : "",
-    rows.some((row) => row.ammoniaMm > (isCellCultureTemplate() ? 6 : 10)) ? "Ammonium crosses the conservative hard-review boundary." : "",
-    rows.some((row) => row.lactateGL > 4) ? "Lactate crosses the conservative cell-culture review boundary." : "",
+    rows.some((row) => row.ammoniaMm > Math.max(0.2, p.ammonia || 2)) ? `Ammonium crosses the configured ${formatNumber(p.ammonia || 2, 1)} mM boundary.` : "",
+    rows.some((row) => row.lactateGL > Math.max(0.2, p.lactate || 2)) ? `Lactate crosses the configured ${formatNumber(p.lactate || 2, 1)} g/L boundary.` : "",
   ].filter(Boolean);
   return {
-    basis: "time-resolved batch profile v1",
+    basis: `coupled nonlinear ODE · ${mode.label}`,
+    operationMode: state.operationMode,
+    mode,
     durationH: duration,
     points: rows,
     warnings,
+    solver: {
+      name: ode.solver,
+      model: ode.model,
+      equations: ode.equations,
+      stepH: ode.stepH,
+      integrationSteps: ode.integrationSteps,
+      maxStepResidual: ode.maxStepResidual,
+    },
     peakHeatKw: Math.max(...rows.map((row) => row.heatLoadKw)),
     minDoPct: Math.min(...rows.map((row) => row.dissolvedOxygenPct)),
     maxAmmoniaMm: Math.max(...rows.map((row) => row.ammoniaMm)),
     finalRecoveredKg: rows.at(-1)?.recoveredProductKg || 0,
   };
+}
+
+function axialTransportProfiles(dynamic = dynamicBatchProfile()) {
+  const p = state.params;
+  const mode = operationProfile();
+  const reactorLengthM = Math.max(1.2, Math.pow(Math.max(1, state.batchSize) / 1000, 1 / 3) * 1.8);
+  const velocityMph = Math.max(0.12, (p.agitation || 0.9) * 0.7 + (p.aeration || 0.35) * 0.45);
+  const dispersionM2h = Math.max(0.015, velocityMph * reactorLengthM / Math.max(12, 20 + (p.agitation || 0.9) * 8));
+  const finalPoint = dynamic.points.at(-1) || {};
+  const common = {
+    durationH: Math.min(12, Math.max(0.5, mode.productionHours / 24)),
+    cells: 48,
+    lengthM: reactorLengthM,
+    velocityMph,
+    dispersionM2h,
+    snapshotCount: 7,
+  };
+  const oxygen = solveAxialTransportPde({
+    ...common,
+    inletConcentration: 1,
+    initialConcentration: Math.max(0.05, Math.min(1, (dynamic.minDoPct || p.doSetpoint || 40) / 100)),
+    uptakePerH: Math.max(0.01, (p.our || 4.5) * Math.max(0.2, finalPoint.viableDensityMCellsMl || 1) / Math.max(20, (p.cellDensity || 18) * 35)),
+    sourcePerH: Math.max(0, (p.kla || 65) / 260),
+  });
+  const nutrient = solveAxialTransportPde({
+    ...common,
+    inletConcentration: 1,
+    initialConcentration: Math.max(0.03, Math.min(1, (finalPoint.substrateGL || p.glucose || 4) / Math.max(0.1, p.glucose || 4))),
+    uptakePerH: Math.max(0.01, (p.specificGrowth || 0.05) * Math.max(0.2, finalPoint.viableDensityMCellsMl || 1) / Math.max(4, p.cellDensity || 18)),
+    sourcePerH: state.operationMode === "batch" ? 0 : Math.max(0.01, (mode.feedFraction || mode.dilutionRatePerDay) / 24),
+  });
+  return { oxygen, nutrient, reactorLengthM, velocityMph, dispersionM2h };
+}
+
+function pdeProfileRows() {
+  const transport = axialTransportProfiles();
+  return ["oxygen", "nutrient"].flatMap((field) => transport[field].snapshots.flatMap((snapshot) => snapshot.values.map((value, index) => ({
+    field,
+    timeH: snapshot.timeH,
+    axialNode: index + 1,
+    axialPositionM: index * transport[field].dz,
+    normalizedConcentration: value,
+    average: snapshot.average,
+    outlet: snapshot.outlet,
+    peclet: transport[field].peclet,
+    residual: transport[field].maxResidual,
+  }))));
 }
 
 function dynamicProfileRows() {
@@ -3359,6 +3555,8 @@ function dynamicProfileRows() {
     dissolvedOxygenPct: row.dissolvedOxygenPct,
     lactateGL: row.lactateGL,
     ammoniaMm: row.ammoniaMm,
+    harvestFlowLDay: row.harvestFlowLDay,
+    cumulativeHarvestProductKg: row.cumulativeHarvestProductKg,
     heatLoadKw: row.heatLoadKw,
     cumulativeEnergyKwh: row.cumulativeEnergyKwh,
     recoveryPct: row.recoveryPct,
@@ -3652,8 +3850,12 @@ function recipePredecessor(unitItem, orderedUnits = orderedScheduleUnits(), rout
 
 function defaultScheduleOperationDuration(unitItem, data) {
   const p = state.params;
+  const mode = data.operationMode || operationProfile();
   const text = `${unitItem.type} ${unitItem.name} ${unitItem.cls}`.toLowerCase();
-  if (unitItem.cls === "Bioreactor") return Math.max(18, data.batchDuration * (text.includes("seed") ? 0.18 : 0.48), unitItem.residence || 0);
+  if (unitItem.cls === "Bioreactor") {
+    if (text.includes("seed") || text.includes("inoculum")) return Math.max(18, data.batchDuration * 0.18, unitItem.residence || 0);
+    return Math.max(18, mode.productionHours);
+  }
   if (unitItem.cls === "Preparation") return Math.max(1.2, unitItem.residence || 0, state.batchSize / 45000);
   if (unitItem.cls === "Hold") return Math.max(0.8, unitItem.residence || 0, Math.min(p.holdupTime || 12, 8));
   if (["Solid-liquid", "Filtration"].includes(unitItem.cls)) return Math.max(1.5, unitItem.residence || 0, state.batchSize / Math.max(12000, (p.sterileFilterFlux || 180) * 80));
@@ -3740,12 +3942,14 @@ function streamFlushDuration(streamItem, kind) {
 function campaignSchedule(routeKey = state.activeRoute) {
   const p = state.params;
   const data = metrics();
+  const mode = data.operationMode || operationProfile();
   const orderedUnits = orderedScheduleUnits();
   const activeUnits = orderedUnits.filter((item) => recipeActive(item) && recipeRouteEnabled(item, routeKey));
   const activeUnitIds = new Set(activeUnits.map((item) => item.id));
-  const simulatedBatches = Math.min(12, Math.max(2, state.batchCount || 2));
+  const targetCycles = Math.max(1, mode.targetCycles);
+  const simulatedBatches = Math.min(12, Math.max(2, targetCycles));
   const effectiveAot = Math.max(24, (p.annualOperatingTime || 7920) * (p.equipmentUptime || 92) / 100);
-  const plannedPitch = Math.max(1, effectiveAot / Math.max(1, state.batchCount || 1));
+  const plannedPitch = Math.max(1, effectiveAot / targetCycles);
   const transferSlack = Math.max(0.05, (p.turnaroundTime || 8) / Math.max(8, activeUnits.length * 2));
   const equipmentAvailable = {};
   const equipmentPools = {};
@@ -3946,6 +4150,9 @@ function campaignSchedule(routeKey = state.activeRoute) {
 
   return {
     basis: "finite-capacity campaign schedule v1",
+    operationMode: state.operationMode,
+    cycleLabel: mode.cycleLabel,
+    countLabel: mode.countLabel,
     activeRoute: routeKey,
     simulatedBatches,
     plannedPitchH: plannedPitch,
@@ -3953,7 +4160,7 @@ function campaignSchedule(routeKey = state.activeRoute) {
     makespanH,
     releasePitchH: Math.max(0, releasePitch),
     feasibleAnnualBatches,
-    batchTarget: state.batchCount,
+    batchTarget: targetCycles,
     bottleneck,
     violations,
     dependencyWarnings,
@@ -3962,7 +4169,7 @@ function campaignSchedule(routeKey = state.activeRoute) {
     batchReleases,
     resourceRows,
     warnings: [
-      feasibleAnnualBatches < state.batchCount ? `Schedule capacity supports ${feasibleAnnualBatches} of ${state.batchCount} target annual batches under the current AOT and uptime.` : "",
+      feasibleAnnualBatches < targetCycles ? `Schedule capacity supports ${feasibleAnnualBatches} of ${targetCycles} target annual ${mode.cycleLabel}s under the current AOT and uptime.` : "",
       violations.length ? `${violations.length} hold-time or waiting violations need recipe/suite review.` : "",
       streamOperations.some((item) => item.status !== "scheduled") ? `${streamOperations.filter((item) => item.status !== "scheduled").length} stream transfer slots need line availability review.` : "",
       dependencyWarnings.length ? `${dependencyWarnings.length} dependency warnings need recipe review.` : "",
@@ -6048,10 +6255,11 @@ function sparklinePath(rows, key, width = 420, height = 112) {
 
 function streamFlow(item) {
   const solved = solveMassBalance().streamMap[item.id];
-  if (solved) return `${formatNumber(solved.massFlow, solved.massFlow < 10 ? 2 : 1)} kg / batch`;
-  if (item.phase === "Solid") return `${formatMass(metrics().productPerBatchKg)} / batch`;
-  if (item.phase === "Slurry") return `${formatNumber(metrics().productPerBatchKg * 1.25, 1)} kg / batch`;
-  return `${formatNumber(state.batchSize, 0)} L / batch`;
+  const cycleLabel = operationProfile().cycleLabel;
+  if (solved) return `${formatNumber(solved.massFlow, solved.massFlow < 10 ? 2 : 1)} kg / ${cycleLabel}`;
+  if (item.phase === "Solid") return `${formatMass(metrics().productPerBatchKg)} / ${cycleLabel}`;
+  if (item.phase === "Slurry") return `${formatNumber(metrics().productPerBatchKg * 1.25, 1)} kg / ${cycleLabel}`;
+  return `${formatNumber(operationProfile().harvestVolumePerCycleL, 0)} L / ${cycleLabel}`;
 }
 
 function streamDirection(item) {
@@ -6717,9 +6925,17 @@ function renderParameters() {
 
 function renderMetrics() {
   const data = metrics();
-  els.processEyebrow.textContent = `${activeTemplate().label} production`;
+  const mode = data.operationMode || operationProfile();
+  els.processEyebrow.textContent = `${activeTemplate().label} · ${mode.label}`;
+  if (els.batchSizeLabel) els.batchSizeLabel.textContent = state.operationMode === "fedBatch" ? "Final working volume" : "Working volume";
+  if (els.batchCountLabel) {
+    els.batchCountLabel.textContent = mode.cycleLabel === "campaign"
+      ? "Requested annual campaigns"
+      : mode.countLabel;
+  }
+  if (els.batchDurationLabel) els.batchDurationLabel.textContent = mode.cycleLabel === "campaign" ? "Campaign duration" : "Batch duration";
   els.batchSizeValue.textContent = `${formatNumber(state.batchSize)} L`;
-  els.batchCountValue.textContent = `${state.batchCount}`;
+  els.batchCountValue.textContent = `${mode.cycleLabel === "campaign" ? mode.requestedCycles : mode.targetCycles}`;
   els.titerValue.textContent = `${formatNumber(state.titer, 1)} g/L`;
   els.recoveryValue.textContent = `${state.recovery}%`;
   els.annualProduct.textContent = formatMass(data.annualKg);
@@ -7581,6 +7797,7 @@ function renderSimulationBoard() {
   const data = metrics();
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
+  const transport = axialTransportProfiles(dynamic);
   const schedule = campaignSchedule();
   const cycleRows = scheduleCycleRows();
   const streamScheduleRows = scheduleStreamRows();
@@ -7646,12 +7863,13 @@ function renderSimulationBoard() {
   );
 
   els.simulationBoard.innerHTML = `
+    ${operationModePickerMarkup("simulation")}
     <section class="simulation-summary">
-      <article><span>Solver</span><strong>Mass + energy v1</strong></article>
+      <article><span>Solver</span><strong>Balances + ODE + PDE</strong></article>
       <article><span>Closure</span><strong class="${solved.totals.closurePct < 98 ? "risk" : "ok"}">${formatNumber(solved.totals.closurePct, 2)}%</strong></article>
       <article><span>Solved streams</span><strong>${solved.totals.solvedStreams}/${state.streams.length}</strong></article>
       <article><span>Recycle convergence</span><strong class="${solved.convergence.converged ? "ok" : "risk"}">${formatNumber(solved.convergence.maxRelativeDelta * 100, 3)}%</strong></article>
-      <article><span>Net heat duty</span><strong>${formatNumber(solved.totals.netHeatDuty, 1)} kWh/batch</strong></article>
+      <article><span>Net heat duty</span><strong>${formatNumber(solved.totals.netHeatDuty, 1)} kWh/${dynamic.mode.cycleLabel}</strong></article>
     </section>
     <section class="simulation-summary">
       <article><span>Mechanistic unit models</span><strong>${unitModels.length}</strong></article>
@@ -7661,12 +7879,69 @@ function renderSimulationBoard() {
       <article><span>Download</span><strong>Unit CSV</strong></article>
     </section>
     <section class="simulation-summary">
-      <article><span>Campaign scheduler</span><strong>${schedule.simulatedBatches} batches</strong></article>
-      <article><span>Feasible annual batches</span><strong class="${schedule.feasibleAnnualBatches < state.batchCount ? "risk" : "ok"}">${schedule.feasibleAnnualBatches}/${state.batchCount}</strong></article>
+      <article><span>Campaign scheduler</span><strong>${schedule.simulatedBatches} ${schedule.cycleLabel}s</strong></article>
+      <article><span>Feasible annual ${schedule.cycleLabel}s</span><strong class="${schedule.feasibleAnnualBatches < schedule.batchTarget ? "risk" : "ok"}">${schedule.feasibleAnnualBatches}/${schedule.batchTarget}</strong></article>
       <article><span>Release interval</span><strong>${formatScheduleDuration(schedule.releasePitchH)}</strong><small>${formatScheduleDuration(schedule.plannedPitchH)} target interval</small></article>
       <article><span>Bottleneck</span><strong>${schedule.bottleneck.tag}</strong></article>
       <article><span>Stream slots</span><strong>${streamScheduleRows.length}</strong></article>
       <article><span>Schedule warnings</span><strong class="${schedule.warnings.length ? "risk" : "ok"}">${schedule.warnings.length}</strong></article>
+    </section>
+    <section class="numerical-solver-panel" aria-label="ODE and PDE numerical simulation">
+      <div class="numerical-solver-heading">
+        <div>
+          <span>Numerical model</span>
+          <h3>Coupled states and distributed transport</h3>
+          <p>The ODE system advances reactor states through time. The PDE system resolves axial oxygen and nutrient transport using convection, dispersion, source, and cellular uptake terms.</p>
+        </div>
+        <div class="numerical-solver-actions">
+          <button data-download-report="ode-profile-csv" type="button">ODE states CSV</button>
+          <button data-download-report="pde-profile-csv" type="button">PDE field CSV</button>
+        </div>
+      </div>
+      <div class="numerical-solver-grid">
+        <article>
+          <span>ODE · ${dynamic.solver.name}</span>
+          <h4>${dynamic.solver.equations} coupled state equations</h4>
+          <code>dX/dt = μ(S,O₂)X − k<sub>d</sub>X − D<sub>bleed</sub>X</code>
+          <svg viewBox="0 0 420 112" role="img" aria-label="ODE biomass substrate and oxygen profile">
+            <path d="${sparklinePath(profileRows, "viableDensityMCellsMl")}" fill="none" stroke="#43b8a8" stroke-width="4" />
+            <path d="${sparklinePath(profileRows, "substrateGL")}" fill="none" stroke="#6f8793" stroke-width="3" />
+            <path d="${sparklinePath(profileRows, "dissolvedOxygenPct")}" fill="none" stroke="#d6bf71" stroke-width="3" />
+          </svg>
+          <dl>
+            <dt>Integration steps</dt><dd>${formatNumber(dynamic.solver.integrationSteps, 0)}</dd>
+            <dt>Step width</dt><dd>${formatNumber(dynamic.solver.stepH, 4)} h</dd>
+            <dt>Max relative step</dt><dd>${formatNumber(dynamic.solver.maxStepResidual, 4)}</dd>
+          </dl>
+        </article>
+        <article>
+          <span>PDE · finite volume</span>
+          <h4>O₂ convective-dispersive field</h4>
+          <code>∂C/∂t + u∂C/∂z = D<sub>ax</sub>∂²C/∂z² + S − qC</code>
+          <svg viewBox="0 0 420 112" role="img" aria-label="PDE oxygen concentration along reactor axis">
+            <path d="${sparklinePath(transport.oxygen.final.values.map((value) => ({ value })), "value")}" fill="none" stroke="#43b8a8" stroke-width="4" />
+          </svg>
+          <dl>
+            <dt>Axial cells</dt><dd>${transport.oxygen.cells}</dd>
+            <dt>Peclet number</dt><dd>${formatNumber(transport.oxygen.peclet, 1)}</dd>
+            <dt>Maximum residual</dt><dd>${formatNumber(transport.oxygen.maxResidual, 5)}</dd>
+          </dl>
+        </article>
+        <article>
+          <span>PDE · finite volume</span>
+          <h4>Nutrient distribution field</h4>
+          <code>R<sub>N</sub> = F<sub>feed</sub>C<sub>N,in</sub>/V − q<sub>N</sub>X</code>
+          <svg viewBox="0 0 420 112" role="img" aria-label="PDE nutrient concentration along reactor axis">
+            <path d="${sparklinePath(transport.nutrient.final.values.map((value) => ({ value })), "value")}" fill="none" stroke="#d6bf71" stroke-width="4" />
+          </svg>
+          <dl>
+            <dt>Reactor length</dt><dd>${formatNumber(transport.reactorLengthM, 2)} m</dd>
+            <dt>Axial velocity</dt><dd>${formatNumber(transport.velocityMph, 2)} m/h</dd>
+            <dt>Dispersion</dt><dd>${formatNumber(transport.dispersionM2h, 3)} m²/h</dd>
+          </dl>
+        </article>
+      </div>
+      <p class="numerical-solver-note">These equations are executable engineering models with explicit initial and boundary conditions. Regulated or final design use still requires calibration, solver verification, parameter estimation, and validation against experimental or plant data.</p>
     </section>
     <section class="simulation-group schedule-command-center">
       <div class="simulation-group-heading">
@@ -7764,7 +8039,7 @@ function renderSimulationBoard() {
     <section class="simulation-summary">
       <article><span>Route optimizer</span><strong>${bestRoute.label}</strong></article>
       <article><span>Route score</span><strong class="${bestRoute.score < 70 ? "risk" : "ok"}">${formatNumber(bestRoute.score, 0)}/100</strong></article>
-      <article><span>Route capacity</span><strong>${bestRoute.feasibleAnnualBatches}/${state.batchCount}</strong></article>
+      <article><span>Route capacity</span><strong>${bestRoute.feasibleAnnualBatches}/${schedule.batchTarget}</strong></article>
       <article><span>Branch steps</span><strong>${bestRoute.branchSteps}</strong></article>
       <article><span>Est. direct cost</span><strong>$${formatNumber(bestRoute.estimatedDirectCost, 0)}/kg</strong></article>
     </section>
@@ -7895,11 +8170,11 @@ function renderSimulationBoard() {
       <article><span>Gross heat</span><strong>${formatNumber(solved.totals.grossHeatDuty, 1)} kWh/batch</strong></article>
       <article><span>Recovered heat</span><strong>${formatNumber(solved.totals.recoveredHeat, 1)} kWh/batch</strong></article>
       <article><span>Recycle streams</span><strong>${solved.convergence.recycleStreams.length}</strong></article>
-      <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / batch</strong></article>
+      <article><span>Generated product</span><strong>${formatMass(data.productPerBatchKg)} / ${dynamic.mode.cycleLabel}</strong></article>
       <article><span>Warnings</span><strong class="${solved.totals.warningCount || solved.warnings.length ? "risk" : "ok"}">${solved.totals.warningCount + solved.warnings.length}</strong></article>
     </section>
     <section class="simulation-group">
-      <h3>Dynamic batch profile</h3>
+      <h3>Dynamic ${dynamic.mode.label.toLowerCase()} profile</h3>
       <div class="simulation-cards">
         <article class="simulation-card">
           <div><span>${dynamic.basis}</span><h4>${formatNumber(dynamic.durationH, 1)} h cycle</h4></div>
@@ -9013,7 +9288,12 @@ async function buildFromProductBrief() {
   state.productFiles = files.map(({ contentPreview, ...file }) => file);
   state.inferredTemplate = templateKey;
   loadTemplate(templateKey);
+  state.operationMode = operationModeFromText(brief, defaultOperationModeForTemplate(templateKey));
+  state.units.forEach((item) => {
+    if (item.cls === "Bioreactor") item.operationMode = state.operationMode;
+  });
   if (scaleSelect?.value && scalePresets[scaleSelect.value]) applyScale(scaleSelect.value);
+  else renderAll();
   try {
     await apiRequest("/api/project/brief", {
       method: "POST",
@@ -9051,6 +9331,7 @@ function renderStartBoard() {
       </div>
       <button class="action-button primary" data-build-from-brief type="button">Create workspace</button>
     </section>
+    ${operationModePickerMarkup("brief")}
     <section class="product-brief-grid">
       <article class="brief-composer">
         <label>
@@ -11827,13 +12108,21 @@ function comprehensiveReport() {
     product: activeTemplate().product,
     generatedAt: new Date().toISOString(),
     parameters: {
-      global: { batchSize: state.batchSize, batchCount: state.batchCount, titer: state.titer, recovery: state.recovery },
+      global: {
+        operationMode: state.operationMode,
+        operationModeLabel: operationProfile().label,
+        batchSize: state.batchSize,
+        batchCount: state.batchCount,
+        titer: state.titer,
+        recovery: state.recovery,
+      },
       biochemical: state.params,
       definitions: processParameters,
     },
     metrics: metrics(),
     solver: solved,
     dynamicProfile: dynamicBatchProfile(),
+    axialTransportPde: pdeProfileRows(),
     unitModels: unitMechanisticModels(),
     physicalBoundaries: physicalBoundaryRows(),
     schedule,
@@ -11938,7 +12227,7 @@ function renderReportsBoard() {
 	      <article><span>Attached source model pack</span><strong>${report.attachedSourceModelPack.length}</strong><p>Clean Axion implementation map for the attached manual, plant-simulation fact sheets, cultured-meat papers, local stream export, digital-twin paper, and scale-up document.</p><button data-download-report="source-model-pack-csv" type="button">Source pack CSV</button><button data-download-report="source-readiness-csv" type="button">Readiness CSV</button></article>
 	      <article><span>Company data registry</span><strong>${report.companyDatasets.length}</strong><p>Customer-supplied bioreactor, historian, TEA, LCA, supplier, QC and schedule datasets with column roles, quality flags, calibration targets and model-use notes.</p><button data-download-report="company-datasets-csv" type="button">Datasets CSV</button></article>
 	      <article><span>Cultured-meat scale model</span><strong>${report.culturedMeatSourceScale.length}</strong><p>Source-backed scale limits, 20 m3 animal-cell boundary, STR/wave working volumes, broth S-145 reference, medium cost pressure, oxygen/CO2 and circularity levers.</p><button data-download-report="cultured-meat-scale-csv" type="button">Scale model CSV</button></article>
-	      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${state.batchCount}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
+	      <article><span>Campaign schedule</span><strong>${report.schedule.feasibleAnnualBatches}/${report.schedule.batchTarget}</strong><p>Finite-capacity operation timing with repeated production, stream transfer slots, cleaning/release, equipment reuse, QC release, hold-time checks, resources, and project-planning handoff.</p><button data-download-report="schedule-csv" type="button">Operations CSV</button><button data-download-report="schedule-gantt-csv" type="button">Gantt CSV</button><button data-download-report="schedule-msproject-csv" type="button">MS Project CSV</button><button data-download-report="schedule-svg" type="button">Gantt SVG</button><button data-download-report="schedule-json" type="button">JSON</button></article>
 	      <article><span>APS planning cockpit</span><strong>${formatNumber(report.advancedPlanning.kpis.planAdherencePct, 0)}%</strong><p>Strategic, tactical, and detailed planning with finite capacity, delivery promises, inventory coverage, WIP, replanning signals, collaboration roles, and sequencing objectives.</p><button data-download-report="aps-horizons-csv" type="button">Horizons CSV</button><button data-download-report="aps-capacity-csv" type="button">Capacity CSV</button><button data-download-report="aps-delivery-csv" type="button">Delivery CSV</button><button data-download-report="aps-inventory-csv" type="button">Inventory CSV</button><button data-download-report="aps-sequencing-csv" type="button">Sequencing CSV</button><button data-download-report="aps-collaboration-csv" type="button">Roles CSV</button><button data-download-report="aps-optimization-csv" type="button">Optimization CSV</button></article>
       <article><span>Plant utilization suite</span><strong>${formatNumber(dataUtilizationFromSchedule(report.schedule), 0)}%</strong><p>Equipment occupancy chart, room/suite load, time buckets, utility demand peaks, cleaning windows, bottleneck ladder, and finite-capacity What-if scenarios for whole-plant utilization modelling.</p><button data-download-report="schedule-buckets-csv" type="button">Buckets CSV</button><button data-download-report="schedule-equipment-occupancy-csv" type="button">Equipment CSV</button><button data-download-report="schedule-room-occupancy-csv" type="button">Rooms CSV</button><button data-download-report="schedule-utility-demand-csv" type="button">Utilities CSV</button><button data-download-report="schedule-scenarios-csv" type="button">Scenarios CSV</button><button data-download-report="schedule-bottlenecks-csv" type="button">Bottlenecks CSV</button></article>
       <article><span>Scheduling resources</span><strong>${report.schedule.resourceRows.length}</strong><p>Detailed equipment, stream line, process-area, operator, CIP/SIP, and QC-release occupancy for finite-capacity review.</p><button data-download-report="schedule-streams-csv" type="button">Streams CSV</button><button data-download-report="schedule-cycles-csv" type="button">Reuse cycles CSV</button><button data-download-report="schedule-resources-csv" type="button">Resources CSV</button><button data-download-report="schedule-utilization-csv" type="button">Utilization matrix</button><button data-download-report="schedule-releases-csv" type="button">Batch releases</button></article>
@@ -12932,25 +13221,30 @@ function downloadSummaryCsv() {
     { metric: "Template", value: activeTemplate().label, unit: "" },
     { metric: "Product", value: activeTemplate().product, unit: "" },
     { metric: "Scale", value: scalePresets[state.scale].label, unit: "" },
-    { metric: "Batch volume", value: state.batchSize, unit: "L" },
-    { metric: "Annual batches", value: state.batchCount, unit: "batches/yr" },
+    { metric: "Production system", value: data.operationMode.label, unit: "" },
+    { metric: "Working volume", value: state.batchSize, unit: "L" },
+    { metric: data.operationMode.countLabel, value: data.operationMode.targetCycles, unit: `${data.operationMode.cycleLabel}s/yr` },
+    { metric: "Annual harvest volume", value: data.annualHarvestVolumeL, unit: "L/yr" },
     { metric: "Titer", value: state.titer, unit: "g/L" },
     { metric: "Recovery", value: state.recovery, unit: "%" },
     { metric: "Annual product", value: data.annualKg, unit: "kg/yr" },
-    { metric: "Batch duration", value: data.batchDuration, unit: "h" },
+    { metric: `${data.operationMode.cycleLabel} duration`, value: data.batchDuration, unit: "h" },
     { metric: "Direct cost", value: data.directCost, unit: "USD/kg" },
     { metric: "Utilities", value: data.utilities, unit: "MWh/yr" },
     { metric: "Plant utilization", value: data.utilization, unit: "%" },
     { metric: "Mass balance closure", value: solved.totals.closurePct, unit: "%" },
     { metric: "Recycle convergence", value: solved.convergence.maxRelativeDelta * 100, unit: "% relative delta" },
     { metric: "Recycle iterations", value: solved.convergence.iterations, unit: "iterations" },
-    { metric: "Net heat duty", value: solved.totals.netHeatDuty, unit: "kWh/batch" },
-    { metric: "Recovered heat", value: solved.totals.recoveredHeat, unit: "kWh/batch" },
+    { metric: "Net heat duty", value: solved.totals.netHeatDuty, unit: `kWh/${data.operationMode.cycleLabel}` },
+    { metric: "Recovered heat", value: solved.totals.recoveredHeat, unit: `kWh/${data.operationMode.cycleLabel}` },
     { metric: "Dynamic profile duration", value: dynamic.durationH, unit: "h" },
     { metric: "Dynamic profile points", value: dynamic.points.length, unit: "points" },
     { metric: "Dynamic peak heat", value: dynamic.peakHeatKw, unit: "kW" },
     { metric: "Dynamic min DO", value: dynamic.minDoPct, unit: "%" },
     { metric: "Dynamic max ammonia", value: dynamic.maxAmmoniaMm, unit: "mM" },
+    { metric: "ODE integration steps", value: dynamic.solver.integrationSteps, unit: "steps" },
+    { metric: "ODE maximum relative step", value: dynamic.solver.maxStepResidual, unit: "" },
+    { metric: "PDE axial cells", value: axialTransportProfiles(dynamic).oxygen.cells, unit: "cells" },
     { metric: "Mechanistic unit models", value: unitModels.length, unit: "models" },
     { metric: "Mechanistic model review flags", value: unitModels.filter((item) => item.severity !== "ok").length, unit: "flags" },
     { metric: "Schedule feasible annual batches", value: schedule.feasibleAnnualBatches, unit: "batches/yr" },
@@ -13020,6 +13314,10 @@ function handleReportDownload(type) {
     ]);
   } else if (type === "dynamic-csv") {
     downloadCsv(`${state.template}-dynamic-batch-profile.csv`, dynamicProfileRows());
+  } else if (type === "ode-profile-csv") {
+    downloadCsv(`${state.template}-${state.operationMode}-ode-state-profile.csv`, dynamicProfileRows(), "Coupled bioprocess ODE state profile");
+  } else if (type === "pde-profile-csv") {
+    downloadCsv(`${state.template}-${state.operationMode}-pde-transport-field.csv`, pdeProfileRows(), "Convective-dispersive PDE transport field");
   } else if (type === "unit-models-csv") {
     downloadCsv(`${state.template}-unit-operation-models.csv`, mechanisticModelRows());
   } else if (type === "physical-boundaries-csv") {
@@ -14133,8 +14431,8 @@ const publicPageMeta = {
     description: "Explore annual Axion Process OS access for professional bioprocess modelling, private projects, balances, scheduling, CFD screening, TEA and LCA.",
   },
   legal: {
-    title: "Privacy and Terms | Axion Process OS",
-    description: "Read the privacy, subscription and engineering-use terms for Axion Process OS.",
+    title: "Impressum, Privacy and Terms | Axion Process OS",
+    description: "Read provider information, privacy, subscription, and engineering-use terms for Axion Process OS.",
   },
   login: {
     title: "Sign in or Start Axion Professional | Axion Process OS",
@@ -16167,6 +16465,11 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
+    const operationModeButton = event.target.closest?.("[data-operation-mode]");
+    if (operationModeButton) {
+      applyOperationMode(operationModeButton.dataset.operationMode);
+      return;
+    }
     const processStream = event.target.closest?.(".stream-line, .stream-label");
     if (processStream?.dataset.streamId) {
       state.selectedId = processStream.dataset.streamId;
