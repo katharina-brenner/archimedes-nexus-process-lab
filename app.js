@@ -7,6 +7,7 @@ import {
   isBoundaryStream,
   retargetStream,
 } from "./flowsheet-connectivity.js";
+import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -2751,7 +2752,7 @@ function currentModelSummary() {
 
 function exportCurrentModelState() {
   return {
-    appVersion: "flowsheet-workbench-v4",
+    appVersion: "model-readiness-v1",
     projectName: state.projectName,
     template: state.template,
     scale: state.scale,
@@ -8393,6 +8394,8 @@ function renderEquations() {
 
 function renderSimulationBoard() {
   const p = state.params;
+  const readiness = modelReadinessAssessment();
+  const dynamicReadiness = readinessOutputById(readiness, "dynamic");
   const data = metrics();
   const solved = solveMassBalance();
   const dynamic = dynamicBatchProfile();
@@ -8462,6 +8465,7 @@ function renderSimulationBoard() {
   );
 
   els.simulationBoard.innerHTML = `
+    ${outputValidityMarkup(dynamicReadiness, "Result validity · dynamic simulation")}
     ${operationModePickerMarkup("simulation")}
     <section class="simulation-summary">
       <article><span>Solver</span><strong>Balances + ODE + PDE</strong></article>
@@ -12783,6 +12787,8 @@ function comprehensiveReport() {
     plantSimulationFunctions: plantSimulationFunctionRows(),
     sourceIngestionReadiness: sourceIngestionReadinessRows(),
     companyDatasets: companyDatasetRows(),
+    modelReadiness: modelReadinessAssessment(),
+    modelReadinessRows: modelReadinessRows(),
     advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
@@ -12803,7 +12809,9 @@ function renderReportsBoard() {
       </div>
       <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
     </section>
+    ${modelReadinessSummaryMarkup(report.modelReadiness, { compact: true })}
     <section class="reports-grid">
+      <article class="report-readiness-card"><span>Output readiness register</span><strong>${report.modelReadiness.score}%</strong><p>${report.modelReadiness.missing.length} explicit evidence or modelling gaps across balances, dynamics, scheduling, TEA, LCA, CFD and GMP. Every row states what the current result is useful for and what must still be modelled.</p><button data-download-report="model-readiness-csv" type="button">Download readiness CSV</button><button data-jump-view="recommendations" type="button">Open roadmap</button></article>
       <article><span>Mass + energy balances</span><strong>${formatNumber(report.solver.totals.closurePct, 2)}%</strong><p>${report.balances.length} unit balances with component inputs/outputs, generation, loss, closure, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
       <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, raw and auxiliary materials, media, labor, QA/QC, utilities, waste, and direct cost with scale-dependent cost pressure.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
       <article><span>TEA-ready export</span><strong>${report.tea.length}</strong><p>Cost model with annual value, per-kg product values, scenario basis, uncertainty range, scale exponent, utilization, and physical utility drivers.</p><button data-download-report="tea-csv" type="button">Download CSV</button><button data-download-report="tea-cost-svg" type="button">Cost SVG</button></article>
@@ -12865,8 +12873,226 @@ function pageTitle(view) {
   }[view] || "Model Brief";
 }
 
+function modelReadinessSignals() {
+  const solved = solveMassBalance();
+  const connectivity = auditFlowsheetConnectivity(state.units, state.streams);
+  const unitModels = unitMechanisticModels();
+  const confidenceRows = unitModels
+    .map((item) => Number(item.confidence || 0))
+    .sort((a, b) => a - b);
+  const medianUnitConfidence = confidenceRows.length
+    ? confidenceRows[Math.floor(confidenceRows.length / 2)]
+    : 0;
+  const boundaryRows = evaluatePhysicalBoundaries();
+  const schedule = campaignSchedule();
+  const datasetRows = (state.datasets || []).map((dataset) => {
+    const columns = [
+      ...(dataset.columns || []),
+      ...(dataset.schema?.columns || []).map((column) => column.name),
+    ].filter(Boolean);
+    return {
+      kind: dataset.kind,
+      qualityScore: Number(dataset.qualityScore || 0),
+      applied: Boolean(dataset.appliedAt || (dataset.appliedChanges || []).length),
+      columns,
+    };
+  });
+  const validatedPropertyColumns = new Set(datasetRows.flatMap((dataset) => (
+    dataset.qualityScore >= 70
+      ? dataset.columns.filter((column) => /density|viscos|rheolog|heat.?capacity|\bcp\b|surface.?tension|diffus|henry|solub|osmola|conductiv|bubble.?size/i.test(column))
+      : []
+  )));
+  const cfdGeometryEvidence = datasetRows.some((dataset) => (
+    dataset.qualityScore >= 70
+    && dataset.columns.some((column) => /diameter|vessel.?height|impeller|baffle|sparger|geometry|shaft|clearance|liquid.?level/i.test(column))
+  ));
+  const lcaBoundaryDefined = datasetRows.some((dataset) => (
+    dataset.kind === "lca"
+    && dataset.qualityScore >= 70
+    && dataset.columns.some((column) => /system.?boundary|allocation|functional.?unit|cut.?off|scope|geography/i.test(column))
+  ));
+  const automation = state.automationState || {};
+  const physicalConnections = (automation.connections || []).filter((connection) => (
+    connection.status === "connected" && connection.kind !== "simulation"
+  ));
+  const validatedControlLogic = Boolean(
+    automation.gateway?.configured
+    && (automation.loops || []).some((loop) => loop.enabled && loop.mode === "closed-loop")
+    && (automation.commissioningRuns || []).some((run) => run.status === "ready" || run.status === "passed"),
+  );
+  const cfdJobStatus = String(state.cfdBackendJob?.status || state.cfdBackendJob?.result?.status || "").toLowerCase();
+
+  return {
+    totalUnits: state.units.length,
+    totalStreams: state.streams.length,
+    openUnits: connectivity.attention.length,
+    externalInputs: state.streams.filter((stream) => !stream.from && stream.to).length,
+    externalOutputs: state.streams.filter((stream) => stream.from && !stream.to).length,
+    closurePct: solved.totals.closurePct,
+    solvedStreams: solved.totals.solvedStreams,
+    datasets: datasetRows,
+    appliedDatasetCount: datasetRows.filter((dataset) => dataset.applied).length,
+    highQualityDatasetCount: datasetRows.filter((dataset) => dataset.qualityScore >= 70).length,
+    validatedPropertyCount: validatedPropertyColumns.size,
+    dataApplicationCount: (state.dataApplicationHistory || []).length + (state.lastDataApplication ? 1 : 0),
+    medianUnitConfidence,
+    recipeOverrideCount: Object.keys(state.recipeOverrides || {}).length,
+    criticalBoundaries: boundaryRows.filter((item) => item.severity === "critical").length,
+    reviewBoundaries: boundaryRows.filter((item) => item.severity === "caution").length,
+    scheduleWarnings: schedule.warnings.length,
+    annualProductKg: metrics().annualKg,
+    customParameterCount: processParameters.filter((item) => item.custom).length,
+    cfdStarted: state.cfdSolverStarted,
+    cfdBackendComplete: ["completed", "complete", "succeeded", "success"].includes(cfdJobStatus),
+    cfdGeometryEvidence,
+    hasBioreactor: cfdBioreactors().length > 0,
+    lcaBoundaryDefined,
+    projectVersionCount: (state.projectVersions || []).length,
+    automationConnected: physicalConnections.length > 0,
+    validatedControlLogic,
+  };
+}
+
+function modelReadinessAssessment() {
+  return assessModelReadiness(modelReadinessSignals());
+}
+
+function modelReadinessRows() {
+  return buildReadinessRows(modelReadinessAssessment());
+}
+
+function readinessStatusLabel(status) {
+  return {
+    ready: "Decision-ready basis",
+    screening: "Screening only",
+    blocked: "Blocked",
+  }[status] || "Not assessed";
+}
+
+function readinessStatusClass(status) {
+  return `status-${status || "blocked"}`;
+}
+
+function readinessOutputById(assessment, outputId) {
+  return assessment.outputs.find((item) => item.id === outputId);
+}
+
+function modelReadinessSummaryMarkup(assessment, { compact = false } = {}) {
+  const topMissing = assessment.missing.slice(0, compact ? 3 : 8);
+  return `
+    <section class="model-readiness-board ${compact ? "model-readiness-compact" : ""}" aria-label="Model output readiness">
+      <header class="readiness-command">
+        <div>
+          <span>Current model status</span>
+          <h3>${escapeHtml(assessment.label)}</h3>
+          <p>${escapeHtml(assessment.statement)}</p>
+        </div>
+        <div class="readiness-score ${readinessStatusClass(assessment.status)}">
+          <strong>${assessment.score}%</strong>
+          <span>evidence complete</span>
+        </div>
+      </header>
+      <div class="readiness-kpis">
+        <span><strong>${assessment.readyOutputs.length}</strong> decision-ready</span>
+        <span><strong>${assessment.screeningOutputs.length}</strong> screening only</span>
+        <span><strong>${assessment.blockedOutputs.length}</strong> blocked</span>
+        <span><strong>${assessment.missing.length}</strong> missing inputs</span>
+      </div>
+      <div class="readiness-now-next">
+        <article>
+          <span>Useful output now</span>
+          <p>${escapeHtml(
+            assessment.readyOutputs[0]?.usefulNow
+            || assessment.screeningOutputs[0]?.usefulNow
+            || "Complete the blocking inputs before interpreting calculated results.",
+          )}</p>
+        </article>
+        <article>
+          <span>Do not use it yet for</span>
+          <p>${escapeHtml(
+            assessment.blockedOutputs[0]?.notFor
+            || assessment.screeningOutputs[0]?.notFor
+            || "Formal approval without independent technical review.",
+          )}</p>
+        </article>
+      </div>
+      <div class="readiness-priority-list">
+        <div class="readiness-section-title">
+          <span>Model next</span>
+          <strong>${topMissing.length ? "Highest-priority gaps" : "Required evidence present"}</strong>
+        </div>
+        ${topMissing.length ? topMissing.map((gap, index) => `
+          <article class="readiness-gap">
+            <b>${String(index + 1).padStart(2, "0")}</b>
+            <div>
+              <span>${escapeHtml(gap.outputTitle)} · ${escapeHtml(gap.label)}</span>
+              <strong>${escapeHtml(gap.modelTask)}</strong>
+              <small>${escapeHtml(gap.missing)}</small>
+            </div>
+            <button data-jump-view="${escapeAttr(gap.view)}" type="button">${escapeHtml(gap.action)}</button>
+          </article>
+        `).join("") : `
+          <article class="readiness-gap readiness-gap-complete">
+            <div><strong>No required modelling gap is currently open.</strong><small>Keep assumptions versioned and complete formal discipline review before approval.</small></div>
+          </article>
+        `}
+      </div>
+      ${compact ? `<button class="readiness-open-roadmap" data-jump-view="recommendations" type="button">Open full output-readiness roadmap</button>` : ""}
+    </section>
+  `;
+}
+
+function readinessOutputCardMarkup(outputItem) {
+  return `
+    <article class="readiness-output-card ${readinessStatusClass(outputItem.status)}">
+      <header>
+        <div>
+          <span>${escapeHtml(outputItem.purpose)}</span>
+          <h3>${escapeHtml(outputItem.title)}</h3>
+        </div>
+        <b>${readinessStatusLabel(outputItem.status)} · ${outputItem.score}%</b>
+      </header>
+      <div class="readiness-use-grid">
+        <div><span>Useful now for</span><p>${escapeHtml(outputItem.usefulNow)}</p></div>
+        <div><span>Not yet valid for</span><p>${escapeHtml(outputItem.notFor || "Use after formal technical review and approval.")}</p></div>
+      </div>
+      <div class="readiness-requirements">
+        ${outputItem.requirements.map((requirementItem) => `
+          <div class="${requirementItem.met ? "is-complete" : "is-missing"}">
+            <i aria-hidden="true">${requirementItem.met ? "✓" : "!"}</i>
+            <span>
+              <strong>${escapeHtml(requirementItem.label)}</strong>
+              <small>${escapeHtml(requirementItem.met ? requirementItem.evidence : requirementItem.modelTask)}</small>
+            </span>
+            ${requirementItem.met ? "" : `<button data-jump-view="${escapeAttr(requirementItem.view)}" type="button">${escapeHtml(requirementItem.action)}</button>`}
+          </div>
+        `).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function outputValidityMarkup(outputItem, title) {
+  const nextGap = outputItem.missing[0];
+  return `
+    <section class="result-validity-banner ${readinessStatusClass(outputItem.status)}">
+      <div>
+        <span>${escapeHtml(title)}</span>
+        <h3>${readinessStatusLabel(outputItem.status)} · ${outputItem.score}% evidence complete</h3>
+        <p>${escapeHtml(outputItem.usefulNow)}</p>
+      </div>
+      <div>
+        <span>${nextGap ? "Required next" : "Review basis"}</span>
+        <p>${escapeHtml(nextGap?.modelTask || "Required evidence is present; freeze a version and complete discipline review.")}</p>
+        <button data-jump-view="${escapeAttr(nextGap?.view || "recommendations")}" type="button">${escapeHtml(nextGap?.action || "Review evidence")}</button>
+      </div>
+    </section>
+  `;
+}
+
 function renderOverview() {
   const data = metrics();
+  const readiness = modelReadinessAssessment();
   const boundary = boundarySummary();
   const streamStats = streamRows().reduce((acc, item) => {
     acc[item.direction] = (acc[item.direction] || 0) + 1;
@@ -12885,6 +13111,7 @@ function renderOverview() {
       </div>
       <button class="action-button primary" data-jump-view="flowsheet" type="button">Open Process Builder</button>
     </section>
+    ${modelReadinessSummaryMarkup(readiness, { compact: true })}
     <section class="overview-grid">
       <article>
         <span>Equipment objects</span>
@@ -13053,47 +13280,27 @@ function simulationReadinessItems() {
 function renderRecommendations() {
   const coverage = icsCoverage();
   const items = simulationReadinessItems();
+  const readiness = modelReadinessAssessment();
   const fullCount = coverage.reduce((sum, item) => sum + item.count, 0);
   els.recommendationsBoard.innerHTML = `
     <section class="recommendation-hero">
       <div>
-        <p>Industry readiness</p>
-        <h3>ICS 71.120 equipment map + full-simulation gap list</h3>
-        <span>Use this as a roadmap from impressive flowsheet prototype toward a rigorous production simulator with validated engineering models.</span>
+        <p>Output-specific model readiness</p>
+        <h3>Know exactly which result is useful, and what must be modelled next</h3>
+        <span>Each output has its own evidence gates. Axion separates preliminary screening from decision-ready engineering and links every missing input to the workspace where it can be resolved.</span>
       </div>
-      <strong>${fullCount} mapped equipment objects</strong>
+      <strong>${readiness.score}% model evidence</strong>
     </section>
-    <section class="market-intel-board">
+    ${modelReadinessSummaryMarkup(readiness)}
+    <section class="readiness-output-grid">
+      ${readiness.outputs.map(readinessOutputCardMarkup).join("")}
+    </section>
+    <section class="readiness-reference-heading">
       <div>
-        <p>Implementation roadmap</p>
-        <h3>Move from screening model to controlled engineering workspace.</h3>
-        <span>Use the readiness list to replace screening assumptions with project-specific data, connect review outputs, and decide which modules need higher-fidelity modelling next.</span>
+        <span>Equipment scope reference</span>
+        <h3>ICS 71.120 coverage in the active model</h3>
+        <p>${fullCount} mapped equipment objects support the flowsheet. Coverage does not replace project-specific design data or validation.</p>
       </div>
-      <div class="market-caveat-list">
-        <span>Validate process-specific kinetics, yields, and impurity behavior.</span>
-        <span>Replace screening costs with supplier quotes and site-specific utility tariffs.</span>
-        <span>Add governance, approvals, and audit trails before regulated production use.</span>
-      </div>
-    </section>
-    <section class="market-wave-grid">
-      <article>
-        <span>Step 1</span>
-        <h3>Calibrate the model</h3>
-        <p>Add measured titers, yields, media composition, utility loads, cleaning limits, and representative batch data.</p>
-        <small>Goal: replace defaults with defendable project assumptions.</small>
-      </article>
-      <article>
-        <span>Step 2</span>
-        <h3>Validate the process boundaries</h3>
-        <p>Review oxygen transfer, heat load, ammonium, lactate, hold time, sterility, waste, and scale-up constraints.</p>
-        <small>Goal: identify the next experiments or engineering studies.</small>
-      </article>
-      <article>
-        <span>Step 3</span>
-        <h3>Connect decision outputs</h3>
-        <p>Use exports for TEA, LCA, equipment review, scheduling, source tracking, and stakeholder-ready technical reports.</p>
-        <small>Goal: turn the model into a repeatable engineering workflow.</small>
-      </article>
     </section>
     <section class="ics-coverage-grid">
       ${coverage.map((item) => `
@@ -13647,6 +13854,8 @@ function renderTwinWorkspace() {
 
 function renderEconomics() {
   const data = metrics();
+  const readiness = modelReadinessAssessment();
+  const teaReadiness = readinessOutputById(readiness, "tea");
   const materialRows = data.scale.materialBreakdown?.rows || [];
   const costItems = [
     { label: "Annualized CAPEX", value: data.scale.annualizedCapital, color: "#123a56" },
@@ -13683,7 +13892,17 @@ function renderEconomics() {
       `).join("")}
   `;
 
-  els.costNarrative.textContent = `${activeTemplate().label} at ${formatNumber(state.batchSize)} L is treated as ${data.scale.profile.label} scale. Materials are now modeled as a major bioprocess cost driver: media, feeds/supplements, buffers, resin, filters, membranes, single-use assemblies, WFI/CIP chemicals, gases, QC consumables, cold-chain, inventory and yield-loss replacement materials are itemized. Larger plants still benefit from purchasing power and learning, but high-value media and consumables remain a dominant OPEX driver. Estimated direct cost is $${formatNumber(data.directCost, 0)}/kg.`;
+  els.costNarrative.innerHTML = `
+    <span class="economic-status ${readinessStatusClass(teaReadiness.status)}">${readinessStatusLabel(teaReadiness.status)} · ${teaReadiness.score}% evidence complete</span>
+    <p>${activeTemplate().label} at ${formatNumber(state.batchSize)} L is treated as ${data.scale.profile.label} scale. Materials are modeled as a major bioprocess cost driver: media, feeds/supplements, buffers, resin, filters, membranes, single-use assemblies, WFI/CIP chemicals, gases, QC consumables, cold-chain, inventory and yield-loss replacement materials are itemized. Estimated direct cost is $${formatNumber(data.directCost, 0)}/kg.</p>
+    <div class="economic-readiness-next">
+      <span>Use this result for</span>
+      <strong>${escapeHtml(teaReadiness.usefulNow)}</strong>
+      <span>Still required</span>
+      <strong>${escapeHtml(teaReadiness.missing[0]?.modelTask || "Formal cost review and approval.")}</strong>
+      <button data-jump-view="${escapeAttr(teaReadiness.missing[0]?.view || "recommendations")}" type="button">${escapeHtml(teaReadiness.missing[0]?.action || "Review evidence")}</button>
+    </div>
+  `;
   els.economicDetails.innerHTML = `
     <dt>Product</dt><dd>${activeTemplate().product}</dd>
     <dt>Product per batch</dt><dd>${formatMass(data.productPerBatchKg)}</dd>
@@ -13875,7 +14094,9 @@ function downloadStreamsCsv() {
 }
 
 function handleReportDownload(type) {
-  if (type === "balances-csv") {
+  if (type === "model-readiness-csv") {
+    downloadCsv(`${state.template}-model-readiness.csv`, modelReadinessRows(), "Output-specific model readiness");
+  } else if (type === "balances-csv") {
     downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
   } else if (type === "costs-csv") {
     downloadCsv(`${state.template}-cost-model.csv`, costRows());

@@ -91,3 +91,22 @@ test("flowsheet workbench supports equipment connections and plant boundary stre
   assert.match(styles, /\.boundary-node/);
   assert.match(styles, /\.unit-disconnected/);
 });
+
+test("output-specific readiness is visible in results and exports", async () => {
+  const [app, styles, readinessModule] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../model-readiness.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /assessModelReadiness/);
+  assert.match(app, /modelReadinessAssessment\(\)/);
+  assert.match(app, /model-readiness-csv/);
+  assert.match(app, /outputValidityMarkup\(dynamicReadiness/);
+  assert.match(app, /readinessOutputById\(readiness,\s*"tea"\)/);
+  assert.match(styles, /\.model-readiness-board/);
+  assert.match(styles, /\.readiness-output-grid/);
+  assert.match(styles, /\.result-validity-banner/);
+  assert.match(readinessModule, /Flowsheet \+ mass and energy balances/);
+  assert.match(readinessModule, /Bioreactor CFD \+ transport/);
+});
