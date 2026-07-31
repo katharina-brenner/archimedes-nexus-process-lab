@@ -110,3 +110,23 @@ test("output-specific readiness is visible in results and exports", async () => 
   assert.match(readinessModule, /Flowsheet \+ mass and energy balances/);
   assert.match(readinessModule, /Bioreactor CFD \+ transport/);
 });
+
+test("reports provide a complete detailed engineering handoff", async () => {
+  const [app, styles, exportModule] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../engineering-export.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /data-download-report="complete-package"/);
+  assert.match(app, /data-download-report="engineering-workbook"/);
+  assert.match(app, /function fullProcessCanvasSvg\(/);
+  assert.match(app, /function sensitivityTornadoSvg\(/);
+  assert.match(app, /function engineeringSensitivityRows\(/);
+  assert.match(app, /parameterIntervals/);
+  assert.match(styles, /\.export-command-center/);
+  assert.match(styles, /\.export-canvas-scroll/);
+  assert.match(styles, /\.export-table-scroll/);
+  assert.match(exportModule, /exceljs\/dist\/exceljs\.min\.js/);
+  assert.match(exportModule, /import\("fflate"\)/);
+});

@@ -8,6 +8,7 @@ import {
   retargetStream,
 } from "./flowsheet-connectivity.js";
 import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
+import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -2752,7 +2753,7 @@ function currentModelSummary() {
 
 function exportCurrentModelState() {
   return {
-    appVersion: "model-readiness-v1",
+    appVersion: "engineering-exports-v1",
     projectName: state.projectName,
     template: state.template,
     scale: state.scale,
@@ -6788,14 +6789,17 @@ function renderSourceCards(sources, compact = false) {
   `).join("");
 }
 
-function downloadText(filename, mime, text) {
-  const blob = new Blob([text], { type: mime });
+function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadText(filename, mime, text) {
+  downloadBlob(filename, new Blob([text], { type: mime }));
 }
 
 function csvEscape(value) {
@@ -12508,6 +12512,241 @@ function lcaImpactRows() {
   }));
 }
 
+function engineeringIntervalRows() {
+  const globalRows = [
+    { key: "batchSize", label: "Working volume", unit: "L", min: 10, max: 250000, value: state.batchSize, group: "Global production basis", isGlobal: true },
+    { key: "batchCount", label: operationProfile().countLabel, unit: `${operationProfile().cycleLabel}s/yr`, min: 1, max: 1000, value: state.batchCount, group: "Global production basis", isGlobal: true },
+    { key: "titer", label: "Titer", unit: "g/L", min: 0.01, max: 250, value: state.titer, group: "Global production basis", isGlobal: true },
+    { key: "recovery", label: "Overall recovery", unit: "%", min: 1, max: 99, value: state.recovery, group: "Global production basis", isGlobal: true },
+  ];
+  return [...globalRows, ...processParameters.map((item) => ({ ...item, group: parameterGroup(item) }))].map((item) => {
+    const base = Number(item.isGlobal ? item.value : (state.params[item.key] ?? item.value ?? 0));
+    const range = Math.max(0.000001, Number(item.max) - Number(item.min));
+    const spread = Math.max(Number(item.step || 0) * 5, Math.min(range * 0.16, Math.max(Math.abs(base) * 0.22, range * 0.04)));
+    const low = Math.max(Number(item.min), base - spread);
+    const high = Math.min(Number(item.max), base + spread);
+    return {
+      parameter: item.label,
+      key: item.key,
+      group: item.group || "Project parameter",
+      unit: item.unit || "",
+      hardMinimum: item.min,
+      p10Low: low,
+      baseP50: base,
+      p90High: high,
+      hardMaximum: item.max,
+      intervalType: "Triangular screening interval",
+      distributionMode: base,
+      sourceClass: item.custom ? "User-defined project parameter" : "Axion default requiring project calibration",
+      evidenceNeeded: "Measured batches, supplier data, site records, literature or approved engineering assumption",
+      sensitivityIncluded: ["batchSize", "batchCount", "titer", "recovery", "specificGrowth", "cellDensity", "kla", "harvestRecovery", "chromYield", "mediaCostPerL", "resinCostPerL", "capitalScaleExponent", "annualOperatingTime"].includes(item.key) ? "yes" : "available for extended sweep",
+    };
+  });
+}
+
+function engineeringSensitivityDefinitions() {
+  const parameter = (key, relativeRange = 30) => {
+    const definition = processParameters.find((item) => item.key === key);
+    return {
+      key,
+      label: definition?.label || key,
+      unit: definition?.unit || "",
+      min: definition?.min ?? -Infinity,
+      max: definition?.max ?? Infinity,
+      relativeRange,
+      get: () => Number(state.params[key]),
+      set: (value) => { state.params[key] = value; },
+    };
+  };
+  return [
+    { key: "batchSize", label: "Working volume", unit: "L", min: 10, max: 250000, relativeRange: 30, get: () => Number(state.batchSize), set: (value) => { state.batchSize = value; } },
+    { key: "batchCount", label: operationProfile().countLabel, unit: `${operationProfile().cycleLabel}s/yr`, min: 1, max: 1000, relativeRange: 30, integer: true, get: () => Number(state.batchCount), set: (value) => { state.batchCount = value; } },
+    { key: "titer", label: "Titer", unit: "g/L", min: 0.01, max: 250, relativeRange: 30, get: () => Number(state.titer), set: (value) => { state.titer = value; } },
+    { key: "recovery", label: "Overall recovery", unit: "%", min: 1, max: 99, relativeRange: 25, get: () => Number(state.recovery), set: (value) => { state.recovery = value; } },
+    parameter("specificGrowth", 25),
+    parameter("cellDensity", 30),
+    parameter("kla", 35),
+    parameter("harvestRecovery", 20),
+    parameter("chromYield", 20),
+    parameter("mediaCostPerL", 40),
+    parameter("resinCostPerL", 40),
+    parameter("capitalScaleExponent", 18),
+    parameter("annualOperatingTime", 20),
+  ];
+}
+
+function engineeringSensitivityRows() {
+  const baseline = metrics();
+  const variations = [-30, -20, -10, 0, 10, 20, 30];
+  const rows = [];
+  const definitions = engineeringSensitivityDefinitions();
+  const original = definitions.map((definition) => ({ definition, value: definition.get() }));
+  try {
+    definitions.forEach((definition) => {
+      const base = definition.get();
+      variations.forEach((variationPct) => {
+        const boundedVariation = Math.max(-definition.relativeRange, Math.min(definition.relativeRange, variationPct));
+        let inputValue = base * (1 + boundedVariation / 100);
+        inputValue = Math.max(definition.min, Math.min(definition.max, inputValue));
+        if (definition.integer) inputValue = Math.max(1, Math.round(inputValue));
+        definition.set(inputValue);
+        const scenario = metrics();
+        rows.push({
+          parameter: definition.label,
+          key: definition.key,
+          unit: definition.unit,
+          variationPct: boundedVariation,
+          inputLowBaseHigh: boundedVariation < 0 ? "low" : boundedVariation > 0 ? "high" : "base",
+          inputValue,
+          baseInputValue: base,
+          annualProductKg: scenario.annualKg,
+          annualProductDeltaPct: (scenario.annualKg / Math.max(0.000001, baseline.annualKg) - 1) * 100,
+          directCostUsdKg: scenario.directCost,
+          directCostDeltaPct: (scenario.directCost / Math.max(0.000001, baseline.directCost) - 1) * 100,
+          utilitiesMwhYr: scenario.utilities,
+          utilitiesDeltaPct: (scenario.utilities / Math.max(0.000001, baseline.utilities) - 1) * 100,
+          utilizationPct: scenario.utilization,
+          utilizationDeltaPoints: scenario.utilization - baseline.utilization,
+          batchDurationH: scenario.batchDuration,
+          productPerCycleKg: scenario.productPerBatchKg,
+          effectiveTiterGL: scenario.effectiveTiter,
+          processYieldPct: scenario.processYield * 100,
+          interpretation: "One-at-a-time local sensitivity; all other model inputs remain at the active base case.",
+          validationNeed: "Replace the screening interval with a project-specific distribution before investment or scale-up decisions.",
+        });
+      });
+      definition.set(base);
+    });
+  } finally {
+    original.forEach(({ definition, value }) => definition.set(value));
+    massBalanceCache = { key: "", value: null };
+  }
+  return rows;
+}
+
+function sensitivityDriverRows(rows = engineeringSensitivityRows(), metric = "directCostDeltaPct") {
+  const groups = new Map();
+  rows.forEach((row) => {
+    if (!groups.has(row.key)) groups.set(row.key, []);
+    groups.get(row.key).push(row);
+  });
+  return [...groups.entries()].map(([key, items]) => {
+    const low = items.filter((item) => item.variationPct < 0).sort((a, b) => Math.abs(a.variationPct + 20) - Math.abs(b.variationPct + 20))[0];
+    const high = items.filter((item) => item.variationPct > 0).sort((a, b) => Math.abs(a.variationPct - 20) - Math.abs(b.variationPct - 20))[0];
+    const base = items.find((item) => item.variationPct === 0) || items[0];
+    return {
+      parameter: base.parameter,
+      key,
+      unit: base.unit,
+      baseInputValue: base.baseInputValue,
+      lowVariationPct: low?.variationPct ?? -20,
+      lowImpactPct: Number(low?.[metric] || 0),
+      highVariationPct: high?.variationPct ?? 20,
+      highImpactPct: Number(high?.[metric] || 0),
+      absoluteImpactPct: Math.max(Math.abs(Number(low?.[metric] || 0)), Math.abs(Number(high?.[metric] || 0))),
+      responseMetric: metric,
+      rankingBasis: "Maximum absolute output response at approximately +/-20% input variation",
+    };
+  }).sort((a, b) => b.absoluteImpactPct - a.absoluteImpactPct);
+}
+
+function workbookReadmeRows(report) {
+  const readiness = report.modelReadiness;
+  return [
+    { section: "Package", item: "Product", value: "Axion Process OS", status: "generated", interpretation: "Complete engineering handoff workbook" },
+    { section: "Package", item: "Scenario", value: `${activeTemplate().label} · ${state.scale} · ${operationProfile().label}`, status: "active", interpretation: activeTemplate().product },
+    { section: "Package", item: "Generated", value: exportDateIso(), status: "timestamp", interpretation: `Generated by ${accountName()}` },
+    { section: "Model validity", item: "Overall readiness", value: `${readiness.score}%`, status: readiness.status, interpretation: readiness.statement },
+    { section: "Model validity", item: "Decision-ready outputs", value: readiness.readyOutputs.length, status: "count", interpretation: readiness.readyOutputs.map((item) => item.title).join(" | ") || "None" },
+    { section: "Model validity", item: "Screening outputs", value: readiness.screeningOutputs.length, status: "count", interpretation: readiness.screeningOutputs.map((item) => item.title).join(" | ") || "None" },
+    { section: "Model validity", item: "Blocked outputs", value: readiness.blockedOutputs.length, status: "count", interpretation: readiness.blockedOutputs.map((item) => item.title).join(" | ") || "None" },
+    { section: "Use", item: "Excel filters", value: "Enabled on every sheet", status: "ready", interpretation: "Freeze panes, sort, filter and pivot the detailed records" },
+    { section: "Use", item: "Intervals", value: "P10 / base P50 / P90", status: "screening", interpretation: "Replace with approved project distributions" },
+    { section: "Use", item: "Sensitivity", value: "One-at-a-time 7-point sweep", status: "screening", interpretation: "Use for driver ranking; use Monte Carlo or Sobol analysis for global uncertainty" },
+    { section: "Use", item: "Process canvas", value: `${state.units.length} equipment · ${state.streams.length} streams`, status: "included", interpretation: "Full editable model JSON and high-resolution SVG are included in the ZIP package" },
+    { section: "Caution", item: "Engineering basis", value: "Not automatically validated", status: "review required", interpretation: "Supplier, site, experimental and regulatory evidence remains necessary" },
+  ];
+}
+
+function equipmentExportRows() {
+  const modelMap = new Map(unitMechanisticModels().map((row) => [row.tag, row]));
+  return state.units.map((item) => {
+    const connections = connectionStateForUnit(state.streams, item.id);
+    const model = modelMap.get(item.id) || {};
+    return {
+      tag: item.id,
+      operationName: item.name,
+      isoName: item.isoName,
+      equipmentClass: item.cls,
+      equipmentType: item.type,
+      processLayer: unitLayer(item),
+      sizeBasis: unitSize(item),
+      residenceTimeH: item.residence,
+      estimatedPower: unitPower(item),
+      xCanvas: item.x,
+      yCanvas: item.y,
+      incomingStreams: connections.incoming.map((row) => row.id).join(" | "),
+      outgoingStreams: connections.outgoing.map((row) => row.id).join(" | "),
+      connectionStatus: connections.complete ? "complete" : connections.isolated ? "isolated" : "open port",
+      modelType: model.modelType || "",
+      modelConfidencePct: model.confidence || "",
+      modelSeverity: model.severity || "",
+      standards: (item.standards || []).join(" | "),
+      status: item.status,
+    };
+  });
+}
+
+function engineeringExportPackageData() {
+  const report = comprehensiveReport();
+  const sensitivity = report.sensitivityAnalysis;
+  const intervals = report.parameterIntervals;
+  const driverRows = report.sensitivityDrivers;
+  const summary = metrics();
+  const tables = [
+    { sheet: "00 Read me", file: "00-read-me.csv", description: "Package scope, model validity and use instructions", rows: workbookReadmeRows(report) },
+    { sheet: "01 Model summary", file: "01-model-summary.csv", description: "Active production scenario and headline results", rows: Object.entries({ template: activeTemplate().label, product: activeTemplate().product, scale: state.scale, operationMode: operationProfile().label, workingVolumeL: state.batchSize, requestedCyclesYr: state.batchCount, titerGL: state.titer, recoveryPct: state.recovery, annualProductKg: summary.annualKg, directCostUsdKg: summary.directCost, utilitiesMwhYr: summary.utilities, utilizationPct: summary.utilization, equipmentCount: state.units.length, streamCount: state.streams.length }).map(([metric, value]) => ({ metric, value })) },
+    { sheet: "02 Readiness", file: "02-output-readiness.csv", description: "Output-specific evidence gates and missing modelling tasks", rows: report.modelReadinessRows },
+    { sheet: "03 Sensitivity sweep", file: "03-sensitivity-sweep.csv", description: "Seven-point one-at-a-time sensitivity results", rows: sensitivity },
+    { sheet: "04 Driver ranking", file: "04-sensitivity-driver-ranking.csv", description: "Ranked direct-cost sensitivity drivers", rows: driverRows },
+    { sheet: "05 Parameter intervals", file: "05-parameter-intervals.csv", description: "Low, base and high input intervals", rows: intervals },
+    { sheet: "06 Parameters", file: "06-all-parameters.csv", description: "Complete active parameter register", rows: processParameters.map((item) => ({ group: parameterGroup(item), key: item.key, label: item.label, value: state.params[item.key], unit: item.unit, minimum: item.min, maximum: item.max, step: item.step, custom: item.custom ? "yes" : "no" })) },
+    { sheet: "07 Equipment", file: "07-equipment-register.csv", description: "Detailed equipment register with connections and model confidence", rows: equipmentExportRows() },
+    { sheet: "08 Streams", file: "08-stream-register.csv", description: "All plant inlet, outlet and internal process streams", rows: report.streams },
+    { sheet: "09 Unit balances", file: "09-unit-mass-energy-balances.csv", description: "Component, mass and energy balances by unit", rows: report.balances },
+    { sheet: "10 TEA detail", file: "10-tea-cost-detail.csv", description: "Detailed cost model with uncertainty intervals", rows: report.tea },
+    { sheet: "11 LCA inventory", file: "11-lca-inventory.csv", description: "Detailed plant-gate LCA inventory", rows: report.lcaInventory },
+    { sheet: "12 LCA impacts", file: "12-lca-impact-screening.csv", description: "Impact and physical-flow screening indicators", rows: report.lcaImpacts },
+    { sheet: "13 Dynamic ODE", file: "13-dynamic-ode-profile.csv", description: "Time-resolved dynamic bioprocess states", rows: dynamicProfileRows() },
+    { sheet: "14 PDE transport", file: "14-pde-transport-field.csv", description: "Distributed axial oxygen and nutrient fields", rows: report.axialTransportPde },
+    { sheet: "15 Schedule operations", file: "15-schedule-operations.csv", description: "Full finite-capacity operation schedule", rows: report.schedule.operations },
+    { sheet: "16 Gantt tasks", file: "16-gantt-tasks.csv", description: "Schedule handoff tasks", rows: scheduleGanttRows(report.schedule) },
+    { sheet: "17 Schedule resources", file: "17-schedule-resources.csv", description: "Equipment, room, operator, cleaning and QC occupancy", rows: report.schedule.resourceRows },
+    { sheet: "18 Utility demand", file: "18-scheduled-utility-demand.csv", description: "Utility demand by schedule bucket", rows: report.scheduleUtilityDemand },
+    { sheet: "19 Editable recipe", file: "19-editable-recipe.csv", description: "Unit procedure timing and route assumptions", rows: report.recipe },
+    { sheet: "20 Physical boundaries", file: "20-physical-chemical-boundaries.csv", description: "Operating limits, actions and validation gaps", rows: report.physicalBoundaries },
+    { sheet: "21 CFD field", file: "21-cfd-field.csv", description: "Transient CFD screening field cells", rows: report.cfdField },
+    { sheet: "22 CFD time series", file: "22-cfd-time-series.csv", description: "Bioreactor CFD screening time series", rows: report.cfdTimeSeries },
+    { sheet: "23 CFD geometry", file: "23-cfd-geometry.csv", description: "Reactor geometry and internals", rows: report.cfdGeometry },
+    { sheet: "24 CFD boundary cond", file: "24-cfd-boundary-conditions.csv", description: "Solver boundary conditions and source terms", rows: report.cfdBoundaryConditions },
+    { sheet: "25 Equations", file: "25-equation-library.csv", description: "Chemical, kinetic, balance and economic equations", rows: report.equations },
+    { sheet: "26 Unit equations", file: "26-unit-equations.csv", description: "Equation packages mapped to equipment", rows: report.unitEquations.flatMap((item) => item.equations.map((equation, index) => ({
+      tag: item.tag,
+      operation: item.name,
+      equationIndex: index + 1,
+      equationTitle: equation.title || `Equation ${index + 1}`,
+      formula: equation.formula || "",
+      note: equation.note || "",
+    }))) },
+    { sheet: "27 Scientific sources", file: "27-scientific-sources.csv", description: "Source and standards register", rows: report.sources },
+    { sheet: "28 Company datasets", file: "28-company-datasets.csv", description: "Uploaded plant-data registry", rows: report.companyDatasets },
+    { sheet: "29 Route optimizer", file: "29-route-optimizer.csv", description: "Alternative route ranking", rows: report.routeOptimization },
+    { sheet: "30 Factory states", file: "30-equipment-state-machines.csv", description: "Reusable equipment states and transitions", rows: report.equipmentStateMachines },
+    { sheet: "31 Project versions", file: "31-project-versions.csv", description: "Saved versions and branches", rows: (state.projectVersions || []).map((item) => ({ ...item, snapshot: item.snapshot ? JSON.stringify(item.snapshot) : "" })) },
+  ];
+  return { report, sensitivity, intervals, driverRows, tables };
+}
+
 function svgEscape(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -12630,6 +12869,159 @@ function processOverviewSvg() {
 </svg>`.trim();
 }
 
+function sensitivityTornadoSvg(rows = engineeringSensitivityRows()) {
+  const drivers = sensitivityDriverRows(rows).slice(0, 12);
+  const width = 1600;
+  const rowHeight = 58;
+  const height = 230 + drivers.length * rowHeight;
+  const center = 930;
+  const chartHalf = 480;
+  const maxImpact = Math.max(1, ...drivers.flatMap((row) => [Math.abs(row.lowImpactPct), Math.abs(row.highImpactPct)]));
+  const xFor = (value) => center + (Number(value) / maxImpact) * chartHalf;
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#071326"/>
+  <rect x="34" y="34" width="${width - 68}" height="${height - 68}" rx="30" fill="#0c1c34" stroke="#28435f"/>
+  <text x="74" y="94" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="760">Direct-cost sensitivity</text>
+  <text x="74" y="132" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">${svgEscape(activeTemplate().label)} · one-at-a-time response around the active base case · ranked by absolute impact</text>
+  <line x1="${center}" y1="164" x2="${center}" y2="${height - 76}" stroke="#8ba9a4" stroke-width="2"/>
+  <text x="${center - chartHalf}" y="174" fill="#8fa1b8" font-family="Inter, Arial, sans-serif" font-size="13">-${formatNumber(maxImpact, 1)}%</text>
+  <text x="${center}" y="174" text-anchor="middle" fill="#c7d3df" font-family="Inter, Arial, sans-serif" font-size="13">0%</text>
+  <text x="${center + chartHalf}" y="174" text-anchor="end" fill="#8fa1b8" font-family="Inter, Arial, sans-serif" font-size="13">+${formatNumber(maxImpact, 1)}%</text>
+  ${drivers.map((row, index) => {
+    const y = 198 + index * rowHeight;
+    const lowX = xFor(row.lowImpactPct);
+    const highX = xFor(row.highImpactPct);
+    const lowLeft = Math.min(center, lowX);
+    const highLeft = Math.min(center, highX);
+    return `
+      <text x="76" y="${y + 27}" fill="#edf4f7" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">${svgEscape(row.parameter)}</text>
+      <text x="420" y="${y + 27}" fill="#8498aa" font-family="Inter, Arial, sans-serif" font-size="12">base ${svgEscape(formatNumber(row.baseInputValue, 3))} ${svgEscape(row.unit)}</text>
+      <rect x="${lowLeft}" y="${y + 5}" width="${Math.max(2, Math.abs(lowX - center))}" height="18" rx="9" fill="#527383"/>
+      <rect x="${highLeft}" y="${y + 27}" width="${Math.max(2, Math.abs(highX - center))}" height="18" rx="9" fill="#54b7a7"/>
+      <text x="${lowX + (row.lowImpactPct < 0 ? -8 : 8)}" y="${y + 19}" text-anchor="${row.lowImpactPct < 0 ? "end" : "start"}" fill="#d5e1e7" font-family="Inter, Arial, sans-serif" font-size="11">${formatNumber(row.lowImpactPct, 1)}%</text>
+      <text x="${highX + (row.highImpactPct < 0 ? -8 : 8)}" y="${y + 42}" text-anchor="${row.highImpactPct < 0 ? "end" : "start"}" fill="#d5e1e7" font-family="Inter, Arial, sans-serif" font-size="11">${formatNumber(row.highImpactPct, 1)}%</text>
+    `;
+  }).join("")}
+  <text x="74" y="${height - 52}" fill="#7f91a5" font-family="Inter, Arial, sans-serif" font-size="13">Blue-grey = lower input · green = higher input. Download the workbook for all seven points, output metrics and intervals.</text>
+</svg>`.trim();
+}
+
+function teaIntervalSvg() {
+  const rows = costRows()
+    .filter((row) => row.unit === "USD/yr" && !String(row.aggregationRole || "").startsWith("material component"))
+    .slice(0, 10);
+  const width = 1600;
+  const rowHeight = 66;
+  const height = 230 + rows.length * rowHeight;
+  const axisStart = 560;
+  const axisWidth = 900;
+  const max = Math.max(1, ...rows.map((row) => Number(row.highEstimateUsdPerYr || row.annualValueUsd || 0)));
+  const xFor = (value) => axisStart + Number(value || 0) / max * axisWidth;
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#071326"/>
+  <rect x="34" y="34" width="${width - 68}" height="${height - 68}" rx="30" fill="#0c1c34" stroke="#28435f"/>
+  <text x="74" y="94" fill="#f4f7fb" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="760">TEA value intervals</text>
+  <text x="74" y="132" fill="#aebbd0" font-family="Inter, Arial, sans-serif" font-size="17">Low, active base and high annual cost ranges · replace screening bands with quote-backed distributions</text>
+  ${rows.map((row, index) => {
+    const y = 190 + index * rowHeight;
+    const low = Number(row.lowEstimateUsdPerYr || row.annualValueUsd || 0);
+    const base = Number(row.annualValueUsd || 0);
+    const high = Number(row.highEstimateUsdPerYr || row.annualValueUsd || 0);
+    return `
+      <text x="76" y="${y + 11}" fill="#edf4f7" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">${svgEscape(row.item)}</text>
+      <text x="76" y="${y + 34}" fill="#8295a8" font-family="Inter, Arial, sans-serif" font-size="12">${svgEscape(row.category)} · ${svgEscape(row.confidence)}</text>
+      <line x1="${xFor(low)}" y1="${y + 10}" x2="${xFor(high)}" y2="${y + 10}" stroke="#66888c" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="${xFor(base)}" cy="${y + 10}" r="10" fill="#66c7b8" stroke="#eaf7f4" stroke-width="3"/>
+      <text x="${axisStart}" y="${y + 38}" fill="#8194a7" font-family="Inter, Arial, sans-serif" font-size="11">$${formatNumber(low / 1000000, 2)}M</text>
+      <text x="${xFor(base)}" y="${y + 38}" text-anchor="middle" fill="#dce8ed" font-family="Inter, Arial, sans-serif" font-size="11">$${formatNumber(base / 1000000, 2)}M base</text>
+      <text x="${axisStart + axisWidth}" y="${y + 38}" text-anchor="end" fill="#8194a7" font-family="Inter, Arial, sans-serif" font-size="11">$${formatNumber(high / 1000000, 2)}M</text>
+    `;
+  }).join("")}
+  <text x="74" y="${height - 52}" fill="#7f91a5" font-family="Inter, Arial, sans-serif" font-size="13">Screening interval: -28% / +38% unless project evidence overrides the item-level assumption.</text>
+</svg>`.trim();
+}
+
+function fullProcessCanvasSvg() {
+  const units = state.units;
+  const minX = Math.min(0, ...units.map((item) => item.x)) - 170;
+  const minY = Math.min(0, ...units.map((item) => item.y)) - 40;
+  const maxX = Math.max(1200, ...units.map((item) => item.x + unitWidth(item))) + 180;
+  const maxY = Math.max(620, ...units.map((item) => item.y + unitHeight(item))) + 100;
+  const width = maxX - minX;
+  const stageOffsetY = 150 - minY;
+  const height = maxY - minY + 180;
+  const offsetX = -minX;
+  const streamColors = { main: "#52b7a6", utility: "#65889a", cleaning: "#4b756f", recycle: "#9aa86e", heat: "#b59861", waste: "#7c8990", qc: "#75849b" };
+  const unitMap = new Map(units.map((item) => [item.id, item]));
+  const streamMarkup = state.streams.map((item, index) => {
+    const from = unitMap.get(item.from);
+    const to = unitMap.get(item.to);
+    const kind = streamKind(item, from, to);
+    const color = streamColors[kind] || streamColors.main;
+    if (!from && to) {
+      const tx = to.x + offsetX;
+      const ty = to.y + unitHeight(to) / 2 + stageOffsetY;
+      const sx = Math.max(38, tx - 138);
+      return `<path d="M${sx} ${ty} H${tx}" fill="none" stroke="${color}" stroke-width="5" marker-end="url(#flow-arrow)"/><text x="${sx}" y="${ty - 10}" fill="#9eb0bf" font-family="Inter, Arial, sans-serif" font-size="10">${svgEscape(item.id)} · IN</text>`;
+    }
+    if (from && !to) {
+      const sx = from.x + unitWidth(from) + offsetX;
+      const sy = from.y + unitHeight(from) / 2 + stageOffsetY;
+      const tx = Math.min(width - 38, sx + 138);
+      return `<path d="M${sx} ${sy} H${tx}" fill="none" stroke="${color}" stroke-width="5" marker-end="url(#flow-arrow)"/><text x="${sx + 18}" y="${sy - 10}" fill="#9eb0bf" font-family="Inter, Arial, sans-serif" font-size="10">${svgEscape(item.id)} · OUT</text>`;
+    }
+    if (!from || !to) return "";
+    const sx = from.x + unitWidth(from) + offsetX;
+    const sy = from.y + unitHeight(from) / 2 + stageOffsetY;
+    const tx = to.x + offsetX;
+    const ty = to.y + unitHeight(to) / 2 + stageOffsetY;
+    const reverse = tx < sx + 36;
+    const busY = Math.max(sy, ty) + 34 + (index % 5) * 12;
+    const midX = sx + (tx - sx) / 2;
+    const path = reverse
+      ? `M${sx} ${sy} H${sx + 26} V${busY} H${tx - 26} V${ty} H${tx}`
+      : `M${sx} ${sy} H${midX} V${ty} H${tx}`;
+    const labelX = reverse ? (sx + tx) / 2 : midX;
+    const labelY = reverse ? busY - 7 : Math.min(sy, ty) + Math.abs(ty - sy) / 2 - 7;
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#flow-arrow)"/><text x="${labelX}" y="${labelY}" text-anchor="middle" fill="#a9bac7" font-family="Inter, Arial, sans-serif" font-size="9">${svgEscape(item.id)} · ${svgEscape(item.composition)}</text>`;
+  }).join("");
+  const unitMarkup = units.map((item) => {
+    const x = item.x + offsetX;
+    const y = item.y + stageOffsetY;
+    const w = unitWidth(item);
+    const h = unitHeight(item);
+    const connections = connectionStateForUnit(state.streams, item.id);
+    const layer = unitLayer(item);
+    return `
+      <g>
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" fill="#f7faf9" stroke="${connections.complete ? item.color : "#899aa0"}" stroke-width="${connections.complete ? 3 : 2}"/>
+        <rect x="${x}" y="${y}" width="12" height="${h}" rx="6" fill="${item.color}"/>
+        <rect x="${x + 24}" y="${y + 20}" width="48" height="48" rx="12" fill="${item.color}" opacity="0.92"/>
+        <text x="${x + 48}" y="${y + 50}" text-anchor="middle" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800">${svgEscape(item.icon)}</text>
+        <text x="${x + 86}" y="${y + 30}" fill="#10242b" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800">${svgEscape(item.id)}</text>
+        <text x="${x + 86}" y="${y + 51}" fill="#314950" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="650">${svgEscape(item.name)}</text>
+        <text x="${x + 86}" y="${y + 69}" fill="#718186" font-family="Inter, Arial, sans-serif" font-size="9">${svgEscape(layer)} · ${connections.incoming.length} in / ${connections.outgoing.length} out</text>
+      </g>`;
+  }).join("");
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#dce6e5" stroke-width="1"/></pattern>
+    <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#79948f"/></marker>
+  </defs>
+  <rect width="${width}" height="${height}" fill="#eef3f2"/>
+  <rect y="128" width="${width}" height="${height - 128}" fill="url(#grid)"/>
+  <rect width="${width}" height="128" fill="#102c3a"/>
+  <text x="48" y="52" fill="#9bc9bf" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="800">AXION PROCESS OS · COMPLETE EDITABLE PROCESS CANVAS</text>
+  <text x="48" y="91" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="780">${svgEscape(activeTemplate().label)} · ${svgEscape(operationProfile().label)} · ${formatNumber(state.batchSize)} L</text>
+  <text x="${width - 48}" y="72" text-anchor="end" fill="#c5d4d7" font-family="Inter, Arial, sans-serif" font-size="13">${units.length} equipment · ${state.streams.length} streams · ${svgEscape(exportDateIso())}</text>
+  ${streamMarkup}
+  ${unitMarkup}
+</svg>`.trim();
+}
+
 function scheduleGanttSvg() {
   const schedule = campaignSchedule();
   const rows = scheduleGanttRows(schedule).filter((row) => row.batchId === "B01").slice(0, 28);
@@ -12702,10 +13094,66 @@ function downloadJson(filename, payload, kind = "JSON export") {
   }, null, 2));
 }
 
+function exportFilenameBase() {
+  return `${state.template}-${state.scale}-${state.operationMode}`.replace(/[^a-z0-9_-]+/gi, "-").toLowerCase();
+}
+
+async function downloadEngineeringWorkbook() {
+  showToast("Building detailed Excel workbook...");
+  const packageData = engineeringExportPackageData();
+  const bytes = await buildEngineeringWorkbook(packageData.tables, exportMetadata("Complete engineering workbook"));
+  downloadBlob(`${exportFilenameBase()}-complete-engineering-workbook.xlsx`, new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }));
+  showToast(`${packageData.tables.length}-sheet workbook downloaded`);
+}
+
+async function downloadCompleteEngineeringPackage() {
+  showToast("Building complete engineering package...");
+  const packageData = engineeringExportPackageData();
+  const metadata = exportMetadata("Complete engineering package");
+  const workbook = await buildEngineeringWorkbook(packageData.tables, metadata);
+  const base = exportFilenameBase();
+  const manifest = {
+    metadata,
+    packageVersion: "engineering-handoff-v1",
+    workbookSheets: packageData.tables.length,
+    csvTables: packageData.tables.map((table) => ({ file: table.file, sheet: table.sheet, description: table.description, rows: table.rows.length })),
+    visualizations: ["full process canvas", "process architecture", "sensitivity tornado", "TEA intervals", "TEA stack", "LCA flow", "LCA impacts", "campaign Gantt", "factory layout"],
+    modelFiles: ["editable-model.json", "complete-report.json"],
+    readiness: packageData.report.modelReadiness,
+  };
+  const files = [
+    { path: `${base}-complete-engineering-workbook.xlsx`, data: workbook },
+    { path: "README.txt", data: `AXION PROCESS OS - COMPLETE ENGINEERING PACKAGE\n\nScenario: ${metadata.scenario}\nGenerated: ${metadata.exportDate}\n\nCONTENTS\n- One formatted Excel workbook with ${packageData.tables.length} filterable worksheets\n- ${packageData.tables.length} individual CSV tables\n- Full process canvas and engineering visualizations as scalable SVG\n- Editable model state and complete report as JSON\n- Low/base/high intervals and seven-point one-at-a-time sensitivity analysis\n\nIMPORTANT\nThis package exposes the current model basis and missing evidence. Screening results require project-specific validation before regulated, investment, scale-up or equipment-design decisions.\n` },
+    { path: "manifest.json", data: JSON.stringify(manifest, null, 2) },
+    { path: "model/editable-model.json", data: JSON.stringify({ metadata, model: exportCurrentModelState() }, null, 2) },
+    { path: "model/complete-report.json", data: JSON.stringify({ metadata, ...packageData.report }, null, 2) },
+    { path: "flowsheets/full-process-canvas.svg", data: brandSvg(fullProcessCanvasSvg()) },
+    { path: "flowsheets/process-architecture.svg", data: brandSvg(processOverviewSvg()) },
+    { path: "visualizations/sensitivity-tornado.svg", data: brandSvg(sensitivityTornadoSvg(packageData.sensitivity)) },
+    { path: "visualizations/tea-value-intervals.svg", data: brandSvg(teaIntervalSvg()) },
+    { path: "visualizations/tea-cost-stack.svg", data: brandSvg(teaCostSvg()) },
+    { path: "visualizations/lca-flow-map.svg", data: brandSvg(lcaFlowSvg()) },
+    { path: "visualizations/lca-impact-bars.svg", data: brandSvg(lcaImpactSvg()) },
+    { path: "visualizations/finite-capacity-schedule.svg", data: brandSvg(scheduleGanttSvg()) },
+    { path: "visualizations/factory-layout.svg", data: brandSvg(plantSimulationSvg()) },
+    ...packageData.tables.map((table) => ({
+      path: `csv/${table.file}`,
+      data: buildCsvText(withExportMetadata(table.rows, table.description)),
+    })),
+  ];
+  const zip = await buildEngineeringZip(files);
+  downloadBlob(`${base}-complete-engineering-package.zip`, new Blob([zip], { type: "application/zip" }));
+  showToast(`${files.length} detailed files downloaded together`);
+}
+
 function comprehensiveReport() {
   const solved = solveMassBalance();
   const plantSim = plantSimulationModel();
   const schedule = campaignSchedule();
+  const sensitivityAnalysis = engineeringSensitivityRows();
+  const parameterIntervals = engineeringIntervalRows();
   return {
     template: state.template,
     product: activeTemplate().product,
@@ -12761,6 +13209,9 @@ function comprehensiveReport() {
     tea: teaRows(),
     lcaInventory: lcaInventoryRows(),
     lcaImpacts: lcaImpactRows(),
+    parameterIntervals,
+    sensitivityAnalysis,
+    sensitivityDrivers: sensitivityDriverRows(sensitivityAnalysis),
     equations,
     unitEquations: state.units.map((item) => ({ tag: item.id, name: item.name, equations: unitReactions(item) })),
     cfd: cfdReport().map((item) => ({ ...item, cells: item.cells.map((cell) => ({ xIndex: cell.xIndex, yIndex: cell.yIndex, oxygen: cell.oxygen, nutrient: cell.nutrient, velocity: cell.velocity, shear: cell.shear, risk: cell.risk })) })),
@@ -12800,18 +13251,81 @@ function comprehensiveReport() {
 
 function renderReportsBoard() {
   const report = comprehensiveReport();
+  const sensitivity = report.sensitivityAnalysis;
+  const sensitivityDrivers = report.sensitivityDrivers;
+  const intervals = report.parameterIntervals;
+  const detailedRowCount = [
+    report.balances,
+    report.streams,
+    report.tea,
+    report.lcaInventory,
+    report.dynamicProfile.points,
+    report.axialTransportPde,
+    report.schedule.operations,
+    report.schedule.resourceRows,
+    report.cfdField,
+    report.cfdTimeSeries,
+    sensitivity,
+    intervals,
+  ].reduce((sum, rows) => sum + (rows?.length || 0), 0);
   els.reportsBoard.innerHTML = `
     <section class="reports-hero">
       <div>
         <p>Engineering evidence package</p>
-        <h3>Review-ready balances, economics, boundaries, CFD fields, schedules, and source records</h3>
-        <span>Export structured CSV and SVG packages for MSAT review, conceptual design, TEA/LCA handoff, model governance, thesis appendices, and external specialist modelling. Each file states its screening basis so assumptions are not confused with validated plant data.</span>
+        <h3>Full-size graphs, complete tables, intervals, sensitivity and the entire process model</h3>
+        <span>Download one professional workbook or the complete ZIP handoff. The package contains every detailed table, the editable model, full process canvas, engineering diagrams and explicit validity limits.</span>
       </div>
-      <button class="action-button primary" data-jump-view="cfd" type="button">Open CFD workbench</button>
+      <button class="action-button primary" data-download-report="complete-package" type="button">Download complete package</button>
     </section>
     ${modelReadinessSummaryMarkup(report.modelReadiness, { compact: true })}
+    <section class="export-command-center" aria-label="Complete engineering export">
+      <div class="export-command-copy">
+        <span>One-click engineering handoff</span>
+        <h3>Everything, in full detail</h3>
+        <p>The ZIP combines a formatted Excel workbook, all individual CSV tables, full-resolution SVG graphs, the complete flowsheet canvas, editable model JSON, complete report JSON and a machine-readable manifest.</p>
+        <div class="export-command-actions">
+          <button class="primary" data-download-report="complete-package" type="button">Download all as ZIP</button>
+          <button data-download-report="engineering-workbook" type="button">Excel workbook</button>
+          <button data-download-report="full-canvas-svg" type="button">Full canvas SVG</button>
+          <button data-download-report="sensitivity-csv" type="button">Sensitivity CSV</button>
+        </div>
+      </div>
+      <div class="export-package-stats">
+        <article><strong>32</strong><span>Excel sheets</span><small>Filterable, frozen headers, formatted intervals</small></article>
+        <article><strong>${formatNumber(detailedRowCount, 0)}</strong><span>Detailed rows</span><small>Balances, streams, ODE/PDE, schedule, CFD, TEA and LCA</small></article>
+        <article><strong>${sensitivity.length}</strong><span>Sensitivity runs</span><small>${sensitivityDrivers.length} parameters · seven points each</small></article>
+        <article><strong>9</strong><span>Large SVGs</span><small>Canvas, economics, LCA, sensitivity, schedule and factory</small></article>
+      </div>
+    </section>
+    <section class="export-visual-gallery" aria-label="Large downloadable engineering visualizations">
+      <article class="export-visual-card export-canvas-card">
+        <header><div><span>Complete process flow</span><h3>Full editable canvas · ${state.units.length} equipment · ${state.streams.length} streams</h3><p>Every process, utility, cleaning, recycle, waste, quality and plant-boundary connection is rendered at full engineering scale. Scroll the preview or download the vector file without loss of detail.</p></div><button data-download-report="full-canvas-svg" type="button">Download full SVG</button></header>
+        <div class="export-canvas-scroll">${fullProcessCanvasSvg()}</div>
+      </article>
+      <article class="export-visual-card">
+        <header><div><span>Sensitivity analysis</span><h3>Which assumptions actually move direct cost?</h3><p>Ranked one-at-a-time response around the active base case. The workbook contains all ${sensitivity.length} runs and every calculated output.</p></div><button data-download-report="sensitivity-svg" type="button">Download graph</button></header>
+        <div class="export-graph-frame">${sensitivityTornadoSvg(sensitivity)}</div>
+      </article>
+      <article class="export-visual-card">
+        <header><div><span>Value intervals</span><h3>Low · base · high TEA ranges</h3><p>Annual cost intervals remain visible instead of being hidden behind one point estimate. Replace screening ranges with quotes and approved project distributions.</p></div><button data-download-report="tea-intervals-svg" type="button">Download graph</button></header>
+        <div class="export-graph-frame">${teaIntervalSvg()}</div>
+      </article>
+    </section>
+    <section class="export-table-preview">
+      <header>
+        <div><span>Ranked sensitivity table</span><h3>Top direct-cost drivers</h3><p>The Excel export includes seven points per parameter plus annual product, utilities, utilization, cycle output, effective titer and process yield.</p></div>
+        <button data-download-report="engineering-workbook" type="button">Open in Excel</button>
+      </header>
+      <div class="export-table-scroll"><table><thead><tr><th>Rank</th><th>Parameter</th><th>Base input</th><th>Lower-case impact</th><th>Higher-case impact</th><th>Maximum effect</th></tr></thead><tbody>
+        ${sensitivityDrivers.slice(0, 12).map((row, index) => `<tr><td>${index + 1}</td><td><strong>${escapeHtml(row.parameter)}</strong></td><td>${formatNumber(row.baseInputValue, 3)} ${escapeHtml(row.unit)}</td><td>${formatNumber(row.lowImpactPct, 2)}%</td><td>${formatNumber(row.highImpactPct, 2)}%</td><td>${formatNumber(row.absoluteImpactPct, 2)}%</td></tr>`).join("")}
+      </tbody></table></div>
+    </section>
     <section class="reports-grid">
       <article class="report-readiness-card"><span>Output readiness register</span><strong>${report.modelReadiness.score}%</strong><p>${report.modelReadiness.missing.length} explicit evidence or modelling gaps across balances, dynamics, scheduling, TEA, LCA, CFD and GMP. Every row states what the current result is useful for and what must still be modelled.</p><button data-download-report="model-readiness-csv" type="button">Download readiness CSV</button><button data-jump-view="recommendations" type="button">Open roadmap</button></article>
+      <article><span>Complete engineering workbook</span><strong>32 sheets</strong><p>Long Excel tables for model summary, readiness, intervals, sensitivity, equipment, streams, balances, TEA, LCA, ODE/PDE, scheduling, CFD, equations, sources and versions.</p><button data-download-report="engineering-workbook" type="button">Download XLSX</button></article>
+      <article><span>Parameter intervals</span><strong>${intervals.length}</strong><p>Every global, biochemical, scale-up and economic input with hard limits plus low P10, active base P50 and high P90 screening values.</p><button data-download-report="parameter-intervals-csv" type="button">Intervals CSV</button><button data-download-report="tea-intervals-svg" type="button">TEA interval graph</button></article>
+      <article><span>Sensitivity analysis</span><strong>${sensitivity.length} runs</strong><p>Seven-point one-at-a-time sweeps across ${sensitivityDrivers.length} key drivers, with calculated effects on cost, throughput, utilities, utilization, duration, titer and yield.</p><button data-download-report="sensitivity-csv" type="button">All runs CSV</button><button data-download-report="sensitivity-svg" type="button">Tornado SVG</button></article>
+      <article><span>Complete process canvas</span><strong>${state.units.length} / ${state.streams.length}</strong><p>All equipment and all internal, inlet, outlet, utility, cleaning, recycle, waste and quality streams as one full-resolution vector flowsheet.</p><button data-download-report="full-canvas-svg" type="button">Download full SVG</button><button data-download-report="comprehensive-json" type="button">Model JSON</button></article>
       <article><span>Mass + energy balances</span><strong>${formatNumber(report.solver.totals.closurePct, 2)}%</strong><p>${report.balances.length} unit balances with component inputs/outputs, generation, loss, closure, heat duty, power, and linked equations.</p><button data-download-report="balances-csv" type="button">Download CSV</button></article>
       <article><span>Costs</span><strong>${report.costs.length}</strong><p>CAPEX, facility burden, raw and auxiliary materials, media, labor, QA/QC, utilities, waste, and direct cost with scale-dependent cost pressure.</p><button data-download-report="costs-csv" type="button">Download CSV</button></article>
       <article><span>TEA-ready export</span><strong>${report.tea.length}</strong><p>Cost model with annual value, per-kg product values, scenario basis, uncertainty range, scale exponent, utilization, and physical utility drivers.</p><button data-download-report="tea-csv" type="button">Download CSV</button><button data-download-report="tea-cost-svg" type="button">Cost SVG</button></article>
@@ -14093,8 +14607,25 @@ function downloadStreamsCsv() {
   showToast("Stream CSV downloaded");
 }
 
-function handleReportDownload(type) {
-  if (type === "model-readiness-csv") {
+async function handleReportDownload(type) {
+  const longExport = type === "complete-package" || type === "engineering-workbook";
+  if (type === "complete-package") {
+    await downloadCompleteEngineeringPackage();
+  } else if (type === "engineering-workbook") {
+    await downloadEngineeringWorkbook();
+  } else if (type === "full-canvas-svg") {
+    downloadSvg(`${exportFilenameBase()}-full-process-canvas.svg`, fullProcessCanvasSvg());
+  } else if (type === "sensitivity-csv") {
+    downloadCsv(`${exportFilenameBase()}-sensitivity-analysis.csv`, engineeringSensitivityRows(), "Seven-point one-at-a-time sensitivity analysis");
+  } else if (type === "parameter-intervals-csv") {
+    downloadCsv(`${exportFilenameBase()}-parameter-intervals.csv`, engineeringIntervalRows(), "Low, base and high parameter intervals");
+  } else if (type === "sensitivity-svg") {
+    downloadSvg(`${exportFilenameBase()}-sensitivity-tornado.svg`, sensitivityTornadoSvg());
+  } else if (type === "tea-intervals-svg") {
+    downloadSvg(`${exportFilenameBase()}-tea-value-intervals.svg`, teaIntervalSvg());
+  } else if (type === "comprehensive-json") {
+    downloadJson(`${exportFilenameBase()}-complete-process-model.json`, { report: comprehensiveReport(), editableModel: exportCurrentModelState() }, "Complete process model");
+  } else if (type === "model-readiness-csv") {
     downloadCsv(`${state.template}-model-readiness.csv`, modelReadinessRows(), "Output-specific model readiness");
   } else if (type === "balances-csv") {
     downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
@@ -14315,7 +14846,14 @@ function handleReportDownload(type) {
       note: "Original Axion generated example library. This package is not copied from third-party simulator example files.",
     }, "Original example library");
   }
-  showToast("Download prepared");
+  if (!longExport) showToast("Download prepared");
+}
+
+function requestReportDownload(type) {
+  void handleReportDownload(type).catch((error) => {
+    console.error("Report download failed", error);
+    showToast(error?.message || "The detailed export could not be created");
+  });
 }
 
 function showToast(message) {
@@ -17557,7 +18095,7 @@ function bindEvents() {
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
       event.stopPropagation();
-      handleReportDownload(downloadButton.dataset.downloadReport);
+      requestReportDownload(downloadButton.dataset.downloadReport);
       return;
     }
     const datasetCard = event.target.closest("[data-dataset-card]");
@@ -17878,7 +18416,7 @@ function bindEvents() {
   els.simulationBoard.addEventListener("click", (event) => {
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
-      handleReportDownload(downloadButton.dataset.downloadReport);
+      requestReportDownload(downloadButton.dataset.downloadReport);
       return;
     }
     const factoryTimeButton = event.target.closest("[data-factory-time]");
@@ -17988,7 +18526,7 @@ function bindEvents() {
     }
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
-      handleReportDownload(downloadButton.dataset.downloadReport);
+      requestReportDownload(downloadButton.dataset.downloadReport);
       return;
     }
     const jumpButton = event.target.closest("[data-jump-view]");
@@ -18062,7 +18600,7 @@ function bindEvents() {
       return;
     }
     const button = event.target.closest("[data-download-report]");
-    if (button) handleReportDownload(button.dataset.downloadReport);
+    if (button) requestReportDownload(button.dataset.downloadReport);
   });
 }
 
