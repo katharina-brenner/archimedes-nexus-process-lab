@@ -37,6 +37,7 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
   const workbookParts = Object.keys(unzipSync(workbook));
   assert.equal(workbookParts.some((path) => path.startsWith("xl/comments")), false);
   assert.equal(workbookParts.some((path) => path.includes("vmlDrawing")), false);
+  assert.equal(workbookParts.includes("xl/worksheets/_rels/sheet1.xml.rels"), false);
 
   const parsed = new ExcelJS.Workbook();
   await parsed.xlsx.load(Buffer.from(workbook));
@@ -69,7 +70,8 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
 
   const index = parsed.getWorksheet("Workbook index");
   assert.equal(index.getCell("E6").value, 140);
-  assert.match(index.getCell("H6").value.hyperlink, /Sensitivity sweep/);
+  assert.match(index.getCell("H6").formula, /HYPERLINK\("#'Sensitivity sweep'!A1"/);
+  assert.equal(index.getCell("H6").result, "Open Sensitivity sweep");
 });
 
 test("complete export ZIP keeps workbook, canvas and detailed tables together", async () => {

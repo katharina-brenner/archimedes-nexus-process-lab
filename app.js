@@ -8,7 +8,7 @@ import {
   retargetStream,
 } from "./flowsheet-connectivity.js";
 import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
-import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v3";
+import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v4";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },

@@ -137,6 +137,12 @@ function statusColors(value) {
   return null;
 }
 
+function internalSheetLinkFormula(sheetName, label) {
+  const escapedSheet = String(sheetName || "Sheet").replaceAll("'", "''");
+  const escapedLabel = String(label || sheetName || "Open sheet").replaceAll('"', '""');
+  return `HYPERLINK("#'${escapedSheet}'!A1","${escapedLabel}")`;
+}
+
 function styleStructuredSheet(worksheet, table, rows, headers, metadata) {
   const lastColumn = Math.max(1, headers.length);
   worksheet.mergeCells(1, 1, 1, lastColumn);
@@ -292,7 +298,10 @@ export async function buildEngineeringWorkbook(tables, metadata = {}) {
   });
   indexRows.forEach((row, index) => {
     const cell = indexSheet.getCell(index + 6, 8);
-    cell.value = { text: row.navigation, hyperlink: `#'${String(row.worksheet).replaceAll("'", "''")}'!A1` };
+    cell.value = {
+      formula: internalSheetLinkFormula(row.worksheet, row.navigation),
+      result: row.navigation,
+    };
     cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FF176B64" }, underline: true };
   });
   qaRows.forEach((row, index) => {
