@@ -15516,6 +15516,167 @@ body.locked .help-dock {
   }
 }
 
+/* Compact scenario controls with full-width, responsive slider travel. */
+.sidebar .global-parameters-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-color: rgba(121, 169, 160, 0.28);
+  border-radius: 22px;
+  background: linear-gradient(155deg, rgba(20, 47, 58, 0.96), rgba(10, 31, 42, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.global-parameters-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.global-parameters-head > div {
+  min-width: 0;
+}
+
+.global-parameters-head span {
+  display: block;
+  margin-bottom: 3px;
+  color: #8faea9;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar .global-parameters-head h2 {
+  margin: 0;
+  color: #f4f8f7;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.global-parameters-head button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border: 1px solid rgba(170, 204, 198, 0.28);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #dbe9e6;
+  background: rgba(255, 255, 255, 0.055);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.global-parameters-head button:hover,
+.global-parameters-head button:focus-visible {
+  border-color: rgba(126, 205, 189, 0.66);
+  color: #fff;
+  background: rgba(88, 159, 146, 0.18);
+  outline: none;
+}
+
+.global-parameters-note {
+  margin: 0;
+  color: #9db1bd;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.global-parameters-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar .global-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label value"
+    "slider slider"
+    "limits limits";
+  gap: 5px 10px;
+  min-width: 0;
+  padding: 10px 11px 8px;
+  border: 1px solid rgba(156, 187, 181, 0.16);
+  border-radius: 15px;
+  color: #d8e5e3;
+  background: rgba(255, 255, 255, 0.045);
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.sidebar .global-parameter-row:hover,
+.sidebar .global-parameter-row:focus-within {
+  border-color: rgba(102, 191, 173, 0.5);
+  background: rgba(76, 139, 128, 0.12);
+}
+
+.global-parameter-row > span {
+  grid-area: label;
+  min-width: 0;
+  overflow: hidden;
+  color: #dce7e5;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-parameter-row output {
+  grid-area: value;
+  min-width: 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 850;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sidebar .global-parameter-row input[type="range"] {
+  grid-area: slider;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  margin: 0;
+  accent-color: #68c8b4;
+  cursor: grab;
+}
+
+.sidebar .global-parameter-row input[type="range"]:active {
+  cursor: grabbing;
+}
+
+.sidebar .global-parameter-row input[type="range"]:focus-visible {
+  outline: 2px solid rgba(111, 211, 190, 0.72);
+  outline-offset: 2px;
+}
+
+.global-parameter-row > small {
+  grid-area: limits;
+  display: flex;
+  justify-content: space-between;
+  color: #78929d;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.global-parameters-panel.is-adjusting .global-parameters-head::after {
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #68c8b4;
+  box-shadow: 0 0 0 5px rgba(104, 200, 180, 0.12);
+  content: "";
+}
+
+.global-parameters-panel.is-adjusting .global-parameters-head button {
+  display: none;
+}
+
 /* 2026-08-01 qualified-demand resource center. */
 #publicResources.public-resources {
   width: min(1240px, calc(100% - 48px)) !important;

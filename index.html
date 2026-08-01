@@ -20,7 +20,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="alternate" type="application/rss+xml" title="Axion Engineering Brief" href="https://ax-i-on.com/feed.xml" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260801-growth-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-global-parameters-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1790,28 +1790,41 @@
           <div id="scaleList" class="segmented"></div>
         </section>
 
-        <section class="control-group">
-          <h2>Global Parameters</h2>
-          <label class="slider-row">
-            <span id="batchSizeLabel">Working volume</span>
-            <input id="batchSize" type="range" min="50" max="200000" step="50" value="4000" />
-            <b id="batchSizeValue">4,000 L</b>
-          </label>
-          <label class="slider-row">
-            <span id="batchCountLabel">Annual batches</span>
-            <input id="batchCount" type="range" min="5" max="330" step="5" value="120" />
-            <b id="batchCountValue">120</b>
-          </label>
-          <label class="slider-row">
-            <span>Titer</span>
-            <input id="titer" type="range" min="0.2" max="80" step="0.1" value="12" />
-            <b id="titerValue">12 g/L</b>
-          </label>
-          <label class="slider-row">
-            <span>Recovery</span>
-            <input id="recovery" type="range" min="20" max="98" step="1" value="72" />
-            <b id="recoveryValue">72%</b>
-          </label>
+        <section class="control-group global-parameters-panel">
+          <header class="global-parameters-head">
+            <div>
+              <span>Scenario basis</span>
+              <h2>Global parameters</h2>
+            </div>
+            <button id="resetGlobalParameters" type="button" title="Reset global parameters to the selected scale">Reset</button>
+          </header>
+          <p class="global-parameters-note">Drag a control to preview the impact. Release it to recalculate the full model.</p>
+          <div class="global-parameters-list">
+            <label class="slider-row global-parameter-row" data-tooltip="Liquid working volume used for throughput, equipment sizing, balances, utilities, scheduling, and economics.">
+              <span id="batchSizeLabel">Working volume</span>
+              <output id="batchSizeValue" for="batchSize">4,000 L</output>
+              <input id="batchSize" type="range" min="50" max="200000" step="50" value="4000" aria-label="Working volume in litres" />
+              <small><span>50 L</span><span>200,000 L</span></small>
+            </label>
+            <label class="slider-row global-parameter-row" data-tooltip="Requested production cycles per year before scheduling, cleaning, maintenance, and bottleneck constraints are applied.">
+              <span id="batchCountLabel">Annual batches</span>
+              <output id="batchCountValue" for="batchCount">120</output>
+              <input id="batchCount" type="range" min="5" max="330" step="5" value="120" aria-label="Requested annual production cycles" />
+              <small><span>5</span><span>330</span></small>
+            </label>
+            <label class="slider-row global-parameter-row" data-tooltip="Product concentration at harvest. This changes annual output, downstream loading, material demand, and direct cost.">
+              <span>Titer</span>
+              <output id="titerValue" for="titer">12 g/L</output>
+              <input id="titer" type="range" min="0.2" max="80" step="0.1" value="12" aria-label="Product titer in grams per litre" />
+              <small><span>0.2 g/L</span><span>80 g/L</span></small>
+            </label>
+            <label class="slider-row global-parameter-row" data-tooltip="Overall recoverable product fraction before detailed unit-operation yields are applied.">
+              <span>Recovery</span>
+              <output id="recoveryValue" for="recovery">72%</output>
+              <input id="recovery" type="range" min="20" max="98" step="1" value="72" aria-label="Overall recovery percentage" />
+              <small><span>20%</span><span>98%</span></small>
+            </label>
+          </div>
         </section>
 
         <section class="control-group parameter-panel">
@@ -2091,6 +2104,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260801-growth-v2"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260801-global-parameters-v1"></script>
   </body>
 </html>

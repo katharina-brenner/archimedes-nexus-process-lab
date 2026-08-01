@@ -40,7 +40,7 @@ const publicTargetPaths = {
 let workspacePromise;
 
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260801-growth-v1");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260801-global-parameters-v1");
   return workspacePromise;
 }
 

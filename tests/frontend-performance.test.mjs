@@ -23,6 +23,23 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.match(indexHtml, /id="checkoutPlan"/);
 });
 
+test("global parameters use full-width responsive controls and defer expensive recalculation", async () => {
+  const [app, indexHtml, styles] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(indexHtml, /class="control-group global-parameters-panel"/);
+  assert.match(indexHtml, /Release it to recalculate the full model/);
+  assert.match(indexHtml, /id="resetGlobalParameters"/);
+  assert.match(styles, /\.sidebar \.global-parameter-row input\[type="range"\][\s\S]+width:\s*100%/);
+  assert.match(styles, /grid-template-areas:[\s\S]+"slider slider"/);
+  assert.match(app, /function previewGlobalParameterChange\(\)/);
+  assert.match(app, /recalculationTimer = window\.setTimeout/);
+  assert.match(app, /input\.addEventListener\("change", commitGlobalParameterChange\)/);
+});
+
 test("production assets use durable caching without caching HTML", async () => {
   const server = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
 

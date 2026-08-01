@@ -2163,6 +2163,8 @@ const els = {
   batchDurationLabel: document.querySelector("#batchDurationLabel"),
   titerValue: document.querySelector("#titerValue"),
   recoveryValue: document.querySelector("#recoveryValue"),
+  globalParametersPanel: document.querySelector(".global-parameters-panel"),
+  resetGlobalParameters: document.querySelector("#resetGlobalParameters"),
   annualProduct: document.querySelector("#annualProduct"),
   pageTitle: document.querySelector("#pageTitle"),
   startBoard: document.querySelector("#startBoard"),
@@ -7038,6 +7040,59 @@ function syncInputs() {
     const input = document.querySelector(`[data-parameter="${item.key}"]`);
     if (input) input.value = state.params[item.key];
   });
+}
+
+function readGlobalParameterInputs() {
+  state.batchSize = Number(els.batchSize.value);
+  state.batchCount = Number(els.batchCount.value);
+  state.titer = Number(els.titer.value);
+  state.recovery = Number(els.recovery.value);
+}
+
+function renderGlobalParameterModelViews() {
+  renderStartBoard();
+  renderOverview();
+  renderCanvas();
+  renderTables();
+  renderSimulationBoard();
+  renderCfdBoard();
+  renderAiBoard();
+  renderRecommendations();
+  renderTwinWorkspace();
+  renderEconomics();
+  renderReportsBoard();
+}
+
+function previewGlobalParameterChange() {
+  readGlobalParameterInputs();
+  renderMetrics();
+  window.clearTimeout(els.globalParametersPanel?.recalculationTimer);
+  if (els.globalParametersPanel) {
+    els.globalParametersPanel.classList.add("is-adjusting");
+    els.globalParametersPanel.recalculationTimer = window.setTimeout(() => {
+      els.globalParametersPanel.classList.remove("is-adjusting");
+      renderGlobalParameterModelViews();
+    }, 180);
+  }
+}
+
+function commitGlobalParameterChange() {
+  readGlobalParameterInputs();
+  window.clearTimeout(els.globalParametersPanel?.recalculationTimer);
+  els.globalParametersPanel?.classList.remove("is-adjusting");
+  renderMetrics();
+  renderGlobalParameterModelViews();
+}
+
+function resetGlobalParameters() {
+  const preset = scalePresets[state.scale] || scalePresets.pilot;
+  state.batchSize = preset.batchSize;
+  state.batchCount = preset.batchCount;
+  state.titer = preset.titer;
+  state.recovery = preset.recovery;
+  syncInputs();
+  renderAll();
+  showToast(`Global parameters reset to ${preset.label} scale`);
 }
 
 function renderTemplateList() {
@@ -19071,22 +19126,10 @@ function bindEvents() {
   });
 
   [els.batchSize, els.batchCount, els.titer, els.recovery].forEach((input) => {
-    input.addEventListener("input", () => {
-      state.batchSize = Number(els.batchSize.value);
-      state.batchCount = Number(els.batchCount.value);
-      state.titer = Number(els.titer.value);
-      state.recovery = Number(els.recovery.value);
-      renderMetrics();
-      renderOverview();
-      renderCanvas();
-      renderTables();
-      renderEconomics();
-      renderCfdBoard();
-      renderAiBoard();
-      renderRecommendations();
-      renderReportsBoard();
-    });
+    input.addEventListener("input", previewGlobalParameterChange);
+    input.addEventListener("change", commitGlobalParameterChange);
   });
+  els.resetGlobalParameters?.addEventListener("click", resetGlobalParameters);
 
   els.parameterList.addEventListener("input", (event) => {
     const input = event.target.closest("[data-parameter], [data-parameter-number]");
