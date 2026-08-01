@@ -18,8 +18,9 @@
     <meta property="og:url" content="https://ax-i-on.com/" />
     <meta property="og:image" content="https://ax-i-on.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="alternate" type="application/rss+xml" title="Axion Engineering Brief" href="https://ax-i-on.com/feed.xml" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260801-seo-export-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-growth-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -99,6 +100,7 @@
             <a href="./product" data-public-target="publicPlatform">Product</a>
             <a href="./workflow" data-public-target="publicWorkflow">How it works</a>
             <a href="./solutions" data-public-target="publicEcosystem">Solutions</a>
+            <a href="./resources" data-public-target="publicResources">Resources</a>
             <a href="./pricing" data-public-target="publicPricing">Pricing</a>
             <a href="./pilot" data-public-target="publicPilot">Request pilot</a>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
@@ -264,6 +266,7 @@
                 <div>
                   <a href="./security" data-public-target="publicReadiness">Security</a>
                   <a href="./superpro-designer-alternative" data-public-target="publicComparison">SuperPro alternative</a>
+                  <a href="./resources" data-public-target="publicResources">Resources</a>
                   <a href="./legal#privacy" data-public-target="publicLegal">Privacy</a>
                   <a href="./legal#terms" data-public-target="publicLegal">Terms</a>
                   <a href="./legal#impressum" data-public-target="publicLegal">Impressum</a>
@@ -1389,6 +1392,111 @@
             <p class="comparison-source">Source basis for competitor facts: <a href="https://www.intelligen.com/products/superpro-overview/" target="_blank" rel="noopener noreferrer">official SuperPro Designer overview</a> and <a href="https://www.intelligen.com/products/superpro-product-features/" target="_blank" rel="noopener noreferrer">official feature documentation</a>, reviewed August 2026.</p>
           </section>
 
+          <section id="publicResources" class="public-section public-resources public-page" data-public-page="resources">
+            <div class="resource-hero">
+              <div>
+                <p>Engineering resources</p>
+                <h1>Build a process model that can survive technical review.</h1>
+                <span>Practical templates and focused guides for process development, MSAT, plant engineering, scheduling, TEA, and LCA teams. No registration is required for the downloads.</span>
+                <div class="resource-hero-actions">
+                  <a class="public-primary" href="./resources/bioprocess-model-readiness-checklist.csv" download>Download readiness checklist</a>
+                  <button class="public-secondary" type="button" data-public-target="publicPilot">Evaluate a real process</button>
+                </div>
+              </div>
+              <figure>
+                <img src="./assets/product/axion-plant-overview.png" alt="Axion plant overview showing model readiness, equipment, streams and physical boundaries" width="1280" height="720" loading="eager" />
+                <figcaption>Turn missing inputs into an explicit engineering worklist before the next design review.</figcaption>
+              </figure>
+            </div>
+
+            <div class="resource-downloads" aria-label="Free bioprocess engineering templates">
+              <article>
+                <span>01 · Model readiness</span>
+                <h2>Bioprocess model readiness checklist</h2>
+                <p>Check the minimum evidence behind balances, kinetics, equipment sizing, cleaning, scheduling, utilities, TEA, LCA, controls, and model validation.</p>
+                <a href="./resources/bioprocess-model-readiness-checklist.csv" download>Download CSV</a>
+              </article>
+              <article>
+                <span>02 · Data ingestion</span>
+                <h2>Production data request template</h2>
+                <p>Structure historian tags, batch records, laboratory results, equipment data, material costs, utility meters, and source ownership before import.</p>
+                <a href="./resources/process-model-data-request-template.csv" download>Download CSV</a>
+              </article>
+              <article>
+                <span>03 · Technical pilot</span>
+                <h2>Acceptance criteria template</h2>
+                <p>Define balance closure, schedule fidelity, equipment duty, sensitivity, economics, sustainability, traceability, and export requirements before a pilot starts.</p>
+                <a href="./resources/technical-pilot-acceptance-criteria.csv" download>Download CSV</a>
+              </article>
+            </div>
+
+            <section class="resource-guides" aria-label="Bioprocess engineering software guides">
+              <header>
+                <p>High-intent technical guides</p>
+                <h2>Choose the engineering question you need to answer.</h2>
+              </header>
+              <div>
+                <article id="simulation-software">
+                  <span>Bioprocess simulation</span>
+                  <h3>From flowsheet to dynamic operating envelope</h3>
+                  <p>Connect component balances, reactions, ODE/PDE kinetics, batch and perfusion modes, equipment duties, physical limits, and uncertainty in one reviewable model.</p>
+                  <ul><li>Use for scale-up, route comparison, and process characterization.</li><li>Validate against measured kinetics, mass closure, and an approved reference case.</li></ul>
+                  <button type="button" data-public-target="publicPlatform">See the modelling workspace</button>
+                </article>
+                <article id="scheduling-software">
+                  <span>Biomanufacturing scheduling</span>
+                  <h3>Model the complete facility, not one isolated batch</h3>
+                  <p>Schedule shared reactors, chromatography skids, hold vessels, utilities, rooms, operators, CIP/SIP, maintenance, release, and campaign changeovers.</p>
+                  <ul><li>Use for capacity planning, facility fit, and debottlenecking.</li><li>Review occupancy, wait states, WIP, and achievable annual throughput.</li></ul>
+                  <button type="button" data-public-target="publicWorkflow">See the workflow</button>
+                </article>
+                <article id="tea-lca-software">
+                  <span>TEA + LCA</span>
+                  <h3>Make the economic and environmental basis auditable</h3>
+                  <p>Trace media, buffers, consumables, labor, utilities, waste, equipment, facility, yield, titer, and utilization through intervals and sensitivity results.</p>
+                  <ul><li>Use for investment, process selection, and sustainability review.</li><li>Export long-form datasets for analysts instead of relying on dashboard totals.</li></ul>
+                  <button type="button" data-public-detail="reports">See decision outputs</button>
+                </article>
+              </div>
+            </section>
+
+            <section class="resource-use-cases" aria-label="Industrial bioprocess use cases">
+              <figure>
+                <img src="./assets/photography/industrial-bioprocess-hall.jpg" alt="Large industrial bioprocess facility with stainless-steel vessels, piping and production skids" width="2200" height="1467" loading="lazy" />
+                <figcaption>Industrial-scale bioprocess modelling connects biology, equipment, facility operations, and economics.</figcaption>
+              </figure>
+              <div>
+                <p>Use-case library</p>
+                <h2>Start from a real production decision.</h2>
+                <article><b>mAb and biopharma</b><span>Fed-batch versus perfusion, shared downstream capacity, resin cycles, buffer demand, viral safety, COGS, and facility fit.</span></article>
+                <article><b>Precision fermentation</b><span>Oxygen transfer, feed strategy, broth rheology, heat removal, recovery route, drying, utilities, and scale-out.</span></article>
+                <article><b>Cultivated products</b><span>Media burden, seed train, working volume, metabolite limits, harvest, recycle, food-grade facility design, TEA, and LCA.</span></article>
+                <article><b>CDMO and engineering</b><span>Customer-specific variants, equipment reuse, campaign scheduling, quotations, assumptions, branches, and review-ready exports.</span></article>
+              </div>
+            </section>
+
+            <section class="resource-brief" aria-label="Axion engineering brief signup">
+              <div>
+                <p>Axion Engineering Brief</p>
+                <h2>One useful technical note, not a generic newsletter.</h2>
+                <span>Receive new model templates, validation checklists, engineering guides, and release notes. You can request removal at any time through the privacy contact.</span>
+              </div>
+              <form id="publicBriefSignupForm" class="brief-signup-form">
+                <label><span>Work email</span><input id="publicBriefEmail" name="email" type="email" autocomplete="email" required placeholder="name@company.com" /></label>
+                <label><span>Role</span><select id="publicBriefRole" name="role"><option value="">Select role</option><option>Process development / R&amp;D</option><option>MSAT / manufacturing</option><option>Plant / project engineering</option><option>TEA / LCA / strategy</option><option>Academic research</option><option>Other</option></select></label>
+                <label class="brief-honeypot" aria-hidden="true"><span>Website</span><input id="publicBriefWebsite" name="website" tabindex="-1" autocomplete="off" /></label>
+                <label class="brief-consent"><input id="publicBriefConsent" name="consent" type="checkbox" required /><span>I agree to receive the Axion Engineering Brief and accept the privacy notice.</span></label>
+                <button class="public-primary" type="submit">Join the engineering brief</button>
+                <div id="publicBriefResult" class="brief-result" aria-live="polite"></div>
+              </form>
+            </section>
+
+            <footer class="resource-footer">
+              <div><strong>Need a model, not another template?</strong><span>Use one customer-owned process and agreed acceptance criteria for a focused technical evaluation.</span></div>
+              <button class="public-primary" type="button" data-public-target="publicPilot">Request a technical pilot</button>
+            </footer>
+          </section>
+
           <section id="publicPilot" class="public-section public-pilot public-page" data-public-page="pilot">
             <div class="pilot-intro">
               <div>
@@ -1983,6 +2091,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260801-seo-export-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260801-growth-v1"></script>
   </body>
 </html>

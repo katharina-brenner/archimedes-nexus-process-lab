@@ -181,6 +181,21 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(health.payload.ok, true);
     assert.equal(health.payload.storage, "local-json");
 
+    const resourceDownload = await fetch(`${server.baseUrl}/resources/bioprocess-model-readiness-checklist.csv`);
+    assert.equal(resourceDownload.status, 200);
+    assert.match(resourceDownload.headers.get("content-type") || "", /^text\/csv/);
+    assert.match(await resourceDownload.text(), /Mass balance/);
+
+    const resourceLanding = await fetch(`${server.baseUrl}/resources`);
+    assert.equal(resourceLanding.status, 200);
+    assert.match(resourceLanding.headers.get("content-type") || "", /^text\/html/);
+    assert.match(await resourceLanding.text(), /Build a process model that can survive technical review/);
+
+    const sitemap = await fetch(`${server.baseUrl}/sitemap.xml`);
+    assert.equal(sitemap.status, 200);
+    assert.match(sitemap.headers.get("content-type") || "", /^application\/xml/);
+    assert.match(await sitemap.text(), /bioprocess-simulation-software/);
+
     const readiness = await jsonFetch(server.baseUrl, "/api/production-readiness");
     assert.equal(readiness.response.status, 200);
     assert.ok(Array.isArray(readiness.payload.checks));
@@ -220,6 +235,20 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     assert.equal(pilotLead.payload.accepted, true);
     assert.match(pilotLead.payload.reference, /^PILOT-/);
 
+    const engineeringBrief = await jsonFetch(server.baseUrl, "/api/leads/engineering-brief", {
+      method: "POST",
+      body: {
+        email: "engineer@example.com",
+        role: "MSAT / manufacturing",
+        consent: true,
+        source: "backend-test",
+        campaign: "resource-center",
+      },
+    });
+    assert.equal(engineeringBrief.response.status, 201);
+    assert.equal(engineeringBrief.payload.accepted, true);
+    assert.match(engineeringBrief.payload.reference, /^BRIEF-/);
+
     const login = await jsonFetch(server.baseUrl, "/api/auth/login", {
       method: "POST",
       body: { user: "owner", password: "owner-test-password" },
@@ -230,8 +259,9 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
 
     const leads = await jsonFetch(server.baseUrl, "/api/admin/leads", { token });
     assert.equal(leads.response.status, 200);
-    assert.equal(leads.payload.count, 1);
-    assert.equal(leads.payload.leads[0].company, "Example Biotech");
+    assert.equal(leads.payload.count, 2);
+    assert.ok(leads.payload.leads.some((lead) => lead.company === "Example Biotech"));
+    assert.ok(leads.payload.leads.some((lead) => lead.kind === "engineering-brief" && lead.email === "engineer@example.com"));
     assert.equal("requestFingerprint" in leads.payload.leads[0], false);
 
     const billingPortal = await jsonFetch(server.baseUrl, "/api/billing/portal", {

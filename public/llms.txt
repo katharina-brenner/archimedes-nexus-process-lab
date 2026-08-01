@@ -1,0 +1,38 @@
+# Axion Process OS
+
+> Axion Process OS is a browser-based bioprocess engineering workspace for process development, MSAT, manufacturing, plant engineering, TEA, and LCA teams.
+
+Canonical website: https://ax-i-on.com/
+
+## Primary pages
+
+- Product: https://ax-i-on.com/product
+- Workflow: https://ax-i-on.com/workflow
+- Solutions: https://ax-i-on.com/solutions
+- Engineering resources: https://ax-i-on.com/resources
+- Independent SuperPro Designer comparison: https://ax-i-on.com/superpro-designer-alternative
+- Security and production architecture: https://ax-i-on.com/security
+- Pricing: https://ax-i-on.com/pricing
+- Technical pilot: https://ax-i-on.com/pilot
+
+## What the product connects
+
+- Editable process flowsheets, equipment, material streams, utilities, cleaning, recycle, and heat reuse
+- Component mass balances, energy balances, reactions, ODE/PDE dynamics, and process constraints
+- Batch, fed-batch, perfusion, and continuous production modes
+- Finite-capacity scheduling for equipment, rooms, operators, utilities, CIP/SIP, maintenance, and campaigns
+- Bioreactor CFD engineering screening with explicit boundary conditions and a path to external validated CFD workers
+- TEA, LCA, parameter intervals, sensitivity analysis, and detailed engineering exports
+- Project collaboration, branches, versions, data ingestion, API connectors, and model readiness review
+
+## Intended users
+
+Process development, MSAT, manufacturing engineering, plant and project engineering, CDMOs, process consultancies, TEA and LCA analysts, industrial biotechnology, biopharma, precision fermentation, cultivated-product, enzyme, and food-biotech teams.
+
+## Important limitations
+
+Axion supports engineering design and screening. Users must validate models, source data, equipment assumptions, safety, GMP, regulatory, and investment decisions with qualified experts and authorized data. Browser CFD screening must not be represented as a validated full 3D CFD study unless an external solver workflow and experimental validation have been completed.
+
+## Content and comparison policy
+
+Axion uses original implementations, public scientific knowledge, and data customers are authorized to use. It does not copy proprietary manuals, restricted model libraries, or proprietary simulator files. Competitor comparisons are independent and should use current official public documentation.

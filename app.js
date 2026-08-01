@@ -2220,6 +2220,12 @@ const els = {
   pilotWebsite: document.querySelector("#pilotWebsite"),
   pilotConsent: document.querySelector("#pilotConsent"),
   pilotResult: document.querySelector("#pilotResult"),
+  publicBriefSignupForm: document.querySelector("#publicBriefSignupForm"),
+  publicBriefEmail: document.querySelector("#publicBriefEmail"),
+  publicBriefRole: document.querySelector("#publicBriefRole"),
+  publicBriefWebsite: document.querySelector("#publicBriefWebsite"),
+  publicBriefConsent: document.querySelector("#publicBriefConsent"),
+  publicBriefResult: document.querySelector("#publicBriefResult"),
   loginUser: document.querySelector("#loginUser"),
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
@@ -16032,11 +16038,42 @@ async function submitPilotRequest() {
   }
 }
 
+async function submitEngineeringBriefSignup() {
+  if (!els.publicBriefSignupForm || !els.publicBriefResult) return;
+  const submitButton = els.publicBriefSignupForm.querySelector('button[type="submit"]');
+  const body = {
+    email: els.publicBriefEmail?.value.trim() || "",
+    role: els.publicBriefRole?.value.trim() || "",
+    website: els.publicBriefWebsite?.value || "",
+    consent: Boolean(els.publicBriefConsent?.checked),
+    source: params.get("utm_source") || document.referrer || "website",
+    campaign: params.get("utm_campaign") || "engineering-brief",
+    landingPage: window.location.href,
+  };
+  submitButton.disabled = true;
+  submitButton.textContent = "Joining...";
+  els.publicBriefResult.className = "brief-result is-pending";
+  els.publicBriefResult.textContent = "Saving your subscription securely.";
+  try {
+    const payload = await apiRequest("/api/leads/engineering-brief", { method: "POST", body: JSON.stringify(body) });
+    els.publicBriefResult.className = "brief-result is-success";
+    els.publicBriefResult.innerHTML = `<strong>You're on the list.</strong><span>Reference ${escapeHtml(payload.reference || "created")}. The first brief will use this address only for Axion engineering updates.</span>`;
+    els.publicBriefSignupForm.reset();
+  } catch (error) {
+    els.publicBriefResult.className = "brief-result is-error";
+    els.publicBriefResult.textContent = error.message || "The signup could not be saved. Please try again.";
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Join the engineering brief";
+  }
+}
+
 const publicPageTargets = {
   publicHome: "home",
   publicPlatform: "platform",
   publicWorkflow: "workflow",
   publicEcosystem: "ecosystem",
+  publicResources: "resources",
   publicReadiness: "readiness",
   publicReviews: "reviews",
   publicComparison: "compare",
@@ -16402,6 +16439,10 @@ const publicPageMeta = {
     title: "Bioprocess Engineering Solutions by Role & Industry | Axion",
     description: "Explore Axion solutions for process development, MSAT, plant engineering, TEA/LCA, biopharma, CDMOs, fermentation, food biotech and industrial manufacturing.",
   },
+  resources: {
+    title: "Free Bioprocess Engineering Templates & Guides | Axion",
+    description: "Download practical bioprocess model-readiness, production-data and technical-pilot templates, with guides for simulation, scheduling, TEA and LCA.",
+  },
   compare: {
     title: "SuperPro Designer Alternative for Bioprocess Engineering | Axion",
     description: "Compare Axion Process OS with SuperPro Designer for browser collaboration, flowsheets, scheduling, APIs, TEA/LCA, versioning and engineering decision workflows.",
@@ -16433,6 +16474,7 @@ const publicPagePaths = {
   platform: "/product",
   workflow: "/workflow",
   ecosystem: "/solutions",
+  resources: "/resources",
   compare: "/superpro-designer-alternative",
   readiness: "/security",
   pricing: "/pricing",
@@ -16446,6 +16488,7 @@ function publicPageFromLocation() {
   if (requested && publicPageMeta[requested]) return requested;
   const route = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (["solutions", "industries"].includes(route)) return "ecosystem";
+  if (["guides", "bioprocess-model-readiness", "bioprocess-simulation-software", "biomanufacturing-scheduling-software", "bioprocess-tea-lca-software"].includes(route)) return "resources";
   if (["compare", "superpro-designer-alternative"].includes(route)) return "compare";
   return Object.entries(publicPagePaths).find(([, path]) => path.replace(/^\/+|\/+$/g, "") === route)?.[0] || "home";
 }
@@ -16501,7 +16544,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", solutions: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", solutions: "publicEcosystem", industries: "publicEcosystem", resources: "publicResources", guides: "publicResources", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;
@@ -18293,6 +18336,11 @@ function bindAuth() {
   els.pilotForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     submitPilotRequest();
+  });
+
+  els.publicBriefSignupForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitEngineeringBriefSignup();
   });
 
   els.checkoutPlan?.addEventListener("change", () => {

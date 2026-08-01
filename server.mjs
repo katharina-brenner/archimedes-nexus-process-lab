@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
@@ -170,6 +170,9 @@ const staticTypes = new Map([
   [".css", "text/css; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
+  [".csv", "text/csv; charset=utf-8"],
+  [".txt", "text/plain; charset=utf-8"],
+  [".xml", "application/xml; charset=utf-8"],
   [".svg", "image/svg+xml"],
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
@@ -193,6 +196,36 @@ const seoRouteMeta = Object.freeze({
   "/solutions": {
     title: "Bioprocess Engineering Solutions by Role & Industry | Axion",
     description: "Explore Axion solutions for process development, MSAT, plant engineering, TEA/LCA, biopharma, CDMOs, fermentation, food biotech and industrial manufacturing.",
+  },
+  "/resources": {
+    title: "Free Bioprocess Engineering Templates & Guides | Axion",
+    description: "Download practical bioprocess model-readiness, production-data and technical-pilot templates, with guides for simulation, scheduling, TEA and LCA.",
+    faq: [
+      {
+        question: "What data is needed for a useful bioprocess model?",
+        answer: "A useful model needs a defined product and process basis, component flows, operating mode, measured or sourced kinetics, equipment data, scheduling constraints, utility conditions, economic assumptions, uncertainty ranges, and explicit ownership for each source.",
+      },
+      {
+        question: "How should a bioprocess simulation pilot be validated?",
+        answer: "Agree acceptance criteria before modelling, then reconcile component mass balances, energy duties, equipment occupancy, cleaning and hold times, sensitivities, economics, sustainability outputs, and model traceability against an authorized reference case.",
+      },
+    ],
+  },
+  "/bioprocess-model-readiness": {
+    title: "Bioprocess Model Readiness Checklist | Free CSV Template",
+    description: "Download a practical checklist for balances, kinetics, equipment, scheduling, utilities, TEA, LCA, controls, validation and source ownership.",
+  },
+  "/bioprocess-simulation-software": {
+    title: "Bioprocess Simulation Software for Scale-Up & Design | Axion",
+    description: "Connect flowsheets, mass and energy balances, reactions, ODE/PDE dynamics, physical limits, equipment duties and uncertainty in one browser model.",
+  },
+  "/biomanufacturing-scheduling-software": {
+    title: "Biomanufacturing Scheduling & Capacity Planning Software | Axion",
+    description: "Schedule reactors, downstream equipment, rooms, utilities, operators, CIP/SIP, maintenance and campaigns to quantify facility capacity and bottlenecks.",
+  },
+  "/bioprocess-tea-lca-software": {
+    title: "Bioprocess TEA & LCA Software with Sensitivity Analysis | Axion",
+    description: "Trace media, materials, utilities, labor, waste, equipment and facility assumptions through detailed TEA, LCA, intervals and sensitivity exports.",
   },
   "/superpro-designer-alternative": {
     title: "SuperPro Designer Alternative for Bioprocess Engineering | Axion",
@@ -254,6 +287,17 @@ function renderPublicHtml(pathname, indexPath) {
     .replace(/<meta property="og:title" content="[^"]*"\s*\/>/i, `<meta property="og:title" content="${htmlAttribute(meta.title)}" />`)
     .replace(/<meta property="og:description" content="[^"]*"\s*\/>/i, `<meta property="og:description" content="${htmlAttribute(meta.description)}" />`)
     .replace(/<meta property="og:url" content="[^"]*"\s*\/>/i, `<meta property="og:url" content="${canonicalUrl}" />`);
+  const structuredData = [];
+  if (route !== "/") {
+    structuredData.push({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Axion Process OS", item: "https://ax-i-on.com/" },
+        { "@type": "ListItem", position: 2, name: meta.title.split("|")[0].trim(), item: canonicalUrl },
+      ],
+    });
+  }
   if (meta.faq?.length) {
     const faqSchema = {
       "@context": "https://schema.org",
@@ -265,7 +309,13 @@ function renderPublicHtml(pathname, indexPath) {
         acceptedAnswer: { "@type": "Answer", text: item.answer },
       })),
     };
-    html = html.replace("</head>", `    <script type="application/ld+json">${JSON.stringify(faqSchema).replaceAll("<", "\\u003c")}</script>\n  </head>`);
+    structuredData.push(faqSchema);
+  }
+  if (structuredData.length) {
+    const schemaTags = structuredData
+      .map((schema) => `    <script type="application/ld+json">${JSON.stringify(schema).replaceAll("<", "\\u003c")}</script>`)
+      .join("\n");
+    html = html.replace("</head>", `${schemaTags}\n  </head>`);
   }
   return html;
 }
@@ -1482,6 +1532,60 @@ async function createPilotLead(req, res) {
     delivery: lead.notification.delivered ? "notified" : "stored",
     message: "Your process evaluation request has been received.",
   });
+}
+
+async function createEngineeringBriefLead(req, res) {
+  if (!consumePublicSubmission(req, 8)) {
+    json(res, 429, { error: "Too many requests. Please try again later." });
+    return;
+  }
+  const body = await parseBody(req);
+  if (cleanPublicField(body.website, 120)) {
+    json(res, 201, { accepted: true, reference: "AXION-BRIEF" });
+    return;
+  }
+  const email = cleanPublicField(body.email, 180).toLowerCase();
+  const role = cleanPublicField(body.role, 120);
+  const consent = body.consent === true;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    json(res, 400, { error: "Enter a valid email address." });
+    return;
+  }
+  if (!consent) {
+    json(res, 400, { error: "Consent is required to receive the Axion Engineering Brief." });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const existing = db.leads.find((lead) => lead.kind === "engineering-brief" && lead.email === email && lead.status !== "unsubscribed");
+  if (existing) {
+    existing.role = role || existing.role;
+    existing.updatedAt = new Date().toISOString();
+    await saveDb(db);
+    json(res, 200, { accepted: true, reference: existing.reference, message: "This address is already subscribed." });
+    return;
+  }
+  const createdAt = new Date().toISOString();
+  const lead = {
+    id: randomUUID(),
+    reference: `BRIEF-${randomBytes(3).toString("hex").toUpperCase()}`,
+    kind: "engineering-brief",
+    email,
+    role,
+    company: "",
+    process: "Engineering resources",
+    challenge: "Opted in to Axion engineering templates, guides, and release notes.",
+    status: "subscribed",
+    consentAt: createdAt,
+    source: cleanPublicField(body.source || "website", 120),
+    campaign: cleanPublicField(body.campaign || "engineering-brief", 120),
+    landingPage: cleanPublicField(body.landingPage, 320),
+    requestFingerprint: publicRequestFingerprint(req),
+    createdAt,
+  };
+  db.leads.unshift(lead);
+  db.audit.unshift({ at: createdAt, type: "engineering-brief.subscribed", leadId: lead.id, reference: lead.reference });
+  await saveDb(db);
+  json(res, 201, { accepted: true, reference: lead.reference, message: "Engineering Brief subscription saved." });
 }
 
 async function listPilotLeads(req, res) {
@@ -5584,6 +5688,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await createPilotLead(req, res);
     return;
   }
+  if (req.method === "POST" && pathname === "/api/leads/engineering-brief") {
+    await createEngineeringBriefLead(req, res);
+    return;
+  }
   const checkoutSessionMatch = pathname.match(/^\/api\/checkout\/session\/([^/]+)$/);
   if (req.method === "GET" && checkoutSessionMatch) {
     await checkoutSessionStatus(req, res, decodeURIComponent(checkoutSessionMatch[1]));
@@ -5836,11 +5944,16 @@ function serveStatic(req, res, pathname) {
     return;
   }
   const clean = normalize(decodeURIComponent(requested)).replace(/^(\.\.[/\\])+/, "");
-  const filePath = resolve(staticRootDir, `.${clean}`);
+  let filePath = resolve(staticRootDir, `.${clean}`);
   if (!filePath.startsWith(staticRootDir)) {
     res.writeHead(403);
     res.end("Forbidden");
     return;
+  }
+  if (!existsSync(filePath) && staticRootDir === rootDir) {
+    const publicRoot = join(rootDir, "public");
+    const publicFilePath = resolve(publicRoot, `.${clean}`);
+    if (publicFilePath.startsWith(publicRoot) && existsSync(publicFilePath) && statSync(publicFilePath).isFile()) filePath = publicFilePath;
   }
   if (!existsSync(filePath)) {
     const fallback = join(staticRootDir, "index.html");

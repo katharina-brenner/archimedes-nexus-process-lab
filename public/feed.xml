@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Axion Engineering Brief</title>
+    <link>https://ax-i-on.com/resources</link>
+    <description>Technical resources for bioprocess simulation, scale-up, scheduling, TEA, LCA, and engineering model validation.</description>
+    <language>en</language>
+    <lastBuildDate>Sat, 01 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Bioprocess model readiness checklist</title>
+      <link>https://ax-i-on.com/bioprocess-model-readiness</link>
+      <guid>https://ax-i-on.com/bioprocess-model-readiness</guid>
+      <pubDate>Sat, 01 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Check the evidence behind balances, kinetics, equipment, cleaning, scheduling, utilities, economics, LCA, uncertainty, and validation.</description>
+    </item>
+    <item>
+      <title>How to evaluate bioprocess simulation software</title>
+      <link>https://ax-i-on.com/bioprocess-simulation-software</link>
+      <guid>https://ax-i-on.com/bioprocess-simulation-software</guid>
+      <pubDate>Sat, 01 Aug 2026 11:00:00 GMT</pubDate>
+      <description>Define an authorized reference case and compare balance closure, equipment duty, operating modes, uncertainty, traceability, and engineering exports.</description>
+    </item>
+    <item>
+      <title>Biomanufacturing scheduling beyond a single batch</title>
+      <link>https://ax-i-on.com/biomanufacturing-scheduling-software</link>
+      <guid>https://ax-i-on.com/biomanufacturing-scheduling-software</guid>
+      <pubDate>Sat, 01 Aug 2026 10:00:00 GMT</pubDate>
+      <description>Model shared equipment, rooms, labor, utilities, CIP/SIP, maintenance, holds, campaigns, and finite-capacity bottlenecks.</description>
+    </item>
+  </channel>
+</rss>
