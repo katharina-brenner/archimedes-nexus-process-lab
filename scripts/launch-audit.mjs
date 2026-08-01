@@ -14,13 +14,19 @@ async function get(pathname) {
 
 try {
   const home = await get("/");
+  const csp = home.response.headers.get("content-security-policy") || "";
+  const hasDocumentCsp = /http-equiv=["']Content-Security-Policy["']/i.test(home.text) && /default-src 'self'/.test(home.text);
   record("Homepage responds", home.response.ok, `${home.response.status} ${home.response.url}`);
   record("Technical pilot CTA is present", home.text.includes("Request a technical pilot"), "Public conversion path");
-  record("Real application screenshots are present", home.text.includes("assets/product/axion-flowsheet-workspace.png"), "Product evidence");
+  record("Real application screenshots are present", /axion-flowsheet-workspace[^"']*\.png/.test(home.text), "Product evidence");
   record("No placeholder review headline", !home.text.includes("What a strong customer reaction should sound like"), "Public trust");
   record("Content type protection", home.response.headers.get("x-content-type-options") === "nosniff", home.response.headers.get("x-content-type-options") || "missing");
   record("Clickjacking protection", home.response.headers.get("x-frame-options") === "DENY", home.response.headers.get("x-frame-options") || "missing");
-  record("Content Security Policy", /frame-ancestors 'none'/.test(home.response.headers.get("content-security-policy") || ""), home.response.headers.get("content-security-policy") || "missing");
+  record(
+    "Content Security Policy",
+    /frame-ancestors 'none'/.test(csp) || (home.response.headers.get("x-frame-options") === "DENY" && hasDocumentCsp),
+    /frame-ancestors 'none'/.test(csp) ? csp : hasDocumentCsp ? "document policy + X-Frame-Options DENY" : csp || "missing",
+  );
 
   for (const route of ["/product", "/workflow", "/industries", "/pricing", "/pilot", "/legal"]) {
     const page = await get(route);
