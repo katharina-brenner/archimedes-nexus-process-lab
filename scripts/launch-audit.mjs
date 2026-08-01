@@ -28,9 +28,13 @@ try {
     /frame-ancestors 'none'/.test(csp) ? csp : hasDocumentCsp ? "document policy + X-Frame-Options DENY" : csp || "missing",
   );
 
-  for (const route of ["/product", "/workflow", "/solutions", "/pricing", "/pilot", "/legal"]) {
+  for (const route of ["/product", "/workflow", "/solutions", "/superpro-designer-alternative", "/pricing", "/pilot", "/legal"]) {
     const page = await get(route);
     record(`Public route ${route}`, page.response.ok && page.text.includes("Axion Process OS"), `${page.response.status}`);
+    if (route === "/superpro-designer-alternative") {
+      record("Comparison route server metadata", page.text.includes("<title>SuperPro Designer Alternative for Bioprocess Engineering | Axion</title>") && page.text.includes('rel="canonical" href="https://ax-i-on.com/superpro-designer-alternative"'), "route-specific title + canonical");
+      record("Comparison route FAQ schema", page.text.includes('"@type":"FAQPage"') && page.text.includes("Is Axion Process OS a direct replacement for SuperPro Designer?"), "server-rendered structured data");
+    }
   }
 
   const health = await get("/api/health");

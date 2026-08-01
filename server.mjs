@@ -177,6 +177,99 @@ const staticTypes = new Map([
   [".ico", "image/x-icon"],
 ]);
 
+const seoRouteMeta = Object.freeze({
+  "/": {
+    title: "Bioprocess Engineering Software for Process Development & MSAT | Axion",
+    description: "One shared engineering model for process development, MSAT, plant engineering and TEA/LCA teams, from flowsheet and scale-up through scheduling and investment review.",
+  },
+  "/product": {
+    title: "Bioprocess Engineering Platform | Axion Process OS",
+    description: "Build editable bioprocess flowsheets, equipment trains, balances, CFD screening models, schedules and engineering exports in one browser workspace.",
+  },
+  "/workflow": {
+    title: "Bioprocess Design Workflow | Axion Process OS",
+    description: "Move from product brief to process model, simulation, scheduling, TEA, LCA and technical review in one connected engineering workflow.",
+  },
+  "/solutions": {
+    title: "Bioprocess Engineering Solutions by Role & Industry | Axion",
+    description: "Explore Axion solutions for process development, MSAT, plant engineering, TEA/LCA, biopharma, CDMOs, fermentation, food biotech and industrial manufacturing.",
+  },
+  "/superpro-designer-alternative": {
+    title: "SuperPro Designer Alternative for Bioprocess Engineering | Axion",
+    description: "Compare Axion Process OS with SuperPro Designer for browser collaboration, flowsheets, scheduling, APIs, TEA/LCA, versioning and engineering decision workflows.",
+    faq: [
+      {
+        question: "Is Axion Process OS a direct replacement for SuperPro Designer?",
+        answer: "Axion is a browser-first engineering workspace with native flowsheets, balances, dynamic models, scheduling, CFD screening, TEA and LCA, versions, data ingestion, and exports. Teams should compare one customer-owned reference process before replacing a validated workflow.",
+      },
+      {
+        question: "Can Axion import existing SuperPro Designer files?",
+        answer: "Axion does not copy or decode proprietary model formats. Teams can reconstruct an authorized reference process from their own stream tables, equipment data, assumptions, and exported results and reconcile it against an approved baseline.",
+      },
+      {
+        question: "Who should evaluate Axion Process OS?",
+        answer: "Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA and LCA, food-biotech, fermentation, and technical-consulting teams that need collaboration, traceability, scenario comparison, and connected engineering outputs.",
+      },
+    ],
+  },
+  "/security": {
+    title: "Security and Production Architecture | Axion Process OS",
+    description: "Review the security, identity, data, payment, deployment and validated-compute architecture behind Axion Process OS.",
+  },
+  "/pricing": {
+    title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
+    description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
+  },
+  "/pilot": {
+    title: "Request a Technical Bioprocess Pilot | Axion Process OS",
+    description: "Evaluate Axion Process OS with one customer-owned bioprocess, dataset, scale-up question, or facility decision before choosing a subscription.",
+  },
+  "/legal": {
+    title: "Impressum, Privacy and Terms | Axion Process OS",
+    description: "Read provider information, privacy, subscription, and engineering-use terms for Axion Process OS.",
+  },
+  "/login": {
+    title: "Sign in or Start Axion Professional | Axion Process OS",
+    description: "Sign in to Axion Process OS or start a professional bioprocess modelling workspace through secure Stripe Checkout.",
+  },
+});
+
+function htmlAttribute(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderPublicHtml(pathname, indexPath) {
+  const route = pathname === "/compare" ? "/superpro-designer-alternative" : pathname;
+  const meta = seoRouteMeta[route] || seoRouteMeta["/"];
+  const canonicalPath = route === "/" ? "/" : route;
+  const canonicalUrl = new URL(canonicalPath, "https://ax-i-on.com").href;
+  let html = readFileSync(indexPath, "utf8")
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${htmlAttribute(meta.title)}</title>`)
+    .replace(/<meta name="description" content="[^"]*"\s*\/>/i, `<meta name="description" content="${htmlAttribute(meta.description)}" />`)
+    .replace(/<link rel="canonical" href="[^"]*"\s*\/>/i, `<link rel="canonical" href="${canonicalUrl}" />`)
+    .replace(/<meta property="og:title" content="[^"]*"\s*\/>/i, `<meta property="og:title" content="${htmlAttribute(meta.title)}" />`)
+    .replace(/<meta property="og:description" content="[^"]*"\s*\/>/i, `<meta property="og:description" content="${htmlAttribute(meta.description)}" />`)
+    .replace(/<meta property="og:url" content="[^"]*"\s*\/>/i, `<meta property="og:url" content="${canonicalUrl}" />`);
+  if (meta.faq?.length) {
+    const faqSchema = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      url: canonicalUrl,
+      mainEntity: meta.faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
+    };
+    html = html.replace("</head>", `    <script type="application/ld+json">${JSON.stringify(faqSchema).replaceAll("<", "\\u003c")}</script>\n  </head>`);
+  }
+  return html;
+}
+
 const defaultDb = {
   users: [],
   orders: [],
@@ -5752,11 +5845,12 @@ function serveStatic(req, res, pathname) {
   }
   if (!existsSync(filePath)) {
     const fallback = join(staticRootDir, "index.html");
+    const body = renderPublicHtml(pathname, fallback);
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache",
     });
-    createReadStream(fallback).pipe(res);
+    res.end(body);
     return;
   }
   const immutableAsset = /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(requested);
@@ -5770,6 +5864,10 @@ function serveStatic(req, res, pathname) {
         ? "no-cache"
         : "public, max-age=3600",
   });
+  if (htmlDocument) {
+    res.end(renderPublicHtml(pathname === "/index.html" ? "/" : pathname, filePath));
+    return;
+  }
   createReadStream(filePath).pipe(res);
 }
 

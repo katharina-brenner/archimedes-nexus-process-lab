@@ -38,19 +38,6 @@ function columnWidth(header, rows) {
   return Math.max(11, Math.min(44, Math.max(String(header).length + 2, ...sample.map((value) => value.length + 2))));
 }
 
-function safeTableName(value, used) {
-  const base = `Axion_${String(value || "Table")}`
-    .replace(/[^a-z0-9_]+/gi, "_")
-    .replace(/^([^a-z_])/, "_$1")
-    .replace(/_+/g, "_")
-    .slice(0, 220) || "Axion_Table";
-  let candidate = base;
-  let index = 2;
-  while (used.has(candidate)) candidate = `${base.slice(0, 214)}_${index++}`;
-  used.add(candidate);
-  return candidate;
-}
-
 function humanizeHeader(header) {
   return String(header || "")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -150,7 +137,7 @@ function statusColors(value) {
   return null;
 }
 
-function styleStructuredSheet(worksheet, table, rows, headers, metadata, tableName) {
+function styleStructuredSheet(worksheet, table, rows, headers, metadata) {
   const lastColumn = Math.max(1, headers.length);
   worksheet.mergeCells(1, 1, 1, lastColumn);
   worksheet.mergeCells(2, 1, 2, lastColumn);
@@ -173,25 +160,15 @@ function styleStructuredSheet(worksheet, table, rows, headers, metadata, tableNa
     column.width = columnWidth(header, rows);
     column.key = header;
   });
-  worksheet.addTable({
-    name: tableName,
-    ref: "A5",
-    headerRow: true,
-    totalsRow: false,
-    style: { theme: "TableStyleMedium2", showRowStripes: true, showFirstColumn: false, showLastColumn: false },
-    columns: headers.map((header) => ({ name: header, filterButton: true })),
-    rows: rows.map((row) => headers.map((header) => spreadsheetValue(row?.[header]))),
-  });
+  worksheet.getRow(5).values = headers;
+  rows.forEach((row) => worksheet.addRow(headers.map((header) => spreadsheetValue(row?.[header]))));
   worksheet.views = [{ state: "frozen", ySplit: 5, xSplit: Math.min(2, headers.length), topLeftCell: headers.length > 1 ? "C6" : "A6", activeCell: "A6" }];
   worksheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5, column: headers.length } };
   worksheet.getRow(5).height = 32;
-  worksheet.getRow(5).eachCell((cell, columnNumber) => {
-    const header = headers[columnNumber - 1];
-    const unit = unitFromHeader(header);
+  worksheet.getRow(5).eachCell((cell) => {
     cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFF5FAF9" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF173F3B" } };
     cell.alignment = { vertical: "middle", wrapText: true };
-    cell.note = `${definitionForHeader(header)}${unit ? `\nUnit: ${unit}` : ""}`;
   });
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber <= 5) return;
@@ -248,7 +225,6 @@ export async function buildEngineeringWorkbook(tables, metadata = {}) {
   workbook.calcProperties.fullCalcOnLoad = true;
 
   const usedNames = new Set();
-  const usedTableNames = new Set();
   const indexSheet = workbook.addWorksheet("Workbook index");
   const dictionarySheet = workbook.addWorksheet("Data dictionary");
   const qaSheet = workbook.addWorksheet("QA summary");
@@ -261,8 +237,7 @@ export async function buildEngineeringWorkbook(tables, metadata = {}) {
     const headers = tableHeaders(rows);
     const sheetName = safeSheetName(table.sheet, usedNames);
     const worksheet = workbook.addWorksheet(sheetName);
-    const tableName = safeTableName(`${tableIndex + 1}_${table.sheet}`, usedTableNames);
-    styleStructuredSheet(worksheet, table, rows, headers, metadata, tableName);
+    styleStructuredSheet(worksheet, table, rows, headers, metadata);
 
     const populatedCells = rows.reduce((count, row) => count + headers.filter((header) => row?.[header] !== "" && row?.[header] !== null && row?.[header] !== undefined).length, 0);
     const totalCells = rows.length * headers.length;
@@ -311,9 +286,9 @@ export async function buildEngineeringWorkbook(tables, metadata = {}) {
     { worksheet: dictionarySheet, table: { sheet: "Data dictionary", description: "Field-level definitions, units, data types, examples and source basis for the complete workbook." }, rows: dictionaryRows },
     { worksheet: qaSheet, table: { sheet: "QA summary", description: "Completeness and review flags for every exported worksheet." }, rows: qaRows },
   ];
-  systemTables.forEach(({ worksheet, table, rows }, index) => {
+  systemTables.forEach(({ worksheet, table, rows }) => {
     const headers = tableHeaders(rows);
-    styleStructuredSheet(worksheet, table, rows, headers, metadata, safeTableName(`System_${index + 1}_${table.sheet}`, usedTableNames));
+    styleStructuredSheet(worksheet, table, rows, headers, metadata);
   });
   indexRows.forEach((row, index) => {
     const cell = indexSheet.getCell(index + 6, 8);

@@ -34,6 +34,10 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
   assert.equal(workbook[1], 0x4b);
   assert.ok(workbook.byteLength > 8000);
 
+  const workbookParts = Object.keys(unzipSync(workbook));
+  assert.equal(workbookParts.some((path) => path.startsWith("xl/comments")), false);
+  assert.equal(workbookParts.some((path) => path.includes("vmlDrawing")), false);
+
   const parsed = new ExcelJS.Workbook();
   await parsed.xlsx.load(Buffer.from(workbook));
   assert.deepEqual(parsed.worksheets.map((sheet) => sheet.name), [
@@ -49,7 +53,7 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
   assert.equal(sensitivity.getCell("A5").value, "run");
   assert.equal(sensitivity.getCell("A6").value, 1);
   assert.equal(sensitivity.getCell("A145").value, 140);
-  assert.equal(Object.keys(sensitivity.tables).length, 1);
+  assert.equal(Object.keys(sensitivity.tables).length, 0);
   assert.equal(sensitivity.views[0].state, "frozen");
   assert.equal(sensitivity.views[0].ySplit, 5);
 

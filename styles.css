@@ -22907,6 +22907,91 @@ textarea::placeholder {
   color: #f5faf8;
 }
 
+.comparison-use-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.comparison-use-grid article,
+.comparison-faq {
+  border: 1px solid rgba(143, 228, 218, 0.16);
+  border-radius: 24px;
+  background: #0c202d;
+}
+
+.comparison-use-grid article,
+.comparison-faq {
+  padding: 30px;
+}
+
+.comparison-use-grid article > span,
+.comparison-faq header > span {
+  color: #8fd7ca;
+  font-size: 10px;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.comparison-use-grid h3,
+.comparison-faq h3 {
+  margin: 10px 0 18px;
+  color: #f5faf8;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.comparison-use-grid ul {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding-left: 19px;
+  color: rgba(221, 233, 230, 0.72);
+  font-size: 14px;
+  line-height: 1.52;
+}
+
+.comparison-faq {
+  margin-top: 24px;
+}
+
+.comparison-faq header {
+  max-width: 720px;
+}
+
+.comparison-faq details {
+  padding: 19px 0;
+  border-top: 1px solid rgba(143, 228, 218, 0.13);
+}
+
+.comparison-faq summary {
+  color: #f5faf8;
+  font-size: 15px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.comparison-faq details p {
+  max-width: 900px;
+  margin: 12px 0 0;
+  color: rgba(221, 233, 230, 0.7);
+  font-size: 14px;
+  line-height: 1.58;
+}
+
+.comparison-source {
+  margin: 18px 0 0;
+  color: rgba(221, 233, 230, 0.55);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.comparison-source a {
+  color: #8fd7ca;
+}
+
 .pricing-price {
   margin: 14px 0 4px;
   display: block;
@@ -23078,6 +23163,10 @@ textarea::placeholder {
     grid-template-columns: 1fr;
   }
 
+  .comparison-use-grid {
+    grid-template-columns: 1fr;
+  }
+
   .comparison-row {
     grid-template-columns: minmax(120px, 0.5fr) minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -23141,6 +23230,12 @@ textarea::placeholder {
     border: 0;
     border-radius: 0;
     background: transparent;
+  }
+
+  .comparison-use-grid article,
+  .comparison-faq {
+    padding: 23px 20px;
+    border-radius: 20px;
   }
 
   .comparison-row {

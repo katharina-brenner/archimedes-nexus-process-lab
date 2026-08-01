@@ -8,7 +8,7 @@ import {
   retargetStream,
 } from "./flowsheet-connectivity.js";
 import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
-import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v2";
+import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v3";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -16403,8 +16403,8 @@ const publicPageMeta = {
     description: "Explore Axion solutions for process development, MSAT, plant engineering, TEA/LCA, biopharma, CDMOs, fermentation, food biotech and industrial manufacturing.",
   },
   compare: {
-    title: "SuperPro Designer Alternative for Collaborative Bioprocess Design | Axion",
-    description: "Compare Axion's browser-first collaboration, versioning, APIs and engineering decision workflow with classical desktop process simulation.",
+    title: "SuperPro Designer Alternative for Bioprocess Engineering | Axion",
+    description: "Compare Axion Process OS with SuperPro Designer for browser collaboration, flowsheets, scheduling, APIs, TEA/LCA, versioning and engineering decision workflows.",
   },
   readiness: {
     title: "Security and Production Architecture | Axion Process OS",
@@ -16433,7 +16433,7 @@ const publicPagePaths = {
   platform: "/product",
   workflow: "/workflow",
   ecosystem: "/solutions",
-  compare: "/compare",
+  compare: "/superpro-designer-alternative",
   readiness: "/security",
   pricing: "/pricing",
   pilot: "/pilot",
@@ -16446,6 +16446,7 @@ function publicPageFromLocation() {
   if (requested && publicPageMeta[requested]) return requested;
   const route = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (["solutions", "industries"].includes(route)) return "ecosystem";
+  if (["compare", "superpro-designer-alternative"].includes(route)) return "compare";
   return Object.entries(publicPagePaths).find(([, path]) => path.replace(/^\/+|\/+$/g, "") === route)?.[0] || "home";
 }
 
@@ -16463,8 +16464,10 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false, defa
   document.title = meta.title;
   document.querySelector('meta[name="description"]')?.setAttribute("content", meta.description);
   const canonicalUrl = new URL(publicPagePaths[targetPage] || "/", window.location.origin).href;
-  document.querySelector('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
+  document.querySelector('meta[property="og:title"]')?.setAttribute("content", meta.title);
+  document.querySelector('meta[property="og:description"]')?.setAttribute("content", meta.description);
   document.querySelector('meta[property="og:url"]')?.setAttribute("content", canonicalUrl);
+  document.querySelector('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
   if (syncUrl) {
     const nextUrl = publicPagePaths[targetPage] || "/";
     window.history.pushState({ publicPage: targetPage }, "", nextUrl);

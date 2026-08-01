@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://mediumturquoise-lapwing-443102.hostingersite.com/sitemap.xml
+Sitemap: https://ax-i-on.com/sitemap.xml
