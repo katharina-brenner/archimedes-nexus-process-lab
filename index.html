@@ -33,8 +33,20 @@
           {
             "@type": "Organization",
             "@id": "https://mediumturquoise-lapwing-443102.hostingersite.com/#organization",
-            "name": "Axion Process OS",
-            "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/"
+            "name": "neunzigzehn UG (haftungsbeschränkt)",
+            "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/",
+            "brand": {
+              "@type": "Brand",
+              "name": "Axion Process OS"
+            },
+            "identifier": "HRB 301734",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Franz-Joseph-Straße 11",
+              "postalCode": "80801",
+              "addressLocality": "München",
+              "addressCountry": "DE"
+            }
           },
           {
             "@type": "SoftwareApplication",
@@ -79,10 +91,11 @@
             <strong>Axion Process OS</strong>
           </button>
           <nav>
-            <a href="./?page=platform" data-public-target="publicPlatform">Product</a>
-            <a href="./?page=workflow" data-public-target="publicWorkflow">How it works</a>
-            <a href="./?page=ecosystem" data-public-target="publicEcosystem">Industries</a>
-            <a href="./?page=pricing" data-public-target="publicPricing">Pricing</a>
+            <a href="./product" data-public-target="publicPlatform">Product</a>
+            <a href="./workflow" data-public-target="publicWorkflow">How it works</a>
+            <a href="./industries" data-public-target="publicEcosystem">Industries</a>
+            <a href="./pricing" data-public-target="publicPricing">Pricing</a>
+            <a href="./pilot" data-public-target="publicPilot">Request pilot</a>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
           </nav>
         </header>
@@ -97,7 +110,8 @@
                   <h1>Bioprocess engineering for the whole plant.</h1>
                   <span>Build the flowsheet, simulate operations, evaluate scale-up, and export the engineering evidence in one browser workspace.</span>
                   <div class="clarity-hero-actions">
-                    <button id="openLoginHero" class="public-primary" type="button">Open workspace</button>
+                    <button class="public-primary" type="button" data-public-target="publicPilot">Request a technical pilot</button>
+                    <button id="openLoginHero" class="public-secondary" type="button">Open workspace</button>
                     <a href="#product-preview">See the product</a>
                   </div>
                 </div>
@@ -177,16 +191,16 @@
                   <p>Axion Process OS</p>
                   <h2>Turn a process idea into an editable plant model.</h2>
                 </div>
-                <button class="public-primary" type="button" data-public-target="loginPanel">Sign in to Axion</button>
+                <button class="public-primary" type="button" data-public-target="publicPilot">Evaluate your process</button>
               </section>
 
               <footer class="clarity-footer">
                 <span>Axion Process OS</span>
                 <div>
-                  <a href="./?page=readiness" data-public-target="publicReadiness">Security</a>
-                  <a href="./?page=legal#privacy" data-public-target="publicLegal">Privacy</a>
-                  <a href="./?page=legal#terms" data-public-target="publicLegal">Terms</a>
-                  <a href="./?page=legal#impressum" data-public-target="publicLegal">Impressum</a>
+                  <a href="./security" data-public-target="publicReadiness">Security</a>
+                  <a href="./legal#privacy" data-public-target="publicLegal">Privacy</a>
+                  <a href="./legal#terms" data-public-target="publicLegal">Terms</a>
+                  <a href="./legal#impressum" data-public-target="publicLegal">Impressum</a>
                 </div>
                 <small>Industrial photography credits and licences are documented in the repository attribution file.</small>
               </footer>
@@ -331,9 +345,9 @@
             <footer class="public-minimal-footer" hidden>
               <span>Axion Process OS</span>
               <div>
-                <a href="./?page=legal#privacy" data-public-target="publicLegal">Privacy</a>
-                <a href="./?page=legal#terms" data-public-target="publicLegal">Terms</a>
-                <a href="./?page=legal#impressum" data-public-target="publicLegal">Impressum</a>
+                <a href="./legal#privacy" data-public-target="publicLegal">Privacy</a>
+                <a href="./legal#terms" data-public-target="publicLegal">Terms</a>
+                <a href="./legal#impressum" data-public-target="publicLegal">Impressum</a>
               </div>
               <small>Photography: Bayerische Staatsbrauerei Weihenstephan, TECNIC Bioprocess Solutions, Marcelo Guarnieri and Crystal Kwok / Unsplash; CC1984USA / Wikimedia Commons. Licence details in the photography attribution file.</small>
             </footer>
@@ -1120,8 +1134,8 @@
 
           <section id="publicReviews" class="public-section public-reviews public-page" data-public-page="reviews">
             <div class="section-heading">
-              <p>Review Examples</p>
-              <h2>What a strong customer reaction should sound like.</h2>
+              <p>Evaluation framework</p>
+              <h2>What a credible pilot must prove.</h2>
             </div>
             <div class="public-visual-pair" aria-label="Review product visuals">
               <figure class="explain-visual visual-review-map">
@@ -1167,23 +1181,23 @@
               </figure>
             </div>
             <div class="review-intro">
-              <p>These examples show the kind of clarity Axion is designed to create for process teams: visible process logic, connected assumptions, and review-ready outputs in one workspace.</p>
+              <p>Axion should earn trust with customer-owned data and visible calculations. A technical evaluation therefore focuses on measurable workflow and model outcomes, not generic testimonials.</p>
             </div>
-            <div class="review-grid" aria-label="Customer review examples">
+            <div class="review-grid" aria-label="Technical pilot evaluation criteria">
               <article>
-                <div class="review-stars">★★★★★</div>
-                <p>“For the first time our process discussion felt visual, quantitative, and editable at the same time. We could see the main process, CIP, utilities, and scale-up constraints without jumping between five files.”</p>
-                <span>Bioprocess lead, cultivated protein startup</span>
+                <div class="review-stars">01</div>
+                <p><strong>Model fidelity</strong><br />Reconcile balances, equipment duties, operating mode, schedule, and economics against an agreed reference case.</p>
+                <span>Acceptance: visible assumptions and explained residuals</span>
               </article>
               <article>
-                <div class="review-stars">★★★★★</div>
-                <p>“The value is not just the flowsheet. It is the way assumptions, equations, equipment, and sources stay connected. That makes technical review much faster and much less political.”</p>
-                <span>Academic biomanufacturing lab</span>
+                <div class="review-stars">02</div>
+                <p><strong>Decision speed</strong><br />Create and compare a process variant without duplicating disconnected spreadsheets, diagrams, and review notes.</p>
+                <span>Acceptance: traceable before/after model change</span>
               </article>
               <article>
-                <div class="review-stars">★★★★★</div>
-                <p>“The boundary checks are exactly what early teams miss: oxygen transfer, heat, ammonium, cleaning, hold times, waste, and recovery. It helps you ask the hard questions before the plant design hardens.”</p>
-                <span>Process development advisor</span>
+                <div class="review-stars">03</div>
+                <p><strong>Engineering completeness</strong><br />Expose missing kinetics, physical limits, cleaning assumptions, hold times, utilities, cost evidence, and validation work.</p>
+                <span>Acceptance: prioritized data and modelling gap list</span>
               </article>
             </div>
           </section>
@@ -1265,8 +1279,59 @@
             <div class="comparison-note">
               <strong>Responsible migration</strong>
               <p>Axion uses original implementations, public scientific knowledge, and data that customers are authorized to use. It does not copy proprietary manuals, model libraries, or restricted simulator files.</p>
-              <button class="public-primary" type="button" data-public-target="loginPanel">Evaluate with one process</button>
+              <button class="public-primary" type="button" data-public-target="publicPilot">Evaluate with one process</button>
             </div>
+          </section>
+
+          <section id="publicPilot" class="public-section public-pilot public-page" data-public-page="pilot">
+            <div class="pilot-intro">
+              <div>
+                <p>Technical pilot</p>
+                <h2>Start with one real process decision.</h2>
+                <span>Bring a company-owned process, dataset, or scale-up question. Axion will structure the flowsheet, identify the required evidence, and define a focused evaluation before a subscription decision.</span>
+                <div class="pilot-outcomes" aria-label="Pilot outcomes">
+                  <article><b>01</b><strong>Process architecture</strong><small>Equipment, streams, utilities, cleaning, and operating mode.</small></article>
+                  <article><b>02</b><strong>Engineering gap map</strong><small>Known values, uncertain assumptions, boundaries, and missing plant data.</small></article>
+                  <article><b>03</b><strong>Decision package</strong><small>Balances, schedule, economics, LCA, sensitivities, and next actions.</small></article>
+                </div>
+              </div>
+              <figure>
+                <img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion Process OS flowsheet workspace used to evaluate a real industrial process" width="1280" height="720" loading="lazy" />
+                <figcaption>Use one representative process to test model depth, traceability, and team workflow.</figcaption>
+              </figure>
+            </div>
+            <form id="pilotForm" class="pilot-form">
+              <header>
+                <p>Request an evaluation</p>
+                <h3>What should the process model help you decide?</h3>
+              </header>
+              <div class="pilot-form-grid">
+                <label><span>Name</span><input id="pilotName" name="name" autocomplete="name" required placeholder="Your name" /></label>
+                <label><span>Work email</span><input id="pilotEmail" name="email" type="email" autocomplete="email" required placeholder="name@company.com" /></label>
+                <label><span>Company or university</span><input id="pilotCompany" name="company" autocomplete="organization" required placeholder="Organisation" /></label>
+                <label><span>Role</span><input id="pilotRole" name="role" autocomplete="organization-title" placeholder="Process development, MSAT, engineering..." /></label>
+                <label class="pilot-form-wide"><span>Process area</span>
+                  <select id="pilotProcess" name="process" required>
+                    <option value="">Choose a process area</option>
+                    <option>Biopharma / monoclonal antibodies</option>
+                    <option>Precision fermentation / industrial biotech</option>
+                    <option>Cultivated meat / cell culture</option>
+                    <option>Food and ingredient processing</option>
+                    <option>Pharmaceutical batch production</option>
+                    <option>Engineering / facility design</option>
+                    <option>Other industrial process</option>
+                  </select>
+                </label>
+                <label class="pilot-form-wide"><span>Engineering question</span><textarea id="pilotChallenge" name="challenge" required minlength="20" rows="5" placeholder="For example: compare fed-batch and perfusion at 2,000 L, quantify media and DSP cost, and identify the facility bottleneck."></textarea></label>
+                <label class="pilot-honeypot" aria-hidden="true"><span>Website</span><input id="pilotWebsite" name="website" tabindex="-1" autocomplete="off" /></label>
+              </div>
+              <label class="pilot-consent"><input id="pilotConsent" name="consent" type="checkbox" required /><span>Axion may use these details to respond to this request. No process files are uploaded through this form.</span></label>
+              <div class="pilot-submit-row">
+                <button class="public-primary" type="submit">Request technical pilot</button>
+                <small>One focused evaluation. No automatic subscription.</small>
+              </div>
+              <div id="pilotResult" class="pilot-result" aria-live="polite"></div>
+            </form>
           </section>
 
           <section id="publicPricing" class="public-section public-pricing public-page" data-public-page="pricing">
@@ -1439,18 +1504,24 @@
                 </label>
                 <label class="checkout-consent">
                   <input id="checkoutTerms" type="checkbox" required />
-                  <span>I agree to the <a href="./?page=legal#terms" data-public-target="publicLegal">terms</a> and <a href="./?page=legal#privacy" data-public-target="publicLegal">privacy notice</a>.</span>
+                  <span>I agree to the <a href="./legal#terms" data-public-target="publicLegal">terms</a> and <a href="./legal#privacy" data-public-target="publicLegal">privacy notice</a>.</span>
                 </label>
                 <button class="login-button checkout-button" type="submit">Continue to secure checkout</button>
                 <p class="checkout-security">Payment details are entered on Stripe Checkout. Axion receives only the verified billing and subscription status needed to activate access.</p>
                 <div id="checkoutResult" class="checkout-result" aria-live="polite"></div>
               </form>
+              <aside id="checkoutUnavailable" class="access-card checkout-unavailable" hidden>
+                <p>New workspace</p>
+                <h3>Evaluate Axion with your process.</h3>
+                <span>Self-service checkout is not active on this deployment yet. Request a focused technical pilot without entering payment details.</span>
+                <button class="public-primary" type="button" data-public-target="publicPilot">Request technical pilot</button>
+              </aside>
             </div>
           </section>
         </main>
       </div>
     </section>
-    <div class="app-shell">
+    <div class="app-shell" inert aria-hidden="true">
       <aside class="sidebar" aria-label="Project controls">
         <button id="workspaceLogo" class="brand brand-button" type="button" title="Open Axion front page">
           <div class="brand-mark technical-logo" aria-label="Axion mark"><span></span></div>

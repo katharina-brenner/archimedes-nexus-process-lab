@@ -2209,6 +2209,17 @@ const els = {
   checkoutPrice: document.querySelector("#checkoutPrice"),
   checkoutBillingMode: document.querySelector("#checkoutBillingMode"),
   checkoutResult: document.querySelector("#checkoutResult"),
+  checkoutUnavailable: document.querySelector("#checkoutUnavailable"),
+  pilotForm: document.querySelector("#pilotForm"),
+  pilotName: document.querySelector("#pilotName"),
+  pilotEmail: document.querySelector("#pilotEmail"),
+  pilotCompany: document.querySelector("#pilotCompany"),
+  pilotRole: document.querySelector("#pilotRole"),
+  pilotProcess: document.querySelector("#pilotProcess"),
+  pilotChallenge: document.querySelector("#pilotChallenge"),
+  pilotWebsite: document.querySelector("#pilotWebsite"),
+  pilotConsent: document.querySelector("#pilotConsent"),
+  pilotResult: document.querySelector("#pilotResult"),
   loginUser: document.querySelector("#loginUser"),
   loginPassword: document.querySelector("#loginPassword"),
   loginError: document.querySelector("#loginError"),
@@ -2218,6 +2229,7 @@ const els = {
   googleButtonMount: document.querySelector("#googleButtonMount"),
   googleLoginStatus: document.querySelector("#googleLoginStatus"),
   loginGate: document.querySelector("#loginGate"),
+  appShell: document.querySelector(".app-shell"),
   profileButton: document.querySelector("#profileButton"),
   profilePanel: document.querySelector("#profilePanel"),
   profileInitials: document.querySelector("#profileInitials"),
@@ -15358,12 +15370,20 @@ function unlockApp() {
   document.body.classList.remove("locked");
   document.body.classList.remove("show-public");
   document.body.classList.add("authenticated");
+  els.appShell?.removeAttribute("inert");
+  els.appShell?.removeAttribute("aria-hidden");
+  els.loginGate?.setAttribute("inert", "");
+  els.loginGate?.setAttribute("aria-hidden", "true");
 }
 
 function lockApp() {
   document.body.classList.add("locked");
   document.body.classList.remove("authenticated");
   document.body.classList.remove("show-public");
+  els.appShell?.setAttribute("inert", "");
+  els.appShell?.setAttribute("aria-hidden", "true");
+  els.loginGate?.removeAttribute("inert");
+  els.loginGate?.removeAttribute("aria-hidden");
   window.setTimeout(() => els.loginGate?.scrollTo({ top: 0, behavior: "auto" }), 0);
 }
 
@@ -15818,6 +15838,13 @@ function renderProductConfig(config) {
     if (option) option.textContent = `${plan.name} · ${billingAmountLabel(plan).replace(" / month", "/month")}`;
   });
   renderSelectedCheckoutPlan(els.checkoutPlan?.value || "professional");
+  const checkoutAvailable = Boolean(config?.payments?.stripeEnabled);
+  if (els.checkoutForm) els.checkoutForm.hidden = !checkoutAvailable;
+  if (els.checkoutUnavailable) els.checkoutUnavailable.hidden = checkoutAvailable;
+  document.querySelectorAll(".pricing-plan-button").forEach((button) => {
+    button.dataset.publicTarget = checkoutAvailable ? "loginPanel" : "publicPilot";
+    button.textContent = checkoutAvailable ? `Choose ${billingPlanById(button.dataset.checkoutPlan).name}` : "Request technical pilot";
+  });
   renderProfileMenu();
 }
 
@@ -15970,6 +15997,41 @@ async function handleCheckoutReturn() {
   }
 }
 
+async function submitPilotRequest() {
+  if (!els.pilotForm || !els.pilotResult) return;
+  const submitButton = els.pilotForm.querySelector('button[type="submit"]');
+  const params = new URLSearchParams(window.location.search);
+  const body = {
+    name: els.pilotName?.value.trim() || "",
+    email: els.pilotEmail?.value.trim() || "",
+    company: els.pilotCompany?.value.trim() || "",
+    role: els.pilotRole?.value.trim() || "",
+    process: els.pilotProcess?.value || "",
+    challenge: els.pilotChallenge?.value.trim() || "",
+    website: els.pilotWebsite?.value || "",
+    consent: Boolean(els.pilotConsent?.checked),
+    source: params.get("utm_source") || document.referrer || "website",
+    campaign: params.get("utm_campaign") || "",
+    landingPage: window.location.href,
+  };
+  submitButton.disabled = true;
+  submitButton.textContent = "Sending request...";
+  els.pilotResult.className = "pilot-result is-pending";
+  els.pilotResult.textContent = "Saving your process evaluation request securely.";
+  try {
+    const payload = await apiRequest("/api/leads/pilot", { method: "POST", body: JSON.stringify(body) });
+    els.pilotResult.className = "pilot-result is-success";
+    els.pilotResult.innerHTML = `<strong>Request received</strong><span>Reference ${escapeHtml(payload.reference || "created")}. Axion will use your engineering question to prepare the next step.</span>`;
+    els.pilotForm.reset();
+  } catch (error) {
+    els.pilotResult.className = "pilot-result is-error";
+    els.pilotResult.textContent = error.message || "The request could not be sent. Please try again.";
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Request technical pilot";
+  }
+}
+
 const publicPageTargets = {
   publicHome: "home",
   publicPlatform: "platform",
@@ -15979,6 +16041,7 @@ const publicPageTargets = {
   publicReviews: "reviews",
   publicComparison: "compare",
   publicPricing: "pricing",
+  publicPilot: "pilot",
   publicLegal: "legal",
   loginPanel: "login",
 };
@@ -16327,6 +16390,10 @@ const publicPageMeta = {
     title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
     description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
   },
+  pilot: {
+    title: "Request a Technical Bioprocess Pilot | Axion Process OS",
+    description: "Evaluate Axion Process OS with one customer-owned bioprocess, dataset, scale-up question, or facility decision before choosing a subscription.",
+  },
   legal: {
     title: "Impressum, Privacy and Terms | Axion Process OS",
     description: "Read provider information, privacy, subscription, and engineering-use terms for Axion Process OS.",
@@ -16336,6 +16403,26 @@ const publicPageMeta = {
     description: "Sign in to Axion Process OS or start a professional bioprocess modelling workspace through secure Stripe Checkout.",
   },
 };
+
+const publicPagePaths = {
+  home: "/",
+  platform: "/product",
+  workflow: "/workflow",
+  ecosystem: "/industries",
+  compare: "/compare",
+  readiness: "/security",
+  pricing: "/pricing",
+  pilot: "/pilot",
+  legal: "/legal",
+  login: "/login",
+};
+
+function publicPageFromLocation() {
+  const requested = new URLSearchParams(window.location.search).get("page");
+  if (requested && publicPageMeta[requested]) return requested;
+  const route = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  return Object.entries(publicPagePaths).find(([, path]) => path.replace(/^\/+|\/+$/g, "") === route)?.[0] || "home";
+}
 
 function showPublicPage(page = "home", { scroll = true, focusLogin = false, defaultDetail = true, syncUrl = false } = {}) {
   const targetPage = page || "home";
@@ -16350,8 +16437,11 @@ function showPublicPage(page = "home", { scroll = true, focusLogin = false, defa
   const meta = publicPageMeta[targetPage] || publicPageMeta.home;
   document.title = meta.title;
   document.querySelector('meta[name="description"]')?.setAttribute("content", meta.description);
+  const canonicalUrl = new URL(publicPagePaths[targetPage] || "/", window.location.origin).href;
+  document.querySelector('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
+  document.querySelector('meta[property="og:url"]')?.setAttribute("content", canonicalUrl);
   if (syncUrl) {
-    const nextUrl = targetPage === "home" ? window.location.pathname : `${window.location.pathname}?page=${encodeURIComponent(targetPage)}`;
+    const nextUrl = publicPagePaths[targetPage] || "/";
     window.history.pushState({ publicPage: targetPage }, "", nextUrl);
   }
   if (scroll) {
@@ -16383,7 +16473,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", legal: "publicLegal", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;
@@ -16414,6 +16504,10 @@ function routePublicAction(target = "", { focusLogin = false } = {}) {
 
 function showPublicHome() {
   document.body.classList.add("show-public");
+  els.loginGate?.removeAttribute("inert");
+  els.loginGate?.removeAttribute("aria-hidden");
+  els.appShell?.setAttribute("inert", "");
+  els.appShell?.setAttribute("aria-hidden", "true");
   window.setTimeout(() => showPublicPage("home"), 0);
 }
 
@@ -18072,10 +18166,10 @@ async function checkStoredAuth() {
 
 function bindAuth() {
   loadProductConfig().finally(() => setupGoogleLogin());
-  const requestedPublicPage = new URLSearchParams(window.location.search).get("page") || "home";
+  const requestedPublicPage = publicPageFromLocation();
   showPublicPage(publicPageMeta[requestedPublicPage] ? requestedPublicPage : "home", { scroll: false });
   window.addEventListener("popstate", () => {
-    const page = new URLSearchParams(window.location.search).get("page") || "home";
+    const page = publicPageFromLocation();
     showPublicPage(publicPageMeta[page] ? page : "home", { scroll: false });
   });
 
@@ -18166,6 +18260,11 @@ function bindAuth() {
   els.checkoutForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     createCheckoutOrder();
+  });
+
+  els.pilotForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitPilotRequest();
   });
 
   els.checkoutPlan?.addEventListener("change", () => {

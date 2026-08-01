@@ -1,7 +1,9 @@
 const publicGate = document.querySelector("#loginGate");
 const session = window.localStorage.getItem("axion-session");
 const params = new URLSearchParams(window.location.search);
-const requestedPage = params.get("page") || "home";
+const routePages = { product: "platform", workflow: "workflow", industries: "ecosystem", compare: "compare", security: "readiness", pricing: "pricing", pilot: "pilot", legal: "legal", login: "login" };
+const pathPage = routePages[window.location.pathname.replace(/^\/+|\/+$/g, "")];
+const requestedPage = params.get("page") || pathPage || "home";
 const checkoutReturn = params.has("checkout") || params.has("session_id");
 
 let workspacePromise;

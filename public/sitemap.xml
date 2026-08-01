@@ -2,34 +2,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/</loc>
-    <lastmod>2026-07-29</lastmod>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=platform</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/product</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=workflow</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/workflow</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=ecosystem</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/industries</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=compare</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/compare</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=readiness</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/security</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=pricing</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/pricing</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
   <url>
-    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/?page=legal</loc>
-    <lastmod>2026-07-29</lastmod>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/pilot</loc>
+    <lastmod>2026-07-31</lastmod>
+  </url>
+  <url>
+    <loc>https://mediumturquoise-lapwing-443102.hostingersite.com/legal</loc>
+    <lastmod>2026-07-31</lastmod>
   </url>
 </urlset>

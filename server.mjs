@@ -83,6 +83,7 @@ const config = {
   supabaseStateTable: process.env.SUPABASE_STATE_TABLE || "axion_state",
   supabaseDocumentsTable: process.env.SUPABASE_DOCUMENTS_TABLE || "axion_documents",
   inviteEmailFrom: process.env.INVITE_EMAIL_FROM || "",
+  salesNotificationTo: process.env.SALES_NOTIFICATION_TO || "",
   smtpHost: process.env.SMTP_HOST || "",
   smtpPort: Number(process.env.SMTP_PORT || 587),
   smtpUser: process.env.SMTP_USER || "",
@@ -197,8 +198,11 @@ const defaultDb = {
   automationControlLoops: [],
   automationActions: [],
   automationCommissioningRuns: [],
+  leads: [],
   audit: [],
 };
+
+const publicSubmissionWindows = new Map();
 
 function backendFeatures() {
   return [
@@ -302,6 +306,46 @@ function emailConfigured() {
   return Boolean(config.resendApiKey && config.inviteEmailFrom) || Boolean(config.smtpHost && config.smtpUser && config.smtpPassword && config.inviteEmailFrom);
 }
 
+function escapeEmailHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+async function sendTransactionalEmail({ to, subject, html, text }) {
+  if (!emailConfigured() || !String(to || "").includes("@")) {
+    return { delivered: false, provider: "none", reason: "Email delivery is not configured." };
+  }
+  if (config.resendApiKey) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.resendApiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ from: config.inviteEmailFrom, to, subject, html, text }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || payload.error || `Resend failed with ${response.status}`);
+    return { delivered: true, provider: "resend", id: payload.id || "" };
+  }
+  if (config.smtpHost && config.smtpUser && config.smtpPassword) {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      secure: config.smtpPort === 465,
+      auth: { user: config.smtpUser, pass: config.smtpPassword },
+    });
+    const result = await transporter.sendMail({ from: config.inviteEmailFrom, to, subject, html, text });
+    return { delivered: true, provider: "smtp", id: result.messageId || "" };
+  }
+  return { delivered: false, provider: "none", reason: "No production email provider is configured." };
+}
+
 function productionReadiness() {
   const isHttps = config.appBaseUrl.startsWith("https://");
   const sessionSecretReady = Boolean(config.sessionSecret && config.sessionSecret !== "axion-local-dev-secret" && config.sessionSecret.length >= 32);
@@ -310,6 +354,7 @@ function productionReadiness() {
   const stripeReady = Boolean(config.stripeSecretKey && /^sk_(live|test)_/.test(config.stripeSecretKey) && config.stripeWebhookSecret && isHttps);
   const emailMissing = [];
   if (!config.inviteEmailFrom) emailMissing.push("INVITE_EMAIL_FROM");
+  if (!config.salesNotificationTo) emailMissing.push("SALES_NOTIFICATION_TO");
   if (!config.resendApiKey && !(config.smtpHost && config.smtpUser && config.smtpPassword)) {
     emailMissing.push("RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD");
   }
@@ -343,12 +388,12 @@ function productionReadiness() {
     },
     {
       key: "email",
-      label: "Invite email delivery",
-      ready: emailConfigured(),
+      label: "Invite + sales email delivery",
+      ready: emailConfigured() && Boolean(config.salesNotificationTo),
       missing: emailMissing,
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
-      ownerAction: "Verify a sending domain in Resend or configure SMTP, then store the email provider secret in the backend host.",
+      ownerAction: "Verify a sending domain in Resend or configure SMTP, then store the provider secret, sender address, and sales notification inbox in the backend host.",
     },
     {
       key: "deployment",
@@ -1248,46 +1293,115 @@ async function sendInviteEmail(invite, project) {
     </div>
   `;
   const text = `You have been invited to collaborate on ${project.name} in Axion Process OS as ${invite.role}. Open: ${inviteUrl}`;
-  if (config.resendApiKey) {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${config.resendApiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        from: config.inviteEmailFrom,
-        to: invite.recipient,
-        subject,
-        html,
-        text,
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || payload.error || `Resend failed with ${response.status}`);
-    return { delivered: true, provider: "resend", id: payload.id || "" };
+  return sendTransactionalEmail({ to: invite.recipient, subject, html, text });
+}
+
+function cleanPublicField(value, maxLength = 240) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function publicRequestFingerprint(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  const address = forwarded || req.socket?.remoteAddress || "unknown";
+  return createHash("sha256").update(`${config.sessionSecret}:${address}`).digest("hex").slice(0, 20);
+}
+
+function consumePublicSubmission(req, limit = 5, windowMs = 60 * 60 * 1000) {
+  const key = publicRequestFingerprint(req);
+  const now = Date.now();
+  const recent = (publicSubmissionWindows.get(key) || []).filter((at) => now - at < windowMs);
+  if (recent.length >= limit) return false;
+  recent.push(now);
+  publicSubmissionWindows.set(key, recent);
+  return true;
+}
+
+async function createPilotLead(req, res) {
+  if (!consumePublicSubmission(req)) {
+    json(res, 429, { error: "Too many requests. Please try again later." });
+    return;
   }
-  if (config.smtpHost && config.smtpUser && config.smtpPassword) {
-    const nodemailer = await import("nodemailer");
-    const transporter = nodemailer.createTransport({
-      host: config.smtpHost,
-      port: config.smtpPort,
-      secure: config.smtpPort === 465,
-      auth: {
-        user: config.smtpUser,
-        pass: config.smtpPassword,
-      },
-    });
-    const result = await transporter.sendMail({
-      from: config.inviteEmailFrom,
-      to: invite.recipient,
-      subject,
-      html,
-      text,
-    });
-    return { delivered: true, provider: "smtp", id: result.messageId || "" };
+  const body = await parseBody(req);
+  if (cleanPublicField(body.website, 120)) {
+    json(res, 201, { accepted: true, reference: "AXION-PILOT" });
+    return;
   }
-  return { delivered: false, provider: "none", reason: "No production email provider is configured." };
+  const name = cleanPublicField(body.name, 120);
+  const email = cleanPublicField(body.email, 180).toLowerCase();
+  const company = cleanPublicField(body.company, 180);
+  const role = cleanPublicField(body.role, 120);
+  const process = cleanPublicField(body.process, 160);
+  const challenge = cleanPublicField(body.challenge, 1800);
+  const consent = body.consent === true;
+  if (name.length < 2 || company.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    json(res, 400, { error: "Enter your name, company, and a valid work email." });
+    return;
+  }
+  if (!process || challenge.length < 20) {
+    json(res, 400, { error: "Choose a process area and describe the engineering question in at least 20 characters." });
+    return;
+  }
+  if (!consent) {
+    json(res, 400, { error: "Consent is required so Axion can respond to this request." });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  const createdAt = new Date().toISOString();
+  const lead = {
+    id: randomUUID(),
+    reference: `PILOT-${randomBytes(3).toString("hex").toUpperCase()}`,
+    name,
+    email,
+    company,
+    role,
+    process,
+    challenge,
+    status: "new",
+    source: cleanPublicField(body.source || "website", 120),
+    campaign: cleanPublicField(body.campaign, 120),
+    landingPage: cleanPublicField(body.landingPage, 320),
+    requestFingerprint: publicRequestFingerprint(req),
+    createdAt,
+    notification: { delivered: false, provider: "none" },
+  };
+  db.leads.unshift(lead);
+  db.audit.unshift({ at: createdAt, type: "pilot.requested", leadId: lead.id, reference: lead.reference, process });
+  await saveDb(db);
+
+  if (config.salesNotificationTo && emailConfigured()) {
+    try {
+      const safe = Object.fromEntries(Object.entries({ name, email, company, role, process, challenge }).map(([key, value]) => [key, escapeEmailHtml(value)]));
+      lead.notification = await sendTransactionalEmail({
+        to: config.salesNotificationTo,
+        subject: `${lead.reference} · ${company} technical pilot request`,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#0b1725"><h2>New Axion technical pilot request</h2><p><strong>${safe.name}</strong> · ${safe.role || "Role not supplied"}<br />${safe.company}<br /><a href="mailto:${safe.email}">${safe.email}</a></p><p><strong>Process</strong><br />${safe.process}</p><p><strong>Engineering question</strong><br />${safe.challenge}</p><p>Reference: ${lead.reference}</p></div>`,
+        text: `New Axion technical pilot request\n${name} · ${role}\n${company}\n${email}\nProcess: ${process}\nQuestion: ${challenge}\nReference: ${lead.reference}`,
+      });
+      await saveDb(db);
+    } catch (error) {
+      lead.notification = { delivered: false, provider: "error", error: cleanPublicField(error.message, 240) };
+      await saveDb(db);
+    }
+  }
+  json(res, 201, {
+    accepted: true,
+    reference: lead.reference,
+    delivery: lead.notification.delivered ? "notified" : "stored",
+    message: "Your process evaluation request has been received.",
+  });
+}
+
+async function listPilotLeads(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session || session.role !== "admin") {
+    json(res, 403, { error: "Admin access required" });
+    return;
+  }
+  const db = ensureDbShape(await loadDb());
+  json(res, 200, {
+    leads: db.leads.map(({ requestFingerprint, ...lead }) => lead),
+    count: db.leads.length,
+  });
 }
 
 function billingProfileForSession(session) {
@@ -1551,6 +1665,7 @@ function ensureDbShape(db) {
   db.automationControlLoops ||= [];
   db.automationActions ||= [];
   db.automationCommissioningRuns ||= [];
+  db.leads ||= [];
   db.audit ||= [];
   seedUsers(db);
   return db;
@@ -5373,6 +5488,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     json(res, 200, publicConfig());
     return;
   }
+  if (req.method === "POST" && pathname === "/api/leads/pilot") {
+    await createPilotLead(req, res);
+    return;
+  }
   const checkoutSessionMatch = pathname.match(/^\/api\/checkout\/session\/([^/]+)$/);
   if (req.method === "GET" && checkoutSessionMatch) {
     await checkoutSessionStatus(req, res, decodeURIComponent(checkoutSessionMatch[1]));
@@ -5605,6 +5724,10 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await listOrders(req, res);
     return;
   }
+  if (req.method === "GET" && pathname === "/api/admin/leads") {
+    await listPilotLeads(req, res);
+    return;
+  }
   const paidMatch = pathname.match(/^\/api\/admin\/orders\/([^/]+)\/mark-paid$/);
   if (req.method === "POST" && paidMatch) {
     await markPaid(req, res, decodeURIComponent(paidMatch[1]));
@@ -5650,8 +5773,40 @@ function serveStatic(req, res, pathname) {
   createReadStream(filePath).pipe(res);
 }
 
+function applySecurityHeaders(res) {
+  res.setHeader("x-content-type-options", "nosniff");
+  res.setHeader("x-frame-options", "DENY");
+  res.setHeader("referrer-policy", "strict-origin-when-cross-origin");
+  res.setHeader("cross-origin-opener-policy", "same-origin-allow-popups");
+  res.setHeader("cross-origin-resource-policy", "same-site");
+  res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=(), usb=(), payment=(self)");
+  res.setHeader(
+    "content-security-policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self' https://checkout.stripe.com",
+      "script-src 'self' 'unsafe-inline' https://accounts.google.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com",
+      "frame-src https://accounts.google.com",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
+      "upgrade-insecure-requests",
+    ].join("; "),
+  );
+  if (config.appBaseUrl.startsWith("https://")) {
+    res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
+  }
+}
+
 const server = createServer(async (req, res) => {
   try {
+    applySecurityHeaders(res);
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (url.pathname.startsWith("/api/")) {
       await routeApi(req, res, url.pathname, url.searchParams);
