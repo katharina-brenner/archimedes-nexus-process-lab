@@ -28,7 +28,7 @@ try {
     /frame-ancestors 'none'/.test(csp) ? csp : hasDocumentCsp ? "document policy + X-Frame-Options DENY" : csp || "missing",
   );
 
-  for (const route of ["/product", "/workflow", "/industries", "/pricing", "/pilot", "/legal"]) {
+  for (const route of ["/product", "/workflow", "/solutions", "/pricing", "/pilot", "/legal"]) {
     const page = await get(route);
     record(`Public route ${route}`, page.response.ok && page.text.includes("Axion Process OS"), `${page.response.status}`);
   }

@@ -16290,6 +16290,30 @@ const publicDetailStories = {
     visual: [["Use cases", "Facility design, capacity, CAPEX"], ["Teams", "Process, digital, simulation"], ["Output", "Team workspace + reports"]],
     actions: [["legacy-migration", "See migration"], ["pricing", "See pricing"], ["login", "Open workspace"]],
   },
+  "target-rd": {
+    eyebrow: "Solution for process development",
+    title: "Move from experimental biology to a scalable process definition",
+    body: "Axion gives process-development and R&D teams one place to define the production mode, build the route, calibrate kinetics, expose scale-dependent limits, and compare the consequences before committing to a pilot or commercial design.",
+    points: ["Model batch, fed-batch, perfusion, and continuous operation with mode-specific balances and dynamic profiles.", "Connect titer, VCD, substrate, product, oxygen, heat, ammonium, lactate, pH, osmolality, shear, and recovery assumptions to the flowsheet.", "Export the selected scenario, sensitivity ranges, physical boundaries, missing data, and validation plan for technical review."],
+    visual: [["Owns", "Process architecture + scale-up basis"], ["Uses", "ODE/PDE dynamics, balances, CFD screening"], ["Decides", "Scale, mode, feed, recovery, next experiment"], ["Hands off", "Process definition + evidence gaps"]],
+    actions: [["mab-upstream", "See upstream example"], ["mab-cfd", "See scale-up physics"], ["login", "Open workspace"]],
+  },
+  "target-msat": {
+    eyebrow: "Solution for MSAT and manufacturing",
+    title: "Turn the process definition into an executable facility plan",
+    body: "MSAT, tech-transfer, and manufacturing-engineering teams use Axion to reconcile the recipe with real equipment, campaign timing, cleaning, hold times, utilities, operators, storage, maintenance, and plant data.",
+    points: ["Schedule every reusable asset across production, transfer, CIP/SIP, release, maintenance, and turnaround states.", "Expose shared-resource conflicts, queue time, utilization, bottlenecks, inventory risk, and annual throughput.", "Map historian, SCADA, OPC UA, batch-record, and company-uploaded data to the variables that govern the model."],
+    visual: [["Owns", "Tech transfer + facility performance"], ["Uses", "Scheduling, resources, equipment states"], ["Decides", "Campaign, capacity, bottleneck, change"], ["Hands off", "Executable plan + readiness worklist"]],
+    actions: [["dynamic-twin", "See live-data path"], ["connectors", "See integrations"], ["login", "Open workspace"]],
+  },
+  "target-tea": {
+    eyebrow: "Solution for TEA, LCA, and strategy",
+    title: "Compare technical options without disconnecting economics from the plant",
+    body: "TEA, LCA, and strategy teams use the same process basis as engineering, so media, feeds, recovery, equipment, utilization, utilities, water, waste, labor, quality, CAPEX, and uncertainty remain traceable to the scenario being evaluated.",
+    points: ["Calculate per-batch, annual, and per-kg material, utility, waste, emissions, labor, facility, and capital drivers.", "Compare scenarios with intervals, sensitivity rankings, uncertainty bands, NPV, IRR, payback, and break-even assumptions.", "Download long-form Excel, CSV, SVG, JSON, process-flow, and evidence-gap packages for independent review."],
+    visual: [["Owns", "Business case + sustainability basis"], ["Uses", "TEA, LCA, uncertainty, sensitivity"], ["Decides", "Route, scale, investment, improvement"], ["Hands off", "Auditable datasets + scenario comparison"]],
+    actions: [["economics-upgrade", "See economics"], ["uncertainty", "See uncertainty"], ["login", "Open workspace"]],
+  },
   "target-biopharma": {
     eyebrow: "Workflow example",
     title: "Biopharma, CDMO, and MSAT teams",
@@ -16363,8 +16387,8 @@ function openPublicDetail(key = "mab-overview", { scroll = true } = {}) {
 
 const publicPageMeta = {
   home: {
-    title: "Bioprocess Simulation, Process Design & Digital Twin | Axion Process OS",
-    description: "Browser-based bioprocess simulation and plant design for flowsheets, balances, scheduling, CFD screening, TEA, LCA, collaboration and model versioning.",
+    title: "Bioprocess Engineering Software for Process Development & MSAT | Axion",
+    description: "One shared engineering model for process development, MSAT, plant engineering and TEA/LCA teams, from flowsheet and scale-up through scheduling and investment review.",
   },
   platform: {
     title: "Bioprocess Engineering Platform | Axion Process OS",
@@ -16375,8 +16399,8 @@ const publicPageMeta = {
     description: "Move from product brief to process model, simulation, scheduling, TEA, LCA and technical review in one connected engineering workflow.",
   },
   ecosystem: {
-    title: "Biopharma, Fermentation & Food Process Modelling | Axion",
-    description: "Explore Axion workflows for biopharma, CDMO, fermentation, cultivated meat, industrial biotech and process-engineering teams.",
+    title: "Bioprocess Engineering Solutions by Role & Industry | Axion",
+    description: "Explore Axion solutions for process development, MSAT, plant engineering, TEA/LCA, biopharma, CDMOs, fermentation, food biotech and industrial manufacturing.",
   },
   compare: {
     title: "SuperPro Designer Alternative for Collaborative Bioprocess Design | Axion",
@@ -16408,7 +16432,7 @@ const publicPagePaths = {
   home: "/",
   platform: "/product",
   workflow: "/workflow",
-  ecosystem: "/industries",
+  ecosystem: "/solutions",
   compare: "/compare",
   readiness: "/security",
   pricing: "/pricing",
@@ -16421,6 +16445,7 @@ function publicPageFromLocation() {
   const requested = new URLSearchParams(window.location.search).get("page");
   if (requested && publicPageMeta[requested]) return requested;
   const route = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  if (["solutions", "industries"].includes(route)) return "ecosystem";
   return Object.entries(publicPagePaths).find(([, path]) => path.replace(/^\/+|\/+$/g, "") === route)?.[0] || "home";
 }
 
@@ -16473,7 +16498,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", solutions: "publicEcosystem", industries: "publicEcosystem", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;

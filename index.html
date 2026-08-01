@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self' https://checkout.stripe.com; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Industrial Bioprocess &amp; Chemical Plant Design | Axion Process OS</title>
-    <meta name="description" content="Browser-based industrial biomanufacturing plant design for stainless-steel process trains, flowsheets, balances, scheduling, CFD screening, TEA, LCA and autonomous factory scenarios." />
+    <title>Bioprocess Engineering Software for Process Development &amp; MSAT | Axion</title>
+    <meta name="description" content="Browser-based bioprocess engineering for process development, MSAT, plant engineering and TEA/LCA teams: flowsheets, dynamics, scheduling, CFD screening, economics, sustainability and engineering exports." />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="theme-color" content="#07131c" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="./assets/axion-favicon.svg?v=20260729" />
@@ -19,7 +19,7 @@
     <meta property="og:image" content="https://mediumturquoise-lapwing-443102.hostingersite.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260731-monthly-pricing-v3" />
+    <link rel="stylesheet" href="./styles.css?v=20260801-solutions-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -58,6 +58,10 @@
             "operatingSystem": "Web browser",
             "url": "https://mediumturquoise-lapwing-443102.hostingersite.com/",
             "description": "Browser-based bioprocess plant design with flowsheets, balances, scheduling, CFD screening, TEA, LCA, collaboration, versioning and engineering exports.",
+            "audience": {
+              "@type": "BusinessAudience",
+              "audienceType": "Process development, MSAT, manufacturing engineering, plant engineering, TEA and LCA teams"
+            },
             "featureList": [
               "Bioprocess flowsheet and equipment builder",
               "Mass and energy balances",
@@ -94,7 +98,7 @@
           <nav>
             <a href="./product" data-public-target="publicPlatform">Product</a>
             <a href="./workflow" data-public-target="publicWorkflow">How it works</a>
-            <a href="./industries" data-public-target="publicEcosystem">Industries</a>
+            <a href="./solutions" data-public-target="publicEcosystem">Solutions</a>
             <a href="./pricing" data-public-target="publicPricing">Pricing</a>
             <a href="./pilot" data-public-target="publicPilot">Request pilot</a>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
@@ -109,7 +113,7 @@
                 <div class="clarity-hero-copy">
                   <p>Axion Process OS</p>
                   <h1>Bioprocess engineering for the whole plant.</h1>
-                  <span>Build the flowsheet, simulate operations, evaluate scale-up, and export the engineering evidence in one browser workspace.</span>
+                  <span>One shared engineering model for process development, MSAT, plant engineering, and TEA/LCA teams.</span>
                   <div class="clarity-hero-actions">
                     <button class="public-primary" type="button" data-public-target="publicPilot">Request a technical pilot</button>
                     <button id="openLoginHero" class="public-secondary" type="button">Open workspace</button>
@@ -123,6 +127,66 @@
                   <span>TEA + LCA</span>
                 </div>
                 <small>Real industrial process installation · Weihenstephan</small>
+              </section>
+
+              <section class="clarity-audience" aria-label="Who should use Axion Process OS">
+                <header>
+                  <p>Who it is for</p>
+                  <h2>Built for teams turning biology into an operable factory.</h2>
+                  <span>Axion is most valuable when process design, scale-up, facility operations, and economics must agree on the same assumptions.</span>
+                </header>
+                <div class="clarity-role-grid">
+                  <article>
+                    <span>Process development</span>
+                    <h3>Design and scale the process.</h3>
+                    <p>Build batch, fed-batch, perfusion, or continuous routes; test yields, kinetics, media strategy, oxygen transfer, recovery, and physical limits.</p>
+                    <strong>Primary result</strong>
+                    <small>An editable process architecture with balances, boundaries, sensitivity ranges, and scale-up gaps.</small>
+                    <button type="button" data-public-detail="target-rd">See process-development workflow</button>
+                  </article>
+                  <article>
+                    <span>MSAT + manufacturing</span>
+                    <h3>Make the process operable.</h3>
+                    <p>Plan tech transfer, campaigns, equipment reuse, CIP/SIP, hold times, shared utilities, staffing, bottlenecks, and plant-data integration.</p>
+                    <strong>Primary result</strong>
+                    <small>A facility schedule, capacity envelope, resource conflicts, and a traceable readiness plan.</small>
+                    <button type="button" data-public-detail="target-msat">See manufacturing workflow</button>
+                  </article>
+                  <article>
+                    <span>Plant + project engineering</span>
+                    <h3>Define the facility concept.</h3>
+                    <p>Compare equipment trains, sizes, parallelization, utilities, cleaning systems, heat recovery, waste treatment, CAPEX, and facility fit.</p>
+                    <strong>Primary result</strong>
+                    <small>A reviewable whole-plant concept with PFD, equipment register, duties, utilities, and investment assumptions.</small>
+                    <button type="button" data-public-detail="target-engineering">See plant-engineering workflow</button>
+                  </article>
+                  <article>
+                    <span>TEA + LCA + strategy</span>
+                    <h3>Choose the defensible option.</h3>
+                    <p>Quantify COGS, CAPEX, water, energy, waste, emissions, uncertainty, and the effect of titer, recovery, media, utilization, and scale.</p>
+                    <strong>Primary result</strong>
+                    <small>Long-form decision datasets, sensitivity analysis, scenario comparisons, and an explicit evidence trail.</small>
+                    <button type="button" data-public-detail="target-tea">See decision workflow</button>
+                  </article>
+                </div>
+                <div class="clarity-fit-note">
+                  <div><b>Best fit</b><span>Biopharma, CDMOs, industrial biotech, precision fermentation, cultivated products, enzymes, food processing, and engineering partners.</span></div>
+                  <div><b>Use it for</b><span>Concept design, scale-up, tech transfer, facility fit, debottlenecking, COGS, sustainability, supplier review, and investment decisions.</span></div>
+                </div>
+              </section>
+
+              <section class="clarity-decisions" aria-label="Decisions supported by Axion">
+                <header>
+                  <p>What it solves</p>
+                  <h2>Start with the decision, not the module.</h2>
+                </header>
+                <div class="clarity-decision-table" role="table" aria-label="Engineering question to Axion output">
+                  <div class="clarity-decision-head" role="row"><span role="columnheader">Engineering question</span><span role="columnheader">Axion connects</span><span role="columnheader">Decision output</span></div>
+                  <article role="row"><strong role="cell">Can this process scale without losing productivity or quality?</strong><span role="cell">ODE/PDE kinetics, mass transfer, feeds, working volume, heat, CFD screening, biochemical limits</span><b role="cell">Scale-up or scale-out recommendation with operating envelope and missing validation work</b></article>
+                  <article role="row"><strong role="cell">Can this facility meet the required annual demand?</strong><span role="cell">Batch scheduling, equipment states, CIP/SIP, hold times, labor, utilities, storage, maintenance</span><b role="cell">Throughput, utilization, bottlenecks, campaign plan, and required equipment changes</b></article>
+                  <article role="row"><strong role="cell">Which process route should we fund or transfer?</strong><span role="cell">Yield, titer, recovery, materials, consumables, CAPEX, OPEX, uncertainty, NPV and sensitivity</span><b role="cell">Comparable scenarios with cost ranges, dominant drivers, and traceable assumptions</b></article>
+                  <article role="row"><strong role="cell">What evidence is still missing before design review?</strong><span role="cell">Plant data, literature, supplier quotes, standards, SOPs, model validity, source ownership</span><b role="cell">Output-specific readiness score and a prioritized engineering worklist</b></article>
+                </div>
               </section>
 
               <section id="how-it-works" class="clarity-workflow" aria-label="How Axion works">
@@ -797,8 +861,8 @@
 
           <section id="publicEcosystem" class="public-section public-ecosystem public-page" data-public-page="ecosystem">
             <div class="section-heading">
-              <p>Partner-ready ecosystem</p>
-              <h2>Built for the stakeholders around a bioprocess project.</h2>
+              <p>Solutions by role and sector</p>
+              <h2>One model, configured for the decision your team owns.</h2>
             </div>
             <div class="public-subpage-gallery public-pointer-scene" aria-label="Real industrial ecosystem context">
               <figure class="public-photo-feature public-photo-wide">
@@ -1310,7 +1374,19 @@
                 <label><span>Name</span><input id="pilotName" name="name" autocomplete="name" required placeholder="Your name" /></label>
                 <label><span>Work email</span><input id="pilotEmail" name="email" type="email" autocomplete="email" required placeholder="name@company.com" /></label>
                 <label><span>Company or university</span><input id="pilotCompany" name="company" autocomplete="organization" required placeholder="Organisation" /></label>
-                <label><span>Role</span><input id="pilotRole" name="role" autocomplete="organization-title" placeholder="Process development, MSAT, engineering..." /></label>
+                <label><span>Your role</span>
+                  <select id="pilotRole" name="role" autocomplete="organization-title">
+                    <option value="">Select role</option>
+                    <option>Process development / R&amp;D</option>
+                    <option>MSAT / tech transfer</option>
+                    <option>Manufacturing / operations</option>
+                    <option>Plant / project engineering</option>
+                    <option>TEA / LCA / strategy</option>
+                    <option>CDMO / engineering consulting</option>
+                    <option>Academic research</option>
+                    <option>Other</option>
+                  </select>
+                </label>
                 <label class="pilot-form-wide"><span>Process area</span>
                   <select id="pilotProcess" name="process" required>
                     <option value="">Choose a process area</option>
@@ -1866,6 +1942,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260731-engineering-export-v2"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260801-solutions-v1"></script>
   </body>
 </html>
