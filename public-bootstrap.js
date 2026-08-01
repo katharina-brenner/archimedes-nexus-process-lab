@@ -144,7 +144,11 @@ async function submitPublicEngineeringBrief(event) {
 
 if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 
-const requiresWorkspaceBundle = session || checkoutReturn || ["login", "pricing", "pilot"].includes(requestedPage);
+const lightweightPublicPages = new Set(["home", "platform", "workflow", "ecosystem", "resources", "compare", "readiness", "legal"]);
+const requiresWorkspaceBundle = checkoutReturn
+  || ["login", "pricing", "pilot"].includes(requestedPage)
+  || !lightweightPublicPages.has(requestedPage)
+  || (Boolean(session) && requestedPage === "home");
 
 if (requiresWorkspaceBundle) {
   loadWorkspace();

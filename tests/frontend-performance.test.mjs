@@ -11,7 +11,9 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.match(indexHtml, /src="\.\/public-bootstrap\.js\?v=/);
   assert.doesNotMatch(indexHtml, /<script[^>]+src="\.\/app\.js/);
   assert.match(bootstrap, /import\("\.\/app\.js\?v=/);
-  assert.match(bootstrap, /const requiresWorkspaceBundle = session \|\| checkoutReturn \|\| \["login", "pricing", "pilot"\]\.includes\(requestedPage\)/);
+  assert.match(bootstrap, /const lightweightPublicPages = new Set/);
+  assert.match(bootstrap, /\(Boolean\(session\) && requestedPage === "home"\)/);
+  assert.match(bootstrap, /!lightweightPublicPages\.has\(requestedPage\)/);
   assert.match(bootstrap, /#publicBriefSignupForm/);
   assert.match(bootstrap, /showRequestedPublicPageImmediately\(requestedPage\)/);
   assert.match(indexHtml, /data-checkout-plan="academic"/);
