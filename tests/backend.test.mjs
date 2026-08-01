@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -843,5 +843,27 @@ test("Stripe subscription checkout activates access and opens the billing portal
   } finally {
     await stopServer(server);
     await stripeMock.close();
+  }
+});
+
+test("production static routes fall back to the app when a public directory shares the route name", async () => {
+  const staticHome = await mkdtemp(join(tmpdir(), "axion-static-test-"));
+  await mkdir(join(staticHome, "resources"));
+  await writeFile(join(staticHome, "index.html"), "<!doctype html><html><head><title>Axion</title></head><body><main id=\"publicResources\">Resource center</main></body></html>");
+  await writeFile(join(staticHome, "resources", "checklist.csv"), "field,value\nstatus,ready\n");
+  const server = await startServer({ AXION_STATIC_DIR: staticHome, NODE_ENV: "production" });
+  try {
+    const resourcePage = await fetch(`${server.baseUrl}/resources`);
+    assert.equal(resourcePage.status, 200);
+    assert.match(resourcePage.headers.get("content-type"), /text\/html/);
+    assert.match(await resourcePage.text(), /Resource center/);
+
+    const resourceFile = await fetch(`${server.baseUrl}/resources/checklist.csv`);
+    assert.equal(resourceFile.status, 200);
+    assert.match(resourceFile.headers.get("content-type"), /text\/csv/);
+    assert.match(await resourceFile.text(), /status,ready/);
+  } finally {
+    await stopServer(server);
+    await rm(staticHome, { recursive: true, force: true });
   }
 });

@@ -5950,12 +5950,12 @@ function serveStatic(req, res, pathname) {
     res.end("Forbidden");
     return;
   }
-  if (!existsSync(filePath) && staticRootDir === rootDir) {
+  if (!isRegularFile(filePath) && staticRootDir === rootDir) {
     const publicRoot = join(rootDir, "public");
     const publicFilePath = resolve(publicRoot, `.${clean}`);
-    if (publicFilePath.startsWith(publicRoot) && existsSync(publicFilePath) && statSync(publicFilePath).isFile()) filePath = publicFilePath;
+    if (publicFilePath.startsWith(publicRoot) && isRegularFile(publicFilePath)) filePath = publicFilePath;
   }
-  if (!existsSync(filePath)) {
+  if (!isRegularFile(filePath)) {
     const fallback = join(staticRootDir, "index.html");
     const body = renderPublicHtml(pathname, fallback);
     res.writeHead(200, {
@@ -5981,6 +5981,14 @@ function serveStatic(req, res, pathname) {
     return;
   }
   createReadStream(filePath).pipe(res);
+}
+
+function isRegularFile(pathname) {
+  try {
+    return statSync(pathname).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function applySecurityHeaders(res) {
