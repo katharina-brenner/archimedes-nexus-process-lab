@@ -782,6 +782,7 @@ test("Stripe subscription checkout activates access and opens the billing portal
     assert.equal(checkout.payload.order.amount, 2490);
     assert.equal(stripeMock.received.checkout.mode, "subscription");
     assert.equal(stripeMock.received.checkout["line_items[0][price]"], "price_test_team_monthly");
+    assert.equal(stripeMock.received.checkout["automatic_payment_methods[enabled]"], undefined);
     assert.equal(stripeMock.received.checkout.billing_address_collection, "required");
     assert.equal(stripeMock.received.checkout["tax_id_collection[enabled]"], "true");
 

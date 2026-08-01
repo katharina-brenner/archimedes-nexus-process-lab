@@ -1680,7 +1680,6 @@ async function createCheckout(req, res) {
     "metadata[customerEmail]": customerEmail,
     "metadata[planId]": selectedPlan.id,
     "metadata[planName]": selectedPlan.name,
-    "automatic_payment_methods[enabled]": "true",
     billing_address_collection: "required",
     "tax_id_collection[enabled]": "true",
     allow_promotion_codes: "true",
