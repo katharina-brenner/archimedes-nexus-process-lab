@@ -147,6 +147,20 @@ async function bindLightweightLogin() {
   });
 
   try {
+    if (session) {
+      status.textContent = "Restoring your secure workspace session.";
+      try {
+        const restored = await lightweightApiRequest("/api/account", {
+          headers: { authorization: `Bearer ${session}` },
+        });
+        await openAuthenticatedWorkspace({ token: session, account: restored.account || null }, controls);
+        return;
+      } catch {
+        window.localStorage.removeItem("axion-session");
+        status.textContent = "Secure workspace ready.";
+      }
+    }
+
     const product = await lightweightApiRequest("/api/product");
     status.textContent = product?.productName ? "Secure workspace ready." : "Backend online.";
     const checkoutAvailable = Boolean(product?.payments?.stripeEnabled);
@@ -370,7 +384,7 @@ const lightweightPublicPages = new Set([
 const requiresWorkspaceBundle = checkoutReturn
   || ["pricing", "pilot"].includes(requestedPage)
   || !lightweightPublicPages.has(requestedPage)
-  || (Boolean(session) && ["home", "login"].includes(requestedPage));
+  || (Boolean(session) && requestedPage === "home");
 
 if (requiresWorkspaceBundle) {
   loadWorkspace();

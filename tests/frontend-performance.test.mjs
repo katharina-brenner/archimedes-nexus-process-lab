@@ -18,7 +18,9 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.match(bootstrap, /\["pricing", "pilot"\]\.includes\(requestedPage\)/);
   assert.doesNotMatch(bootstrap, /\["login", "pricing", "pilot"\]\.includes\(requestedPage\)/);
   assert.match(bootstrap, /"legal", "login"/);
-  assert.match(bootstrap, /\(Boolean\(session\) && \["home", "login"\]\.includes\(requestedPage\)\)/);
+  assert.match(bootstrap, /\(Boolean\(session\) && requestedPage === "home"\)/);
+  assert.match(bootstrap, /lightweightApiRequest\("\/api\/account"/);
+  assert.match(bootstrap, /authorization: `Bearer \$\{session\}`/);
   assert.match(bootstrap, /!lightweightPublicPages\.has\(requestedPage\)/);
   assert.match(bootstrap, /#publicBriefSignupForm/);
   assert.match(bootstrap, /showRequestedPublicPageImmediately\(requestedPage\)/);
