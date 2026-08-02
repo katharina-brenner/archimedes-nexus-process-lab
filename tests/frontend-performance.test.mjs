@@ -12,7 +12,13 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.doesNotMatch(indexHtml, /<script[^>]+src="\.\/app\.js/);
   assert.match(bootstrap, /import\("\.\/app\.js\?v=/);
   assert.match(bootstrap, /const lightweightPublicPages = new Set/);
-  assert.match(bootstrap, /\(Boolean\(session\) && requestedPage === "home"\)/);
+  assert.match(bootstrap, /bindLightweightLogin\(\)/);
+  assert.match(bootstrap, /checkoutForm\.addEventListener\("focusin", loadCheckoutWorkspace/);
+  assert.match(bootstrap, /checkoutForm\.requestSubmit\(\)/);
+  assert.match(bootstrap, /\["pricing", "pilot"\]\.includes\(requestedPage\)/);
+  assert.doesNotMatch(bootstrap, /\["login", "pricing", "pilot"\]\.includes\(requestedPage\)/);
+  assert.match(bootstrap, /"legal", "login"/);
+  assert.match(bootstrap, /\(Boolean\(session\) && \["home", "login"\]\.includes\(requestedPage\)\)/);
   assert.match(bootstrap, /!lightweightPublicPages\.has\(requestedPage\)/);
   assert.match(bootstrap, /#publicBriefSignupForm/);
   assert.match(bootstrap, /showRequestedPublicPageImmediately\(requestedPage\)/);
@@ -21,6 +27,16 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.match(indexHtml, /data-checkout-plan="team"/);
   assert.match(indexHtml, /data-checkout-plan="enterprise"/);
   assert.match(indexHtml, /id="checkoutPlan"/);
+});
+
+test("workspace initialization waits for verified authentication", async () => {
+  const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+
+  assert.match(app, /function initializeAuthenticatedWorkspace\(\)/);
+  assert.match(app, /if \(authenticated\) initializeAuthenticatedWorkspace\(\)/);
+  assert.match(app, /window\.__AXION_AUTH_BOOTSTRAP__/);
+  assert.match(app, /window\.__AXION_ACCEPT_AUTH__ = \(payload\)/);
+  assert.doesNotMatch(app, /bindPublicPointerMotion\(\);\s*bindEvents\(\);\s*loadTemplate/);
 });
 
 test("global parameters use full-width responsive controls and defer expensive recalculation", async () => {

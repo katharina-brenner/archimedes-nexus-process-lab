@@ -49,8 +49,173 @@ const publicTargetPaths = {
 let workspacePromise;
 
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260801-global-parameters-v1");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260802-fast-login-v1");
   return workspacePromise;
+}
+
+async function lightweightApiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "The secure workspace could not be reached.");
+  return payload;
+}
+
+async function openAuthenticatedWorkspace(payload, controls = {}) {
+  if (!payload?.token) throw new Error("The login response did not contain a session token.");
+  window.localStorage.setItem("axion-session", payload.token);
+  window.__AXION_AUTH_BOOTSTRAP__ = { token: payload.token, account: payload.account || null };
+  if (controls.password) controls.password.value = "";
+  if (controls.button) {
+    controls.button.disabled = true;
+    controls.button.textContent = "Opening workspace...";
+  }
+  if (controls.status) controls.status.textContent = "Access verified. Preparing your engineering workspace.";
+  if (typeof window.__AXION_ACCEPT_AUTH__ === "function") {
+    window.__AXION_ACCEPT_AUTH__(payload);
+    return;
+  }
+  await loadWorkspace();
+}
+
+function loadGoogleIdentityScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector("script[data-google-identity]");
+    if (existing) {
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentity = "true";
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", reject, { once: true });
+    document.head.append(script);
+  });
+}
+
+async function bindLightweightLogin() {
+  const form = document.querySelector("#loginForm");
+  if (!form || form.dataset.lightweightLoginBound === "true") return;
+  form.dataset.lightweightLoginBound = "true";
+  const user = form.querySelector("#loginUser");
+  const password = form.querySelector("#loginPassword");
+  const error = form.querySelector("#loginError");
+  const status = form.querySelector("#loginOrigin");
+  const button = form.querySelector('button[type="submit"]');
+  const googleFallback = form.querySelector("#googleLoginFallback");
+  const googleStatus = form.querySelector("#googleLoginStatus");
+  const googleMount = form.querySelector("#googleButtonMount");
+  const checkoutForm = document.querySelector("#checkoutForm");
+  const checkoutUnavailable = document.querySelector("#checkoutUnavailable");
+  const controls = { password, status, button };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    error.textContent = "";
+    if (!user.value.trim() || !password.value) {
+      error.textContent = "Enter your username and password.";
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Checking access...";
+    status.textContent = "Verifying your private workspace access.";
+    try {
+      const payload = await lightweightApiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ user: user.value.trim(), password: password.value, licenseKey: password.value }),
+      });
+      await openAuthenticatedWorkspace(payload, controls);
+    } catch (requestError) {
+      button.disabled = false;
+      button.textContent = "Enter workspace";
+      status.textContent = "Secure workspace ready.";
+      error.textContent = requestError.message || "Access denied. Check your credentials.";
+    }
+  });
+
+  try {
+    const product = await lightweightApiRequest("/api/product");
+    status.textContent = product?.productName ? "Secure workspace ready." : "Backend online.";
+    const checkoutAvailable = Boolean(product?.payments?.stripeEnabled);
+    if (checkoutForm) checkoutForm.hidden = !checkoutAvailable;
+    if (checkoutUnavailable) checkoutUnavailable.hidden = checkoutAvailable;
+    if (checkoutAvailable && checkoutForm) {
+      const loadCheckoutWorkspace = () => loadWorkspace().catch(() => {});
+      checkoutForm.addEventListener("focusin", loadCheckoutWorkspace, { once: true });
+      const handOffCheckout = async (event) => {
+        event.preventDefault();
+        const submit = checkoutForm.querySelector('button[type="submit"]');
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Preparing secure checkout...";
+        }
+        try {
+          await loadWorkspace();
+          checkoutForm.removeEventListener("submit", handOffCheckout);
+          if (submit) submit.disabled = false;
+          checkoutForm.requestSubmit();
+        } catch {
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "Continue to secure checkout";
+          }
+          const result = checkoutForm.querySelector("#checkoutResult");
+          if (result) result.textContent = "Secure checkout could not be prepared. Please retry.";
+        }
+      };
+      checkoutForm.addEventListener("submit", handOffCheckout);
+    }
+
+    const googleConfig = await lightweightApiRequest("/api/auth/google-config");
+    if (!googleConfig.enabled || !googleConfig.clientId) {
+      googleFallback.disabled = true;
+      googleStatus.textContent = "Password login is available.";
+      return;
+    }
+    await loadGoogleIdentityScript();
+    googleFallback.hidden = true;
+    googleStatus.textContent = "Google login ready.";
+    window.google.accounts.id.initialize({
+      client_id: googleConfig.clientId,
+      ux_mode: "popup",
+      callback: async (response) => {
+        error.textContent = "";
+        try {
+          const payload = await lightweightApiRequest("/api/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ credential: response.credential }),
+          });
+          await openAuthenticatedWorkspace(payload, controls);
+        } catch (requestError) {
+          error.textContent = requestError.message || "Google login could not be completed.";
+        }
+      },
+    });
+    window.google.accounts.id.renderButton(googleMount, {
+      theme: "filled_black",
+      size: "large",
+      text: "continue_with",
+      shape: "pill",
+      width: 320,
+    });
+  } catch {
+    status.textContent = "The workspace service is currently unavailable. Please retry shortly.";
+    googleFallback.disabled = true;
+    googleStatus.textContent = "Password login will resume when the backend is reachable.";
+  }
 }
 
 function showRequestedPublicPageImmediately(page) {
@@ -200,12 +365,12 @@ if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 
 const lightweightPublicPages = new Set([
   "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",
-  "biopharma", "fermentation", "compare", "migration", "readiness", "legal",
+  "biopharma", "fermentation", "compare", "migration", "readiness", "legal", "login",
 ]);
 const requiresWorkspaceBundle = checkoutReturn
-  || ["login", "pricing", "pilot"].includes(requestedPage)
+  || ["pricing", "pilot"].includes(requestedPage)
   || !lightweightPublicPages.has(requestedPage)
-  || (Boolean(session) && requestedPage === "home");
+  || (Boolean(session) && ["home", "login"].includes(requestedPage));
 
 if (requiresWorkspaceBundle) {
   loadWorkspace();
@@ -213,4 +378,7 @@ if (requiresWorkspaceBundle) {
   document.addEventListener("click", interceptPublicAction, true);
   document.querySelector("#publicBriefSignupForm")?.addEventListener("submit", submitPublicEngineeringBrief);
   document.querySelector("#migrationAssessmentForm")?.addEventListener("submit", submitMigrationAssessment);
+  if (requestedPage === "login") {
+    bindLightweightLogin();
+  }
 }

@@ -16046,7 +16046,7 @@ async function handleCheckoutReturn() {
       storeSession(loginPayload.token);
       state.account = loginPayload.account || null;
       unlockApp();
-      refreshProjects();
+      initializeAuthenticatedWorkspace();
       showToast("Payment confirmed. Workspace unlocked.");
     }
   } catch (error) {
@@ -18277,16 +18277,24 @@ async function checkStoredAuth() {
   const session = window.localStorage.getItem("axion-session");
   if (!session) {
     lockApp();
-    return;
+    return false;
+  }
+  const bootstrapAuth = window.__AXION_AUTH_BOOTSTRAP__;
+  if (bootstrapAuth?.token === session && bootstrapAuth.account) {
+    state.account = bootstrapAuth.account;
+    delete window.__AXION_AUTH_BOOTSTRAP__;
+    unlockApp();
+    return true;
   }
   try {
     const payload = await apiRequest("/api/account");
     state.account = payload.account || null;
     unlockApp();
-    refreshProjects();
+    return true;
   } catch {
     window.localStorage.removeItem("axion-session");
     lockApp();
+    return false;
   }
 }
 
@@ -18358,30 +18366,32 @@ function bindAuth() {
     openPublicDetail(detailButton.dataset.publicDetail);
   });
 
-  els.loginForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const user = els.loginUser.value.trim();
-    const password = els.loginPassword.value.trim();
-    els.loginError.textContent = "";
-    if (staticAccessMode) {
-      els.loginError.textContent = "Start the Axion backend to sign in securely.";
-      return;
-    }
-    try {
-      const payload = await apiRequest("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ user, password, licenseKey: password }),
-      });
-      storeSession(payload.token);
-      state.account = payload.account || null;
-      els.loginPassword.value = "";
-      unlockApp();
-      refreshProjects();
-      showToast(`Logged in as ${accountName()}`);
-    } catch (error) {
-      els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
-    }
-  });
+  if (els.loginForm?.dataset.lightweightLoginBound !== "true") {
+    els.loginForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const user = els.loginUser.value.trim();
+      const password = els.loginPassword.value.trim();
+      els.loginError.textContent = "";
+      if (staticAccessMode) {
+        els.loginError.textContent = "Start the Axion backend to sign in securely.";
+        return;
+      }
+      try {
+        const payload = await apiRequest("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ user, password, licenseKey: password }),
+        });
+        storeSession(payload.token);
+        state.account = payload.account || null;
+        els.loginPassword.value = "";
+        unlockApp();
+        initializeAuthenticatedWorkspace();
+        showToast(`Logged in as ${accountName()}`);
+      } catch (error) {
+        els.loginError.textContent = error.message || "Access denied. Use the workspace password.";
+      }
+    });
+  }
 
   els.checkoutForm?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -19369,11 +19379,33 @@ function bindEvents() {
   });
 }
 
+let workspaceInitialized = false;
+
+function initializeAuthenticatedWorkspace() {
+  if (workspaceInitialized) return;
+  workspaceInitialized = true;
+  bindEvents();
+  loadTemplate("culturedMeat");
+  startRealtimeTelemetry();
+  startAutomationPolling();
+  setView("start");
+  refreshProjects();
+}
+
+window.__AXION_ACCEPT_AUTH__ = (payload) => {
+  const wasInitialized = workspaceInitialized;
+  state.account = payload?.account || null;
+  delete window.__AXION_AUTH_BOOTSTRAP__;
+  unlockApp();
+  initializeAuthenticatedWorkspace();
+  if (wasInitialized) refreshProjects();
+  showToast(`Logged in as ${accountName()}`);
+};
+
 bindAuth();
 bindPublicPointerMotion();
-bindEvents();
-loadTemplate("culturedMeat");
-startRealtimeTelemetry();
-startAutomationPolling();
-setView("start");
-checkStoredAuth().finally(() => handleCheckoutReturn());
+checkStoredAuth()
+  .then((authenticated) => {
+    if (authenticated) initializeAuthenticatedWorkspace();
+  })
+  .finally(() => handleCheckoutReturn());
