@@ -14,7 +14,10 @@ Do not commit real values. Store them in the backend host secret manager.
 | `SUPABASE_STATE_TABLE` | Use `axion_state` unless renamed | Account, order, license, project and collaboration metadata |
 | `SUPABASE_DOCUMENTS_TABLE` | Use `axion_documents` unless renamed | Active models, archived versions, simulation runs and CFD job payloads |
 | `STRIPE_SECRET_KEY` | Stripe Developers/API keys | Creates Checkout sessions |
-| `STRIPE_PRICE_ID` | Stripe product price | Annual Axion SaaS price |
+| `STRIPE_PRICE_ACADEMIC_ID` | Stripe monthly recurring price | Research subscription |
+| `STRIPE_PRICE_PROFESSIONAL_ID` | Stripe monthly recurring price | Professional subscription |
+| `STRIPE_PRICE_TEAM_ID` | Stripe monthly recurring price | Engineering Team subscription |
+| `STRIPE_PRICE_ENTERPRISE_ID` | Stripe monthly recurring price | Enterprise Site subscription |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook endpoint signing secret | Verifies paid checkout events |
 
 ## Required for Google login
@@ -37,6 +40,15 @@ Do not commit real values. Store them in the backend host secret manager.
 | `SMTP_PASSWORD` | SMTP provider | Alternative invite email transport |
 
 Use either Resend or SMTP. Resend is simpler for a first SaaS deployment; SMTP is now supported when all SMTP variables are present.
+
+## Optional search verification
+
+| Secret | Where to get it | Used for |
+| --- | --- | --- |
+| `GOOGLE_SITE_VERIFICATION` | Google Search Console HTML-tag verification | Adds the server-rendered Google verification meta tag |
+| `BING_SITE_VERIFICATION` | Bing Webmaster Tools HTML meta verification | Adds the server-rendered Bing verification meta tag |
+
+Both values stay in Hostinger environment variables. Do not commit verification tokens to the repository.
 
 ## Required for AI command changes
 

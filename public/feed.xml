@@ -5,7 +5,21 @@
     <link>https://ax-i-on.com/resources</link>
     <description>Technical resources for bioprocess simulation, scale-up, scheduling, TEA, LCA, and engineering model validation.</description>
     <language>en</language>
-    <lastBuildDate>Sat, 01 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Sun, 02 Aug 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Controlled SuperPro Designer migration benchmark</title>
+      <link>https://ax-i-on.com/superpro-designer-migration</link>
+      <guid>https://ax-i-on.com/superpro-designer-migration</guid>
+      <pubDate>Sun, 02 Aug 2026 12:00:00 GMT</pubDate>
+      <description>Use one authorized reference process and explicit acceptance criteria to compare balances, scheduling, TEA, LCA, exports, traceability, and collaboration.</description>
+    </item>
+    <item>
+      <title>Bioprocess TEA and LCA with analyst-ready exports</title>
+      <link>https://ax-i-on.com/bioprocess-tea-lca-software</link>
+      <guid>https://ax-i-on.com/bioprocess-tea-lca-software</guid>
+      <pubDate>Sun, 02 Aug 2026 11:00:00 GMT</pubDate>
+      <description>Trace materials, equipment, utilities, labor, waste, intervals, and sensitivities back to the process assumptions that drive them.</description>
+    </item>
     <item>
       <title>Bioprocess model readiness checklist</title>
       <link>https://ax-i-on.com/bioprocess-model-readiness</link>

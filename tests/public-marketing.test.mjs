@@ -20,6 +20,7 @@ test("resource downloads and AI-readable product summary are shipped", async () 
     "../public/resources/bioprocess-model-readiness-checklist.csv",
     "../public/resources/process-model-data-request-template.csv",
     "../public/resources/technical-pilot-acceptance-criteria.csv",
+    "../public/resources/superpro-migration-benchmark.csv",
     "../public/llms.txt",
   ];
   await Promise.all(paths.map((path) => access(new URL(path, import.meta.url))));
@@ -27,6 +28,31 @@ test("resource downloads and AI-readable product summary are shipped", async () 
   assert.ok(checklist.trim().split("\n").length >= 25);
   assert.match(checklist, /Mass balance/);
   assert.match(checklist, /Validation/);
+});
+
+test("high-intent buyer pages are distinct, visual, and conversion ready", async () => {
+  const [html, bootstrap, server] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
+    readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+  ]);
+  const pages = [
+    ["publicSimulationIntent", "simulation", "bioprocess-simulation-software"],
+    ["publicSchedulingIntent", "scheduling", "biomanufacturing-scheduling-software"],
+    ["publicTeaIntent", "tea", "bioprocess-tea-lca-software"],
+    ["publicBiopharmaIntent", "biopharma", "biopharma-process-simulation"],
+    ["publicFermentationIntent", "fermentation", "fermentation-process-modeling"],
+    ["publicMigration", "migration", "superpro-designer-migration"],
+  ];
+  for (const [id, page, route] of pages) {
+    assert.match(html, new RegExp(`id="${id}"[\\s\\S]{0,160}data-public-page="${page}"`));
+    assert.match(bootstrap, new RegExp(`"?${route}"?: "${page}"`));
+    assert.match(server, new RegExp(`/${route}`));
+  }
+  assert.match(html, /id="migrationAssessmentForm"/);
+  assert.match(bootstrap, /submitMigrationAssessment/);
+  assert.match(html, /assets\/product\/axion-flowsheet-workspace\.png/);
+  assert.match(html, /assets\/photography\/industrial-fermenters-15000l\.jpg/);
 });
 
 test("sitemap and server metadata cover high-intent engineering routes", async () => {
@@ -41,6 +67,9 @@ test("sitemap and server metadata cover high-intent engineering routes", async (
     "bioprocess-simulation-software",
     "biomanufacturing-scheduling-software",
     "bioprocess-tea-lca-software",
+    "biopharma-process-simulation",
+    "fermentation-process-modeling",
+    "superpro-designer-migration",
   ]) {
     assert.match(sitemap, new RegExp(`https://ax-i-on\\.com/${route}`));
     assert.match(server, new RegExp(`/${route}`));

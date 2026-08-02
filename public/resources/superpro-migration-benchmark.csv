@@ -1,0 +1,35 @@
+section,acceptance_test,reference_input,axion_input,comparison_metric,tolerance_or_rule,owner,status,evidence,notes
+Scope,Authorized model ownership,Written authorization,Written authorization,Authorization confirmed,Required,Project owner,Open,,Do not transfer proprietary files without authorization
+Scope,Reference process selected,Reference model name,Axion project name,One representative process frozen,Required,Process lead,Open,,Use a controlled baseline
+Scope,Decision question,Approved decision statement,Axion project brief,Question is identical,Exact match,Project sponsor,Open,,Avoid comparing unrelated scopes
+Components,Component register,Exported component list,Axion component register,Component identity and units,100 percent mapped,Process engineer,Open,,Record aliases and molecular basis
+Streams,Stream topology,Authorized stream table,Axion stream table,Inlets outlets and connections,100 percent mapped,Process engineer,Open,,Include plant boundary streams
+Streams,Component mass balance,Reference balance report,Axion balance report,Component closure,Project-defined tolerance,Process engineer,Open,,Explain residuals rather than hiding them
+Streams,Volumetric flow,Reference stream report,Axion stream report,Flow by stream,Project-defined tolerance,Process engineer,Open,,Confirm standard versus actual conditions
+Streams,Temperature and pressure,Reference stream report,Axion stream report,State by stream,Project-defined tolerance,Process engineer,Open,,Document missing thermodynamic detail
+Equipment,Equipment register,Reference equipment report,Axion equipment register,Tag class size and material,100 percent critical assets mapped,Plant engineer,Open,,Include supporting equipment
+Equipment,Equipment sizing,Reference sizing basis,Axion sizing basis,Volume area duty and parallel count,Project-defined tolerance,Plant engineer,Open,,Separate working and total volume
+Equipment,Heat duties,Reference energy report,Axion energy report,Heating and cooling duty,Project-defined tolerance,Utilities engineer,Open,,Reconcile utility conditions
+Operations,Operation sequence,Reference procedures,Axion operation list,Order and dependency,Exact critical path match,MSAT,Open,,Include setup transfer and hold
+Operations,Operation duration,Reference schedule,Axion schedule,Duration by operation,Project-defined tolerance,MSAT,Open,,Separate process from turnaround
+Scheduling,Equipment occupancy,Reference occupancy report,Axion resource schedule,Busy time by asset,Project-defined tolerance,Scheduler,Open,,Check reusable equipment pools
+Scheduling,CIP and SIP,Reference cleaning schedule,Axion cleaning schedule,Cleaning duration and resource use,Exact critical constraints,MSAT,Open,,Include shared CIP skid
+Scheduling,Facility throughput,Reference annual output,Axion annual output,Feasible annual batches or campaigns,Project-defined tolerance,Capacity lead,Open,,Use identical annual operating time
+Scheduling,Bottleneck identity,Reference bottleneck report,Axion bottleneck report,Limiting resource and reason,Same or explained,Capacity lead,Open,,Record queue and hold effects
+Utilities,Utility demand,Reference utility report,Axion utility ledger,Steam cooling WFI air and power,Project-defined tolerance,Utilities engineer,Open,,Align utility definitions
+Economics,Material costs,Reference material report,Axion material ledger,Annual amount and cost,Project-defined tolerance,TEA lead,Open,,Media and consumables usually need line-item detail
+Economics,Equipment purchase cost,Reference cost basis,Axion equipment cost basis,Cost and source date,Same source or explained,TEA lead,Open,,Do not compare different cost years silently
+Economics,CAPEX,Reference capital report,Axion CAPEX report,Installed and total capital,Project-defined tolerance,TEA lead,Open,,Align indirects contingency and region
+Economics,OPEX and COGS,Reference operating report,Axion OPEX report,Annual cost and cost per kg,Project-defined tolerance,TEA lead,Open,,Align utilization yield and labor
+Economics,Cash flow,Reference profitability report,Axion cash-flow report,NPV IRR and break-even,Same finance assumptions,Finance lead,Open,,Align tax depreciation and discount rate
+LCA,Life-cycle inventory,Reference inventory,Axion LCA inventory,Mass energy water waste emissions,100 percent material categories mapped,LCA lead,Open,,Record allocation and system boundary
+Sensitivity,Parameter ranges,Reference scenario inputs,Axion uncertainty register,Low base and high ranges,Same ranges,Model owner,Open,,Use sourced intervals
+Sensitivity,Driver ranking,Reference sensitivity output,Axion sensitivity output,Top drivers and direction,Same or explained,Model owner,Open,,Check nonlinear interactions
+Data,Source ownership,Reference citations,Axion source register,Source type owner and date,100 percent critical assumptions,QA reviewer,Open,,Separate measured supplier literature and default
+Data,Validity domain,Reference model limitations,Axion readiness register,Scale mode material and range limits,Explicit for each critical model,QA reviewer,Open,,Screening is not validated prediction
+Collaboration,Version comparison,Reference file history,Axion branches and versions,Reproducible before and after change,Required,Project owner,Open,,Record author timestamp and rationale
+Collaboration,Review and approval,Reference approval record,Axion review record,Named reviewer and disposition,Required,QA reviewer,Open,,Do not infer approval from model existence
+Exports,Engineering workbook,Reference workbook,Axion workbook,Sheets open and data reconcile,No corrupt files and mapped totals,Analyst,Open,,Test in Microsoft Excel
+Exports,Canvas and PFD,Reference flowsheet export,Axion SVG or PDF,Readable topology and labels,No overlaps or missing critical streams,Process engineer,Open,,Preserve plant boundary connections
+Security,Data handling,Existing data policy,Axion deployment controls,Storage access retention and deletion,Approved by customer,Security owner,Open,,Use only authorized data
+Decision,Pilot acceptance,Approved acceptance criteria,Completed benchmark,All blocking tests dispositioned,Written sponsor decision,Project sponsor,Open,,Expand only workflows that pass

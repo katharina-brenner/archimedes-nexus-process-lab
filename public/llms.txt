@@ -10,7 +10,13 @@ Canonical website: https://ax-i-on.com/
 - Workflow: https://ax-i-on.com/workflow
 - Solutions: https://ax-i-on.com/solutions
 - Engineering resources: https://ax-i-on.com/resources
+- Bioprocess simulation: https://ax-i-on.com/bioprocess-simulation-software
+- Biomanufacturing scheduling: https://ax-i-on.com/biomanufacturing-scheduling-software
+- Bioprocess TEA and LCA: https://ax-i-on.com/bioprocess-tea-lca-software
+- Biopharma process simulation: https://ax-i-on.com/biopharma-process-simulation
+- Fermentation process modelling: https://ax-i-on.com/fermentation-process-modeling
 - Independent SuperPro Designer comparison: https://ax-i-on.com/superpro-designer-alternative
+- Controlled SuperPro Designer migration benchmark: https://ax-i-on.com/superpro-designer-migration
 - Security and production architecture: https://ax-i-on.com/security
 - Pricing: https://ax-i-on.com/pricing
 - Technical pilot: https://ax-i-on.com/pilot

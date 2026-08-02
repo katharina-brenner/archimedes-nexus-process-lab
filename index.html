@@ -20,7 +20,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="alternate" type="application/rss+xml" title="Axion Engineering Brief" href="https://ax-i-on.com/feed.xml" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260801-global-parameters-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260802-growth-pages-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1387,9 +1387,166 @@
             <div class="comparison-note">
               <strong>Responsible migration</strong>
               <p>Axion uses original implementations, public scientific knowledge, and data that customers are authorized to use. It does not copy proprietary manuals, model libraries, or restricted simulator files. SuperPro Designer is a trademark of its respective owner; the comparison is independent and based on publicly documented product capabilities.</p>
-              <button class="public-primary" type="button" data-public-target="publicPilot">Evaluate with one process</button>
+              <a class="public-primary" href="./superpro-designer-migration" data-public-target="publicMigration">Open migration benchmark</a>
             </div>
             <p class="comparison-source">Source basis for competitor facts: <a href="https://www.intelligen.com/products/superpro-overview/" target="_blank" rel="noopener noreferrer">official SuperPro Designer overview</a> and <a href="https://www.intelligen.com/products/superpro-product-features/" target="_blank" rel="noopener noreferrer">official feature documentation</a>, reviewed August 2026.</p>
+          </section>
+
+          <section id="publicSimulationIntent" class="public-section public-page intent-page" data-public-page="simulation">
+            <header class="intent-hero">
+              <div>
+                <p>Bioprocess simulation software</p>
+                <h1>Model the process, the equipment, and the decision in one system.</h1>
+                <span>Axion connects component balances, reactions, ODE/PDE dynamics, operating modes, equipment duties, physical limits, scheduling, uncertainty, and economics without separating the flowsheet from its evidence.</span>
+                <div class="intent-actions">
+                  <button class="public-primary" type="button" data-public-target="publicPilot">Evaluate one process</button>
+                  <a class="public-secondary" href="./superpro-designer-alternative" data-public-target="publicComparison">Compare workflows</a>
+                </div>
+              </div>
+              <figure><img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion bioprocess simulation workspace with connected equipment and process streams" width="1280" height="720" loading="eager" /><figcaption>Editable flowsheet linked to model inputs, equations, and outputs.</figcaption></figure>
+            </header>
+            <div class="intent-mode-strip" aria-label="Supported production modes"><span>Batch</span><span>Fed-batch</span><span>Perfusion</span><span>Continuous</span><span>Hybrid trains</span></div>
+            <div class="intent-decision-grid">
+              <article><span>01 · Define</span><h2>Process basis</h2><p>Components, reactions, yields, kinetics, feeds, harvest logic, recycle, cleaning, operating mode, working volume, and scale.</p></article>
+              <article><span>02 · Solve</span><h2>Engineering model</h2><p>Mass and energy balances, equipment duty, ODE/PDE states, oxygen transfer, heat removal, physical boundaries, and uncertainty.</p></article>
+              <article><span>03 · Decide</span><h2>Review outputs</h2><p>Throughput, bottlenecks, sensitivities, cost, environmental burden, model validity, missing evidence, and detailed exports.</p></article>
+            </div>
+            <div class="intent-proof-pair">
+              <figure><img src="./assets/product/axion-plant-overview.png" alt="Axion model readiness and whole-plant overview" width="1280" height="720" loading="lazy" /><figcaption><b>Whole-plant context</b><span>See disconnected equipment, missing streams, physical constraints, sources, and readiness before trusting a result.</span></figcaption></figure>
+              <figure><img src="./assets/photography/industrial-bioprocess-hall.jpg" alt="Large industrial bioprocess facility with stainless steel equipment" width="2200" height="1467" loading="lazy" /><figcaption><b>Industrial design basis</b><span>Connect the biological model to the facility, utilities, cleaning, materials, rooms, and reusable assets.</span></figcaption></figure>
+            </div>
+            <div class="intent-review-table" role="table" aria-label="Bioprocess simulation validation workflow">
+              <div role="row"><b role="columnheader">Question</b><b role="columnheader">Axion output</b><b role="columnheader">Evidence required</b></div>
+              <div role="row"><span role="cell">Can the process scale?</span><span role="cell">Operating envelope and scale-up gaps</span><span role="cell">Kinetics, kLa, mixing, heat, rheology, geometry</span></div>
+              <div role="row"><span role="cell">Does the route close?</span><span role="cell">Component balance and residual diagnostics</span><span role="cell">Stream assays, yields, hold-up, losses, recycle</span></div>
+              <div role="row"><span role="cell">Which scenario wins?</span><span role="cell">Before/after comparison with sensitivities</span><span role="cell">Ranges, source ownership, validation criteria</span></div>
+            </div>
+          </section>
+
+          <section id="publicSchedulingIntent" class="public-section public-page intent-page" data-public-page="scheduling">
+            <header class="intent-hero intent-hero-reverse">
+              <div>
+                <p>Biomanufacturing scheduling software</p>
+                <h1>Prove what the complete facility can actually produce.</h1>
+                <span>Build a finite-capacity campaign schedule across reactors, downstream assets, rooms, operators, inventories, utilities, CIP/SIP, maintenance, holds, release, and changeovers.</span>
+                <div class="intent-actions"><button class="public-primary" type="button" data-public-target="publicPilot">Run a capacity pilot</button><a class="public-secondary" href="./bioprocess-simulation-software" data-public-target="publicSimulationIntent">See process simulation</a></div>
+              </div>
+              <figure><img src="./assets/photography/industrial-fermenters-15000l.jpg" alt="Industrial stainless steel fermentation vessels used as shared scheduled assets" width="1800" height="1192" loading="eager" /><figcaption>Reusable equipment and shared infrastructure determine achievable throughput.</figcaption></figure>
+            </header>
+            <div class="intent-schedule-visual" aria-label="Finite capacity schedule illustration">
+              <header><b>Finite-capacity campaign</b><span>Equipment · cleaning · transfer · hold · release</span></header>
+              <div class="intent-schedule-row"><strong>Seed BR-101</strong><i style="--start:2;--span:18"></i><em>Culture</em><i class="clean" style="--start:20;--span:5"></i></div>
+              <div class="intent-schedule-row"><strong>Production BR-201</strong><i style="--start:20;--span:36"></i><em>Fed-batch</em><i class="clean" style="--start:56;--span:8"></i></div>
+              <div class="intent-schedule-row"><strong>Harvest CF-301</strong><i class="support" style="--start:55;--span:10"></i><em>Harvest</em><i class="clean" style="--start:65;--span:5"></i></div>
+              <div class="intent-schedule-row"><strong>CIP-901</strong><i class="clean" style="--start:18;--span:6"></i><i class="clean" style="--start:57;--span:12"></i><em>Shared CIP</em></div>
+            </div>
+            <div class="intent-decision-grid four">
+              <article><span>Assets</span><h2>Equipment states</h2><p>Setup, processing, transfer, waiting, cleaning, sterilization, maintenance, and available states.</p></article>
+              <article><span>Constraints</span><h2>Shared resources</h2><p>Rooms, labor, utilities, skids, tanks, storage, QC queues, and transfer paths.</p></article>
+              <article><span>Performance</span><h2>Capacity</h2><p>Occupancy, cycle time, feasible batches, lateness, WIP, utilization, and bottlenecks.</p></article>
+              <article><span>Action</span><h2>What-if plans</h2><p>Parallel capacity, campaign sequence, cleaning reduction, outsourcing, and demand changes.</p></article>
+            </div>
+            <div class="intent-proof-pair">
+              <figure><img src="./assets/product/axion-plant-overview.png" alt="Axion facility overview for scheduling and capacity planning" width="1280" height="720" loading="lazy" /><figcaption><b>One schedule, one model</b><span>Equipment occupancy remains connected to process assumptions and annual output.</span></figcaption></figure>
+              <figure><img src="./assets/photography/process-skid.jpg" alt="Industrial process skid with piping and automation" loading="lazy" /><figcaption><b>Resource-level detail</b><span>Represent shared skids, transfers, cleaning windows, and supporting systems explicitly.</span></figcaption></figure>
+            </div>
+          </section>
+
+          <section id="publicTeaIntent" class="public-section public-page intent-page" data-public-page="tea">
+            <header class="intent-hero">
+              <div>
+                <p>Bioprocess TEA + LCA software</p>
+                <h1>Trace every cost and impact back to the process assumption.</h1>
+                <span>Axion links media, materials, consumables, labor, utilities, equipment, facility, waste, emissions, yields, schedules, and uncertainty to transparent long-form decision datasets.</span>
+                <div class="intent-actions"><button class="public-primary" type="button" data-public-target="publicPilot">Evaluate a business case</button><a class="public-secondary" href="./resources" data-public-target="publicResources">Download templates</a></div>
+              </div>
+              <figure><img src="./assets/product/axion-tea-lca.png" alt="Axion TEA and LCA workspace with cost and environmental drivers" width="1280" height="720" loading="eager" /><figcaption>Cost, sustainability, intervals, and evidence stay connected.</figcaption></figure>
+            </header>
+            <div class="intent-decision-grid four">
+              <article><span>OPEX</span><h2>Materials first</h2><p>Media, feeds, buffers, resins, filters, single-use assemblies, solvents, packaging, and waste handling.</p></article>
+              <article><span>CAPEX</span><h2>Facility reality</h2><p>Equipment, installation, piping, controls, clean utilities, rooms, indirects, contingency, region, and escalation.</p></article>
+              <article><span>LCA</span><h2>Inventory depth</h2><p>Mass, energy, water, waste, transport, consumables, direct emissions, allocation, and impact factors.</p></article>
+              <article><span>Risk</span><h2>Intervals</h2><p>Low/base/high cases, Monte Carlo-ready tables, sensitivity rankings, break-even, NPV, IRR, and dominant drivers.</p></article>
+            </div>
+            <div class="intent-output-list">
+              <div><b>Analyst-ready exports</b><span>Assumption register · stream inventory · equipment cost basis · labor model · utility ledger · waste ledger · annual cash flow · LCA inventory · sensitivity matrix · source register</span></div>
+              <div><b>Review discipline</b><span>Each value carries units, scenario, range, source type, owner, date, confidence, validity domain, and the output decisions it influences.</span></div>
+            </div>
+            <div class="intent-proof-pair">
+              <figure><img src="./assets/photography/weihenstephan-kombikeller.jpg" alt="Large stainless steel processing installation relevant to industrial cost and utility modelling" loading="lazy" /><figcaption><b>Industrial scope</b><span>Model the facility burden behind each kilogram, not only the reaction yield.</span></figcaption></figure>
+              <figure><img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion flowsheet linking streams and equipment to TEA and LCA" width="1280" height="720" loading="lazy" /><figcaption><b>Traceable calculation chain</b><span>Every economic and environmental result resolves to a process stream, unit, schedule, or explicit assumption.</span></figcaption></figure>
+            </div>
+          </section>
+
+          <section id="publicBiopharmaIntent" class="public-section public-page intent-page" data-public-page="biopharma">
+            <header class="intent-hero intent-hero-reverse">
+              <div>
+                <p>Biopharma process simulation</p>
+                <h1>Connect upstream, downstream, facility fit, and COGS.</h1>
+                <span>Evaluate mAbs, recombinant proteins, vaccines, and advanced biologics with an explicit seed train, production mode, harvest, purification, viral safety, formulation, filling, utilities, cleaning, release, and evidence model.</span>
+                <div class="intent-actions"><button class="public-primary" type="button" data-public-target="publicPilot">Model a biopharma process</button><a class="public-secondary" href="./biomanufacturing-scheduling-software" data-public-target="publicSchedulingIntent">See facility scheduling</a></div>
+              </div>
+              <figure><img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Large industrial biopharmaceutical reactor installation" loading="eager" /><figcaption>Biology, equipment, clean utilities, and regulated operations share one design basis.</figcaption></figure>
+            </header>
+            <div class="intent-process-chain" aria-label="Biopharma process chain"><span>Media + buffer</span><i></i><span>Seed train</span><i></i><span>Production BR</span><i></i><span>Harvest</span><i></i><span>Capture</span><i></i><span>Viral safety</span><i></i><span>Polishing</span><i></i><span>UF/DF + fill</span></div>
+            <div class="intent-decision-grid">
+              <article><span>Upstream</span><h2>Scale and mode</h2><p>Fed-batch versus perfusion, viable-cell density, titer, OUR, kLa, feeds, metabolites, bleed, and harvest logic.</p></article>
+              <article><span>Downstream</span><h2>Capacity and yield</h2><p>Clarification, filters, chromatography cycles, pool tanks, buffers, hold times, viral clearance, UF/DF, and formulation.</p></article>
+              <article><span>Facility</span><h2>Fit and transfer</h2><p>Campaign scheduling, reusable assets, CIP/SIP, single-use changeover, rooms, WFI, clean steam, QC, and release.</p></article>
+            </div>
+            <div class="intent-proof-pair"><figure><img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion biopharma flowsheet with connected unit operations" width="1280" height="720" loading="lazy" /><figcaption><b>Editable production architecture</b><span>Open every equipment item, stream, reaction, assumption, and data gap.</span></figcaption></figure><figure><img src="./assets/product/axion-plant-overview.png" alt="Axion biopharma plant readiness overview" width="1280" height="720" loading="lazy" /><figcaption><b>Review readiness</b><span>Separate implemented logic, screening assumptions, missing evidence, and validation work.</span></figcaption></figure></div>
+          </section>
+
+          <section id="publicFermentationIntent" class="public-section public-page intent-page" data-public-page="fermentation">
+            <header class="intent-hero">
+              <div>
+                <p>Fermentation process modelling</p>
+                <h1>Design aerobic fermentation around oxygen, heat, recovery, and cost.</h1>
+                <span>Evaluate precision fermentation, enzymes, food ingredients, biomass, and industrial biotechnology from raw-material preparation through seed, production, recovery, concentration, drying, utilities, recycle, wastewater, TEA, and LCA.</span>
+                <div class="intent-actions"><button class="public-primary" type="button" data-public-target="publicPilot">Evaluate a fermentation route</button><a class="public-secondary" href="./bioprocess-tea-lca-software" data-public-target="publicTeaIntent">See TEA + LCA</a></div>
+              </div>
+              <figure><img src="./assets/photography/industrial-fermenters-15000l.jpg" alt="Large industrial stainless steel fermenters for precision fermentation" width="1800" height="1192" loading="eager" /><figcaption>Industrial fermentation is constrained by transfer, heat, rheology, utilities, and recovery.</figcaption></figure>
+            </header>
+            <div class="intent-decision-grid four">
+              <article><span>Biology</span><h2>Kinetics</h2><p>Biomass, substrate, product, oxygen, carbon dioxide, maintenance, inhibition, by-products, and variable yields.</p></article>
+              <article><span>Reactor</span><h2>Scale-up</h2><p>OUR/OTR, kLa, power per volume, tip speed, gas flow, pressure, heat removal, viscosity, foam, and working volume.</p></article>
+              <article><span>Recovery</span><h2>DSP route</h2><p>Cell removal, disruption, extraction, membrane steps, chromatography, evaporation, crystallization, and drying.</p></article>
+              <article><span>Business case</span><h2>Economics</h2><p>Feedstock and media, productivity, recovery yield, energy, wastewater, labor, utilization, CAPEX, and uncertainty.</p></article>
+            </div>
+            <div class="intent-proof-pair"><figure><img src="./assets/product/axion-tea-lca.png" alt="Axion fermentation TEA and LCA analysis" width="1280" height="720" loading="lazy" /><figcaption><b>Cost and footprint</b><span>Identify whether media, aeration, cooling, recovery, drying, water, or utilization dominates.</span></figcaption></figure><figure><img src="./assets/photography/process-skid.jpg" alt="Industrial hygienic process skid used for downstream recovery" loading="lazy" /><figcaption><b>Complete recovery train</b><span>Represent downstream equipment, transfers, cleaning, consumables, and utility demand explicitly.</span></figcaption></figure></div>
+          </section>
+
+          <section id="publicMigration" class="public-section public-page intent-page migration-page" data-public-page="migration">
+            <header class="intent-hero">
+              <div>
+                <p>SuperPro Designer migration</p>
+                <h1>Benchmark one authorized model before changing your workflow.</h1>
+                <span>Keep the existing approved model as the baseline. Reconstruct one representative process from customer-owned exports and assumptions, reconcile the results, and evaluate collaboration, traceability, scenario speed, and decision outputs.</span>
+                <div class="intent-actions"><a class="public-primary" href="./resources/superpro-migration-benchmark.csv" download>Download benchmark checklist</a><a class="public-secondary" href="./superpro-designer-alternative" data-public-target="publicComparison">Read the comparison</a></div>
+              </div>
+              <figure><img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion workspace used to reconstruct and benchmark an authorized reference process" width="1280" height="720" loading="eager" /><figcaption>Parallel validation protects the existing engineering basis while testing a modern workflow.</figcaption></figure>
+            </header>
+            <div class="migration-steps" aria-label="Responsible migration workflow"><article><b>01</b><span>Select</span><p>Choose one representative, company-owned process and freeze the reference outputs.</p></article><article><b>02</b><span>Reconstruct</span><p>Map permitted streams, equipment, operations, costs, schedule, and source assumptions.</p></article><article><b>03</b><span>Reconcile</span><p>Explain differences in balances, duties, occupancy, economics, and environmental results.</p></article><article><b>04</b><span>Evaluate</span><p>Measure variant speed, review effort, traceability, exports, and collaboration.</p></article><article><b>05</b><span>Decide</span><p>Expand only the workflows that pass predefined technical and governance criteria.</p></article></div>
+            <div class="migration-assessment-layout">
+              <div>
+                <p>Migration assessment</p>
+                <h2>Define the comparison before sharing any process data.</h2>
+                <span>This request collects contact and evaluation scope only. Do not submit confidential process files through this form.</span>
+                <form id="migrationAssessmentForm" class="intent-form">
+                  <div><label><span>Name</span><input id="migrationName" autocomplete="name" required /></label><label><span>Work email</span><input id="migrationEmail" type="email" autocomplete="email" required /></label></div>
+                  <div><label><span>Company</span><input id="migrationCompany" autocomplete="organization" required /></label><label><span>Role</span><input id="migrationRole" autocomplete="organization-title" placeholder="Process engineering / MSAT / TEA" /></label></div>
+                  <label><span>Current workflow</span><select id="migrationCurrentWorkflow"><option>SuperPro Designer reference model</option><option>Spreadsheet and desktop simulation workflow</option><option>Other validated process-modelling workflow</option></select></label>
+                  <label><span>Primary evaluation goal</span><select id="migrationPriority"><option>Mass-balance and equipment reconciliation</option><option>Scheduling and facility capacity</option><option>TEA, LCA, and sensitivity</option><option>Collaboration, versions, and review workflow</option><option>Data integration and automation</option></select></label>
+                  <label><span>Scope note</span><textarea id="migrationNotes" rows="4" minlength="20" required placeholder="Which authorized reference process and decision should the benchmark cover?"></textarea></label>
+                  <label class="intent-honeypot" aria-hidden="true"><span>Website</span><input id="migrationWebsite" tabindex="-1" autocomplete="off" /></label>
+                  <label class="intent-consent"><input id="migrationConsent" type="checkbox" required /><span>Axion may use these details to respond to this assessment request.</span></label>
+                  <button class="public-primary" type="submit">Request migration assessment</button>
+                  <div id="migrationAssessmentResult" class="intent-form-result" aria-live="polite"></div>
+                </form>
+              </div>
+              <figure><img src="./assets/product/axion-plant-overview.png" alt="Axion model readiness view used to compare migration completeness" width="1280" height="720" loading="lazy" /><figcaption><b>Acceptance, not promises</b><span>Close balances, explain residuals, verify equipment duty, reproduce the schedule, trace costs, and list every unresolved gap.</span></figcaption></figure>
+            </div>
+            <p class="comparison-source">Independent comparison. SuperPro Designer is a trademark of its respective owner. Axion does not copy proprietary files, manuals, or restricted model libraries.</p>
           </section>
 
           <section id="publicResources" class="public-section public-resources public-page" data-public-page="resources">
@@ -1441,21 +1598,21 @@
                   <h3>From flowsheet to dynamic operating envelope</h3>
                   <p>Connect component balances, reactions, ODE/PDE kinetics, batch and perfusion modes, equipment duties, physical limits, and uncertainty in one reviewable model.</p>
                   <ul><li>Use for scale-up, route comparison, and process characterization.</li><li>Validate against measured kinetics, mass closure, and an approved reference case.</li></ul>
-                  <button type="button" data-public-target="publicPlatform">See the modelling workspace</button>
+                  <a href="./bioprocess-simulation-software" data-public-target="publicSimulationIntent">See bioprocess simulation</a>
                 </article>
                 <article id="scheduling-software">
                   <span>Biomanufacturing scheduling</span>
                   <h3>Model the complete facility, not one isolated batch</h3>
                   <p>Schedule shared reactors, chromatography skids, hold vessels, utilities, rooms, operators, CIP/SIP, maintenance, release, and campaign changeovers.</p>
                   <ul><li>Use for capacity planning, facility fit, and debottlenecking.</li><li>Review occupancy, wait states, WIP, and achievable annual throughput.</li></ul>
-                  <button type="button" data-public-target="publicWorkflow">See the workflow</button>
+                  <a href="./biomanufacturing-scheduling-software" data-public-target="publicSchedulingIntent">See facility scheduling</a>
                 </article>
                 <article id="tea-lca-software">
                   <span>TEA + LCA</span>
                   <h3>Make the economic and environmental basis auditable</h3>
                   <p>Trace media, buffers, consumables, labor, utilities, waste, equipment, facility, yield, titer, and utilization through intervals and sensitivity results.</p>
                   <ul><li>Use for investment, process selection, and sustainability review.</li><li>Export long-form datasets for analysts instead of relying on dashboard totals.</li></ul>
-                  <button type="button" data-public-detail="reports">See decision outputs</button>
+                  <a href="./bioprocess-tea-lca-software" data-public-target="publicTeaIntent">See TEA + LCA outputs</a>
                 </article>
               </div>
             </section>
@@ -2104,6 +2261,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260801-global-parameters-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260802-growth-pages-v1"></script>
   </body>
 </html>

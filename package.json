@@ -16,7 +16,7 @@
     "bff:install": "pnpm --dir nextjs-bff install",
     "bff:dev": "pnpm --dir nextjs-bff dev",
     "bff:build": "pnpm --dir nextjs-bff build",
-    "check": "node --check app.js && node --check server.mjs && node --check automation-gateway/server.mjs && node scripts/check-contrast.mjs",
+    "check": "node --check app.js && node --check public-bootstrap.js && node --check server.mjs && node --check automation-gateway/server.mjs && node scripts/check-contrast.mjs",
     "gateway:start": "node automation-gateway/server.mjs",
     "gateway:site:check": "node scripts/validate-automation-site-pack.mjs",
     "gateway:container:check": "node scripts/validate-automation-container.mjs",

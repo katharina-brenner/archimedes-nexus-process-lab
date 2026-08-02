@@ -9,11 +9,14 @@ const routePages = {
   resources: "resources",
   guides: "resources",
   "bioprocess-model-readiness": "resources",
-  "bioprocess-simulation-software": "resources",
-  "biomanufacturing-scheduling-software": "resources",
-  "bioprocess-tea-lca-software": "resources",
+  "bioprocess-simulation-software": "simulation",
+  "biomanufacturing-scheduling-software": "scheduling",
+  "bioprocess-tea-lca-software": "tea",
+  "biopharma-process-simulation": "biopharma",
+  "fermentation-process-modeling": "fermentation",
   compare: "compare",
   "superpro-designer-alternative": "compare",
+  "superpro-designer-migration": "migration",
   security: "readiness",
   pricing: "pricing",
   pilot: "pilot",
@@ -29,8 +32,14 @@ const publicTargetPaths = {
   publicWorkflow: "/workflow",
   publicEcosystem: "/solutions",
   publicResources: "/resources",
+  publicSimulationIntent: "/bioprocess-simulation-software",
+  publicSchedulingIntent: "/biomanufacturing-scheduling-software",
+  publicTeaIntent: "/bioprocess-tea-lca-software",
+  publicBiopharmaIntent: "/biopharma-process-simulation",
+  publicFermentationIntent: "/fermentation-process-modeling",
   publicReadiness: "/security",
   publicComparison: "/superpro-designer-alternative",
+  publicMigration: "/superpro-designer-migration",
   publicPricing: "/pricing",
   publicPilot: "/pilot",
   publicLegal: "/legal",
@@ -142,9 +151,57 @@ async function submitPublicEngineeringBrief(event) {
   }
 }
 
+async function submitMigrationAssessment(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const result = form.querySelector("#migrationAssessmentResult");
+  const button = form.querySelector('button[type="submit"]');
+  const currentWorkflow = form.querySelector("#migrationCurrentWorkflow")?.value.trim() || "Current process-modelling workflow";
+  const priority = form.querySelector("#migrationPriority")?.value.trim() || "Workflow evaluation";
+  const notes = form.querySelector("#migrationNotes")?.value.trim() || "Compare one authorized reference process using agreed acceptance criteria.";
+  const payload = {
+    name: form.querySelector("#migrationName")?.value.trim() || "Migration assessment",
+    email: form.querySelector("#migrationEmail")?.value.trim() || "",
+    company: form.querySelector("#migrationCompany")?.value.trim() || "",
+    role: form.querySelector("#migrationRole")?.value.trim() || "Process engineering",
+    process: currentWorkflow,
+    challenge: `${priority}: ${notes}`,
+    website: form.querySelector("#migrationWebsite")?.value || "",
+    consent: Boolean(form.querySelector("#migrationConsent")?.checked),
+    source: params.get("utm_source") || document.referrer || "website",
+    campaign: params.get("utm_campaign") || "superpro-migration",
+    landingPage: window.location.href,
+  };
+  button.disabled = true;
+  button.textContent = "Submitting...";
+  result.className = "intent-form-result is-pending";
+  result.textContent = "Creating a private assessment request.";
+  try {
+    const response = await fetch("/api/leads/pilot", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "The assessment request could not be saved.");
+    result.className = "intent-form-result is-success";
+    result.textContent = `Assessment request received. Reference ${body.reference || "created"}.`;
+    form.reset();
+  } catch (error) {
+    result.className = "intent-form-result is-error";
+    result.textContent = error.message || "The assessment request could not be saved.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Request migration assessment";
+  }
+}
+
 if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 
-const lightweightPublicPages = new Set(["home", "platform", "workflow", "ecosystem", "resources", "compare", "readiness", "legal"]);
+const lightweightPublicPages = new Set([
+  "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",
+  "biopharma", "fermentation", "compare", "migration", "readiness", "legal",
+]);
 const requiresWorkspaceBundle = checkoutReturn
   || ["login", "pricing", "pilot"].includes(requestedPage)
   || !lightweightPublicPages.has(requestedPage)
@@ -155,4 +212,5 @@ if (requiresWorkspaceBundle) {
 } else {
   document.addEventListener("click", interceptPublicAction, true);
   document.querySelector("#publicBriefSignupForm")?.addEventListener("submit", submitPublicEngineeringBrief);
+  document.querySelector("#migrationAssessmentForm")?.addEventListener("submit", submitMigrationAssessment);
 }

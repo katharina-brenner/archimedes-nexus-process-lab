@@ -60,6 +60,8 @@ const config = {
   adminPassword: process.env.AXION_ADMIN_PASSWORD || "",
   localPasswordLogin: process.env.AXION_LOCAL_PASSWORD_LOGIN === "true",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleSiteVerification: process.env.GOOGLE_SITE_VERIFICATION || "",
+  bingSiteVerification: process.env.BING_SITE_VERIFICATION || "",
   googleAllowedEmails: (process.env.GOOGLE_ALLOWED_EMAILS || "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
@@ -218,14 +220,44 @@ const seoRouteMeta = Object.freeze({
   "/bioprocess-simulation-software": {
     title: "Bioprocess Simulation Software for Scale-Up & Design | Axion",
     description: "Connect flowsheets, mass and energy balances, reactions, ODE/PDE dynamics, physical limits, equipment duties and uncertainty in one browser model.",
+    image: "/assets/product/axion-flowsheet-workspace.png",
+    audience: "Process development, scale-up, and process systems engineering teams",
+    faq: [
+      { question: "Which production modes can Axion model?", answer: "Axion supports batch, fed-batch, perfusion, continuous, and hybrid process architectures, with mode-specific balances, harvest logic, schedules, and economic assumptions." },
+      { question: "Does Axion replace experimental validation?", answer: "No. Axion distinguishes screening assumptions from measured and validated models. Scale-up, safety-critical, regulated, or investment decisions require an agreed validation plan and customer-owned evidence." },
+    ],
   },
   "/biomanufacturing-scheduling-software": {
     title: "Biomanufacturing Scheduling & Capacity Planning Software | Axion",
     description: "Schedule reactors, downstream equipment, rooms, utilities, operators, CIP/SIP, maintenance and campaigns to quantify facility capacity and bottlenecks.",
+    image: "/assets/photography/industrial-fermenters-15000l.jpg",
+    audience: "MSAT, manufacturing, capacity planning, and facility engineering teams",
+    faq: [
+      { question: "What constraints can the Axion scheduler represent?", answer: "The scheduling model represents equipment occupancy, predecessors, setup, transfer, processing, CIP and SIP, maintenance, rooms, operators, utilities, inventories, hold times, release queues, and campaign changeovers." },
+      { question: "Can equipment be reused across multiple batches?", answer: "Yes. Reusable equipment pools cycle through setup, production, transfer, cleaning, sterilization, maintenance, and available states across repeated batches or campaigns." },
+    ],
   },
   "/bioprocess-tea-lca-software": {
     title: "Bioprocess TEA & LCA Software with Sensitivity Analysis | Axion",
     description: "Trace media, materials, utilities, labor, waste, equipment and facility assumptions through detailed TEA, LCA, intervals and sensitivity exports.",
+    image: "/assets/product/axion-tea-lca.png",
+    audience: "Techno-economic analysis, sustainability, strategy, and investment teams",
+    faq: [
+      { question: "What does the Axion TEA export include?", answer: "The engineering workbook includes assumptions, stream inventories, material and consumable demand, equipment and facility cost bases, labor, utilities, waste, annual cash flow, uncertainty ranges, sensitivities, and source ownership." },
+      { question: "How are uncertain values handled?", answer: "Axion records low, base, and high values with units, sources, confidence, and validity domains and exposes long-form sensitivity data for further statistical analysis." },
+    ],
+  },
+  "/biopharma-process-simulation": {
+    title: "Biopharma Process Simulation for mAbs, Vaccines & Facility Fit | Axion",
+    description: "Model upstream, downstream, viral safety, formulation, filling, utilities, cleaning, scheduling, facility fit and COGS in one biopharma engineering workspace.",
+    image: "/assets/photography/vaccine-bioreactor-plant.jpg",
+    audience: "Biopharma process development, MSAT, CDMO, and plant engineering teams",
+  },
+  "/fermentation-process-modeling": {
+    title: "Fermentation Process Modelling for Scale-Up, TEA & LCA | Axion",
+    description: "Model aerobic fermentation, oxygen and heat transfer, feed strategy, recovery, drying, utilities, wastewater, TEA and LCA for industrial biotechnology.",
+    image: "/assets/photography/industrial-fermenters-15000l.jpg",
+    audience: "Precision fermentation, food biotech, enzyme, and industrial biotechnology teams",
   },
   "/superpro-designer-alternative": {
     title: "SuperPro Designer Alternative for Bioprocess Engineering | Axion",
@@ -243,6 +275,16 @@ const seoRouteMeta = Object.freeze({
         question: "Who should evaluate Axion Process OS?",
         answer: "Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA and LCA, food-biotech, fermentation, and technical-consulting teams that need collaboration, traceability, scenario comparison, and connected engineering outputs.",
       },
+    ],
+  },
+  "/superpro-designer-migration": {
+    title: "SuperPro Designer Migration & Validation Benchmark | Axion",
+    description: "Benchmark one authorized SuperPro Designer reference process against Axion using explicit acceptance criteria for balances, scheduling, TEA/LCA, exports, traceability and collaboration.",
+    image: "/assets/product/axion-plant-overview.png",
+    audience: "Teams evaluating a controlled migration from an established process-modelling workflow",
+    faq: [
+      { question: "Does Axion import proprietary SuperPro Designer files?", answer: "Axion does not copy or decode proprietary model formats. A migration pilot uses customer-owned and authorized exports, stream tables, equipment data, assumptions, and reference results." },
+      { question: "How is a migration benchmark accepted?", answer: "The team agrees tolerances and acceptance criteria before modelling, reconciles every material difference, and expands only the workflows that pass technical, governance, and data-handling review." },
     ],
   },
   "/security": {
@@ -286,7 +328,14 @@ function renderPublicHtml(pathname, indexPath) {
     .replace(/<link rel="canonical" href="[^"]*"\s*\/>/i, `<link rel="canonical" href="${canonicalUrl}" />`)
     .replace(/<meta property="og:title" content="[^"]*"\s*\/>/i, `<meta property="og:title" content="${htmlAttribute(meta.title)}" />`)
     .replace(/<meta property="og:description" content="[^"]*"\s*\/>/i, `<meta property="og:description" content="${htmlAttribute(meta.description)}" />`)
-    .replace(/<meta property="og:url" content="[^"]*"\s*\/>/i, `<meta property="og:url" content="${canonicalUrl}" />`);
+    .replace(/<meta property="og:url" content="[^"]*"\s*\/>/i, `<meta property="og:url" content="${canonicalUrl}" />`)
+    .replace(/<meta property="og:image" content="[^"]*"\s*\/>/i, `<meta property="og:image" content="${new URL(meta.image || "/assets/photography/weihenstephan-kombikeller-1600.jpg", "https://ax-i-on.com").href}" />`)
+    .replace(/<meta name="twitter:card" content="[^"]*"\s*\/>/i, `<meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="${htmlAttribute(meta.title)}" /><meta name="twitter:description" content="${htmlAttribute(meta.description)}" />`);
+  const verificationTags = [
+    config.googleSiteVerification ? `<meta name="google-site-verification" content="${htmlAttribute(config.googleSiteVerification)}" />` : "",
+    config.bingSiteVerification ? `<meta name="msvalidate.01" content="${htmlAttribute(config.bingSiteVerification)}" />` : "",
+  ].filter(Boolean).join("");
+  if (verificationTags) html = html.replace("</head>", `${verificationTags}</head>`);
   const structuredData = [];
   if (route !== "/") {
     structuredData.push({
@@ -296,6 +345,16 @@ function renderPublicHtml(pathname, indexPath) {
         { "@type": "ListItem", position: 1, name: "Axion Process OS", item: "https://ax-i-on.com/" },
         { "@type": "ListItem", position: 2, name: meta.title.split("|")[0].trim(), item: canonicalUrl },
       ],
+    });
+    structuredData.push({
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: meta.title.split("|")[0].trim(),
+      url: canonicalUrl,
+      description: meta.description,
+      audience: meta.audience ? { "@type": "BusinessAudience", audienceType: meta.audience } : undefined,
+      isPartOf: { "@id": "https://ax-i-on.com/#website" },
+      about: { "@id": "https://ax-i-on.com/#software" },
     });
   }
   if (meta.faq?.length) {
