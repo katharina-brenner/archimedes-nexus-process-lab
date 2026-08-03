@@ -15453,15 +15453,7 @@ function jumpToView(view) {
 function openProcessCanvas() {
   window.requestAnimationFrame(() => {
     const workspace = document.querySelector(".workspace");
-    const target = document.querySelector("#flowsheetView");
-    const topbar = document.querySelector(".topbar");
-    if (workspace && target) {
-      workspace.scrollTo({
-        left: 0,
-        top: Math.max(0, target.offsetTop - (topbar?.offsetHeight || 0) - 10),
-        behavior: "auto",
-      });
-    }
+    workspace?.scrollTo({ left: 0, top: 0, behavior: "auto" });
     els.canvas?.focus?.({ preventScroll: true });
     showToast("Process canvas opened");
   });
