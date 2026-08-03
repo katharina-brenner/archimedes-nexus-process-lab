@@ -1002,8 +1002,8 @@
               </article>
               <article>
                 <span>Model example</span>
-                <h3>gPROMS-style high-fidelity path</h3>
-                <p>Use Axion’s model cards to decide where equation-oriented modelling, parameter estimation, optimization, soft sensors, web apps and utility optimization should be connected next.</p>
+                <h3>Equation-oriented high-fidelity modelling</h3>
+                <p>Diagnose model structure, fit experiments, quantify uncertainty, optimize constrained decisions, reconcile live states, and solve distributed transport from one connected workbench.</p>
                 <button type="button" data-public-target="publicPlatform" data-public-detail="recommendations">See readiness path</button>
               </article>
             </div>
@@ -1867,6 +1867,7 @@
               <header><span>02</span><div><h3>Models and evidence</h3><p>What is calculated and how results should be reviewed.</p></div></header>
               <div class="public-faq-list">
                 <details><summary>What is included in the engineering output?</summary><p>The combined package includes the PFD, stream table, equipment register, mass and energy balances, reactions, parameters, ODE/PDE profiles, scheduling, utilization, TEA, LCA, uncertainty, sensitivity, sources, open boundaries, and missing validation tasks.</p></details>
+                <details><summary>Does Axion support advanced equation-oriented modelling?</summary><p>Yes. The modelling workbench checks degrees of freedom and initial conditions, executes operating procedures and events, fits parameters to experiments, runs Monte Carlo sensitivity, optimizes constrained decisions, reconciles online states, builds surrogate design spaces, and inspects distributed PDE domains.</p></details>
                 <details><summary>How accurate are the calculations?</summary><p>Accuracy depends on model structure, inputs, calibration, and evidence. Axion records low, base, and high values, units, sources, confidence, and validation state so screening results are not presented as validated plant predictions.</p></details>
                 <details><summary>Is the CFD view a validated CFD solver?</summary><p>The in-app view is an interactive engineering screen for geometry, boundary conditions, transport risks, and external job preparation. Validated three-dimensional CFD requires a verified mesh, numerical settings, material models, convergence evidence, and an external CFD worker such as OpenFOAM.</p></details>
                 <details><summary>Does Axion replace engineering judgment?</summary><p>No. It makes assumptions, dependencies, consequences, and missing evidence visible. Qualified engineers remain responsible for safety, GMP, regulatory, equipment, validation, and investment decisions.</p></details>
@@ -2049,6 +2050,7 @@
           <button class="suite-link" data-view="equations">Model Equations</button>
           <span class="suite-nav-label">Analyze</span>
           <button class="suite-link" data-view="simulation">Dynamic Simulation</button>
+          <button class="suite-link" data-view="modelling">Advanced Modelling</button>
           <button class="suite-link" data-view="cfd">Reactor CFD</button>
           <button class="suite-link" data-view="ai">Constraints + AI</button>
           <button class="suite-link" data-view="standards">Standards Check</button>
@@ -2323,6 +2325,10 @@
 
         <section id="simulationView" class="view simulation-view">
           <div class="simulation-board" id="simulationBoard"></div>
+        </section>
+
+        <section id="modellingView" class="view modelling-view">
+          <div class="modelling-board" id="modellingBoard"></div>
         </section>
 
         <section id="cfdView" class="view cfd-view">

@@ -9,6 +9,17 @@ import {
 } from "./flowsheet-connectivity.js";
 import { assessModelReadiness, readinessRows as buildReadinessRows } from "./model-readiness.js";
 import { buildEngineeringWorkbook, buildEngineeringZip, csvText as buildCsvText } from "./engineering-export.js?v=engineering-v4";
+import {
+  analyzeDesignSpace,
+  analyzeModelStructure,
+  buildDistributedDomain,
+  estimateParameters,
+  executeOperatingProcedure,
+  fitSurrogate,
+  monteCarloAnalysis,
+  optimizeDesign,
+  runScalarStateEstimator,
+} from "./advanced-process-modeling.js";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -104,6 +115,17 @@ const palette = [
   { type: "sludge-thickener", label: "Sludge Thickener", isoName: "Gravity sludge thickener", cls: "Environmental", icon: "TH", color: "#62738a", residence: 6, power: 1.4, standards: ["ISO 14001", "ISO 10628"] },
   { type: "belt-filter", label: "Belt Filter Press", isoName: "Belt filter press sludge dewatering unit", cls: "Solid-liquid", icon: "BFP", color: "#4f7f89", residence: 1.2, power: 8.2, standards: ["ISO 14001", "ISO 10628"] },
   { type: "uv-disinfection", label: "UV Disinfection", isoName: "UV wastewater disinfection channel", cls: "Environmental", icon: "UV", color: "#62738a", residence: 0.2, power: 4.1, standards: ["ISO 14001"] },
+  { type: "anoxic-selector", label: "Anoxic Selector", isoName: "Anoxic activated-sludge selector basin", cls: "Environmental", icon: "ANX", color: "#315f68", residence: 4, power: 3.4, standards: ["ISO 14001", "ISO 10628", "ISA-88"] },
+  { type: "mbr", label: "Membrane Bioreactor", isoName: "Activated-sludge membrane bioreactor", cls: "Environmental", icon: "MBR", color: "#0f766e", residence: 12, power: 18, standards: ["ISO 14001", "ISO 10628", "ISO 13408-2"] },
+  { type: "daf", label: "Dissolved Air Flotation", isoName: "Dissolved air flotation separator", cls: "Solid-liquid", icon: "DAF", color: "#4f7f89", residence: 1.2, power: 6.8, standards: ["ISO 14001", "ISO 10628"] },
+  { type: "coag-floc", label: "Coagulation + Flocculation", isoName: "Coagulation and flocculation reactor train", cls: "Environmental", icon: "CF", color: "#577590", residence: 1.5, power: 2.2, standards: ["ISO 14001", "ISO 10628"] },
+  { type: "thermal-hydrolysis", label: "Thermal Hydrolysis", isoName: "Pressurized sludge thermal hydrolysis system", cls: "Thermal", icon: "THP", color: "#596a64", residence: 1.5, power: 16, standards: ["ISO 14001", "ISO 10628", "PED"] },
+  { type: "uasb", label: "UASB Reactor", isoName: "Upflow anaerobic sludge blanket reactor", cls: "Environmental", icon: "UASB", color: "#0f766e", residence: 18, power: 5.8, standards: ["ISO 14001", "ISO 10628", "ATEX/DSEAR"] },
+  { type: "sbr", label: "Sequencing Batch Reactor", isoName: "Sequencing batch activated-sludge reactor", cls: "Environmental", icon: "SBR", color: "#11847d", residence: 16, power: 14, standards: ["ISO 14001", "ISO 10628", "ISA-88"] },
+  { type: "granular-sludge", label: "Granular Sludge Reactor", isoName: "Aerobic granular sludge reactor", cls: "Environmental", icon: "AGS", color: "#11847d", residence: 10, power: 12, standards: ["ISO 14001", "ISO 10628"] },
+  { type: "sludge-decanter", label: "Sludge Decanter", isoName: "Centrifugal sludge decanter", cls: "Solid-liquid", icon: "DEC", color: "#4f7f89", residence: 0.8, power: 11, standards: ["ISO 14001", "ISO 10628"] },
+  { type: "biogas-scrubber", label: "Biogas Scrubber", isoName: "Biogas hydrogen-sulfide and carbon-dioxide scrubber", cls: "Environmental", icon: "BGS", color: "#315f68", residence: 1.2, power: 5.2, standards: ["ISO 14001", "ISO 10628", "ATEX/DSEAR"] },
+  { type: "biogas-chp", label: "Biogas CHP", isoName: "Biogas combined heat and power package", cls: "Utilities", icon: "CHP", color: "#275f6b", residence: 0.2, power: 22, standards: ["ISO 14001", "IEC 61511", "ATEX/DSEAR"] },
   { type: "ion-exchange", label: "Ion Exchange", isoName: "Ion exchange column", cls: "Separation", icon: "IX", color: "#62738a", residence: 1.8, power: 0.9, standards: ["ISO 10628", "USP <1231>"] },
   { type: "reverse-osmosis", label: "Reverse Osmosis", isoName: "Reverse osmosis membrane skid", cls: "Separation", icon: "RO", color: "#43aa8b", residence: 1.5, power: 5.7, standards: ["USP <1231>", "ISO 10628"] },
   { type: "scrubber", label: "Gas Scrubber", isoName: "Wet gas scrubber", cls: "Air pollution", icon: "GS", color: "#4895ef", residence: 0.8, power: 6.4, standards: ["EPA-MACT", "ISO 14001"] },
@@ -168,46 +190,66 @@ const flowDetailOptions = [
 const gpromsModelCapabilities = [
   {
     name: "Equation-oriented plant model",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "Units, streams, reaction kinetics, property package, recycle loops",
     output: "High-fidelity equation set and variable map",
     example: "mAb: connect growth, substrate uptake, kLa, harvest recovery, chromatography yield, utilities, and recycle equations into one solvable model.",
   },
   {
     name: "Parameter estimation",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "Batch data, PAT tags, lab runs, CSV uploads, literature priors",
     output: "Estimated kinetic, transfer, yield, and cost parameters with confidence flags",
     example: "Fit mu max, qO2, kLa correction, resin capacity, filter fouling and media-consumption coefficients from uploaded batches.",
   },
   {
     name: "Dynamic optimization",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "Objective, constraints, batch schedule, feed profile, control bounds",
     output: "Optimized feed, DO, temperature, harvest, cleaning, and utility strategy",
     example: "Minimize cost per kg while respecting ammonium, lactate, DO, shear, hold-time, sterility and bottleneck constraints.",
   },
   {
     name: "Uncertainty and design-space",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "Parameter ranges, scale assumptions, yield uncertainty, CAPEX/OPEX factors",
     output: "Risk-ranked design envelope and sensitivity map",
     example: "Show whether titer, recovery, resin lifetime, media cost or utility carbon intensity dominates LCA/TEA uncertainty.",
   },
   {
     name: "Soft sensors and online twin",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "SCADA / historian tags, Raman, capacitance, pH, DO, airflow, feed mass",
     output: "Live state estimates, deviation warnings, and model-vs-plant residuals",
     example: "Estimate biomass, OUR, substrate depletion, oxygen limitation and heat-load drift during production.",
   },
   {
     name: "Utilities and sustainability optimizer",
-    status: "Axion scaffold",
+    status: "Implemented",
     inputs: "Steam, WFI, chilled water, heat recovery, wastewater, solvent recovery, power",
     output: "Utility pinch, heat reuse, water reuse, CO2e and cost improvement ideas",
     example: "Rank heat-recovery loop, condensate return, water reuse and solvent recycle by cost, carbon and implementation impact.",
   },
+];
+
+const advancedModelActivities = [
+  { key: "structure", index: "01", label: "Model structure", detail: "Degrees of freedom, initial conditions, DAE risk, domains, and events" },
+  { key: "procedure", index: "02", label: "Operating procedure", detail: "Sequences, parallel tasks, conditions, loops, state changes, save and restore" },
+  { key: "estimation", index: "03", label: "Parameter estimation", detail: "Fit kinetic or transfer parameters and inspect residuals and confidence intervals" },
+  { key: "uncertainty", index: "04", label: "Uncertainty + GSA", detail: "Monte Carlo intervals and global sensitivity ranking for production and cost" },
+  { key: "optimization", index: "05", label: "Dynamic optimization", detail: "Bounded design decisions with physical and operational constraints" },
+  { key: "state", index: "06", label: "Online state estimation", detail: "Model-data reconciliation, soft sensor residuals, and live-state uncertainty" },
+  { key: "design-space", index: "07", label: "Design space + surrogate", detail: "Feasible operating envelope and fast response-surface approximation" },
+  { key: "distributed", index: "08", label: "Distributed domains", detail: "PDE mesh, boundary conditions, axial oxygen, and nutrient transport" },
+];
+
+const advancedApplicationFamilies = [
+  ["Bioprocessing", "Bioreactors, chromatography, TFF, membrane filtration, and end-to-end trains", "Native equipment + dynamic basis"],
+  ["Drug substance", "Continuous and batch reaction, crystallization, impurity tracking, filtration, hydrogenation, and milling", "Configurable model basis"],
+  ["Drug product", "Granulation, spray drying, tableting, coating, dissolution, and oral absorption", "Configurable model basis"],
+  ["Water + resource recovery", "Activated sludge, selectors, clarification, MBR, digestion, biogas, and water reuse", "Native equipment + optimization basis"],
+  ["Adsorption + gas systems", "Fixed beds, pressure-swing adsorption, blowdown, flare, and relief scenarios", "Configurable model basis"],
+  ["Energy transition", "Electrolysis, green hydrogen, heat integration, utilities, and carbon-intensity scenarios", "Configurable model basis"],
 ];
 
 function gpromsAlgorithmRows() {
@@ -591,7 +633,7 @@ const scientificSources = [
     title: "Bioprocess digital twins and gPROMS-style modelling",
     appliesTo: ["process-explorer", "pat", "sensor", "report-set", "utility", "power-demand", "bioreactor"],
     benchmark: "Bioprocess digital twins support in-silico design, optimization, scale-up, soft sensing, monitoring, real-time optimization, and manufacturing decision support.",
-    modelUse: "Advanced process modelling panel, soft-sensor telemetry, parameter-estimation scaffold, model-predictive optimization path, and utility/sustainability optimizer.",
+    modelUse: "Executable advanced-modelling workbench, soft-sensor telemetry, parameter estimation, constrained optimization, state estimation, design-space analysis, and utility/sustainability optimization.",
     source: "Siemens - Bioprocess digital twins",
     url: "https://resources.sw.siemens.com/en-US/bioprocess-digital-twins/",
   },
@@ -1130,9 +1172,9 @@ const templates = {
     costs: costs(18, 16, 24, 8, 34),
   },
   wastewater: {
-    label: "Industrial Wastewater",
-    description: "Equalization, pH control, clarification, activated sludge, disinfection, sludge dewatering",
-    product: "Treated effluent",
+    label: "Water Resource Recovery",
+    description: "Physical-chemical pretreatment, nitrogen removal, MBR polishing, sludge valorization, biogas CHP, and recycle",
+    product: "Treated water and recovered energy",
     titer: 3,
     recovery: 92,
     batchSize: 150000,
@@ -1140,26 +1182,39 @@ const templates = {
     units: [
       unit("EQ-101", "equalization", 40, 80),
       unit("NT-201", "neutralization", 290, 80),
-      unit("PC-301", "primary-clarifier", 540, 80),
-      unit("AB-401", "aeration-basin", 790, 80, "Activated Sludge Basin"),
-      unit("SC-501", "secondary-clarifier", 1040, 80),
-      unit("UV-601", "uv-disinfection", 1290, 80),
-      unit("TH-701", "sludge-thickener", 540, 265),
-      unit("BFP-801", "belt-filter", 790, 265),
-      unit("WH-901", "waste-hold", 1040, 265, "Dewatered Sludge Hold"),
-      unit("QC-999", "qc", 1290, 265, "Effluent Compliance"),
+      unit("CF-301", "coag-floc", 540, 80),
+      unit("DAF-302", "daf", 790, 80),
+      unit("ANX-401", "anoxic-selector", 1040, 80),
+      unit("AB-402", "aeration-basin", 1290, 80, "Aerobic Activated Sludge"),
+      unit("MBR-501", "mbr", 1540, 80),
+      unit("UV-601", "uv-disinfection", 1790, 80),
+      unit("QC-999", "qc", 2040, 80, "Effluent Compliance and Reuse Release"),
+      unit("TH-701", "sludge-thickener", 1040, 300),
+      unit("THP-702", "thermal-hydrolysis", 1290, 300),
+      unit("UASB-703", "uasb", 1540, 300),
+      unit("DEC-801", "sludge-decanter", 1790, 300),
+      unit("WH-901", "waste-hold", 2040, 300, "Dewatered Biosolids Hold"),
+      unit("BGS-704", "biogas-scrubber", 1540, 520),
+      unit("CHP-705", "biogas-chp", 1790, 520),
     ],
     streams: [
       stream("S-101", "EQ-101", "NT-201", "Equalized wastewater", "Liquid"),
-      stream("S-201", "NT-201", "PC-301", "Neutralized wastewater", "Liquid"),
-      stream("S-301", "PC-301", "AB-401", "Primary clarified effluent", "Liquid"),
-      stream("S-302", "PC-301", "TH-701", "Primary sludge", "Slurry"),
-      stream("S-401", "AB-401", "SC-501", "Mixed liquor", "Slurry"),
-      stream("S-501", "SC-501", "UV-601", "Clarified effluent", "Liquid"),
-      stream("S-502", "SC-501", "TH-701", "Waste activated sludge", "Slurry"),
-      stream("S-601", "UV-601", "QC-999", "Disinfected effluent", "Liquid"),
-      stream("S-701", "TH-701", "BFP-801", "Thickened sludge", "Slurry"),
-      stream("S-801", "BFP-801", "WH-901", "Dewatered sludge cake", "Solid"),
+      stream("S-201", "NT-201", "CF-301", "Neutralized wastewater", "Liquid"),
+      stream("S-301", "CF-301", "DAF-302", "Flocculated wastewater", "Slurry"),
+      stream("S-302", "DAF-302", "ANX-401", "Physically clarified effluent", "Liquid"),
+      stream("S-303", "DAF-302", "TH-701", "Flotation sludge", "Slurry"),
+      stream("S-401", "ANX-401", "AB-402", "Denitrified mixed liquor", "Slurry"),
+      stream("S-402", "AB-402", "MBR-501", "Aerobic mixed liquor", "Slurry"),
+      stream("S-501", "MBR-501", "UV-601", "Membrane permeate", "Liquid"),
+      stream("S-502", "MBR-501", "ANX-401", "Return activated sludge recycle", "Slurry"),
+      stream("S-503", "MBR-501", "TH-701", "Waste activated sludge", "Slurry"),
+      stream("S-601", "UV-601", "QC-999", "Disinfected reuse water", "Liquid"),
+      stream("S-701", "TH-701", "THP-702", "Thickened sludge", "Slurry"),
+      stream("S-702", "THP-702", "UASB-703", "Hydrolyzed sludge", "Slurry"),
+      stream("S-703", "UASB-703", "DEC-801", "Digested sludge", "Slurry"),
+      stream("S-704", "DEC-801", "WH-901", "Dewatered biosolids", "Solid"),
+      stream("S-705", "UASB-703", "BGS-704", "Raw biogas", "Gas"),
+      stream("S-706", "BGS-704", "CHP-705", "Conditioned biogas", "Gas"),
     ],
     costs: costs(8, 18, 38, 12, 24),
   },
@@ -2125,6 +2180,9 @@ const state = {
   cfdSolverRunning: false,
   cfdIteration: 0,
   cfdBackendJob: null,
+  advancedActivity: "structure",
+  advancedRun: null,
+  advancedMonteCarloSamples: 320,
   commandHistory: [],
   commandHighlights: [],
   lockedRoutes: {},
@@ -2179,6 +2237,7 @@ const els = {
   streamSummary: document.querySelector("#streamSummary"),
   aiBoard: document.querySelector("#aiBoard"),
   simulationBoard: document.querySelector("#simulationBoard"),
+  modellingBoard: document.querySelector("#modellingBoard"),
   cfdBoard: document.querySelector("#cfdBoard"),
   equationSearch: document.querySelector("#equationSearch"),
   equationFilter: document.querySelector("#equationFilter"),
@@ -2799,6 +2858,7 @@ function loadTemplate(key, preserveScale = false) {
   state.canvasFocus = "main";
   state.flowDetail = "standard";
   state.zoom = 0.68;
+  state.advancedRun = null;
 
   if (!preserveScale) {
     state.batchSize = template.batchSize;
@@ -2925,6 +2985,7 @@ function applyScale(key) {
   state.batchCount = preset.batchCount;
   state.titer = preset.titer;
   state.recovery = preset.recovery;
+  state.advancedRun = null;
   syncInputs();
   renderAll();
   showToast(`${preset.label} scale applied`);
@@ -7047,6 +7108,7 @@ function readGlobalParameterInputs() {
   state.batchCount = Number(els.batchCount.value);
   state.titer = Number(els.titer.value);
   state.recovery = Number(els.recovery.value);
+  state.advancedRun = null;
 }
 
 function renderGlobalParameterModelViews() {
@@ -8626,6 +8688,303 @@ function renderEquations() {
   `).join("");
 }
 
+function advancedRunRows(run = state.advancedRun) {
+  return (run?.rows || []).map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [
+    key,
+    value && typeof value === "object" ? JSON.stringify(value) : value,
+  ])));
+}
+
+function runAdvancedModelActivity(activity = state.advancedActivity) {
+  const selected = advancedModelActivities.find((item) => item.key === activity) || advancedModelActivities[0];
+  const data = metrics();
+  const dynamic = dynamicBatchProfile();
+  const transport = axialTransportProfiles(dynamic);
+  const generatedAt = new Date().toISOString();
+  const baseRun = { activity: selected.key, title: selected.label, generatedAt, rows: [], summary: [], chart: [], notes: [] };
+  state.advancedActivity = selected.key;
+
+  if (selected.key === "structure") {
+    const connectivity = auditFlowsheetConnectivity(state.units, state.streams);
+    const stateNames = ["viable cells", "dead cells", "glucose", "glutamine", "product", "oxygen", "lactate", "ammonium", "liquid volume"];
+    const algebraicCount = state.units.length * 3 + state.streams.length * 6;
+    const unknownCount = stateNames.length + algebraicCount;
+    const unresolved = connectivity.isolated.length;
+    const analysis = analyzeModelStructure({
+      variables: [
+        ...stateNames.map((name) => ({ name, role: "state", initialized: true })),
+        ...Array.from({ length: algebraicCount }, (_, index) => ({ name: `algebraic_${index + 1}`, role: "algebraic", initialized: true })),
+      ],
+      equations: Array.from({ length: Math.max(0, unknownCount - unresolved) }, (_, index) => ({ name: `equation_${index + 1}`, derivativeConstraint: false })),
+      domains: [
+        { name: "axial oxygen", nodes: transport.oxygen.cells },
+        { name: "axial nutrient", nodes: transport.nutrient.cells },
+      ],
+      events: [{ name: "harvest", condition: { key: "time", operator: ">=", value: dynamic.durationH } }],
+    });
+    baseRun.status = analysis.status;
+    baseRun.summary = [
+      { label: "Structural status", value: analysis.status, detail: `${analysis.degreesOfFreedom} degrees of freedom` },
+      { label: "Unknowns / equations", value: `${analysis.unknownVariables} / ${analysis.activeEquations}`, detail: "Active equation set" },
+      { label: "Dynamic states", value: analysis.dynamicStates, detail: `${analysis.missingInitialConditions.length} missing initial values` },
+      { label: "Distributed domains", value: analysis.distributedDomains, detail: `${analysis.stateTransitions} event network` },
+    ];
+    baseRun.rows = [
+      ...analysis.diagnostics.map((item) => ({ category: "solver diagnostic", severity: item.severity, code: item.code, element: "model", finding: item.message, action: item.severity === "ok" ? "No structural action" : "Complete specifications before execution" })),
+      ...connectivity.attention.map((item) => ({ category: "connectivity", severity: item.isolated ? "error" : "review", code: item.isolated ? "ISOLATED_UNIT" : "BOUNDARY_REVIEW", element: item.unit.id, finding: item.isolated ? "Equipment has no connected stream." : `${item.missingInlet ? "Missing inlet" : ""}${item.missingInlet && item.missingOutlet ? " and " : ""}${item.missingOutlet ? "missing outlet" : ""}.`, action: "Add an equipment connection or an explicit plant-boundary stream" })),
+    ];
+    baseRun.chart = [
+      { label: "Specified", value: Math.max(0, analysis.activeEquations) },
+      { label: "Open DOF", value: Math.max(0, analysis.degreesOfFreedom) },
+      { label: "Initial states", value: analysis.dynamicStates - analysis.missingInitialConditions.length },
+    ];
+    baseRun.notes = ["Structural consistency is necessary but does not prove numerical convergence or physical validity."];
+  }
+
+  if (selected.key === "procedure") {
+    const mode = operationProfile();
+    const procedure = executeOperatingProcedure({
+      context: { phase: "ready", volumeL: state.batchSize * mode.startVolumeFraction, elapsedH: 0, cleaningCycles: 0, released: false },
+      tasks: [
+        { type: "save", label: "pre-batch" },
+        { type: "sequence", label: "Charge and inoculate", steps: [{ type: "switch", key: "phase", value: "charge" }, { type: "set", key: "volumeL", value: state.batchSize * mode.startVolumeFraction }, { type: "add", key: "elapsedH", value: 2 }] },
+        { type: "parallel", label: "Culture and monitor", steps: [{ type: "switch", key: "phase", value: state.operationMode }, { type: "add", key: "elapsedH", value: mode.productionHours }, { type: "monitor", label: "PAT and boundary monitor", message: "DO, pH, temperature, ammonium, lactate, feed mass" }] },
+        { type: "if", label: "Release gate", condition: { key: "elapsedH", operator: ">=", value: mode.productionHours }, then: [{ type: "set", key: "released", value: true }, { type: "message", message: "Production phase complete; transfer authorized." }] },
+        { type: "sequence", label: "Turnaround", steps: [{ type: "switch", key: "phase", value: "CIP/SIP" }, { type: "add", key: "cleaningCycles", value: 1 }, { type: "add", key: "elapsedH", value: Number(state.params.turnaroundTime || 4) }, { type: "reinitialize", key: "phase", value: "ready" }] },
+      ],
+    });
+    baseRun.status = procedure.context.released ? "ready" : "review";
+    baseRun.summary = [
+      { label: "Procedure status", value: procedure.context.phase, detail: procedure.context.released ? "Release gate passed" : "Release gate open" },
+      { label: "Executed steps", value: procedure.log.length, detail: "Auditable operation log" },
+      { label: "Elapsed time", value: `${formatNumber(procedure.context.elapsedH, 1)} h`, detail: mode.label },
+      { label: "Cleaning cycles", value: procedure.context.cleaningCycles, detail: "Asset ready for reuse" },
+    ];
+    baseRun.rows = procedure.log.map((item) => ({ step: item.step, construct: item.type, task: item.label, detail: item.detail, phase: item.context.phase, elapsedH: item.context.elapsedH, volumeL: item.context.volumeL, released: item.context.released }));
+    baseRun.chart = procedure.log.filter((item) => Number.isFinite(Number(item.context.elapsedH))).map((item) => ({ label: `S${item.step}`, value: Number(item.context.elapsedH) }));
+    baseRun.notes = ["The procedure is executable and auditable; equipment-specific interlocks and approved batch instructions still require site data."];
+  }
+
+  if (selected.key === "estimation") {
+    const samplePoints = dynamic.points.filter((_, index) => index % Math.max(1, Math.floor(dynamic.points.length / 14)) === 0).slice(0, 15);
+    const noisePattern = [0.018, -0.012, 0.009, -0.02, 0.014, -0.006];
+    const observations = samplePoints.map((point, index) => ({ timeH: point.timeH, baseline: point.viableDensityMCellsMl, observed: point.viableDensityMCellsMl * (1 + noisePattern[index % noisePattern.length]) }));
+    const estimation = estimateParameters({
+      observations,
+      parameters: { growthFactor: 0.88 },
+      bounds: { growthFactor: [0.6, 1.4] },
+      simulate: ({ growthFactor }, observation) => observation.baseline * Math.exp((growthFactor - 1) * observation.timeH * 0.012),
+      iterations: 90,
+    });
+    const estimatedMu = state.params.specificGrowth * estimation.parameters.growthFactor;
+    baseRun.status = estimation.r2 > 0.95 ? "ready" : "review";
+    baseRun.summary = [
+      { label: "Estimated mu max", value: `${formatNumber(estimatedMu, 4)} 1/h`, detail: `factor ${formatNumber(estimation.parameters.growthFactor, 3)}` },
+      { label: "RMSE", value: formatNumber(estimation.rmse, 4), detail: "million cells/mL" },
+      { label: "Model fit", value: `${formatNumber(estimation.r2 * 100, 1)}%`, detail: "R-squared" },
+      { label: "Data basis", value: state.datasets.length ? `${state.datasets.length} dataset(s)` : "Demonstration", detail: state.datasets.length ? "Project uploads available" : "Model-derived validation series" },
+    ];
+    baseRun.rows = estimation.predicted.map((item) => ({ timeH: item.timeH, observed: item.observed, predicted: item.predicted, residual: item.residual, estimatedMuPerH: estimatedMu, confidenceLow: state.params.specificGrowth * estimation.intervals.growthFactor.low, confidenceHigh: state.params.specificGrowth * estimation.intervals.growthFactor.high }));
+    baseRun.chart = estimation.predicted.map((item) => ({ label: `${formatNumber(item.timeH, 0)}h`, value: item.predicted }));
+    baseRun.notes = [state.datasets.length ? "Select and map imported plant columns in Data & Sources before treating this fit as evidence." : "This run demonstrates the estimation engine with a model-derived series. Upload experiments or historian data for a real fit."];
+  }
+
+  if (selected.key === "uncertainty") {
+    const analysis = monteCarloAnalysis({
+      samples: state.advancedMonteCarloSamples,
+      seed: 71,
+      parameters: [
+        { key: "titerGL", low: state.titer * 0.72, mode: state.titer, high: state.titer * 1.28 },
+        { key: "recoveryPct", low: Math.max(20, state.recovery - 14), mode: state.recovery, high: Math.min(98, state.recovery + 12) },
+        { key: "mediaCostFactor", low: 0.72, mode: 1, high: 1.38 },
+        { key: "uptimePct", low: Math.max(45, data.utilization - 12), mode: data.utilization, high: Math.min(88, data.utilization + 9) },
+      ],
+      evaluate: ({ titerGL, recoveryPct, mediaCostFactor, uptimePct }) => {
+        const productionFactor = Math.max(0.05, titerGL / Math.max(0.01, state.titer) * recoveryPct / Math.max(1, state.recovery) * uptimePct / Math.max(1, data.utilization));
+        return { annualProductKg: data.annualKg * productionFactor, directCostPerKg: data.directCost * (0.42 + 0.58 * mediaCostFactor) / productionFactor };
+      },
+    });
+    const cost = analysis.summary.directCostPerKg;
+    const production = analysis.summary.annualProductKg;
+    baseRun.status = "ready";
+    baseRun.summary = [
+      { label: "Simulation runs", value: analysis.samples, detail: `Reproducible seed ${analysis.seed}` },
+      { label: "Direct cost P05-P95", value: `$${formatNumber(cost.p05, 0)}-$${formatNumber(cost.p95, 0)}/kg`, detail: `median $${formatNumber(cost.p50, 0)}/kg` },
+      { label: "Annual output P05-P95", value: `${formatNumber(production.p05, 0)}-${formatNumber(production.p95, 0)} kg`, detail: `median ${formatNumber(production.p50, 0)} kg` },
+      { label: "Top sensitivity", value: analysis.sensitivity[0]?.input || "n/a", detail: `${formatNumber(Math.abs(analysis.sensitivity[0]?.correlation || 0) * 100, 0)}% absolute correlation` },
+    ];
+    baseRun.rows = analysis.rows;
+    baseRun.chart = analysis.sensitivity.filter((item) => item.output === "directCostPerKg").map((item) => ({ label: item.input, value: Math.abs(item.correlation) * 100 }));
+    baseRun.notes = ["Intervals represent the configured engineering assumptions, not statistical confidence until distributions are calibrated from measured or supplier data."];
+    baseRun.secondaryRows = analysis.sensitivity;
+  }
+
+  if (selected.key === "optimization") {
+    const baseline = { titer: state.titer, recovery: state.recovery };
+    const optimization = optimizeDesign({
+      variables: [
+        { key: "titer", initial: state.titer, low: Math.max(0.1, state.titer * 0.7), high: state.titer * 1.35 },
+        { key: "recovery", initial: state.recovery, low: Math.max(40, state.recovery - 18), high: Math.min(98, state.recovery + 16) },
+      ],
+      evaluate: ({ titer, recovery }) => {
+        const productionFactor = titer / Math.max(0.01, baseline.titer) * recovery / Math.max(1, baseline.recovery);
+        const estimatedUtilization = Math.min(100, data.utilization * (0.9 + productionFactor * 0.1));
+        return {
+          objective: data.directCost / Math.max(0.1, productionFactor) + Math.max(0, titer / baseline.titer - 1.22) * data.directCost * 0.18,
+          constraints: [
+            { name: "plant utilization <= 82%", violation: Math.max(0, estimatedUtilization - 82) / 10 },
+            { name: "ammonium <= configured boundary", violation: Math.max(0, dynamic.maxAmmoniaMm - state.params.ammonia) },
+            { name: "lactate <= configured boundary", violation: Math.max(0, dynamic.maxLactateGL - state.params.lactate) },
+          ],
+          outputs: { estimatedUtilization, annualProductKg: data.annualKg * productionFactor },
+        };
+      },
+      iterations: 110,
+    });
+    baseRun.status = optimization.feasible ? "ready" : "blocked";
+    baseRun.summary = [
+      { label: "Optimization status", value: optimization.feasible ? "Feasible" : "Constraint conflict", detail: `${optimization.trace.length - 1} search iterations` },
+      { label: "Recommended titer", value: `${formatNumber(optimization.variables.titer, 2)} g/L`, detail: `from ${formatNumber(baseline.titer, 2)} g/L` },
+      { label: "Recommended recovery", value: `${formatNumber(optimization.variables.recovery, 1)}%`, detail: `from ${formatNumber(baseline.recovery, 1)}%` },
+      { label: "Estimated direct cost", value: `$${formatNumber(optimization.objective, 0)}/kg`, detail: `${formatNumber((1 - optimization.objective / Math.max(1, data.directCost)) * 100, 1)}% vs current` },
+    ];
+    baseRun.rows = optimization.trace.map((item) => ({ iteration: item.iteration, titerGL: item.titer, recoveryPct: item.recovery, objectiveCostPerKg: item.objective, constraintViolation: item.violation }));
+    baseRun.chart = optimization.trace.filter((_, index) => index % Math.max(1, Math.floor(optimization.trace.length / 12)) === 0).map((item) => ({ label: `I${item.iteration}`, value: item.objective }));
+    baseRun.notes = optimization.constraints.map((item) => `${item.name}: ${Number(item.violation || 0) > 0 ? "violated" : "satisfied"}`);
+    baseRun.applyValues = { titer: optimization.variables.titer, recovery: optimization.variables.recovery };
+    baseRun.beforeValues = baseline;
+  }
+
+  if (selected.key === "state") {
+    const samplePoints = dynamic.points.filter((_, index) => index % Math.max(1, Math.floor(dynamic.points.length / 18)) === 0).slice(0, 20);
+    const measurements = samplePoints.map((point, index) => ({ timeH: point.timeH, trueState: point.viableDensityMCellsMl, measurement: point.viableDensityMCellsMl * (1 + [0.04, -0.03, 0.018, -0.012][index % 4]), input: index ? point.viableDensityMCellsMl - samplePoints[index - 1].viableDensityMCellsMl : 0 }));
+    const estimated = runScalarStateEstimator({ observations: measurements, initialState: measurements[0]?.measurement || 0, initialVariance: 0.8, processVariance: 0.025, measurementVariance: 0.16 });
+    const rawMae = estimated.reduce((sum, item) => sum + Math.abs(item.measurement - item.trueState), 0) / Math.max(1, estimated.length);
+    const filteredMae = estimated.reduce((sum, item) => sum + Math.abs(item.estimate - item.trueState), 0) / Math.max(1, estimated.length);
+    baseRun.status = filteredMae <= rawMae ? "ready" : "review";
+    baseRun.summary = [
+      { label: "Observer", value: "Recursive state estimator", detail: "Prediction + measurement update" },
+      { label: "Raw sensor MAE", value: formatNumber(rawMae, 4), detail: "million cells/mL" },
+      { label: "Filtered MAE", value: formatNumber(filteredMae, 4), detail: `${formatNumber((1 - filteredMae / Math.max(1e-12, rawMae)) * 100, 0)}% residual improvement` },
+      { label: "Final uncertainty", value: formatNumber(Math.sqrt(estimated.at(-1)?.variance || 0), 4), detail: "state standard deviation" },
+    ];
+    baseRun.rows = estimated.map((item) => ({ timeH: item.timeH, sensorValue: item.measurement, predictedState: item.predicted, reconciledState: item.estimate, referenceState: item.trueState, innovationResidual: item.residual, observerGain: item.gain, stateVariance: item.variance }));
+    baseRun.chart = estimated.map((item) => ({ label: `${formatNumber(item.timeH, 0)}h`, value: item.estimate }));
+    baseRun.notes = [state.datasets.length ? "Map historian or PAT tags in Data & Sources to replace the demonstration measurements." : "This observer currently reconciles model-derived demonstration measurements; connect plant tags for an online twin."];
+  }
+
+  if (selected.key === "design-space") {
+    const finalPoint = dynamic.points.at(-1) || {};
+    const designSpace = analyzeDesignSpace({
+      factors: [
+        { key: "temperatureC", levels: [state.params.temperature - 1.5, state.params.temperature, state.params.temperature + 1.5] },
+        { key: "ph", levels: [state.params.ph - 0.2, state.params.ph, state.params.ph + 0.2] },
+        { key: "doPct", levels: [Math.max(15, state.params.doSetpoint - 15), state.params.doSetpoint, Math.min(80, state.params.doSetpoint + 15)] },
+      ],
+      evaluate: ({ temperatureC, ph, doPct }) => {
+        const qualityPenalty = (temperatureC - 36.5) ** 2 * 1.8 + (ph - 7.1) ** 2 * 28 + Math.max(0, 30 - doPct) * 0.35;
+        const predictedViability = state.params.viability - qualityPenalty;
+        const predictedCost = data.directCost * (1 + qualityPenalty / 100);
+        return { objective: predictedCost, predictedViabilityPct: predictedViability, constraints: [{ name: "viability >= 80%", violation: Math.max(0, 80 - predictedViability) }, { name: "DO >= 20%", violation: Math.max(0, 20 - doPct) }], ammoniaMm: finalPoint.ammoniaMm || 0, lactateGL: finalPoint.lactateGL || 0 };
+      },
+    });
+    const surrogate = fitSurrogate({ rows: designSpace.rows, features: ["temperatureC", "ph", "doPct"], target: "objective" });
+    baseRun.status = designSpace.feasibleRows.length ? "ready" : "blocked";
+    baseRun.summary = [
+      { label: "Design points", value: designSpace.rows.length, detail: "Full-factorial screening" },
+      { label: "Feasible region", value: `${formatNumber(designSpace.feasibleFraction * 100, 0)}%`, detail: `${designSpace.feasibleRows.length} operating points` },
+      { label: "Best screened cost", value: designSpace.best ? `$${formatNumber(designSpace.best.objective, 0)}/kg` : "n/a", detail: designSpace.best ? `${formatNumber(designSpace.best.temperatureC, 1)} C, pH ${formatNumber(designSpace.best.ph, 2)}` : "No feasible point" },
+      { label: "Surrogate quality", value: `${formatNumber(surrogate.r2 * 100, 1)}%`, detail: `RMSE ${formatNumber(surrogate.rmse, 2)}` },
+    ];
+    baseRun.rows = designSpace.rows.map((item) => ({ temperatureC: item.temperatureC, ph: item.ph, doPct: item.doPct, predictedCostPerKg: item.objective, predictedViabilityPct: item.predictedViabilityPct, ammoniaMm: item.ammoniaMm, lactateGL: item.lactateGL, feasible: item.feasible }));
+    baseRun.chart = designSpace.rows.map((item, index) => ({ label: `D${index + 1}`, value: item.predictedViabilityPct }));
+    baseRun.notes = ["The surrogate is an acceleration layer around the mechanistic screen; it must remain inside the sampled design domain."];
+  }
+
+  if (selected.key === "distributed") {
+    const domain = buildDistributedDomain({ name: "bioreactor axial transport", length: transport.reactorLengthM, nodes: transport.oxygen.cells, method: "finite volume", inlet: "specified concentration / source", outlet: "zero concentration gradient" });
+    const oxygen = transport.oxygen.final.values;
+    const nutrient = transport.nutrient.final.values;
+    baseRun.status = Math.max(transport.oxygen.massBalanceResidualPct, transport.nutrient.massBalanceResidualPct) < 2 ? "ready" : "review";
+    baseRun.summary = [
+      { label: "Discretization", value: `${domain.nodes} cells`, detail: `${formatNumber(domain.spacing, 3)} m spacing` },
+      { label: "Boundary conditions", value: "Inlet + outlet", detail: `${domain.boundaries.inlet}; ${domain.boundaries.outlet}` },
+      { label: "Oxygen residual", value: `${formatNumber(transport.oxygen.massBalanceResidualPct, 3)}%`, detail: `Pe ${formatNumber(transport.oxygen.peclet, 1)}` },
+      { label: "Nutrient residual", value: `${formatNumber(transport.nutrient.massBalanceResidualPct, 3)}%`, detail: `${formatNumber(transport.velocityMph, 2)} m/h axial velocity` },
+    ];
+    baseRun.rows = domain.grid.map((node, index) => ({ cell: node.index, positionM: node.position, boundary: node.boundary, oxygenNormalized: oxygen[index], nutrientNormalized: nutrient[index], method: domain.method, inletCondition: domain.boundaries.inlet, outletCondition: domain.boundaries.outlet }));
+    baseRun.chart = oxygen.map((value, index) => ({ label: `z${index + 1}`, value: value * 100 }));
+    baseRun.notes = ["This one-dimensional finite-volume model resolves axial transport. Equipment design decisions still require mesh-independent 2D/3D CFD where local impeller, sparger, baffle, and free-surface effects matter."];
+  }
+
+  state.advancedRun = baseRun;
+  return baseRun;
+}
+
+function renderAdvancedModellingBoard() {
+  if (!els.modellingBoard) return;
+  const run = state.advancedRun?.activity === state.advancedActivity ? state.advancedRun : runAdvancedModelActivity(state.advancedActivity);
+  const rows = advancedRunRows(run);
+  const headers = Object.keys(rows[0] || {}).slice(0, 9);
+  const maxChart = Math.max(1, ...(run.chart || []).map((item) => Math.abs(Number(item.value) || 0)));
+  const readinessClass = run.status === "ready" ? "ready" : run.status === "blocked" ? "blocked" : "review";
+  els.modellingBoard.innerHTML = `
+    <header class="advanced-model-hero">
+      <div>
+        <span>Equation-oriented engineering workspace</span>
+        <h2>Build, validate, and optimize the model behind the flowsheet.</h2>
+        <p>Run structural diagnostics, operating procedures, experiment fitting, uncertainty, constrained optimization, online state estimation, surrogate models, and distributed transport against the active ${escapeHtml(activeTemplate().label)} model.</p>
+      </div>
+      <div class="advanced-model-hero-actions">
+        <span class="advanced-run-status ${readinessClass}">${escapeHtml(run.status || "review")}</span>
+        <button class="action-button primary" data-advanced-run="${escapeAttr(state.advancedActivity)}" type="button">Run ${escapeHtml(run.title)}</button>
+      </div>
+    </header>
+    <section class="advanced-model-workbench">
+      <nav class="advanced-model-nav" aria-label="Advanced modelling activities">
+        ${advancedModelActivities.map((item) => `
+          <button class="${item.key === state.advancedActivity ? "active" : ""}" data-advanced-activity="${item.key}" type="button">
+            <span>${item.index}</span>
+            <strong>${item.label}</strong>
+            <small>${item.detail}</small>
+          </button>
+        `).join("")}
+      </nav>
+      <div class="advanced-model-result">
+        <header>
+          <div><span>Latest execution · ${escapeHtml(new Date(run.generatedAt).toLocaleString())}</span><h3>${escapeHtml(run.title)}</h3></div>
+          <div class="advanced-result-actions">
+            <button data-download-report="advanced-run-csv" type="button">CSV</button>
+            <button data-download-report="advanced-run-json" type="button">JSON</button>
+            ${run.applyValues ? `<button class="primary" data-advanced-apply type="button">Apply to model</button>` : ""}
+          </div>
+        </header>
+        ${run.applied ? `<div class="advanced-applied-change"><strong>Applied to active model</strong><span>Titer ${formatNumber(run.beforeValues.titer, 2)} -> ${formatNumber(run.applyValues.titer, 2)} g/L · Recovery ${formatNumber(run.beforeValues.recovery, 1)} -> ${formatNumber(run.applyValues.recovery, 1)}%</span></div>` : ""}
+        <div class="advanced-result-kpis">
+          ${run.summary.map((item) => `<article><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong><small>${escapeHtml(item.detail)}</small></article>`).join("")}
+        </div>
+        <div class="advanced-result-chart" aria-label="${escapeAttr(run.title)} result chart">
+          ${(run.chart || []).slice(0, 28).map((item) => `<i style="--value:${Math.max(3, Math.abs(Number(item.value) || 0) / maxChart * 100)}%" title="${escapeAttr(`${item.label}: ${formatNumber(item.value, 3)}`)}"><span>${escapeHtml(item.label)}</span></i>`).join("")}
+        </div>
+        <div class="advanced-result-table-wrap">
+          <table class="advanced-result-table">
+            <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.slice(0, 16).map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody>
+          </table>
+        </div>
+        <footer>
+          <span>Showing ${Math.min(16, rows.length)} of ${rows.length} result rows. Downloads contain the complete run.</span>
+          ${(run.notes || []).map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
+        </footer>
+      </div>
+    </section>
+    <section class="advanced-application-library">
+      <header><div><span>Application model library</span><h3>One modelling engine, specialized process families</h3></div><button data-jump-view="flowsheet" type="button">Open flowsheet</button></header>
+      <div>${advancedApplicationFamilies.map(([family, scope, status]) => `<article><span>${escapeHtml(status)}</span><strong>${escapeHtml(family)}</strong><p>${escapeHtml(scope)}</p></article>`).join("")}</div>
+    </section>
+  `;
+}
+
 function renderSimulationBoard() {
   const p = state.params;
   const readiness = modelReadinessAssessment();
@@ -8966,9 +9325,9 @@ function renderSimulationBoard() {
       <div class="simulation-group-heading">
         <div>
           <span>Advanced process modelling</span>
-          <h3>gPROMS-style high-fidelity modelling path</h3>
+          <h3>Equation-oriented high-fidelity modelling</h3>
         </div>
-        <strong>${gpromsModelCapabilities.length} model capabilities</strong>
+        <button data-jump-view="modelling" type="button">Open modelling workbench</button>
       </div>
       <div class="simulation-cards">
         ${gpromsModelCapabilities.map((item) => `
@@ -8985,12 +9344,12 @@ function renderSimulationBoard() {
           </article>
         `).join("")}
       </div>
-      <div class="equation-algorithm-panel" aria-label="Equation-oriented gPROMS simulation algorithm">
+      <div class="equation-algorithm-panel" aria-label="Equation-oriented simulation algorithm">
         <div class="algorithm-copy">
           <span>Convective-dispersive + PVSD workflow</span>
           <h4>Equation-oriented simulation algorithm</h4>
           <p>Axion turns the process model into a high-fidelity handoff path: define the target, choose the distributed model, set parameters and boundary conditions, discretize the PDE, run the dynamic solver, validate against data, then iterate or export.</p>
-          <button data-download-report="gproms-algorithm-csv" type="button">Download algorithm CSV</button>
+          <button data-download-report="gproms-algorithm-csv" type="button">Download solver workflow</button>
         </div>
         <div class="algorithm-flow">
           ${gpromsAlgorithm.map((item) => `
@@ -13933,6 +14292,7 @@ function pageTitle(view) {
     streams: "Input / Output Streams",
     equations: "Model Equations",
     simulation: "Dynamic Simulation",
+    modelling: "Advanced Modelling",
     cfd: "Reactor CFD",
     ai: "Constraints + AI",
     standards: "Standards Check",
@@ -15066,6 +15426,7 @@ function setView(view) {
   if (!target) return;
   document.body.dataset.activeView = view;
   if (view === "simulation") renderSimulationBoard();
+  if (view === "modelling") renderAdvancedModellingBoard();
   if (view === "cfd") renderCfdBoard();
   if (view === "reports") renderReportsBoard();
   if (view === "recommendations") renderRecommendations();
@@ -15234,6 +15595,12 @@ async function handleReportDownload(type) {
     await downloadCompleteEngineeringPackage();
   } else if (type === "engineering-workbook") {
     await downloadEngineeringWorkbook();
+  } else if (type === "advanced-run-csv") {
+    if (!state.advancedRun) runAdvancedModelActivity(state.advancedActivity);
+    downloadCsv(`${exportFilenameBase()}-${state.advancedRun.activity}-advanced-model-run.csv`, advancedRunRows(), `Advanced modelling - ${state.advancedRun.title}`);
+  } else if (type === "advanced-run-json") {
+    if (!state.advancedRun) runAdvancedModelActivity(state.advancedActivity);
+    downloadJson(`${exportFilenameBase()}-${state.advancedRun.activity}-advanced-model-run.json`, { run: state.advancedRun, model: { template: state.template, scale: state.scale, operationMode: state.operationMode, projectId: state.currentProjectId } }, `Advanced modelling - ${state.advancedRun.title}`);
   } else if (type === "full-canvas-svg") {
     downloadSvg(`${exportFilenameBase()}-full-process-canvas.svg`, fullProcessCanvasSvg());
   } else if (type === "sensitivity-csv") {
@@ -18674,6 +19041,7 @@ function renderAll() {
   renderTables();
   renderEquations();
   renderSimulationBoard();
+  renderAdvancedModellingBoard();
   renderCfdBoard();
   renderAiBoard();
   renderStandards();
@@ -19351,6 +19719,39 @@ function bindEvents() {
     }
     const resetButton = event.target.closest("[data-recipe-reset]");
     if (resetButton) resetRecipeOverrides();
+  });
+
+  els.modellingBoard?.addEventListener("click", (event) => {
+    const downloadButton = event.target.closest("[data-download-report]");
+    if (downloadButton) {
+      requestReportDownload(downloadButton.dataset.downloadReport);
+      return;
+    }
+    const activityButton = event.target.closest("[data-advanced-activity], [data-advanced-run]");
+    if (activityButton) {
+      const activity = activityButton.dataset.advancedActivity || activityButton.dataset.advancedRun;
+      runAdvancedModelActivity(activity);
+      renderAdvancedModellingBoard();
+      showToast(`${advancedModelActivities.find((item) => item.key === activity)?.label || "Advanced model"} completed`);
+      return;
+    }
+    const applyButton = event.target.closest("[data-advanced-apply]");
+    if (applyButton && state.advancedRun?.applyValues) {
+      state.titer = Number(state.advancedRun.applyValues.titer);
+      state.recovery = Number(state.advancedRun.applyValues.recovery);
+      state.advancedRun.applied = true;
+      renderParameters();
+      renderMetrics();
+      renderOverview();
+      renderCanvas();
+      renderTables();
+      renderSimulationBoard();
+      renderEconomics();
+      renderRecommendations();
+      renderReportsBoard();
+      renderAdvancedModellingBoard();
+      showToast("Optimized titer and recovery applied to the active model");
+    }
   });
 
   els.equationSearch.addEventListener("input", renderEquations);
