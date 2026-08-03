@@ -84,6 +84,12 @@ const config = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   supabaseStateTable: process.env.SUPABASE_STATE_TABLE || "axion_state",
   supabaseDocumentsTable: process.env.SUPABASE_DOCUMENTS_TABLE || "axion_documents",
+  supabaseCustomersTable: process.env.SUPABASE_CUSTOMERS_TABLE || "axion_customers",
+  supabaseContractsTable: process.env.SUPABASE_CONTRACTS_TABLE || "axion_contracts",
+  supabaseCustomerUsersTable: process.env.SUPABASE_CUSTOMER_USERS_TABLE || "axion_customer_users",
+  supabasePlanEntitlementsTable: process.env.SUPABASE_PLAN_ENTITLEMENTS_TABLE || "axion_plan_entitlements",
+  supabaseEntitlementOverridesTable: process.env.SUPABASE_ENTITLEMENT_OVERRIDES_TABLE || "axion_entitlement_overrides",
+  supabaseSubscriptionEventsTable: process.env.SUPABASE_SUBSCRIPTION_EVENTS_TABLE || "axion_subscription_events",
   inviteEmailFrom: process.env.INVITE_EMAIL_FROM || "",
   salesNotificationTo: process.env.SALES_NOTIFICATION_TO || "",
   smtpHost: process.env.SMTP_HOST || "",
@@ -146,6 +152,102 @@ const billingPlans = Object.freeze([
   },
 ]);
 
+const featureCatalogue = Object.freeze({
+  core_modeling: { label: "Flowsheet and equipment modelling", minimumPlan: "academic" },
+  mass_energy_balances: { label: "Mass and energy balances", minimumPlan: "academic" },
+  dynamic_simulation: { label: "ODE and PDE simulation", minimumPlan: "academic" },
+  engineering_exports: { label: "Engineering exports", minimumPlan: "academic" },
+  scheduling: { label: "Finite-capacity scheduling", minimumPlan: "professional" },
+  tea_lca: { label: "TEA and LCA", minimumPlan: "professional" },
+  cfd_screening: { label: "Bioreactor CFD screening", minimumPlan: "professional" },
+  company_data_ingestion: { label: "Company data ingestion", minimumPlan: "professional" },
+  branches_versions: { label: "Branches and model versions", minimumPlan: "professional" },
+  ai_command_engine: { label: "AI command engine", minimumPlan: "professional" },
+  collaboration: { label: "Multi-user collaboration", minimumPlan: "team" },
+  api_connectors: { label: "API connector registry", minimumPlan: "team" },
+  cfd_worker_jobs: { label: "Validated CFD worker jobs", minimumPlan: "enterprise" },
+  automation_opcua: { label: "OPC UA and plant automation", minimumPlan: "enterprise" },
+  priority_support: { label: "Priority engineering support", minimumPlan: "team" },
+});
+
+const planFeatureLimits = Object.freeze({
+  academic: { dynamic_simulation: 25, engineering_exports: 25, collaboration: 1 },
+  professional: { dynamic_simulation: 250, engineering_exports: 250, cfd_screening: 50, company_data_ingestion: 20, branches_versions: 100, ai_command_engine: 250, collaboration: 1 },
+  team: { dynamic_simulation: 2000, engineering_exports: 2000, cfd_screening: 500, company_data_ingestion: 250, branches_versions: 1000, ai_command_engine: 2500, collaboration: 5, api_connectors: 25 },
+  enterprise: { collaboration: 20 },
+});
+
+function planRank(planId = "") {
+  return ["academic", "professional", "team", "enterprise"].indexOf(String(planId || "").toLowerCase());
+}
+
+function planEntitlements(planId = "") {
+  const normalizedPlan = billingPlan(planId)?.id || "";
+  const currentRank = planRank(normalizedPlan);
+  return Object.fromEntries(Object.entries(featureCatalogue).map(([key, feature]) => {
+    const enabled = currentRank >= planRank(feature.minimumPlan);
+    const limit = enabled ? planFeatureLimits[normalizedPlan]?.[key] ?? null : null;
+    return [key, { key, label: feature.label, enabled, limit, minimumPlan: feature.minimumPlan }];
+  }));
+}
+
+function entitlementSnapshotForSession(session = {}) {
+  const allAccess = session.role === "admin" || Boolean(session.paymentExempt);
+  const features = allAccess
+    ? Object.fromEntries(Object.entries(featureCatalogue).map(([key, feature]) => [key, { key, label: feature.label, enabled: true, limit: null, minimumPlan: feature.minimumPlan }]))
+    : planEntitlements(session.planId);
+  return {
+    planId: session.planId || (allAccess ? "internal" : ""),
+    allAccess,
+    features,
+  };
+}
+
+function sessionHasFeature(session, featureKey) {
+  return Boolean(entitlementSnapshotForSession(session).features[featureKey]?.enabled);
+}
+
+async function requireFeature(req, res, featureKey) {
+  const verifiedSession = verifySession(getBearer(req));
+  let session = verifiedSession;
+  let entitlements = entitlementSnapshotForSession(session || {});
+  if (!session) {
+    json(res, 401, { error: "Not authenticated" });
+    return null;
+  }
+  if (session.role !== "admin" && !session.paymentExempt) {
+    const db = ensureDbShape(await loadDb());
+    const license = db.licenses.find((item) =>
+      (session.licenseKey && item.key === session.licenseKey)
+      || (session.email && normalizePrincipal(item.customerEmail) === normalizePrincipal(session.email)));
+    if (!license || license.status !== "active") {
+      json(res, 402, { error: "The subscription is not active. Update billing before using this function.", code: "SUBSCRIPTION_INACTIVE" });
+      return null;
+    }
+    session = { ...session, planId: license.planId || session.planId, billingStatus: license.billingStatus || session.billingStatus };
+    entitlements = await resolvedEntitlementsForSession(session, license);
+    if (entitlements.contractStatus && !["active", "trialing", "past_due"].includes(entitlements.contractStatus)) {
+      json(res, 402, { error: "The Supabase contract is not active. Update billing before using this function.", code: "CONTRACT_INACTIVE", contractStatus: entitlements.contractStatus });
+      return null;
+    }
+    session = { ...session, planId: entitlements.planId || session.planId };
+  }
+  if (!entitlements.features[featureKey]?.enabled) {
+    const feature = featureCatalogue[featureKey];
+    const minimum = billingPlan(feature?.minimumPlan);
+    json(res, 403, {
+      error: `${feature?.label || "This function"} is not included in the current plan.`,
+      code: "FEATURE_NOT_INCLUDED",
+      feature: featureKey,
+      currentPlan: session.planId || "workspace",
+      requiredPlan: minimum?.id || feature?.minimumPlan || "enterprise",
+      requiredPlanName: minimum?.name || "Enterprise Site",
+    });
+    return null;
+  }
+  return session;
+}
+
 function billingPlan(planId = "professional") {
   return billingPlans.find((plan) => plan.id === String(planId || "").toLowerCase()) || null;
 }
@@ -153,6 +255,7 @@ function billingPlan(planId = "professional") {
 function publicBillingPlans() {
   return billingPlans.map(({ stripePriceId, ...plan }) => ({
     ...plan,
+    entitlements: planEntitlements(plan.id),
     amount: plan.priceCents / 100,
     amountFormatted: new Intl.NumberFormat("de-DE", { style: "currency", currency: config.currency, maximumFractionDigits: 0 }).format(plan.priceCents / 100),
     interval: "month",
@@ -469,7 +572,7 @@ function publicConfig() {
       automaticTax: config.stripeAutomaticTax,
     },
     backend: {
-      currentStorage: supabaseConfigured() ? `Supabase/Postgres tables ${config.supabaseStateTable} + ${config.supabaseDocumentsTable}` : "local JSON files in .data/models",
+      currentStorage: supabaseConfigured() ? `Supabase/Postgres: model documents plus normalized customers, contracts, users and entitlements` : "local JSON files in .data/models",
       recommendedProductionDataApp: "Supabase Postgres + Supabase Storage, or managed Postgres on Render/Fly/Railway plus S3-compatible object storage",
       pythonRuntime: config.pythonExecutable,
       modellingEndpoint: "/api/model-runs/python",
@@ -565,7 +668,7 @@ function productionReadiness() {
       key: "postgres",
       label: "Supabase/Postgres database",
       ready: supabaseConfigured(),
-      missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_STATE_TABLE", "SUPABASE_DOCUMENTS_TABLE"].filter((key) => !process.env[key]),
+      missing: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].filter((key) => !process.env[key]),
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
       ownerAction: "Create a Supabase project, run supabase/schema.sql, and place the server-only URL and service-role key in the backend host secrets.",
@@ -704,7 +807,7 @@ function serviceStatusFromReadiness() {
         label: "Supabase/Postgres",
         configured: byKey.get("postgres")?.ready || false,
         status: byKey.get("postgres")?.ready ? "ready" : "missing-secrets",
-        safeDetail: supabaseConfigured() ? `Using ${config.supabaseStateTable} and ${config.supabaseDocumentsTable}` : "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the backend host.",
+        safeDetail: supabaseConfigured() ? `Using model, customer, contract and entitlement tables in Supabase` : "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the backend host.",
       },
       {
         key: "stripe",
@@ -868,6 +971,174 @@ async function supabaseRequest(pathname, { method = "GET", body, headers = {} } 
     throw new Error(payload?.message || payload?.error || `Supabase request failed with ${response.status}`);
   }
   return payload;
+}
+
+function stableCommerceNumber(prefix, identity) {
+  const digest = createHash("sha256").update(String(identity || randomUUID()).trim().toLowerCase()).digest("hex").slice(0, 10).toUpperCase();
+  return `AX-${prefix}-${digest}`;
+}
+
+function ensureCommerceIdentifiers(order = {}, license = null) {
+  const identity = order.customerEmail || license?.customerEmail || order.id || license?.key;
+  const customerNumber = order.customerNumber || license?.customerNumber || stableCommerceNumber("C", identity);
+  const contractNumber = order.contractNumber || license?.contractNumber || stableCommerceNumber("K", order.id || license?.orderId || license?.key || identity);
+  order.customerNumber = customerNumber;
+  order.contractNumber = contractNumber;
+  if (license) {
+    license.customerNumber = customerNumber;
+    license.contractNumber = contractNumber;
+  }
+  return { customerNumber, contractNumber };
+}
+
+function normalizedContractStatus(order = {}, license = {}) {
+  const status = String(order.subscriptionStatus || license.billingStatus || order.status || license.status || "draft").toLowerCase();
+  if (["active", "trialing", "past_due", "cancelled"].includes(status)) return status;
+  if (["paid_active", "paid"].includes(status)) return "active";
+  if (status.includes("past_due") || status.includes("action_required") || status.includes("payment_failed")) return "past_due";
+  if (status.includes("cancel") || status.includes("delete")) return "cancelled";
+  if (status.includes("suspend") || status.includes("pause") || status.includes("unpaid")) return "suspended";
+  return "draft";
+}
+
+async function syncCommerceRecordToSupabase(order, license = null, user = null) {
+  if (!supabaseConfigured() || !order) return null;
+  const { customerNumber, contractNumber } = ensureCommerceIdentifiers(order, license);
+  try {
+    const customerRows = await supabaseRequest(`${config.supabaseCustomersTable}?on_conflict=customer_number`, {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates,return=representation" },
+      body: {
+        customer_number: customerNumber,
+        legal_name: order.company || license?.company || order.customerName || license?.customerName || "Axion customer",
+        display_name: order.company || license?.company || order.customerName || license?.customerName || "Axion customer",
+        billing_email: String(order.customerEmail || license?.customerEmail || user?.email || "").toLowerCase(),
+        stripe_customer_id: order.stripeCustomerId || license?.stripeCustomerId || null,
+        status: normalizedContractStatus(order, license) === "cancelled" ? "cancelled" : normalizedContractStatus(order, license) === "suspended" ? "suspended" : normalizedContractStatus(order, license) === "past_due" ? "past_due" : order.status === "pending_stripe_checkout" ? "lead" : "active",
+        metadata: { source: "axion-backend", orderId: order.id || license?.orderId || "" },
+      },
+    });
+    const customer = Array.isArray(customerRows) ? customerRows[0] : null;
+    if (!customer?.id) throw new Error("Supabase customer upsert did not return an id.");
+    const contractRows = await supabaseRequest(`${config.supabaseContractsTable}?on_conflict=contract_number`, {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates,return=representation" },
+      body: {
+        contract_number: contractNumber,
+        customer_id: customer.id,
+        plan_id: order.planId || license?.planId || "professional",
+        plan_name: order.planName || license?.planName || billingPlan(order.planId || license?.planId)?.name || "Professional",
+        status: normalizedContractStatus(order, license),
+        seat_limit: Math.max(1, Number(order.seats || license?.seats || 1)),
+        billing_interval: order.billingMode === "payment" ? "one_time" : "month",
+        currency: order.currency || config.currency,
+        amount: Math.max(0, Number(order.amount || 0)),
+        stripe_subscription_id: order.stripeSubscriptionId || license?.stripeSubscriptionId || null,
+        valid_from: order.paidAt || license?.createdAt || null,
+        current_period_end: order.currentPeriodEnd || license?.currentPeriodEnd || null,
+        metadata: { orderId: order.id || license?.orderId || "", licenseKeyAssigned: Boolean(license?.key || order.licenseKey) },
+      },
+    });
+    const contract = Array.isArray(contractRows) ? contractRows[0] : null;
+    const email = String(user?.email || order.customerEmail || license?.customerEmail || "").toLowerCase();
+    if (email) {
+      await supabaseRequest(`${config.supabaseCustomerUsersTable}?on_conflict=customer_id,email`, {
+        method: "POST",
+        headers: { prefer: "resolution=merge-duplicates,return=representation" },
+        body: {
+          customer_id: customer.id,
+          user_id: user?.id || null,
+          email,
+          username: user?.username || email.split("@")[0],
+          role: "owner",
+          status: normalizedContractStatus(order, license) === "suspended" ? "suspended" : "active",
+        },
+      });
+    }
+    return { customer, contract };
+  } catch (error) {
+    console.warn(`Supabase customer/contract sync failed: ${error.message}`);
+    return null;
+  }
+}
+
+async function recordSubscriptionEventToSupabase(event, commerceRecord = null) {
+  if (!supabaseConfigured() || !event?.type) return;
+  try {
+    const object = event.data?.object || {};
+    await supabaseRequest(`${config.supabaseSubscriptionEventsTable}?on_conflict=provider_event_id`, {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates,return=minimal" },
+      body: {
+        customer_id: commerceRecord?.customer?.id || null,
+        contract_id: commerceRecord?.contract?.id || null,
+        provider: "stripe",
+        provider_event_id: event.id || stableCommerceNumber("E", `${event.type}:${object.id || Date.now()}`),
+        event_type: event.type,
+        payload: {
+          objectId: object.id || "",
+          status: object.status || object.payment_status || "",
+          customerId: typeof object.customer === "string" ? object.customer : object.customer?.id || "",
+          subscriptionId: typeof object.subscription === "string" ? object.subscription : object.subscription?.id || "",
+          planId: object.metadata?.planId || "",
+        },
+      },
+    });
+  } catch (error) {
+    console.warn(`Supabase subscription-event sync failed: ${error.message}`);
+  }
+}
+
+async function supabaseContractContext(license) {
+  if (!supabaseConfigured() || !license?.customerNumber) return null;
+  try {
+    const customerRows = await supabaseRequest(`${config.supabaseCustomersTable}?customer_number=eq.${encodeURIComponent(license.customerNumber)}&select=id,customer_number,status&limit=1`);
+    const customer = customerRows?.[0];
+    if (!customer) return null;
+    const contractFilter = license.contractNumber
+      ? `contract_number=eq.${encodeURIComponent(license.contractNumber)}`
+      : `customer_id=eq.${encodeURIComponent(customer.id)}`;
+    const contractRows = await supabaseRequest(`${config.supabaseContractsTable}?${contractFilter}&select=*&order=updated_at.desc&limit=1`);
+    const contract = contractRows?.[0];
+    if (!contract) return null;
+    const [planRows, overrideRows] = await Promise.all([
+      supabaseRequest(`${config.supabasePlanEntitlementsTable}?plan_id=eq.${encodeURIComponent(contract.plan_id)}&select=feature_key,feature_label,enabled,limit_value`),
+      supabaseRequest(`${config.supabaseEntitlementOverridesTable}?customer_id=eq.${encodeURIComponent(customer.id)}&select=feature_key,enabled,limit_value,valid_until`),
+    ]);
+    const now = Date.now();
+    const overrides = new Map(overrideRows
+      .filter((item) => !item.valid_until || new Date(item.valid_until).getTime() > now)
+      .map((item) => [item.feature_key, item]));
+    const features = Object.fromEntries(Object.entries(featureCatalogue).map(([key, definition]) => {
+      const planRow = planRows.find((item) => item.feature_key === key);
+      const override = overrides.get(key);
+      return [key, {
+        key,
+        label: planRow?.feature_label || definition.label,
+        enabled: override?.enabled ?? planRow?.enabled ?? false,
+        limit: override?.limit_value ?? planRow?.limit_value ?? null,
+        minimumPlan: definition.minimumPlan,
+      }];
+    }));
+    return { customer, contract, features };
+  } catch (error) {
+    console.warn(`Supabase entitlement lookup failed, using signed-session plan: ${error.message}`);
+    return null;
+  }
+}
+
+async function resolvedEntitlementsForSession(session, license = null) {
+  if (session.role === "admin" || session.paymentExempt) return entitlementSnapshotForSession(session);
+  const context = await supabaseContractContext(license);
+  if (!context) return entitlementSnapshotForSession(session);
+  return {
+    planId: context.contract.plan_id,
+    allAccess: false,
+    contractStatus: context.contract.status,
+    contractNumber: context.contract.contract_number,
+    customerNumber: context.customer.customer_number,
+    features: context.features,
+  };
 }
 
 async function loadDbFromSupabase() {
@@ -1452,6 +1723,8 @@ function sanitizeOrder(order) {
     customerName: order.customerName,
     customerEmail: order.customerEmail,
     company: order.company,
+    customerNumber: order.customerNumber || "",
+    contractNumber: order.contractNumber || "",
     licenseKey: order.licenseKey || "",
     billingMode: order.billingMode || "subscription",
     stripeCustomerId: order.stripeCustomerId || "",
@@ -1467,6 +1740,8 @@ function sanitizeLicense(license) {
     customerEmail: license.customerEmail,
     customerName: license.customerName,
     company: license.company,
+    customerNumber: license.customerNumber || "",
+    contractNumber: license.contractNumber || "",
     orderId: license.orderId,
     planId: license.planId || "professional",
     planName: license.planName || "Professional",
@@ -1676,7 +1951,10 @@ function billingProfileForSession(session) {
     amountFormatted,
     currency: config.currency,
     billingEmail: session.email || "",
-    customerId: session.stripeCustomerId || session.licenseKey || sessionPrincipal(session),
+    customerId: session.customerNumber || session.stripeCustomerId || session.licenseKey || sessionPrincipal(session),
+    customerNumber: session.customerNumber || "",
+    contractNumber: session.contractNumber || "",
+    contractStatus: session.contractStatus || session.billingStatus || (isCustomer ? "active" : "workspace access"),
     licenseKey: session.licenseKey || "",
     paymentExempt: isExempt || isAdmin,
     checkoutConfigured: Boolean(config.stripeSecretKey),
@@ -1733,6 +2011,7 @@ function activatePaidOrder(db, order, {
   order.subscriptionStatus = subscriptionStatus || order.subscriptionStatus || (order.billingMode === "subscription" ? "active" : "paid");
   order.currentPeriodEnd = currentPeriodEnd || order.currentPeriodEnd || "";
   if (paymentId) order.paymentId = paymentId;
+  ensureCommerceIdentifiers(order, license);
   db.audit.unshift({ at: paidAt, type: "order.paid", orderId: order.id, reference: order.reference, licenseKey: order.licenseKey, paymentProvider, paymentId });
   return order.licenseKey;
 }
@@ -1757,6 +2036,12 @@ function findStripeOrder(db, object = {}) {
 
 function syncSubscriptionAccess(db, order, subscription = {}) {
   if (!order) return;
+  const updatedPlan = billingPlan(subscription.metadata?.planId || order.planId);
+  if (updatedPlan) {
+    order.planId = updatedPlan.id;
+    order.planName = updatedPlan.name;
+    order.seats = updatedPlan.seats;
+  }
   const status = String(subscription.status || order.subscriptionStatus || "active");
   const activeStatuses = new Set(["active", "trialing", "past_due"]);
   const accessStatus = activeStatuses.has(status) ? "active" : "suspended";
@@ -1768,12 +2053,18 @@ function syncSubscriptionAccess(db, order, subscription = {}) {
   order.status = accessStatus === "active" ? "paid_active" : `subscription_${status}`;
   const license = db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id);
   if (license) {
+    if (updatedPlan) {
+      license.planId = updatedPlan.id;
+      license.planName = updatedPlan.name;
+      license.seats = updatedPlan.seats;
+    }
     license.status = accessStatus;
     license.billingStatus = status;
     license.stripeCustomerId = order.stripeCustomerId;
     license.stripeSubscriptionId = order.stripeSubscriptionId;
     license.currentPeriodEnd = currentPeriodEnd;
   }
+  ensureCommerceIdentifiers(order, license);
   db.audit.unshift({
     at: new Date().toISOString(),
     type: "billing.subscription.synced",
@@ -1828,6 +2119,7 @@ async function createCheckout(req, res) {
     company,
     billingMode: config.stripeBillingMode,
   };
+  ensureCommerceIdentifiers(order);
   db.orders.unshift(order);
   db.audit.unshift({ at: order.createdAt, type: "checkout.created", orderId: order.id, reference: order.reference, provider: "stripe" });
   await saveDb(db);
@@ -1873,6 +2165,7 @@ async function createCheckout(req, res) {
   order.stripeSessionId = session.id;
   order.checkoutUrl = session.url;
   await saveDb(db);
+  await syncCommerceRecordToSupabase(order);
 
   json(res, 201, {
     order: sanitizeOrder(order),
@@ -1922,6 +2215,18 @@ function ensureDbShape(db) {
   db.automationCommissioningRuns ||= [];
   db.leads ||= [];
   db.audit ||= [];
+  db.orders.forEach((order) => {
+    const license = db.licenses.find((item) => item.orderId === order.id || item.key === order.licenseKey);
+    ensureCommerceIdentifiers(order, license);
+  });
+  db.licenses.forEach((license) => {
+    const order = db.orders.find((item) => item.id === license.orderId || item.licenseKey === license.key);
+    if (order) ensureCommerceIdentifiers(order, license);
+    else {
+      license.customerNumber ||= stableCommerceNumber("C", license.customerEmail || license.key);
+      license.contractNumber ||= stableCommerceNumber("K", license.orderId || license.key);
+    }
+  });
   seedUsers(db);
   return db;
 }
@@ -5222,6 +5527,18 @@ async function inviteCollaborator(req, res, projectId) {
     json(res, 404, { error: "Project not found" });
     return;
   }
+  const seatLimit = entitlementSnapshotForSession(session).features.collaboration?.limit;
+  const alreadyAssigned = project.collaborators?.some((item) => normalizePrincipal(item.principal || item.email || item.username) === recipient);
+  const assignedSeats = 1 + new Set((project.collaborators || []).map((item) => normalizePrincipal(item.principal || item.email || item.username)).filter(Boolean)).size;
+  if (!alreadyAssigned && Number.isFinite(seatLimit) && assignedSeats >= seatLimit) {
+    json(res, 409, {
+      error: `The ${billingPlan(session.planId)?.name || "current"} plan includes ${seatLimit} named seats. Remove a collaborator or change the subscription before inviting another user.`,
+      code: "SEAT_LIMIT_REACHED",
+      seatLimit,
+      assignedSeats,
+    });
+    return;
+  }
   const now = new Date().toISOString();
   const matchedUser = db.users.find((user) => user.username === recipient || user.email === recipient);
   const invite = {
@@ -5352,6 +5669,10 @@ async function googleLogin(req, res) {
     db.audit.unshift({ at: user.createdAt, type: "user.google.created", userId: user.id, email });
     await saveDb(db);
   }
+  if (license) {
+    const order = db.orders.find((item) => item.id === license.orderId || item.licenseKey === license.key);
+    if (order) await syncCommerceRecordToSupabase(order, license, user);
+  }
   const token = signSession({
     sub: user.id,
     role: user.role || "user",
@@ -5366,6 +5687,9 @@ async function googleLogin(req, res) {
     stripeCustomerId: license?.stripeCustomerId || "",
     stripeSubscriptionId: license?.stripeSubscriptionId || "",
     currentPeriodEnd: license?.currentPeriodEnd || "",
+    customerNumber: license?.customerNumber || "",
+    contractNumber: license?.contractNumber || "",
+    contractStatus: license?.billingStatus || "",
     exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
   });
   json(res, 200, {
@@ -5377,6 +5701,7 @@ async function googleLogin(req, res) {
       email,
       productName: config.productName,
       licenseKey: license?.key || "",
+      entitlements: entitlementSnapshotForSession({ role: user.role || "user", paymentExempt: Boolean(user.paymentExempt), planId: license?.planId || "" }),
       billing: billingProfileForSession({
         role: user.role || "user",
         email,
@@ -5390,6 +5715,9 @@ async function googleLogin(req, res) {
         stripeCustomerId: license?.stripeCustomerId || "",
         stripeSubscriptionId: license?.stripeSubscriptionId || "",
         currentPeriodEnd: license?.currentPeriodEnd || "",
+        customerNumber: license?.customerNumber || "",
+        contractNumber: license?.contractNumber || "",
+        contractStatus: license?.billingStatus || "",
       }),
     },
   });
@@ -5412,13 +5740,17 @@ async function login(req, res) {
     const adminUsername = user || config.adminUser || "owner";
     const adminName = adminUsername === "owner" ? "Owner" : adminUsername;
     const token = signSession({ sub: "admin", role: "admin", username: adminUsername, name: adminName, paymentExempt: true, exp: Date.now() + 1000 * 60 * 60 * 12 });
-    json(res, 200, { token, account: { role: "admin", username: adminUsername, name: adminName, productName: config.productName, billing: billingProfileForSession({ role: "admin", username: adminUsername, name: adminName, paymentExempt: true }) } });
+    json(res, 200, { token, account: { role: "admin", username: adminUsername, name: adminName, productName: config.productName, entitlements: entitlementSnapshotForSession({ role: "admin", paymentExempt: true }), billing: billingProfileForSession({ role: "admin", username: adminUsername, name: adminName, paymentExempt: true }) } });
     return;
   }
 
   const localUser = db.users.find((item) => item.status === "active" && (item.username === user || item.email === user));
   if (localUser?.passwordHash && safeCompare(localUser.passwordHash, userPasswordHash(password))) {
     const localLicense = activeLicenseForEmail(db, localUser.email);
+    if (localLicense) {
+      const localOrder = db.orders.find((item) => item.id === localLicense.orderId || item.licenseKey === localLicense.key);
+      if (localOrder) await syncCommerceRecordToSupabase(localOrder, localLicense, localUser);
+    }
     const token = signSession({
       sub: localUser.id,
       role: localUser.role || "user",
@@ -5433,6 +5765,9 @@ async function login(req, res) {
       stripeCustomerId: localLicense?.stripeCustomerId || "",
       stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
       currentPeriodEnd: localLicense?.currentPeriodEnd || "",
+      customerNumber: localLicense?.customerNumber || "",
+      contractNumber: localLicense?.contractNumber || "",
+      contractStatus: localLicense?.billingStatus || "",
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
     });
     json(res, 200, {
@@ -5444,6 +5779,7 @@ async function login(req, res) {
         email: localUser.email,
         productName: config.productName,
         licenseKey: localLicense?.key || "",
+        entitlements: entitlementSnapshotForSession({ role: localUser.role || "user", paymentExempt: Boolean(localUser.paymentExempt), planId: localLicense?.planId || "" }),
         billing: billingProfileForSession({
           role: localUser.role || "user",
           username: localUser.username,
@@ -5457,6 +5793,9 @@ async function login(req, res) {
           stripeCustomerId: localLicense?.stripeCustomerId || "",
           stripeSubscriptionId: localLicense?.stripeSubscriptionId || "",
           currentPeriodEnd: localLicense?.currentPeriodEnd || "",
+          customerNumber: localLicense?.customerNumber || "",
+          contractNumber: localLicense?.contractNumber || "",
+          contractStatus: localLicense?.billingStatus || "",
         }),
       },
     });
@@ -5466,6 +5805,8 @@ async function login(req, res) {
   const license = db.licenses.find((item) => item.key === licenseKey && item.status === "active");
   const emailMatches = !user || license?.customerEmail === user;
   if (license && emailMatches) {
+    const order = db.orders.find((item) => item.id === license.orderId || item.licenseKey === license.key);
+    if (order) await syncCommerceRecordToSupabase(order, license);
     const customerSession = {
       sub: license.key,
       role: "customer",
@@ -5478,6 +5819,9 @@ async function login(req, res) {
       stripeCustomerId: license.stripeCustomerId || "",
       stripeSubscriptionId: license.stripeSubscriptionId || "",
       currentPeriodEnd: license.currentPeriodEnd || "",
+      customerNumber: license.customerNumber || "",
+      contractNumber: license.contractNumber || "",
+      contractStatus: license.billingStatus || "",
       exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
     };
     const token = signSession(customerSession);
@@ -5489,6 +5833,7 @@ async function login(req, res) {
         email: license.customerEmail,
         productName: config.productName,
         licenseKey: license.key,
+        entitlements: entitlementSnapshotForSession(customerSession),
         billing: billingProfileForSession(customerSession),
       },
     });
@@ -5499,11 +5844,35 @@ async function login(req, res) {
 }
 
 async function account(req, res) {
-  const session = verifySession(getBearer(req));
-  if (!session) {
+  const verifiedSession = verifySession(getBearer(req));
+  if (!verifiedSession) {
     json(res, 401, { error: "Not authenticated" });
     return;
   }
+  const db = ensureDbShape(await loadDb());
+  const license = db.licenses.find((item) =>
+    (verifiedSession.licenseKey && item.key === verifiedSession.licenseKey)
+    || (verifiedSession.email && normalizePrincipal(item.customerEmail) === normalizePrincipal(verifiedSession.email)));
+  let session = license ? {
+    ...verifiedSession,
+    planId: license.planId || verifiedSession.planId,
+    planName: license.planName || verifiedSession.planName,
+    billingStatus: license.billingStatus || verifiedSession.billingStatus,
+    stripeCustomerId: license.stripeCustomerId || verifiedSession.stripeCustomerId,
+    stripeSubscriptionId: license.stripeSubscriptionId || verifiedSession.stripeSubscriptionId,
+    currentPeriodEnd: license.currentPeriodEnd || verifiedSession.currentPeriodEnd,
+    customerNumber: license.customerNumber || verifiedSession.customerNumber,
+    contractNumber: license.contractNumber || verifiedSession.contractNumber,
+    contractStatus: license.billingStatus || verifiedSession.contractStatus,
+  } : verifiedSession;
+  const entitlements = await resolvedEntitlementsForSession(session, license);
+  session = {
+    ...session,
+    planId: entitlements.planId || session.planId,
+    customerNumber: entitlements.customerNumber || session.customerNumber,
+    contractNumber: entitlements.contractNumber || session.contractNumber,
+    contractStatus: entitlements.contractStatus || session.contractStatus,
+  };
   json(res, 200, {
     account: {
       role: session.role,
@@ -5513,6 +5882,7 @@ async function account(req, res) {
       principal: sessionPrincipal(session),
       productName: config.productName,
       licenseKey: session.licenseKey || "",
+      entitlements,
       billing: billingProfileForSession(session),
     },
   });
@@ -5557,6 +5927,126 @@ async function listOrders(req, res) {
   json(res, 200, { orders: db.orders.map(sanitizeOrder), licenses: db.licenses.map(sanitizeLicense) });
 }
 
+async function listCustomerAccounts(req, res) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") {
+    json(res, 403, { error: "Admin access required" });
+    return;
+  }
+  if (supabaseConfigured()) {
+    try {
+      const [customers, contracts, users] = await Promise.all([
+        supabaseRequest(`${config.supabaseCustomersTable}?select=*&order=updated_at.desc`),
+        supabaseRequest(`${config.supabaseContractsTable}?select=*&order=updated_at.desc`),
+        supabaseRequest(`${config.supabaseCustomerUsersTable}?select=id,customer_id,user_id,email,username,role,status,created_at,updated_at&order=updated_at.desc`),
+      ]);
+      json(res, 200, {
+        source: "supabase",
+        customers: customers.map((customer) => ({
+          ...customer,
+          contracts: contracts.filter((contract) => contract.customer_id === customer.id),
+          users: users.filter((user) => user.customer_id === customer.id),
+        })),
+      });
+      return;
+    } catch (error) {
+      console.warn(`Supabase customer listing failed, using local commerce records: ${error.message}`);
+    }
+  }
+  const db = ensureDbShape(await loadDb());
+  const customers = Array.from(new Set(db.licenses.map((license) => license.customerNumber))).filter(Boolean).map((customerNumber) => {
+    const licenses = db.licenses.filter((license) => license.customerNumber === customerNumber);
+    const orders = db.orders.filter((order) => order.customerNumber === customerNumber);
+    const primary = licenses[0] || orders[0] || {};
+    return {
+      customer_number: customerNumber,
+      legal_name: primary.company || primary.customerName || "Axion customer",
+      billing_email: primary.customerEmail || "",
+      status: primary.status || "active",
+      contracts: licenses.map((license) => ({
+        contract_number: license.contractNumber,
+        plan_id: license.planId,
+        plan_name: license.planName,
+        status: license.billingStatus || license.status,
+        seat_limit: license.seats,
+        current_period_end: license.currentPeriodEnd || null,
+      })),
+      users: db.users.filter((user) => normalizePrincipal(user.email) === normalizePrincipal(primary.customerEmail)).map(sanitizeUser),
+    };
+  });
+  json(res, 200, { source: "local-fallback", customers });
+}
+
+async function updateCustomerContract(req, res, customerNumber) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") return json(res, 403, { error: "Admin access required" });
+  const body = await parseBody(req);
+  const selectedPlan = billingPlan(body.planId);
+  const allowedStatuses = new Set(["draft", "trialing", "active", "past_due", "suspended", "cancelled", "expired"]);
+  if (!selectedPlan || !allowedStatuses.has(String(body.status || "active"))) {
+    return json(res, 400, { error: "Provide a valid planId and contract status." });
+  }
+  const status = String(body.status || "active");
+  const seatLimit = Math.max(1, Number(body.seatLimit || selectedPlan.seats));
+  const db = ensureDbShape(await loadDb());
+  db.orders.filter((order) => order.customerNumber === customerNumber).forEach((order) => {
+    order.planId = selectedPlan.id;
+    order.planName = selectedPlan.name;
+    order.seats = seatLimit;
+    order.subscriptionStatus = status;
+    order.status = ["active", "trialing", "past_due"].includes(status) ? "paid_active" : `subscription_${status}`;
+  });
+  db.licenses.filter((license) => license.customerNumber === customerNumber).forEach((license) => {
+    license.planId = selectedPlan.id;
+    license.planName = selectedPlan.name;
+    license.seats = seatLimit;
+    license.billingStatus = status;
+    license.status = ["active", "trialing", "past_due"].includes(status) ? "active" : "suspended";
+  });
+  db.audit.unshift({ at: new Date().toISOString(), type: "customer.contract.updated", customerNumber, planId: selectedPlan.id, status, seatLimit, by: sessionPrincipal(session) });
+  await saveDb(db);
+  let contract = null;
+  if (supabaseConfigured()) {
+    const customers = await supabaseRequest(`${config.supabaseCustomersTable}?customer_number=eq.${encodeURIComponent(customerNumber)}&select=id&limit=1`);
+    if (!customers?.[0]) return json(res, 404, { error: "Customer not found in Supabase" });
+    const contracts = await supabaseRequest(`${config.supabaseContractsTable}?customer_id=eq.${encodeURIComponent(customers[0].id)}&select=id&order=updated_at.desc&limit=1`);
+    if (!contracts?.[0]) return json(res, 404, { error: "Contract not found in Supabase" });
+    const rows = await supabaseRequest(`${config.supabaseContractsTable}?id=eq.${encodeURIComponent(contracts[0].id)}`, {
+      method: "PATCH",
+      body: { plan_id: selectedPlan.id, plan_name: selectedPlan.name, status, seat_limit: seatLimit },
+    });
+    contract = rows?.[0] || null;
+  }
+  json(res, 200, { customerNumber, contract, plan: { id: selectedPlan.id, name: selectedPlan.name, seatLimit }, status });
+}
+
+async function setCustomerEntitlementOverride(req, res, customerNumber, featureKey) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") return json(res, 403, { error: "Admin access required" });
+  if (!featureCatalogue[featureKey]) return json(res, 400, { error: "Unknown feature key" });
+  if (!supabaseConfigured()) return json(res, 503, { error: "Supabase is required for customer-specific entitlement overrides." });
+  const body = await parseBody(req);
+  const customers = await supabaseRequest(`${config.supabaseCustomersTable}?customer_number=eq.${encodeURIComponent(customerNumber)}&select=id&limit=1`);
+  const customer = customers?.[0];
+  if (!customer) return json(res, 404, { error: "Customer not found" });
+  const contracts = await supabaseRequest(`${config.supabaseContractsTable}?customer_id=eq.${encodeURIComponent(customer.id)}&select=id&order=updated_at.desc&limit=1`);
+  const contract = contracts?.[0];
+  const rows = await supabaseRequest(`${config.supabaseEntitlementOverridesTable}?on_conflict=customer_id,contract_id,feature_key`, {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates,return=representation" },
+    body: {
+      customer_id: customer.id,
+      contract_id: contract?.id || null,
+      feature_key: featureKey,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : null,
+      limit_value: Number.isFinite(Number(body.limit)) ? Number(body.limit) : null,
+      reason: String(body.reason || "Admin contract override").slice(0, 500),
+      valid_until: body.validUntil || null,
+    },
+  });
+  json(res, 200, { customerNumber, override: rows?.[0] || null });
+}
+
 async function markPaid(req, res, orderId) {
   const session = verifySession(getBearer(req));
   if (session?.role !== "admin") {
@@ -5571,6 +6061,7 @@ async function markPaid(req, res, orderId) {
   }
   activatePaidOrder(db, order, { paymentProvider: order.paymentProvider || "admin" });
   await saveDb(db);
+  await syncCommerceRecordToSupabase(order, db.licenses.find((item) => item.key === order.licenseKey));
   json(res, 200, { order: sanitizeOrder(order), licenseKey: order.licenseKey });
 }
 
@@ -5596,6 +6087,7 @@ async function checkoutSessionStatus(req, res, sessionId) {
       subscriptionStatus: config.stripeBillingMode === "subscription" ? "active" : "paid",
     });
     await saveDb(db);
+    await syncCommerceRecordToSupabase(order, db.licenses.find((item) => item.key === order.licenseKey));
   }
   json(res, 200, {
     order: sanitizeOrder(order),
@@ -5677,7 +6169,14 @@ async function stripeWebhook(req, res) {
       changed = true;
     }
   }
-  if (changed) await saveDb(db);
+  if (changed) {
+    await saveDb(db);
+    const order = findStripeOrder(db, object);
+    if (order) {
+      const commerceRecord = await syncCommerceRecordToSupabase(order, db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id));
+      await recordSubscriptionEventToSupabase(event, commerceRecord);
+    }
+  }
   json(res, 200, { received: true });
 }
 
@@ -5716,6 +6215,22 @@ async function createBillingPortal(req, res) {
   });
   await saveDb(db);
   json(res, 201, { url: portal.url });
+}
+
+function requiredFeatureForRequest(method, pathname) {
+  if (method === "POST" && pathname === "/api/model-runs/python") return "dynamic_simulation";
+  if (method === "POST" && pathname === "/api/cfd/jobs") return config.cfdWorkerUrl ? "cfd_worker_jobs" : "cfd_screening";
+  if (method === "POST" && ["/api/datasets", "/api/datasets/apply"].includes(pathname)) return "company_data_ingestion";
+  if (method === "POST" && (pathname === "/api/commands/plan" || /^\/api\/commands\/[^/]+\/apply$/.test(pathname))) return "ai_command_engine";
+  if (method === "POST" && /^\/api\/projects\/[^/]+\/invites$/.test(pathname)) return "collaboration";
+  if (method === "POST" && (/^\/api\/projects\/[^/]+\/branches/.test(pathname) || /^\/api\/projects\/[^/]+\/versions\/(compare|[^/]+\/restore)$/.test(pathname))) return "branches_versions";
+  if (["POST", "DELETE"].includes(method) && (/^\/api\/integrations\//.test(pathname))) return "api_connectors";
+  if (method === "POST" && (
+    pathname === "/api/automation/connections"
+    || pathname === "/api/automation/commissioning/run"
+    || /^\/api\/automation\/control-loops\/[^/]+(?:\/cycle)?$/.test(pathname)
+  )) return "automation_opcua";
+  return "";
 }
 
 async function routeApi(req, res, pathname, query = new URLSearchParams()) {
@@ -5780,6 +6295,8 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await googleLogin(req, res);
     return;
   }
+  const requiredFeature = requiredFeatureForRequest(req.method, pathname);
+  if (requiredFeature && !(await requireFeature(req, res, requiredFeature))) return;
   if (req.method === "POST" && pathname === "/api/project/brief") {
     await createProjectBrief(req, res);
     return;
@@ -5981,6 +6498,20 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/admin/orders") {
     await listOrders(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/admin/customers") {
+    await listCustomerAccounts(req, res);
+    return;
+  }
+  const adminCustomerContractMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)\/contract$/);
+  if (req.method === "PATCH" && adminCustomerContractMatch) {
+    await updateCustomerContract(req, res, decodeURIComponent(adminCustomerContractMatch[1]));
+    return;
+  }
+  const adminCustomerEntitlementMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)\/entitlements\/([^/]+)$/);
+  if (req.method === "PUT" && adminCustomerEntitlementMatch) {
+    await setCustomerEntitlementOverride(req, res, decodeURIComponent(adminCustomerEntitlementMatch[1]), decodeURIComponent(adminCustomerEntitlementMatch[2]));
     return;
   }
   if (req.method === "GET" && pathname === "/api/admin/leads") {

@@ -777,6 +777,11 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
     assert.match(schema, /create table if not exists public\.axion_state/);
     assert.match(schema, /create table if not exists public\.axion_documents/);
+    for (const table of ["axion_customers", "axion_contracts", "axion_customer_users", "axion_plan_entitlements", "axion_entitlement_overrides", "axion_subscription_events"]) {
+      assert.match(schema, new RegExp(`create table if not exists public\\.${table}`));
+    }
+    assert.match(schema, /revoke all on table public\.axion_state[\s\S]*from anon, authenticated/);
+    assert.match(schema, /grant select, insert, update, delete[\s\S]*to service_role/);
     for (const kind of ["project_model", "project_version", "simulation_run", "dataset", "connector_run", "cfd_job", "command_plan"]) {
       assert.match(schema, new RegExp(`'${kind}'`));
     }
@@ -832,6 +837,16 @@ test("Stripe subscription checkout activates access and opens the billing portal
     assert.equal(paidLogin.response.status, 200);
     assert.equal(paidLogin.payload.account.billing.stripeCustomerId, "cus_test_axion");
     assert.equal(paidLogin.payload.account.billing.billingPortalAvailable, true);
+    assert.match(paidLogin.payload.account.billing.customerNumber, /^AX-C-[A-F0-9]{10}$/);
+    assert.match(paidLogin.payload.account.billing.contractNumber, /^AX-K-[A-F0-9]{10}$/);
+    assert.equal(paidLogin.payload.account.entitlements.features.collaboration.enabled, true);
+    assert.equal(paidLogin.payload.account.entitlements.features.api_connectors.enabled, true);
+    assert.equal(paidLogin.payload.account.entitlements.features.cfd_worker_jobs.enabled, false);
+
+    const account = await jsonFetch(server.baseUrl, "/api/account", { token: paidLogin.payload.token });
+    assert.equal(account.response.status, 200);
+    assert.equal(account.payload.account.billing.customerNumber, paidLogin.payload.account.billing.customerNumber);
+    assert.equal(account.payload.account.billing.contractNumber, paidLogin.payload.account.billing.contractNumber);
 
     const portal = await jsonFetch(server.baseUrl, "/api/billing/portal", {
       token: paidLogin.payload.token,
@@ -840,6 +855,43 @@ test("Stripe subscription checkout activates access and opens the billing portal
     assert.equal(portal.response.status, 201);
     assert.equal(portal.payload.url, "https://billing.stripe.test/session");
     assert.equal(stripeMock.received.portal.customer, "cus_test_axion");
+  } finally {
+    await stopServer(server);
+    await stripeMock.close();
+  }
+});
+
+test("subscription entitlements block functions outside the contracted plan", async () => {
+  const stripeMock = await startStripeMock();
+  const server = await startServer({
+    STRIPE_API_BASE_URL: stripeMock.baseUrl,
+    STRIPE_SECRET_KEY: "sk_test_axion",
+    STRIPE_WEBHOOK_SECRET: "whsec_test_axion",
+    AXION_BILLING_MODE: "subscription",
+  });
+  try {
+    const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
+      method: "POST",
+      body: { customerName: "Research User", customerEmail: "research@example.com", company: "Research Lab", planId: "academic" },
+    });
+    assert.equal(checkout.response.status, 201);
+    const status = await jsonFetch(server.baseUrl, `/api/checkout/session/${checkout.payload.payment.sessionId}`);
+    const login = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "research@example.com", password: status.payload.licenseKey, licenseKey: status.payload.licenseKey },
+    });
+    assert.equal(login.response.status, 200);
+    assert.equal(login.payload.account.entitlements.features.dynamic_simulation.enabled, true);
+    assert.equal(login.payload.account.entitlements.features.cfd_screening.enabled, false);
+
+    const blocked = await jsonFetch(server.baseUrl, "/api/cfd/jobs", {
+      token: login.payload.token,
+      method: "POST",
+      body: { volumeL: 2000 },
+    });
+    assert.equal(blocked.response.status, 403);
+    assert.equal(blocked.payload.code, "FEATURE_NOT_INCLUDED");
+    assert.equal(blocked.payload.requiredPlan, "professional");
   } finally {
     await stopServer(server);
     await stripeMock.close();

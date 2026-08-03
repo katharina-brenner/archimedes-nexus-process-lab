@@ -254,10 +254,18 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 SUPABASE_STATE_TABLE=axion_state
 SUPABASE_DOCUMENTS_TABLE=axion_documents
+SUPABASE_CUSTOMERS_TABLE=axion_customers
+SUPABASE_CONTRACTS_TABLE=axion_contracts
+SUPABASE_CUSTOMER_USERS_TABLE=axion_customer_users
+SUPABASE_PLAN_ENTITLEMENTS_TABLE=axion_plan_entitlements
+SUPABASE_ENTITLEMENT_OVERRIDES_TABLE=axion_entitlement_overrides
+SUPABASE_SUBSCRIPTION_EVENTS_TABLE=axion_subscription_events
 SUPABASE_STORAGE_BUCKET=axion-model-data
 ```
 
-The service-role key must only exist on the backend host. Never expose it in GitHub Pages, frontend code, or browser environment variables.
+The service-role key must only exist on the backend host. Never expose it in GitHub Pages, frontend code, or browser environment variables. The normalized customer layer stores customer numbers, contracts, named users, seat limits, plan entitlements, customer-specific overrides and Stripe lifecycle events. Browser roles are explicitly denied table access; the Node backend is the only data-access boundary.
+
+The contract in Supabase is authoritative for protected functions. Research, Professional, Engineering Team and Enterprise Site each receive a defined entitlement set; inactive contracts and non-included functions are rejected server-side. Admin operations are available through `GET /api/admin/customers`, `PATCH /api/admin/customers/:customerNumber/contract`, and `PUT /api/admin/customers/:customerNumber/entitlements/:featureKey`.
 
 ## CFD worker setup
 

@@ -15005,6 +15005,15 @@ function setMode(mode) {
 }
 
 function setView(view) {
+  const featureKey = viewFeatureMap[view];
+  const feature = featureKey ? accountFeature(featureKey) : { enabled: true };
+  if (!feature.enabled) {
+    showToast(`${feature.label} is not included in this plan`);
+    renderProfileMenu();
+    if (els.profilePanel) els.profilePanel.hidden = false;
+    els.profileButton?.setAttribute("aria-expanded", "true");
+    return;
+  }
   const target = document.querySelector(`#${view}View`);
   if (!target) return;
   document.body.dataset.activeView = view;
@@ -15532,6 +15541,31 @@ function accountAccessLabel(account = state.account || {}) {
   return "Workspace access";
 }
 
+const viewFeatureMap = Object.freeze({
+  cfd: "cfd_screening",
+  ai: "ai_command_engine",
+  sources: "company_data_ingestion",
+  twin: "automation_opcua",
+  economics: "tea_lca",
+});
+
+function accountFeature(featureKey) {
+  const features = state.account?.entitlements?.features;
+  if (!features) return { enabled: true, label: "Workspace function", minimumPlan: "professional" };
+  return features[featureKey] || { enabled: false, label: "Workspace function", minimumPlan: "enterprise" };
+}
+
+function renderEntitlementNavigation() {
+  document.querySelectorAll(".suite-link[data-view]").forEach((button) => {
+    const featureKey = viewFeatureMap[button.dataset.view];
+    const feature = featureKey ? accountFeature(featureKey) : { enabled: true };
+    button.classList.toggle("plan-locked", !feature.enabled);
+    button.setAttribute("aria-disabled", String(!feature.enabled));
+    if (!feature.enabled) button.title = `${feature.label} is available from the ${feature.minimumPlan} plan.`;
+    else button.removeAttribute("title");
+  });
+}
+
 function accountInitials() {
   const parts = accountName().split(/[\s@._-]+/).filter(Boolean);
   if (parts.length > 1) return (parts[0]?.[0] || "A") + (parts[1]?.[0] || "");
@@ -15795,6 +15829,7 @@ function renderProfileMenu() {
   const paymentStatus = billing.paymentStatus || (account.licenseKey ? "active license" : account.role === "static" ? "static access" : "workspace access");
   const plan = billing.plan || (account.role === "admin" ? "Owner workspace" : account.role === "customer" ? "Professional license" : "Private workspace");
   const principal = account.username || account.email || account.principal || accountName();
+  const includedFeatures = Object.values(account.entitlements?.features || {}).filter((feature) => feature.enabled);
   els.profileInitials.textContent = "";
   els.profileInitials.setAttribute("aria-hidden", "true");
   els.profileButton.setAttribute("aria-label", `Open profile for ${accountName()}`);
@@ -15816,7 +15851,11 @@ function renderProfileMenu() {
         <dt>Price</dt><dd>${amount}</dd>
         <dt>License</dt><dd>${account.licenseKey || billing.licenseKey || "not assigned"}</dd>
         <dt>Billing email</dt><dd>${billing.billingEmail || account.email || "not set"}</dd>
-        <dt>Customer ID</dt><dd>${billing.customerId || account.principal || "local-session"}</dd>
+        <dt>Customer number</dt><dd>${billing.customerNumber || billing.customerId || account.principal || "not assigned"}</dd>
+        <dt>Contract</dt><dd>${billing.contractNumber || "not assigned"}</dd>
+        <dt>Contract status</dt><dd>${billing.contractStatus || paymentStatus}</dd>
+        <dt>Seats</dt><dd>${billing.seats || 1}</dd>
+        <dt>Included functions</dt><dd>${includedFeatures.length || "full workspace"}</dd>
         <dt>Project</dt><dd>${activeProject?.name || state.projectName || "unsaved model"}</dd>
       </dl>
       <div class="profile-actions">
@@ -18383,6 +18422,8 @@ function bindAuth() {
         });
         storeSession(payload.token);
         state.account = payload.account || null;
+        renderEntitlementNavigation();
+        renderProfileMenu();
         els.loginPassword.value = "";
         unlockApp();
         initializeAuthenticatedWorkspace();
@@ -19385,6 +19426,8 @@ function initializeAuthenticatedWorkspace() {
   if (workspaceInitialized) return;
   workspaceInitialized = true;
   bindEvents();
+  renderEntitlementNavigation();
+  renderProfileMenu();
   loadTemplate("culturedMeat");
   startRealtimeTelemetry();
   startAutomationPolling();
@@ -19395,6 +19438,8 @@ function initializeAuthenticatedWorkspace() {
 window.__AXION_ACCEPT_AUTH__ = (payload) => {
   const wasInitialized = workspaceInitialized;
   state.account = payload?.account || null;
+  renderEntitlementNavigation();
+  renderProfileMenu();
   delete window.__AXION_AUTH_BOOTSTRAP__;
   unlockApp();
   initializeAuthenticatedWorkspace();

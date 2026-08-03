@@ -24807,6 +24807,30 @@ body:not(.locked) .suite-link.active::before {
   box-shadow: 0 0 10px rgba(98, 200, 183, 0.6);
 }
 
+body:not(.locked) .suite-link.plan-locked {
+  position: relative;
+  padding-right: 42px;
+  color: rgba(221, 233, 236, 0.58);
+  opacity: 0.82;
+}
+
+body:not(.locked) .suite-link.plan-locked::after {
+  content: "Upgrade";
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9db7b7;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+body:not(.locked) .suite-link.plan-locked:hover {
+  color: #f4f9f8;
+  background: rgba(102, 134, 139, 0.14);
+}
+
 body:not(.locked) .control-group {
   padding: 12px !important;
   border: 1px solid rgba(184, 214, 214, 0.14) !important;
