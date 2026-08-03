@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bioprocess Engineering Software for Process Development &amp; MSAT | Axion</title>
     <meta name="description" content="Browser-based bioprocess engineering for process development, MSAT, plant engineering and TEA/LCA teams: flowsheets, dynamics, scheduling, CFD screening, economics, sustainability and engineering exports." />
-    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <meta name="theme-color" content="#07131c" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="./assets/axion-favicon.svg?v=20260729" />
     <link rel="shortcut icon" href="./assets/axion-favicon.svg?v=20260729" />
@@ -18,9 +18,10 @@
     <meta property="og:url" content="https://ax-i-on.com/" />
     <meta property="og:image" content="https://ax-i-on.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://ax-i-on.com/assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <link rel="alternate" type="application/rss+xml" title="Axion Engineering Brief" href="https://ax-i-on.com/feed.xml" />
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
-    <link rel="stylesheet" href="./styles.css?v=20260802-growth-pages-v1" />
+    <link rel="stylesheet" href="./styles.css?v=20260803-payments-faq-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -101,6 +102,7 @@
             <a href="./workflow" data-public-target="publicWorkflow">How it works</a>
             <a href="./solutions" data-public-target="publicEcosystem">Solutions</a>
             <a href="./resources" data-public-target="publicResources">Resources</a>
+            <a href="./faq" data-public-target="publicFaq">FAQ</a>
             <a href="./pricing" data-public-target="publicPricing">Pricing</a>
             <a href="./pilot" data-public-target="publicPilot">Request pilot</a>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
@@ -272,6 +274,18 @@
                 <div><span>Simulate</span><strong>Balances, dynamics, CFD, scheduling</strong></div>
                 <div><span>Decide</span><strong>Capacity, TEA, LCA, uncertainty</strong></div>
                 <div><span>Handoff</span><strong>Reports, data, versions, audit trail</strong></div>
+              </section>
+
+              <section class="clarity-home-faq" aria-label="Frequently asked questions about Axion Process OS">
+                <header><p>Quick answers</p><h2>Know what Axion does before you open it.</h2></header>
+                <div class="public-faq-list">
+                  <details><summary>Who should use Axion Process OS?</summary><p>Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA and LCA teams that need one traceable model for process design, facility capacity, cost, environmental impact, and technical review.</p></details>
+                  <details><summary>What do I receive from a model?</summary><p>An editable process flowsheet, stream and equipment data, balances, dynamic profiles, schedule and capacity results, TEA/LCA datasets, sensitivities, source records, validation gaps, and a combined engineering export.</p></details>
+                  <details><summary>Can we use our own plant and experimental data?</summary><p>Yes. Company-owned CSV and JSON datasets, historian exports, assays, supplier quotes, schedules, and model parameters can be mapped to the project with source, unit, confidence, and version context.</p></details>
+                  <details><summary>Is every result automatically validated?</summary><p>No. Axion separates screening, calibrated, and decision-ready evidence. Safety-critical, regulated, scale-up, and investment decisions still require agreed acceptance criteria and qualified engineering review.</p></details>
+                  <details><summary>How should a team start?</summary><p>Use one representative process and one real decision question. A technical pilot reconciles the process basis, required data, outputs, and acceptance criteria before a wider rollout.</p></details>
+                </div>
+                <a class="public-text-link" href="./faq" data-public-target="publicFaq">Read all frequently asked questions</a>
               </section>
 
               <section class="clarity-cta">
@@ -1821,6 +1835,56 @@
               </div>
             </article>
             <p class="pricing-tax-note">Prices exclude applicable VAT. Compute-heavy validated CFD and private deployment infrastructure may be scoped separately.</p>
+            <section class="pricing-faq" aria-label="Subscription and payment questions">
+              <div><p>Payment FAQ</p><h2>Simple monthly access.</h2></div>
+              <div class="public-faq-list">
+                <details><summary>How does payment work?</summary><p>Choose a plan, enter billing details, and continue to Stripe Checkout. Axion activates access only after Stripe confirms the subscription.</p></details>
+                <details><summary>Which payment methods are available?</summary><p>Stripe shows the eligible methods enabled for the account, currency, device, and customer location. Payment credentials are entered on Stripe, not stored in Axion.</p></details>
+                <details><summary>Can I cancel or update the payment method?</summary><p>Yes. Active customers can open the Stripe customer portal from their profile to manage payment methods, invoices, and cancellation.</p></details>
+                <details><summary>Is VAT included?</summary><p>No. Displayed prices exclude applicable VAT. Stripe collects billing address and tax ID details so the configured tax treatment can be applied.</p></details>
+                <details><summary>When does access start?</summary><p>Immediately after verified payment. The checkout return confirms the subscription and opens the licensed workspace automatically.</p></details>
+                <details><summary>Do validated CFD or private deployments cost extra?</summary><p>They can. Dedicated infrastructure, customer-specific calibration, validation work, and external CFD compute are scoped separately because the required effort and compute vary by project.</p></details>
+              </div>
+            </section>
+          </section>
+
+          <section id="publicFaq" class="public-section public-faq-page public-page" data-public-page="faq">
+            <div class="section-heading">
+              <p>Frequently asked questions</p>
+              <h2>Clear answers for process and engineering teams.</h2>
+              <span>What Axion models, where evidence comes from, how subscriptions work, and what still needs qualified validation.</span>
+            </div>
+            <div class="faq-category">
+              <header><span>01</span><div><h3>Product and fit</h3><p>Who Axion is for and the decisions it supports.</p></div></header>
+              <div class="public-faq-list">
+                <details open><summary>What is Axion Process OS?</summary><p>Axion is a browser-based bioprocess engineering workspace. It connects process flowsheets, mass and energy balances, dynamic models, facility scheduling, CFD screening, TEA, LCA, source evidence, versions, and exports around one project model.</p></details>
+                <details><summary>Which teams receive the most value?</summary><p>Process development uses it to design and scale routes; MSAT and manufacturing use it for tech transfer, scheduling and capacity; plant engineering uses it for equipment, utilities and facility concepts; TEA and LCA teams use the same process basis for cost and environmental decisions.</p></details>
+                <details><summary>Which processes are supported?</summary><p>Batch, fed-batch, perfusion, continuous, and hybrid architectures can be applied to fermentation, cultivated products, biopharma, enzymes, alternative proteins, food processing, and related industrial biotechnology routes.</p></details>
+                <details><summary>Can Axion be evaluated alongside an existing simulator?</summary><p>Yes. Use a customer-owned reference process, define acceptance tolerances, reconstruct the authorized process basis, and compare balances, schedules, economics, exports, and collaboration workflows before migrating any validated work.</p></details>
+              </div>
+            </div>
+            <div class="faq-category">
+              <header><span>02</span><div><h3>Models and evidence</h3><p>What is calculated and how results should be reviewed.</p></div></header>
+              <div class="public-faq-list">
+                <details><summary>What is included in the engineering output?</summary><p>The combined package includes the PFD, stream table, equipment register, mass and energy balances, reactions, parameters, ODE/PDE profiles, scheduling, utilization, TEA, LCA, uncertainty, sensitivity, sources, open boundaries, and missing validation tasks.</p></details>
+                <details><summary>How accurate are the calculations?</summary><p>Accuracy depends on model structure, inputs, calibration, and evidence. Axion records low, base, and high values, units, sources, confidence, and validation state so screening results are not presented as validated plant predictions.</p></details>
+                <details><summary>Is the CFD view a validated CFD solver?</summary><p>The in-app view is an interactive engineering screen for geometry, boundary conditions, transport risks, and external job preparation. Validated three-dimensional CFD requires a verified mesh, numerical settings, material models, convergence evidence, and an external CFD worker such as OpenFOAM.</p></details>
+                <details><summary>Does Axion replace engineering judgment?</summary><p>No. It makes assumptions, dependencies, consequences, and missing evidence visible. Qualified engineers remain responsible for safety, GMP, regulatory, equipment, validation, and investment decisions.</p></details>
+              </div>
+            </div>
+            <div class="faq-category">
+              <header><span>03</span><div><h3>Data, collaboration, and access</h3><p>How projects become company-specific and controlled.</p></div></header>
+              <div class="public-faq-list">
+                <details><summary>Can companies upload their own production data?</summary><p>Yes. Projects accept company-owned CSV and JSON data such as historian series, batch records, assays, recipes, schedules, utilities, TEA/LCA inventories, and supplier quotes. Mapping and preview steps show what changes before data is applied.</p></details>
+                <details><summary>Can several people work on one model?</summary><p>Team plans support projects, collaborators, invitations, branches, saved versions, comparisons, and audit records so changes can be reviewed and earlier states reopened.</p></details>
+                <details><summary>How are payments handled?</summary><p>Monthly subscriptions use Stripe-hosted Checkout. Stripe handles payment credentials; Axion stores the customer, contract, plan, entitlement, and verified subscription status required to control access.</p></details>
+                <details><summary>How do we start without committing to a rollout?</summary><p>Request a technical pilot for one process and one decision. The pilot defines inputs, model scope, outputs, acceptance criteria, and remaining validation work before a subscription or enterprise deployment.</p></details>
+              </div>
+            </div>
+            <div class="faq-next">
+              <div><span>Next step</span><h3>Bring one process and one decision question.</h3><p>Axion will show the required data, the modelling route, and the evidence still missing.</p></div>
+              <div><a class="public-primary" href="./pilot" data-public-target="publicPilot">Request a technical pilot</a><a href="./pricing" data-public-target="publicPricing">Compare plans</a></div>
+            </div>
           </section>
 
           <section id="publicLegal" class="public-section public-legal public-page" data-public-page="legal">
@@ -1859,6 +1923,11 @@
           </section>
 
           <section id="loginPanel" class="public-section public-login public-page" data-public-page="login">
+            <div class="access-heading">
+              <p>Access Axion</p>
+              <h2>Sign in or create a licensed workspace.</h2>
+              <span>Existing customers sign in on the left. New customers choose a monthly plan and pay securely on the right.</span>
+            </div>
             <div class="access-panel">
               <form id="loginForm" class="login-card access-card access-primary-card">
                 <div class="login-brand">
@@ -1935,6 +2004,26 @@
               </aside>
             </div>
           </section>
+
+          <footer class="public-route-footer" aria-label="Axion public site links">
+            <div><strong>Axion Process OS</strong><span>Bioprocess engineering from process concept to plant decision.</span></div>
+            <nav aria-label="Explore Axion capabilities">
+              <a href="./bioprocess-simulation-software">Process simulation</a>
+              <a href="./biomanufacturing-scheduling-software">Scheduling + capacity</a>
+              <a href="./bioprocess-tea-lca-software">TEA + LCA</a>
+              <a href="./fermentation-process-modeling">Fermentation</a>
+              <a href="./biopharma-process-simulation">Biopharma</a>
+              <a href="./superpro-designer-migration">Migration benchmark</a>
+            </nav>
+            <nav aria-label="Company and support">
+              <a href="./faq">FAQ</a>
+              <a href="./resources">Resources</a>
+              <a href="./pricing">Pricing</a>
+              <a href="./security">Security</a>
+              <a href="./pilot">Technical pilot</a>
+              <a href="./legal">Legal</a>
+            </nav>
+          </footer>
         </main>
       </div>
     </section>
@@ -2295,6 +2384,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260802-fast-login-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260803-payments-faq-v1"></script>
   </body>
 </html>

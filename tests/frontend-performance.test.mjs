@@ -13,11 +13,11 @@ test("public homepage defers the authenticated workspace bundle", async () => {
   assert.match(bootstrap, /import\("\.\/app\.js\?v=/);
   assert.match(bootstrap, /const lightweightPublicPages = new Set/);
   assert.match(bootstrap, /bindLightweightLogin\(\)/);
-  assert.match(bootstrap, /checkoutForm\.addEventListener\("focusin", loadCheckoutWorkspace/);
-  assert.match(bootstrap, /checkoutForm\.requestSubmit\(\)/);
-  assert.match(bootstrap, /\["pricing", "pilot"\]\.includes\(requestedPage\)/);
+  assert.match(bootstrap, /submitLightweightCheckout/);
+  assert.match(bootstrap, /handleLightweightCheckoutReturn/);
+  assert.match(bootstrap, /\["pilot"\]\.includes\(requestedPage\)/);
   assert.doesNotMatch(bootstrap, /\["login", "pricing", "pilot"\]\.includes\(requestedPage\)/);
-  assert.match(bootstrap, /"legal", "login"/);
+  assert.match(bootstrap, /"faq", "pricing", "legal", "login"/);
   assert.match(bootstrap, /\(Boolean\(session\) && requestedPage === "home"\)/);
   assert.match(bootstrap, /lightweightApiRequest\("\/api\/account"/);
   assert.match(bootstrap, /authorization: `Bearer \$\{session\}`/);

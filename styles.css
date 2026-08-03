@@ -30464,3 +30464,337 @@ body.locked #publicHome .clarity-evidence-scale span {
 body.locked #publicHome .clarity-evidence-scale b {
   color: #263d43 !important;
 }
+
+/* Public clarity, FAQ, and lightweight subscription flow. */
+.clarity-home-faq {
+  width: min(1120px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 84px 0;
+  border-top: 1px solid #d4dddb;
+}
+
+.clarity-home-faq > header {
+  max-width: 700px;
+  margin-bottom: 30px;
+}
+
+.clarity-home-faq > header p,
+.pricing-faq > div:first-child > p {
+  margin: 0 0 10px;
+  color: #367c70;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.clarity-home-faq h2,
+.pricing-faq h2 {
+  margin: 0;
+  color: #102129;
+  font-size: clamp(30px, 4vw, 43px);
+  line-height: 1.1;
+}
+
+.public-faq-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(162, 185, 181, 0.5);
+}
+
+.public-faq-list details {
+  min-width: 0;
+  border-bottom: 1px solid rgba(162, 185, 181, 0.38);
+}
+
+.public-faq-list summary {
+  position: relative;
+  padding: 20px 42px 20px 0;
+  color: #172a31;
+  font-size: 16px;
+  font-weight: 760;
+  line-height: 1.35;
+  cursor: pointer;
+  list-style: none;
+}
+
+.public-faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.public-faq-list summary::after {
+  position: absolute;
+  top: 18px;
+  right: 4px;
+  content: "+";
+  color: #367c70;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.public-faq-list details[open] summary::after {
+  content: "−";
+}
+
+.public-faq-list details p {
+  max-width: 850px;
+  margin: -4px 0 20px;
+  color: #596b71;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.public-text-link {
+  display: inline-flex;
+  margin-top: 24px;
+  color: #1f6f64;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+#publicFaq.public-faq-page {
+  width: min(1080px, calc(100% - 48px)) !important;
+  max-width: 1080px !important;
+  margin: 0 auto !important;
+  padding: clamp(64px, 8vw, 108px) 0 100px !important;
+}
+
+.faq-category {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 46px;
+  padding: 34px 0;
+  border-top: 1px solid rgba(159, 190, 198, 0.22);
+}
+
+.faq-category > header {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 14px;
+  align-content: start;
+}
+
+.faq-category > header > span,
+.faq-category h3,
+.faq-category header p {
+  margin: 0;
+}
+
+.faq-category > header > span {
+  color: #70c1b1;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.faq-category h3 {
+  color: #eff7f5;
+  font-size: 22px;
+}
+
+.faq-category header p {
+  margin-top: 8px;
+  color: #9fb2bd;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#publicFaq .public-faq-list {
+  border-top: 0;
+}
+
+#publicFaq .public-faq-list details {
+  border-color: rgba(159, 190, 198, 0.2);
+}
+
+#publicFaq .public-faq-list summary {
+  color: #eef6f4;
+}
+
+#publicFaq .public-faq-list summary::after {
+  color: #70c1b1;
+}
+
+#publicFaq .public-faq-list details p {
+  color: #adbec6;
+}
+
+.faq-next {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 30px;
+  align-items: end;
+  margin-top: 28px;
+  padding: 30px;
+  border: 1px solid rgba(112, 193, 177, 0.32);
+  border-radius: 24px;
+  background: #0d2935;
+}
+
+.faq-next span,
+.faq-next h3,
+.faq-next p {
+  display: block;
+  margin: 0;
+}
+
+.faq-next span {
+  color: #70c1b1;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.faq-next h3 {
+  margin-top: 7px;
+  color: #f1f8f6;
+  font-size: 24px;
+}
+
+.faq-next p {
+  margin-top: 7px;
+  color: #aebfc6;
+  font-size: 13px;
+}
+
+.faq-next > div:last-child {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.faq-next a:not(.public-primary) {
+  color: #c7d9d5;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.pricing-faq {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 44px;
+  margin-top: 54px;
+  padding-top: 38px;
+  border-top: 1px solid rgba(159, 190, 198, 0.22);
+}
+
+.pricing-faq h2 {
+  color: #eff7f5;
+  font-size: 28px;
+}
+
+.pricing-faq .public-faq-list summary {
+  color: #eef6f4;
+}
+
+.pricing-faq .public-faq-list details,
+.pricing-faq .public-faq-list {
+  border-color: rgba(159, 190, 198, 0.2);
+}
+
+.pricing-faq .public-faq-list details p {
+  color: #adbec6;
+}
+
+#loginPanel .access-heading {
+  max-width: 720px;
+  margin-bottom: 30px;
+}
+
+#loginPanel .access-heading p,
+#loginPanel .access-heading h2,
+#loginPanel .access-heading span {
+  display: block;
+  margin: 0;
+}
+
+#loginPanel .access-heading p {
+  color: #70c1b1;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+#loginPanel .access-heading h2 {
+  margin-top: 10px;
+  color: #f1f8f6;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.08;
+}
+
+#loginPanel .access-heading span {
+  max-width: 620px;
+  margin-top: 12px;
+  color: #aebfc6;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.checkout-result.is-success {
+  color: #a7e4d6;
+}
+
+.checkout-result.is-error {
+  color: #f0c477;
+}
+
+.public-route-footer {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) repeat(2, minmax(180px, 0.7fr));
+  gap: 48px;
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 50px 0 58px;
+  border-top: 1px solid rgba(159, 190, 198, 0.16);
+}
+
+.public-route-footer > div,
+.public-route-footer nav {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.public-route-footer strong {
+  color: #eef6f4;
+  font-size: 15px;
+}
+
+.public-route-footer span,
+.public-route-footer a {
+  color: #95aab4;
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.public-route-footer a:hover {
+  color: #d9eeea;
+}
+
+@media (max-width: 800px) {
+  .clarity-home-faq {
+    width: calc(100% - 32px);
+    padding: 60px 0;
+  }
+
+  .faq-category,
+  .pricing-faq,
+  .faq-next,
+  .public-route-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .faq-category {
+    gap: 18px;
+  }
+
+  .faq-next > div:last-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .public-route-footer {
+    gap: 28px;
+  }
+}

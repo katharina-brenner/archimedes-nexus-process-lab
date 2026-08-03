@@ -16095,7 +16095,7 @@ async function createCheckoutOrder() {
   try {
     const payload = await apiRequest("/api/checkout", {
       method: "POST",
-      body: JSON.stringify({ customerName, customerEmail, company, planId }),
+      body: JSON.stringify({ customerName, customerEmail, company, planId, acceptedTerms: true }),
     });
     renderCheckoutResult(payload);
     const checkoutUrl = payload.payment?.checkoutUrl || payload.order?.checkoutUrl;
@@ -16217,6 +16217,7 @@ const publicPageTargets = {
   publicEcosystem: "ecosystem",
   publicResources: "resources",
   publicReadiness: "readiness",
+  publicFaq: "faq",
   publicReviews: "reviews",
   publicComparison: "compare",
   publicPricing: "pricing",
@@ -16593,6 +16594,10 @@ const publicPageMeta = {
     title: "Security and Production Architecture | Axion Process OS",
     description: "Review the security, identity, data, payment, deployment and validated-compute architecture behind Axion Process OS.",
   },
+  faq: {
+    title: "Bioprocess Engineering Software FAQ | Axion Process OS",
+    description: "Clear answers about Axion Process OS, supported bioprocesses, modelling depth, validation, data imports, security, subscriptions, CFD, TEA, LCA and migration.",
+  },
   pricing: {
     title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
     description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
@@ -16619,6 +16624,7 @@ const publicPagePaths = {
   resources: "/resources",
   compare: "/superpro-designer-alternative",
   readiness: "/security",
+  faq: "/faq",
   pricing: "/pricing",
   pilot: "/pilot",
   legal: "/legal",
@@ -16686,7 +16692,7 @@ function scrollPublicTarget(targetId, focusLogin = false) {
 
 function routePublicAction(target = "", { focusLogin = false } = {}) {
   if (!target) return;
-  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", solutions: "publicEcosystem", industries: "publicEcosystem", resources: "publicResources", guides: "publicResources", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
+  const pageAliases = { home: "publicHome", platform: "publicPlatform", workflow: "publicWorkflow", ecosystem: "publicEcosystem", solutions: "publicEcosystem", industries: "publicEcosystem", resources: "publicResources", guides: "publicResources", compare: "publicComparison", readiness: "publicReadiness", professional: "publicReadiness", security: "publicReadiness", reviews: "publicReviews", faq: "publicFaq", pricing: "publicPricing", pilot: "publicPilot", demo: "publicPilot", contact: "publicPilot", legal: "publicLegal", login: "loginPanel" };
   if (target === "login" || target === "workspace" || target === "paywall") {
     scrollPublicTarget("loginPanel", true);
     return;

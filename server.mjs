@@ -289,6 +289,11 @@ const seoRouteMeta = Object.freeze({
   "/": {
     title: "Bioprocess Engineering Software for Process Development & MSAT | Axion",
     description: "One shared engineering model for process development, MSAT, plant engineering and TEA/LCA teams, from flowsheet and scale-up through scheduling and investment review.",
+    faq: [
+      { question: "Who should use Axion Process OS?", answer: "Axion is built for process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA and LCA teams that need one traceable model for process design, facility capacity, cost, environmental impact and technical review." },
+      { question: "What does an Axion model produce?", answer: "A project can produce an editable flowsheet, equipment and stream data, balances, dynamic profiles, schedules, capacity results, TEA and LCA datasets, sensitivities, source records, validation gaps and combined engineering exports." },
+      { question: "Can Axion use company production data?", answer: "Yes. Customer-owned CSV and JSON datasets, historian exports, assays, supplier quotes, schedules and model parameters can be mapped to a project with units, sources, confidence and version context." },
+    ],
   },
   "/product": {
     title: "Bioprocess Engineering Platform | Axion Process OS",
@@ -394,9 +399,28 @@ const seoRouteMeta = Object.freeze({
     title: "Security and Production Architecture | Axion Process OS",
     description: "Review the security, identity, data, payment, deployment and validated-compute architecture behind Axion Process OS.",
   },
+  "/faq": {
+    title: "Bioprocess Engineering Software FAQ | Axion Process OS",
+    description: "Clear answers about Axion Process OS, supported bioprocesses, modelling depth, validation, data imports, security, subscriptions, CFD, TEA, LCA and migration.",
+    image: "/assets/product/axion-flowsheet-workspace.png",
+    audience: "Process development, MSAT, manufacturing, plant engineering, TEA, LCA and technical decision teams",
+    faq: [
+      { question: "What is Axion Process OS?", answer: "Axion is a browser-based bioprocess engineering workspace that connects process flowsheets, balances, dynamic models, facility scheduling, CFD screening, TEA, LCA, source evidence, versions and exports around one project model." },
+      { question: "Which production modes can Axion model?", answer: "Axion supports batch, fed-batch, perfusion, continuous and hybrid process architectures with mode-specific material balances, dynamic profiles, harvest logic, schedules and economic assumptions." },
+      { question: "Is the Axion CFD view a validated CFD solver?", answer: "The in-app CFD view is an interactive engineering screen. Validated three-dimensional CFD requires a verified mesh, numerical settings, material models, convergence evidence and an external CFD worker such as OpenFOAM." },
+      { question: "Can companies upload their own production data?", answer: "Yes. Projects accept customer-owned historian series, batch records, assays, recipes, schedules, utilities, TEA and LCA inventories and supplier quotes through structured CSV and JSON ingestion workflows." },
+      { question: "How are Axion subscriptions paid?", answer: "Monthly subscriptions use Stripe-hosted Checkout. Stripe handles payment credentials, while Axion stores only the customer, contract, plan, entitlement and verified subscription status required to control access." },
+      { question: "Does Axion replace engineering validation?", answer: "No. Axion distinguishes screening, calibrated and decision-ready evidence. Qualified engineers remain responsible for safety, GMP, regulatory, equipment, validation and investment decisions." },
+    ],
+  },
   "/pricing": {
     title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
     description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
+    faq: [
+      { question: "How does Axion subscription payment work?", answer: "Choose a monthly plan and continue to Stripe-hosted Checkout. Axion activates workspace access after Stripe confirms the subscription." },
+      { question: "Can an Axion subscription be cancelled?", answer: "Yes. Active customers can use the Stripe customer portal from their Axion profile to manage payment methods, invoices and cancellation." },
+      { question: "Does Axion store card or bank details?", answer: "No. Payment credentials are entered and stored with Stripe. Axion receives the verified customer and subscription status required for access control." },
+    ],
   },
   "/pilot": {
     title: "Request a Technical Bioprocess Pilot | Axion Process OS",
@@ -433,7 +457,8 @@ function renderPublicHtml(pathname, indexPath) {
     .replace(/<meta property="og:description" content="[^"]*"\s*\/>/i, `<meta property="og:description" content="${htmlAttribute(meta.description)}" />`)
     .replace(/<meta property="og:url" content="[^"]*"\s*\/>/i, `<meta property="og:url" content="${canonicalUrl}" />`)
     .replace(/<meta property="og:image" content="[^"]*"\s*\/>/i, `<meta property="og:image" content="${new URL(meta.image || "/assets/photography/weihenstephan-kombikeller-1600.jpg", "https://ax-i-on.com").href}" />`)
-    .replace(/<meta name="twitter:card" content="[^"]*"\s*\/>/i, `<meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="${htmlAttribute(meta.title)}" /><meta name="twitter:description" content="${htmlAttribute(meta.description)}" />`);
+    .replace(/<meta name="twitter:card" content="[^"]*"\s*\/>/i, `<meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="${htmlAttribute(meta.title)}" /><meta name="twitter:description" content="${htmlAttribute(meta.description)}" />`)
+    .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/i, `<meta name="twitter:image" content="${new URL(meta.image || "/assets/photography/weihenstephan-kombikeller-1600.jpg", "https://ax-i-on.com").href}" />`);
   const verificationTags = [
     config.googleSiteVerification ? `<meta name="google-site-verification" content="${htmlAttribute(config.googleSiteVerification)}" />` : "",
     config.bingSiteVerification ? `<meta name="msvalidate.01" content="${htmlAttribute(config.bingSiteVerification)}" />` : "",
@@ -504,6 +529,7 @@ const defaultDb = {
   automationActions: [],
   automationCommissioningRuns: [],
   leads: [],
+  stripeEvents: [],
   audit: [],
 };
 
@@ -2101,8 +2127,14 @@ async function createCheckout(req, res) {
     });
     return;
   }
+  if (body.acceptedTerms !== true) {
+    json(res, 400, { error: "Accept the terms and privacy notice before starting checkout." });
+    return;
+  }
 
   const db = ensureDbShape(await loadDb());
+  const termsAcceptedAt = new Date().toISOString();
+  const termsVersion = "2026-08-03";
   const order = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -2118,6 +2150,8 @@ async function createCheckout(req, res) {
     customerEmail,
     company,
     billingMode: config.stripeBillingMode,
+    termsAcceptedAt,
+    termsVersion,
   };
   ensureCommerceIdentifiers(order);
   db.orders.unshift(order);
@@ -2126,8 +2160,8 @@ async function createCheckout(req, res) {
 
   const sessionParams = {
     mode: config.stripeBillingMode,
-    success_url: `${config.appBaseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${config.appBaseUrl}/?checkout=cancelled`,
+    success_url: `${config.appBaseUrl}/login?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${config.appBaseUrl}/login?checkout=cancelled&plan=${encodeURIComponent(selectedPlan.id)}`,
     customer_email: customerEmail,
     client_reference_id: order.id,
     "metadata[orderId]": order.id,
@@ -2135,6 +2169,7 @@ async function createCheckout(req, res) {
     "metadata[customerEmail]": customerEmail,
     "metadata[planId]": selectedPlan.id,
     "metadata[planName]": selectedPlan.name,
+    "metadata[termsVersion]": termsVersion,
     billing_address_collection: "required",
     "tax_id_collection[enabled]": "true",
     allow_promotion_codes: "true",
@@ -2146,6 +2181,8 @@ async function createCheckout(req, res) {
     sessionParams["subscription_data[metadata][orderId]"] = order.id;
     sessionParams["subscription_data[metadata][reference]"] = order.reference;
     sessionParams["subscription_data[metadata][planId]"] = selectedPlan.id;
+    sessionParams["subscription_data[metadata][customerEmail]"] = customerEmail;
+    sessionParams["subscription_data[metadata][termsVersion]"] = termsVersion;
   } else {
     sessionParams.customer_creation = "always";
     sessionParams["invoice_creation[enabled]"] = "true";
@@ -2161,7 +2198,16 @@ async function createCheckout(req, res) {
       sessionParams["line_items[0][price_data][recurring][interval]"] = "month";
     }
   }
-  const session = await stripeRequest("/v1/checkout/sessions", sessionParams);
+  let session;
+  try {
+    session = await stripeRequest("/v1/checkout/sessions", sessionParams);
+  } catch (error) {
+    order.status = "checkout_failed";
+    db.audit.unshift({ at: new Date().toISOString(), type: "checkout.failed", orderId: order.id, reference: order.reference });
+    await saveDb(db);
+    json(res, 502, { error: "Secure checkout could not be created. Please retry in a moment." });
+    return;
+  }
   order.stripeSessionId = session.id;
   order.checkoutUrl = session.url;
   await saveDb(db);
@@ -2214,6 +2260,7 @@ function ensureDbShape(db) {
   db.automationActions ||= [];
   db.automationCommissioningRuns ||= [];
   db.leads ||= [];
+  db.stripeEvents ||= [];
   db.audit ||= [];
   db.orders.forEach((order) => {
     const license = db.licenses.find((item) => item.orderId === order.id || item.key === order.licenseKey);
@@ -6109,6 +6156,10 @@ async function stripeWebhook(req, res) {
   const event = JSON.parse(rawBody);
   const object = event.data?.object || {};
   const db = ensureDbShape(await loadDb());
+  if (event.id && db.stripeEvents.some((item) => item.id === event.id)) {
+    json(res, 200, { received: true, duplicate: true });
+    return;
+  }
   let changed = false;
   if ((event.type === "checkout.session.completed" && object.payment_status === "paid") || event.type === "checkout.session.async_payment_succeeded") {
     const order = findStripeOrder(db, object);
@@ -6176,6 +6227,11 @@ async function stripeWebhook(req, res) {
       const commerceRecord = await syncCommerceRecordToSupabase(order, db.licenses.find((item) => item.key === order.licenseKey || item.orderId === order.id));
       await recordSubscriptionEventToSupabase(event, commerceRecord);
     }
+  }
+  if (event.id) {
+    db.stripeEvents.unshift({ id: event.id, type: event.type, receivedAt: new Date().toISOString() });
+    db.stripeEvents = db.stripeEvents.slice(0, 2000);
+    await saveDb(db);
   }
   json(res, 200, { received: true });
 }

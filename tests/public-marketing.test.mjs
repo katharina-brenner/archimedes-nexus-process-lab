@@ -70,11 +70,34 @@ test("sitemap and server metadata cover high-intent engineering routes", async (
     "biopharma-process-simulation",
     "fermentation-process-modeling",
     "superpro-designer-migration",
+    "faq",
   ]) {
     assert.match(sitemap, new RegExp(`https://ax-i-on\\.com/${route}`));
     assert.match(server, new RegExp(`/${route}`));
     assert.match(bootstrap, new RegExp(`"?${route}"?`));
   }
+});
+
+test("public FAQ, subscription clarity, and internal discovery links are shipped", async () => {
+  const [html, bootstrap, server, sitemap] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
+    readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /id="publicFaq"[\s\S]{0,180}data-public-page="faq"/);
+  assert.match(html, /Know what Axion does before you open it/);
+  assert.match(html, /Payment FAQ/);
+  assert.match(html, /public-route-footer/);
+  assert.match(html, /href="\.\/bioprocess-simulation-software"/);
+  assert.match(html, /href="\.\/biomanufacturing-scheduling-software"/);
+  assert.match(html, /href="\.\/bioprocess-tea-lca-software"/);
+  assert.match(html, /max-snippet:-1/);
+  assert.match(html, /name="twitter:image"/);
+  assert.match(bootstrap, /faq: "faq"/);
+  assert.match(server, /"\/faq"/);
+  assert.match(server, /Bioprocess Engineering Software FAQ/);
+  assert.match(sitemap, /https:\/\/ax-i-on\.com\/faq/);
 });
 
 test("public positioning sells an evidence-led engineering decision package", async () => {

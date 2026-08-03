@@ -801,6 +801,18 @@ test("Stripe subscription checkout activates access and opens the billing portal
     AXION_BILLING_MODE: "subscription",
   });
   try {
+    const rejectedCheckout = await jsonFetch(server.baseUrl, "/api/checkout", {
+      method: "POST",
+      body: {
+        customerName: "Paid Test User",
+        customerEmail: "paid@example.com",
+        company: "Axion Test",
+        planId: "team",
+      },
+    });
+    assert.equal(rejectedCheckout.response.status, 400);
+    assert.match(rejectedCheckout.payload.error, /terms and privacy/i);
+
     const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
       body: {
@@ -808,6 +820,7 @@ test("Stripe subscription checkout activates access and opens the billing portal
         customerEmail: "paid@example.com",
         company: "Axion Test",
         planId: "team",
+        acceptedTerms: true,
       },
     });
     assert.equal(checkout.response.status, 201);
@@ -820,6 +833,9 @@ test("Stripe subscription checkout activates access and opens the billing portal
     assert.equal(stripeMock.received.checkout["automatic_payment_methods[enabled]"], undefined);
     assert.equal(stripeMock.received.checkout.billing_address_collection, "required");
     assert.equal(stripeMock.received.checkout["tax_id_collection[enabled]"], "true");
+    assert.match(stripeMock.received.checkout.success_url, /\/login\?checkout=success/);
+    assert.match(stripeMock.received.checkout.cancel_url, /\/login\?checkout=cancelled&plan=team/);
+    assert.equal(stripeMock.received.checkout["metadata[termsVersion]"], "2026-08-03");
 
     const checkoutStatus = await jsonFetch(server.baseUrl, "/api/checkout/session/cs_test_axion_subscription");
     assert.equal(checkoutStatus.response.status, 200);
@@ -872,7 +888,7 @@ test("subscription entitlements block functions outside the contracted plan", as
   try {
     const checkout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
-      body: { customerName: "Research User", customerEmail: "research@example.com", company: "Research Lab", planId: "academic" },
+      body: { customerName: "Research User", customerEmail: "research@example.com", company: "Research Lab", planId: "academic", acceptedTerms: true },
     });
     assert.equal(checkout.response.status, 201);
     const status = await jsonFetch(server.baseUrl, `/api/checkout/session/${checkout.payload.payment.sessionId}`);

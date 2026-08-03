@@ -18,6 +18,7 @@ const routePages = {
   "superpro-designer-alternative": "compare",
   "superpro-designer-migration": "migration",
   security: "readiness",
+  faq: "faq",
   pricing: "pricing",
   pilot: "pilot",
   legal: "legal",
@@ -25,7 +26,6 @@ const routePages = {
 };
 const pathPage = routePages[window.location.pathname.replace(/^\/+|\/+$/g, "")];
 const requestedPage = params.get("page") || pathPage || "home";
-const checkoutReturn = params.has("checkout") || params.has("session_id");
 const publicTargetPaths = {
   publicHome: "/",
   publicPlatform: "/product",
@@ -38,6 +38,7 @@ const publicTargetPaths = {
   publicBiopharmaIntent: "/biopharma-process-simulation",
   publicFermentationIntent: "/fermentation-process-modeling",
   publicReadiness: "/security",
+  publicFaq: "/faq",
   publicComparison: "/superpro-designer-alternative",
   publicMigration: "/superpro-designer-migration",
   publicPricing: "/pricing",
@@ -48,8 +49,15 @@ const publicTargetPaths = {
 
 let workspacePromise;
 
+const fallbackCheckoutPlans = [
+  { id: "academic", name: "Research", amountFormatted: "€149", seats: 1 },
+  { id: "professional", name: "Professional", amountFormatted: "€590", seats: 1 },
+  { id: "team", name: "Engineering Team", amountFormatted: "€2,490", seats: 5 },
+  { id: "enterprise", name: "Enterprise Site", amountFormatted: "€6,900", seats: 20 },
+];
+
 function loadWorkspace() {
-  if (!workspacePromise) workspacePromise = import("./app.js?v=20260802-fast-login-v1");
+  if (!workspacePromise) workspacePromise = import("./app.js?v=20260803-payments-faq-v1");
   return workspacePromise;
 }
 
@@ -64,6 +72,96 @@ async function lightweightApiRequest(path, options = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "The secure workspace could not be reached.");
   return payload;
+}
+
+function selectedCheckoutPlan(config, planId) {
+  const plans = Array.isArray(config?.plans) && config.plans.length ? config.plans : fallbackCheckoutPlans;
+  return plans.find((plan) => plan.id === planId)
+    || plans.find((plan) => plan.id === "professional")
+    || fallbackCheckoutPlans[1];
+}
+
+function renderLightweightCheckoutPlan(config, planId) {
+  const plan = selectedCheckoutPlan(config, planId);
+  const select = document.querySelector("#checkoutPlan");
+  if (select) select.value = plan.id;
+  const name = document.querySelector("#checkoutPlanName");
+  const price = document.querySelector("#checkoutPrice");
+  const mode = document.querySelector("#checkoutBillingMode");
+  if (name) name.textContent = `Axion ${plan.name}`;
+  if (price) price.textContent = `${plan.amountFormatted || `€${plan.amount}`} / month`;
+  if (mode) mode.textContent = `Monthly subscription · ${plan.seats} named seat${Number(plan.seats) === 1 ? "" : "s"} · manage or cancel in the billing portal`;
+  return plan;
+}
+
+function renderLightweightCheckoutResult(title, message, kind = "") {
+  const result = document.querySelector("#checkoutResult");
+  if (!result) return;
+  result.className = `checkout-result${kind ? ` is-${kind}` : ""}`;
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  const copy = document.createElement("p");
+  copy.textContent = message;
+  result.replaceChildren(heading, copy);
+}
+
+async function submitLightweightCheckout(event, config) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const customerName = form.querySelector("#checkoutName")?.value.trim() || "";
+  const customerEmail = form.querySelector("#checkoutEmail")?.value.trim() || "";
+  const company = form.querySelector("#checkoutCompany")?.value.trim() || "";
+  const planId = form.querySelector("#checkoutPlan")?.value || "professional";
+  const acceptedTerms = Boolean(form.querySelector("#checkoutTerms")?.checked);
+  if (!customerName || !customerEmail.includes("@")) {
+    renderLightweightCheckoutResult("Complete billing details", "Enter a customer name and valid billing email.", "error");
+    return;
+  }
+  if (!acceptedTerms) {
+    renderLightweightCheckoutResult("Confirm the terms", "Accept the terms and privacy notice before continuing.", "error");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Opening secure checkout...";
+  renderLightweightCheckoutResult("Preparing checkout", "Axion is creating your monthly subscription securely with Stripe.", "pending");
+  try {
+    const payload = await lightweightApiRequest("/api/checkout", {
+      method: "POST",
+      body: JSON.stringify({ customerName, customerEmail, company, planId, acceptedTerms: true }),
+    });
+    const checkoutUrl = payload.payment?.checkoutUrl || payload.order?.checkoutUrl;
+    if (!checkoutUrl) throw new Error("Stripe did not return a checkout URL.");
+    window.location.assign(checkoutUrl);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Continue to secure checkout";
+    renderLightweightCheckoutResult("Checkout could not start", error.message || "Please retry.", "error");
+  }
+}
+
+async function handleLightweightCheckoutReturn(controls) {
+  const checkoutState = params.get("checkout");
+  const sessionId = params.get("session_id");
+  if (!checkoutState) return;
+  if (checkoutState === "cancelled") {
+    renderLightweightCheckoutResult("Checkout cancelled", "No payment was taken. You can change the plan or restart checkout.", "pending");
+    return;
+  }
+  if (checkoutState !== "success" || !sessionId) return;
+  renderLightweightCheckoutResult("Confirming payment", "Stripe is confirming the subscription and Axion is activating the workspace.", "pending");
+  try {
+    const status = await lightweightApiRequest(`/api/checkout/session/${encodeURIComponent(sessionId)}`);
+    if (!status.paid || !status.licenseKey) throw new Error("Payment is still processing. Reload this page in a moment.");
+    renderLightweightCheckoutResult("Subscription active", "Payment is confirmed. Your workspace is opening now.", "success");
+    const loginPayload = await lightweightApiRequest("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ user: status.customerEmail, password: status.licenseKey, licenseKey: status.licenseKey }),
+    });
+    await openAuthenticatedWorkspace(loginPayload, controls);
+  } catch (error) {
+    renderLightweightCheckoutResult("Activation pending", error.message || "Payment could not be confirmed yet.", "error");
+  }
 }
 
 async function openAuthenticatedWorkspace(payload, controls = {}) {
@@ -167,31 +265,14 @@ async function bindLightweightLogin() {
     if (checkoutForm) checkoutForm.hidden = !checkoutAvailable;
     if (checkoutUnavailable) checkoutUnavailable.hidden = checkoutAvailable;
     if (checkoutAvailable && checkoutForm) {
-      const loadCheckoutWorkspace = () => loadWorkspace().catch(() => {});
-      checkoutForm.addEventListener("focusin", loadCheckoutWorkspace, { once: true });
-      const handOffCheckout = async (event) => {
-        event.preventDefault();
-        const submit = checkoutForm.querySelector('button[type="submit"]');
-        if (submit) {
-          submit.disabled = true;
-          submit.textContent = "Preparing secure checkout...";
-        }
-        try {
-          await loadWorkspace();
-          checkoutForm.removeEventListener("submit", handOffCheckout);
-          if (submit) submit.disabled = false;
-          checkoutForm.requestSubmit();
-        } catch {
-          if (submit) {
-            submit.disabled = false;
-            submit.textContent = "Continue to secure checkout";
-          }
-          const result = checkoutForm.querySelector("#checkoutResult");
-          if (result) result.textContent = "Secure checkout could not be prepared. Please retry.";
-        }
-      };
-      checkoutForm.addEventListener("submit", handOffCheckout);
+      renderLightweightCheckoutPlan(product, params.get("plan") || "professional");
+      checkoutForm.querySelector("#checkoutPlan")?.addEventListener("change", (event) => {
+        renderLightweightCheckoutPlan(product, event.currentTarget.value);
+      });
+      checkoutForm.addEventListener("submit", (event) => submitLightweightCheckout(event, product));
     }
+
+    await handleLightweightCheckoutReturn(controls);
 
     const googleConfig = await lightweightApiRequest("/api/auth/google-config");
     if (!googleConfig.enabled || !googleConfig.clientId) {
@@ -267,6 +348,13 @@ function interceptPublicAction(event) {
   if (target.id === "publicLogo") {
     event.preventDefault();
     openPublicHome();
+    return;
+  }
+
+  if (target.dataset.checkoutPlan) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    window.location.assign(`/login?plan=${encodeURIComponent(target.dataset.checkoutPlan)}`);
     return;
   }
 
@@ -379,10 +467,9 @@ if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 
 const lightweightPublicPages = new Set([
   "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",
-  "biopharma", "fermentation", "compare", "migration", "readiness", "legal", "login",
+  "biopharma", "fermentation", "compare", "migration", "readiness", "faq", "pricing", "legal", "login",
 ]);
-const requiresWorkspaceBundle = checkoutReturn
-  || ["pricing", "pilot"].includes(requestedPage)
+const requiresWorkspaceBundle = ["pilot"].includes(requestedPage)
   || !lightweightPublicPages.has(requestedPage)
   || (Boolean(session) && requestedPage === "home");
 
