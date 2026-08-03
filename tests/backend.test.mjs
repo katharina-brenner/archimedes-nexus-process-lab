@@ -801,6 +801,11 @@ test("Stripe subscription checkout activates access and opens the billing portal
     AXION_BILLING_MODE: "subscription",
   });
   try {
+    const billingConfig = await jsonFetch(server.baseUrl, "/api/product");
+    assert.equal(billingConfig.payload.payments.liveMode, false);
+    assert.equal(billingConfig.payload.payments.webhookConfigured, true);
+    assert.equal(billingConfig.payload.payments.providerPricesConfigured, false);
+
     const rejectedCheckout = await jsonFetch(server.baseUrl, "/api/checkout", {
       method: "POST",
       body: {
@@ -911,6 +916,23 @@ test("subscription entitlements block functions outside the contracted plan", as
   } finally {
     await stopServer(server);
     await stripeMock.close();
+  }
+});
+
+test("production readiness does not classify Stripe test mode as real customer billing", async () => {
+  const server = await startServer({
+    NODE_ENV: "production",
+    APP_BASE_URL: "https://ax-i-on.com",
+    STRIPE_SECRET_KEY: "sk_test_axion",
+    STRIPE_WEBHOOK_SECRET: "whsec_test_axion",
+  });
+  try {
+    const readiness = await jsonFetch(server.baseUrl, "/api/production-readiness");
+    const stripe = readiness.payload.checks.find((item) => item.key === "stripe");
+    assert.equal(stripe.ready, false);
+    assert.ok(stripe.missing.some((item) => /live mode/.test(item)));
+  } finally {
+    await stopServer(server);
   }
 });
 

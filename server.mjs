@@ -596,6 +596,9 @@ function publicConfig() {
       interval: config.stripeBillingMode === "subscription" ? "month" : "one-time",
       customerPortal: Boolean(config.stripeSecretKey),
       automaticTax: config.stripeAutomaticTax,
+      liveMode: /^sk_live_/.test(config.stripeSecretKey),
+      webhookConfigured: Boolean(config.stripeWebhookSecret),
+      providerPricesConfigured: billingPlans.every((plan) => Boolean(plan.stripePriceId)),
     },
     backend: {
       currentStorage: supabaseConfigured() ? `Supabase/Postgres: model documents plus normalized customers, contracts, users and entitlements` : "local JSON files in .data/models",
@@ -679,10 +682,14 @@ async function sendTransactionalEmail({ to, subject, html, text }) {
 
 function productionReadiness() {
   const isHttps = config.appBaseUrl.startsWith("https://");
+  const productionRuntime = process.env.NODE_ENV === "production";
   const sessionSecretReady = Boolean(config.sessionSecret && config.sessionSecret !== "axion-local-dev-secret" && config.sessionSecret.length >= 32);
   const adminPasswordReady = Boolean(config.adminPassword && config.adminPassword !== "owner-local-password" && config.adminPassword.length >= 12);
   const openAiReady = Boolean(config.openaiApiKey && /^sk-/.test(config.openaiApiKey));
-  const stripeReady = Boolean(config.stripeSecretKey && /^sk_(live|test)_/.test(config.stripeSecretKey) && config.stripeWebhookSecret && isHttps);
+  const stripeKeyReady = productionRuntime
+    ? /^sk_live_/.test(config.stripeSecretKey)
+    : /^sk_(live|test)_/.test(config.stripeSecretKey);
+  const stripeReady = Boolean(stripeKeyReady && config.stripeWebhookSecret && isHttps);
   const emailMissing = [];
   if (!config.inviteEmailFrom) emailMissing.push("INVITE_EMAIL_FROM");
   if (!config.salesNotificationTo) emailMissing.push("SALES_NOTIFICATION_TO");
@@ -703,7 +710,10 @@ function productionReadiness() {
       key: "stripe",
       label: "Stripe Checkout + webhook",
       ready: stripeReady,
-      missing: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key]).concat(isHttps ? [] : ["APP_BASE_URL must be https://..."]).concat(config.stripeSecretKey && !/^sk_(live|test)_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must look like a Stripe secret key"] : []),
+      missing: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"].filter((key) => !process.env[key])
+        .concat(isHttps ? [] : ["APP_BASE_URL must be https://..."])
+        .concat(config.stripeSecretKey && !/^sk_(live|test)_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must look like a Stripe secret key"] : [])
+        .concat(productionRuntime && /^sk_test_/.test(config.stripeSecretKey) ? ["STRIPE_SECRET_KEY must use Stripe live mode for real customer charges"] : []),
       requiresOwnerAction: true,
       requiresPaymentApproval: true,
       ownerAction: "Create the Stripe product/price, enable live payments when ready, add the webhook endpoint, and store the keys only as backend secrets.",
