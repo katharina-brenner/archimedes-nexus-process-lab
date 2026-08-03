@@ -2245,6 +2245,7 @@ const els = {
   standardsList: document.querySelector("#standardsList"),
   sourcesBoard: document.querySelector("#sourcesBoard"),
   recommendationsBoard: document.querySelector("#recommendationsBoard"),
+  validationBoard: document.querySelector("#validationBoard"),
   twinBoard: document.querySelector("#twinBoard"),
   costStack: document.querySelector("#costStack"),
   costNarrative: document.querySelector("#costNarrative"),
@@ -13569,6 +13570,7 @@ function engineeringExportPackageData(existingReport = null) {
   addTable("Summary", "KPI register", "Decision outputs with base values, observed sensitivity range, units, formula basis and validation need.", engineeringKpiRows(report, sensitivity));
   addTable("Summary", "Calculation audit", "Transparent calculation equations, current inputs, outputs and validation requirements.", calculationAuditRows(report));
   addTable("Evidence", "Output readiness", "Output-specific evidence gates and missing modelling tasks.", report.modelReadinessRows);
+  addTable("Evidence", "Industrial validation", "External evidence gates that distinguish executable functions from calibrated, verified and industrially validated predictions.", report.industrialValidation.rows);
   addTable("Inputs", "Parameter register", "All editable global, biochemical, physical, scale-up and economic parameters with limits and provenance.", engineeringParameterRegisterRows());
   addTable("Inputs", "Parameter intervals", "Hard limits and P10/base P50/P90 screening intervals for uncertainty work.", intervals);
   addTable("Uncertainty", "Sensitivity sweep", "Seven-point one-at-a-time sensitivity results across production, cost, utility and utilization outputs.", sensitivity);
@@ -14168,6 +14170,7 @@ function comprehensiveReport() {
     companyDatasets: companyDatasetRows(),
     modelReadiness: modelReadinessAssessment(),
     modelReadinessRows: modelReadinessRows(),
+    industrialValidation: industrialValidationAssessment(),
     advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
@@ -14238,6 +14241,7 @@ function renderReportsBoard() {
     </section>
     <section class="reports-grid">
       <article class="report-readiness-card"><span>Output readiness register</span><strong>${report.modelReadiness.score}%</strong><p>${report.modelReadiness.missing.length} explicit evidence or modelling gaps across balances, dynamics, scheduling, TEA, LCA, CFD and GMP. Every row states what the current result is useful for and what must still be modelled.</p><button data-download-report="model-readiness-csv" type="button">Download readiness CSV</button><button data-jump-view="recommendations" type="button">Open roadmap</button></article>
+      <article class="report-validation-card"><span>Industrial validation matrix</span><strong>${report.industrialValidation.validated}/${report.industrialValidation.rows.length}</strong><p>Separates executable software from customer calibration, application-specific model validation, external 3D CFD and real PLC/SCADA/historian evidence.</p><button data-download-report="industrial-validation-csv" type="button">Download validation CSV</button><button data-jump-view="validation" type="button">Open center</button></article>
       <article><span>Complete engineering workbook</span><strong>${packageData.workbookSheetCount} sheets</strong><p>Long-form component ledgers, KPI and formula audit, inputs, properties, balances, TEA/LCA, ODE/PDE, scheduling, APS, CFD, factory twin, evidence and version history. An index, data dictionary and QA summary keep the package navigable.</p><button data-download-report="engineering-workbook" type="button">Download XLSX</button></article>
       <article><span>Parameter intervals</span><strong>${intervals.length}</strong><p>Every global, biochemical, scale-up and economic input with hard limits plus low P10, active base P50 and high P90 screening values.</p><button data-download-report="parameter-intervals-csv" type="button">Intervals CSV</button><button data-download-report="tea-intervals-svg" type="button">TEA interval graph</button></article>
       <article><span>Sensitivity analysis</span><strong>${sensitivity.length} runs</strong><p>Seven-point one-at-a-time sweeps across ${sensitivityDrivers.length} key drivers, with calculated effects on cost, throughput, utilities, utilization, duration, titer and yield.</p><button data-download-report="sensitivity-csv" type="button">All runs CSV</button><button data-download-report="sensitivity-svg" type="button">Tornado SVG</button></article>
@@ -14298,6 +14302,7 @@ function pageTitle(view) {
     standards: "Standards Check",
     sources: "Data & Sources",
     recommendations: "Readiness Roadmap",
+    validation: "Validation Center",
     twin: "Factory Twin",
     economics: "TEA + LCA",
     reports: "Reports + Exports",
@@ -14390,6 +14395,146 @@ function modelReadinessAssessment() {
 
 function modelReadinessRows() {
   return buildReadinessRows(modelReadinessAssessment());
+}
+
+const INDUSTRIAL_VALIDITY_BOUNDARY_DE = "Für industrielle Vorhersagequalität fehlen weiterhin kundenspezifische Kalibrierungsdaten, validierte Spezialmodelle für jede einzelne Anwendung, ein externer 3D-CFD-Cluster sowie reale PLC/SCADA-/Historian-Verbindungen. Die neuen Funktionen sind ausführbar, aber diese externen Nachweise entscheiden über die industrielle Validität.";
+
+function industrialValidationRows() {
+  const signals = modelReadinessSignals();
+  const automation = activeAutomationState();
+  const physicalConnections = (automation.connections || []).filter((item) => item.kind !== "simulation");
+  const commissionedConnections = physicalConnections.filter((item) => item.status === "connected" && (
+    item.commissioning?.status === "ready"
+    || (automation.commissioningRuns || []).some((run) => run.status === "ready" || run.status === "passed")
+  ));
+  const highQualityDatasets = (state.datasets || []).filter((item) => Number(item.qualityScore || 0) >= 70);
+  const appliedDatasets = highQualityDatasets.filter((item) => item.appliedAt || (item.appliedChanges || []).length);
+  const cfdExternal = Boolean(signals.cfdBackendComplete && (
+    state.cfdBackendJob?.worker?.status === "connected"
+    || state.cfdBackendJob?.worker?.solver?.status === "connected"
+    || state.cfdBackendJob?.worker?.external === true
+  ));
+  const advancedEvidence = Boolean(state.advancedRun && appliedDatasets.length);
+
+  return [
+    {
+      gateId: "VAL-01",
+      gate: "Customer-specific calibration data",
+      owner: "Process development + data owner",
+      executableCapability: "CSV/XLSX/JSON ingestion, column mapping, quality scoring, parameter application and calibration runs",
+      evidenceStatus: appliedDatasets.length ? "Evidence review required" : highQualityDatasets.length ? "Data uploaded - not applied" : "Missing project evidence",
+      evidenceAvailable: appliedDatasets.length ? appliedDatasets.map((item) => item.name || item.fileName || item.id).join(" | ") : highQualityDatasets.length ? `${highQualityDatasets.length} quality-screened dataset(s)` : "No customer calibration dataset applied",
+      acceptanceCriterion: "Representative experiments or historian batches span the intended operating envelope; units, timestamps, missingness and uncertainty are reviewed; fitted parameters pass hold-out validation.",
+      industriallyValidated: false,
+      reasonNotValidated: "Data ingestion alone is not evidence of predictive accuracy. A controlled calibration and independent validation dataset are required.",
+      action: "Upload and map data",
+      view: "sources",
+    },
+    {
+      gateId: "VAL-02",
+      gate: "Application-specific validated model",
+      owner: "Model owner + subject-matter expert",
+      executableCapability: "Mass/energy balances, ODE/PDE dynamics, unit models, parameter estimation, uncertainty and sensitivity workflows",
+      evidenceStatus: advancedEvidence ? "Executable model - validation pending" : "Generic model basis only",
+      evidenceAvailable: advancedEvidence ? `${state.advancedRun.title || "Advanced modelling run"} with project data` : `${unitMechanisticModels().length} executable unit-operation model(s); no approved application validation record`,
+      acceptanceCriterion: "Model form, equations, parameters, assumptions and numerical tolerances are approved for this product and scale; predictions meet pre-defined error limits on independent data.",
+      industriallyValidated: false,
+      reasonNotValidated: "Each organism, product, unit operation and scale requires its own validated model envelope and documented applicability range.",
+      action: "Open modelling workbench",
+      view: "modelling",
+    },
+    {
+      gateId: "VAL-03",
+      gate: "External 3D CFD cluster",
+      owner: "CFD lead + compute administrator",
+      executableCapability: "Reactor geometry, boundary conditions, turbulence basis, scalar transport, OpenFOAM handoff, residual targets and transient browser screening",
+      evidenceStatus: cfdExternal ? "External result - verification pending" : signals.cfdStarted ? "Browser screening only" : "CFD evidence not run",
+      evidenceAvailable: cfdExternal ? `${state.cfdBackendJob.id || "External CFD job"} completed` : signals.cfdBackendComplete ? "Backend result present without verified external-worker identity" : "No verified external 3D solver result",
+      acceptanceCriterion: "Mesh-independent 3D multiphase solution converges against approved residual and conservation criteria and is compared with mixing-time, kLa, PIV, tracer or probe data.",
+      industriallyValidated: false,
+      reasonNotValidated: "The interactive reactor screen is a design aid, not a validated Navier-Stokes result. Solver verification and experimental validation remain external gates.",
+      action: "Open CFD handoff",
+      view: "cfd",
+    },
+    {
+      gateId: "VAL-04",
+      gate: "PLC / SCADA / historian connection",
+      owner: "Site automation + OT security",
+      executableCapability: "Tag mapping, historian trends, soft sensors, control-loop modes, commissioning checks and auditable control recommendations",
+      evidenceStatus: commissionedConnections.length ? "Connected - site acceptance pending" : physicalConnections.length ? "Physical connector not commissioned" : "Simulator only",
+      evidenceAvailable: commissionedConnections.length ? commissionedConnections.map((item) => item.name).join(" | ") : physicalConnections.length ? `${physicalConnections.length} physical connection(s) registered` : "Axion verified simulator; no real plant telemetry",
+      acceptanceCriterion: "Approved Node IDs and certificates, trusted OT gateway, good tag quality, synchronized timestamps, reviewed interlocks/trips, FAT/SAT evidence and read-only commissioning are complete.",
+      industriallyValidated: false,
+      reasonNotValidated: "A simulated or merely registered connector does not prove site integration, data integrity or safe closed-loop operation.",
+      action: "Open factory connection",
+      view: "twin",
+    },
+  ];
+}
+
+function industrialValidationAssessment() {
+  const rows = industrialValidationRows();
+  const evidenceConnected = rows.filter((item) => !/Missing|only|not run|Generic/i.test(item.evidenceStatus)).length;
+  const validated = rows.filter((item) => item.industriallyValidated).length;
+  return {
+    rows,
+    executable: rows.length,
+    evidenceConnected,
+    validated,
+    score: Math.round((evidenceConnected / Math.max(1, rows.length)) * 100),
+    releaseState: validated === rows.length ? "Industrially validated" : evidenceConnected ? "Evidence build in progress" : "Executable screening model",
+  };
+}
+
+function renderValidationCenter() {
+  if (!els.validationBoard) return;
+  const assessment = industrialValidationAssessment();
+  els.validationBoard.innerHTML = `
+    <section class="validation-hero">
+      <div>
+        <p>Industrial validity boundary</p>
+        <h3>Know exactly what runs, what is evidenced, and what is approved.</h3>
+        <span>${escapeHtml(INDUSTRIAL_VALIDITY_BOUNDARY_DE)}</span>
+      </div>
+      <button class="action-button primary" data-download-report="industrial-validation-csv" type="button">Export validation matrix</button>
+    </section>
+    <section class="validation-status-grid" aria-label="Industrial validation status">
+      <article><span>Executable capabilities</span><strong>${assessment.executable}/${assessment.rows.length}</strong><p>The model functions can be run and exported.</p></article>
+      <article><span>External evidence connected</span><strong>${assessment.evidenceConnected}/${assessment.rows.length}</strong><p>Evidence exists but still needs controlled technical review.</p></article>
+      <article><span>Industrially validated</span><strong>${assessment.validated}/${assessment.rows.length}</strong><p>No gate turns green without application-specific acceptance evidence.</p></article>
+      <article class="validation-release-state"><span>Release state</span><strong>${escapeHtml(assessment.releaseState)}</strong><p>${assessment.score}% of external evidence routes currently have project material.</p></article>
+    </section>
+    <section class="validation-ladder" aria-label="Validation maturity ladder">
+      <div class="is-complete"><b>01</b><span><strong>Executable</strong><small>Equations, simulations and workflows run.</small></span></div>
+      <i></i>
+      <div class="${assessment.evidenceConnected ? "is-active" : ""}"><b>02</b><span><strong>Calibrated</strong><small>Customer evidence is fitted and reconciled.</small></span></div>
+      <i></i>
+      <div><b>03</b><span><strong>Verified</strong><small>Solvers, implementation and numerical tolerances pass.</small></span></div>
+      <i></i>
+      <div><b>04</b><span><strong>Validated</strong><small>Independent evidence meets approved acceptance limits.</small></span></div>
+    </section>
+    <section class="validation-gate-list">
+      ${assessment.rows.map((item, index) => `
+        <article class="validation-gate-card">
+          <header>
+            <div><span>${item.gateId} · Gate ${index + 1}</span><h3>${escapeHtml(item.gate)}</h3></div>
+            <b>${escapeHtml(item.evidenceStatus)}</b>
+          </header>
+          <div class="validation-gate-body">
+            <div><span>Runs now</span><p>${escapeHtml(item.executableCapability)}</p></div>
+            <div><span>Project evidence</span><p>${escapeHtml(item.evidenceAvailable)}</p></div>
+            <div><span>Acceptance criterion</span><p>${escapeHtml(item.acceptanceCriterion)}</p></div>
+            <div><span>Why it is not validated yet</span><p>${escapeHtml(item.reasonNotValidated)}</p></div>
+          </div>
+          <footer><span>Owner · ${escapeHtml(item.owner)}</span><button data-jump-view="${escapeAttr(item.view)}" type="button">${escapeHtml(item.action)}</button></footer>
+        </article>
+      `).join("")}
+    </section>
+    <section class="validation-handoff">
+      <div><span>Controlled handoff</span><h3>Required before an industrial prediction claim</h3><p>Freeze the model version, approve the intended-use statement, define acceptance criteria before looking at validation results, retain raw evidence, document deviations, and obtain independent discipline review.</p></div>
+      <div class="validation-handoff-actions"><button data-jump-view="projects" type="button">Freeze project version</button><button data-jump-view="recommendations" type="button">Review all model gaps</button><button data-jump-view="reports" type="button">Build evidence package</button></div>
+    </section>
+  `;
 }
 
 function readinessStatusLabel(status) {
@@ -15430,6 +15575,7 @@ function setView(view) {
   if (view === "cfd") renderCfdBoard();
   if (view === "reports") renderReportsBoard();
   if (view === "recommendations") renderRecommendations();
+  if (view === "validation") renderValidationCenter();
   if (view === "twin") {
     renderTwinWorkspace();
     refreshAutomationState({ silent: true });
@@ -15607,6 +15753,8 @@ async function handleReportDownload(type) {
     downloadJson(`${exportFilenameBase()}-complete-process-model.json`, { report: comprehensiveReport(), editableModel: exportCurrentModelState() }, "Complete process model");
   } else if (type === "model-readiness-csv") {
     downloadCsv(`${state.template}-model-readiness.csv`, modelReadinessRows(), "Output-specific model readiness");
+  } else if (type === "industrial-validation-csv") {
+    downloadCsv(`${state.template}-industrial-validation-matrix.csv`, industrialValidationRows(), "Industrial validation evidence matrix");
   } else if (type === "balances-csv") {
     downloadCsv(`${state.template}-mass-energy-balances.csv`, balanceRows());
   } else if (type === "costs-csv") {
@@ -19039,6 +19187,7 @@ function renderAll() {
   renderStandards();
   renderSources();
   renderRecommendations();
+  renderValidationCenter();
   renderTwinWorkspace();
   renderEconomics();
   renderReportsBoard();
