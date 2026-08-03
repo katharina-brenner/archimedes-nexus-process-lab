@@ -194,7 +194,7 @@ function styleStructuredSheet(worksheet, table, rows, headers, metadata) {
   });
   worksheet.pageSetup = { orientation: headers.length > 8 ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
   worksheet.headerFooter.oddHeader = `&LAxion Process OS&C${String(table.sheet || "Engineering data")}&R${metadata.exportDate || ""}`;
-  worksheet.headerFooter.oddFooter = "&Lneunzigzehn UG&CPage &P of &N&RScreening model - review assumptions";
+  worksheet.headerFooter.oddFooter = "&LAxion Process OS&CPage &P of &N&RScreening model - review assumptions";
   worksheet.properties.defaultRowHeight = 18;
 }
 
@@ -227,7 +227,7 @@ export async function buildEngineeringWorkbook(tables, metadata = {}) {
   workbook.subject = metadata.exportKind || "Detailed engineering model export";
   workbook.title = `${metadata.scenario || "Axion model"} engineering package`;
   workbook.description = metadata.modelBasis || "Process engineering export";
-  workbook.company = "neunzigzehn UG";
+  workbook.company = metadata.exportProduct || "Axion Process OS";
   workbook.calcProperties.fullCalcOnLoad = true;
 
   const usedNames = new Set();

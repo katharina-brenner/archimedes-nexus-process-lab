@@ -41,6 +41,9 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
 
   const parsed = new ExcelJS.Workbook();
   await parsed.xlsx.load(Buffer.from(workbook));
+  assert.equal(parsed.creator, "Axion Process OS");
+  assert.equal(parsed.company, "Axion Process OS");
+  assert.doesNotMatch(Buffer.from(workbook).toString("utf8"), /neunzigzehn UG/i);
   assert.deepEqual(parsed.worksheets.map((sheet) => sheet.name), [
     "Workbook index",
     "Data dictionary",
@@ -50,6 +53,9 @@ test("engineering workbook contains formatted long-form worksheets", async () =>
   ]);
 
   const sensitivity = parsed.getWorksheet("Sensitivity sweep");
+  assert.match(sensitivity.headerFooter.oddHeader, /Axion Process OS/);
+  assert.match(sensitivity.headerFooter.oddFooter, /Axion Process OS/);
+  assert.doesNotMatch(sensitivity.headerFooter.oddFooter, /neunzigzehn UG/i);
   assert.equal(sensitivity.getCell("A1").value, "Sensitivity sweep");
   assert.equal(sensitivity.getCell("A5").value, "run");
   assert.equal(sensitivity.getCell("A6").value, 1);
