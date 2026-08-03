@@ -76,3 +76,19 @@ test("sitemap and server metadata cover high-intent engineering routes", async (
     assert.match(bootstrap, new RegExp(`"?${route}"?`));
   }
 });
+
+test("public positioning sells an evidence-led engineering decision package", async () => {
+  const [html, app] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /Best fit now/);
+  assert.match(html, /Precision fermentation, cultivated products, industrial biotechnology/);
+  assert.match(html, /One reviewable engineering decision package/);
+  assert.match(html, /Validated models, dedicated infrastructure, and implementation/);
+  assert.doesNotMatch(html, /SuperPro is probably|3 bis 6 Mio|Umsatzbandbreite/);
+  assert.match(app, /function decisionPackageMarkup/);
+  for (const label of ["Process basis", "Scale-up envelope", "Capacity plan", "Investment model", "Environmental model", "Transport + validation"]) {
+    assert.ok(app.includes(label), `missing decision-package label: ${label}`);
+  }
+});

@@ -26,6 +26,7 @@ The front of the application now works like a company-grade product entry flow:
 - Axion automatically maps the brief to the closest process model
 - The detailed workspace then opens with flowsheets, equipment, balances, CFD, boundaries, economics, sources, recommendations, and downloads
 - The download center exports detailed LCA inventory CSVs, LCA impact summaries, TEA-ready cost tables, and downloadable SVG visualizations for plant architecture, LCA flows, and cost stacks
+- The Overview assembles a six-part engineering decision package covering the process basis, scale-up envelope, capacity plan, investment model, environmental model, and transport/validation evidence, with explicit readiness scores and open evidence gaps
 - The Process Builder can be opened directly from Twin OS and automatically fits the full process canvas
 - Platform, Workflow, and Ecosystem pages include concrete tool examples for mAb, cultured meat, penicillin, LCA/TEA handoff, SCADA/historian, supplier quotes, and gPROMS-style modelling paths
 - Real-time digital-twin telemetry cards show live DO, pH, OTR margin, mixing time, heat load, and mass-closure signals in Overview, Simulation, and CFD

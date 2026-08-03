@@ -14161,6 +14161,53 @@ function outputValidityMarkup(outputItem, title) {
   `;
 }
 
+function decisionPackageMarkup(readiness) {
+  const packageItems = [
+    { id: "balances", number: "01", label: "Process basis", view: "flowsheet" },
+    { id: "dynamic", number: "02", label: "Scale-up envelope", view: "simulation" },
+    { id: "schedule", number: "03", label: "Capacity plan", view: "simulation" },
+    { id: "tea", number: "04", label: "Investment model", view: "economics" },
+    { id: "lca", number: "05", label: "Environmental model", view: "reports" },
+    { id: "cfd", number: "06", label: "Transport + validation", view: "cfd" },
+  ];
+  const outputsById = new Map(readiness.outputs.map((item) => [item.id, item]));
+  return `
+    <section class="decision-package">
+      <header>
+        <div>
+          <span>Engineering decision package</span>
+          <h3>Six connected results. One evidence trail.</h3>
+          <p>Each result states what it can support now, what it cannot support yet, and which evidence must be modelled next.</p>
+        </div>
+        <button data-jump-view="reports" type="button">Open complete export</button>
+      </header>
+      <div class="decision-package-grid">
+        ${packageItems.map((packageItem) => {
+          const outputItem = outputsById.get(packageItem.id);
+          const status = outputItem?.status || "blocked";
+          const missingCount = outputItem?.missing?.length || 0;
+          return `
+            <button class="decision-package-card ${readinessStatusClass(status)}" data-jump-view="${escapeAttr(packageItem.view)}" type="button">
+              <b>${packageItem.number}</b>
+              <span>
+                <strong>${escapeHtml(packageItem.label)}</strong>
+                <small>${escapeHtml(outputItem?.title || "Model result")}</small>
+              </span>
+              <em>${outputItem?.score || 0}%</em>
+              <i>${missingCount ? `${missingCount} evidence ${missingCount === 1 ? "gap" : "gaps"}` : "Review baseline ready"}</i>
+            </button>
+          `;
+        }).join("")}
+      </div>
+      <footer>
+        <span><i class="is-screening"></i><b>Screening</b> Compare options</span>
+        <span><i class="is-calibrated"></i><b>Calibrated</b> Company data applied</span>
+        <span><i class="is-ready"></i><b>Decision-ready</b> Evidence gates passed</span>
+      </footer>
+    </section>
+  `;
+}
+
 function renderOverview() {
   const data = metrics();
   const readiness = modelReadinessAssessment();
@@ -14183,6 +14230,7 @@ function renderOverview() {
       <button class="action-button primary" data-jump-view="flowsheet" type="button">Open Process Builder</button>
     </section>
     ${modelReadinessSummaryMarkup(readiness, { compact: true })}
+    ${decisionPackageMarkup(readiness)}
     <section class="overview-grid">
       <article>
         <span>Equipment objects</span>
