@@ -138,6 +138,29 @@ create table if not exists public.axion_subscription_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.axion_access_grants (
+  id uuid primary key default gen_random_uuid(),
+  external_id text not null unique,
+  grant_type text not null default 'founding_customer' check (grant_type in ('founding_customer', 'partner', 'internal')),
+  slot_number integer check (slot_number between 1 and 5),
+  email text not null unique,
+  username text not null unique,
+  display_name text not null,
+  company text not null default '',
+  plan_id text not null check (plan_id in ('academic', 'professional', 'team', 'enterprise')),
+  status text not null default 'active' check (status in ('active', 'blocked', 'payment_required', 'converted')),
+  customer_number text not null,
+  contract_number text not null,
+  converted_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists axion_access_grants_active_slot_idx
+on public.axion_access_grants (slot_number)
+where status <> 'converted';
+
 create index if not exists axion_entitlement_overrides_contract_idx
   on public.axion_entitlement_overrides (contract_id)
   where contract_id is not null;
@@ -176,6 +199,10 @@ for each row execute function public.axion_set_updated_at();
 
 drop trigger if exists axion_entitlement_overrides_updated_at on public.axion_entitlement_overrides;
 create trigger axion_entitlement_overrides_updated_at before update on public.axion_entitlement_overrides
+for each row execute function public.axion_set_updated_at();
+
+drop trigger if exists axion_access_grants_updated_at on public.axion_access_grants;
+create trigger axion_access_grants_updated_at before update on public.axion_access_grants
 for each row execute function public.axion_set_updated_at();
 
 insert into public.axion_plan_entitlements (plan_id, feature_key, feature_label, enabled, limit_value)
@@ -252,6 +279,7 @@ alter table public.axion_customer_users enable row level security;
 alter table public.axion_plan_entitlements enable row level security;
 alter table public.axion_entitlement_overrides enable row level security;
 alter table public.axion_subscription_events enable row level security;
+alter table public.axion_access_grants enable row level security;
 
 drop policy if exists axion_backend_only on public.axion_state;
 create policy axion_backend_only on public.axion_state for all to anon, authenticated using (false) with check (false);
@@ -269,16 +297,20 @@ drop policy if exists axion_backend_only on public.axion_entitlement_overrides;
 create policy axion_backend_only on public.axion_entitlement_overrides for all to anon, authenticated using (false) with check (false);
 drop policy if exists axion_backend_only on public.axion_subscription_events;
 create policy axion_backend_only on public.axion_subscription_events for all to anon, authenticated using (false) with check (false);
+drop policy if exists axion_backend_only on public.axion_access_grants;
+create policy axion_backend_only on public.axion_access_grants for all to anon, authenticated using (false) with check (false);
 
 -- The browser never receives these tables directly. All reads and writes pass
 -- through the Node backend, which keeps the service-role secret server-side.
 revoke all on table public.axion_state, public.axion_documents, public.axion_customers,
   public.axion_contracts, public.axion_customer_users, public.axion_plan_entitlements,
   public.axion_entitlement_overrides, public.axion_subscription_events from anon, authenticated;
+revoke all on table public.axion_access_grants from anon, authenticated;
 grant select, insert, update, delete on table public.axion_state, public.axion_documents,
   public.axion_customers, public.axion_contracts, public.axion_customer_users,
   public.axion_plan_entitlements, public.axion_entitlement_overrides,
   public.axion_subscription_events to service_role;
+grant select, insert, update, delete on table public.axion_access_grants to service_role;
 
 -- Some starter projects contain a helper RPC that can change RLS state. It is
 -- not part of Axion and must never be callable through the public REST API.
