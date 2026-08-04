@@ -7,7 +7,7 @@
     <title>Bioprocess Engineering Software for Process Development &amp; MSAT | Axion</title>
     <meta name="description" content="Browser-based bioprocess engineering for process development, MSAT, plant engineering and TEA/LCA teams: flowsheets, dynamics, scheduling, CFD screening, economics, sustainability and engineering exports." />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
-    <meta name="theme-color" content="#071827" />
+    <meta name="theme-color" content="#f4f4f0" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="./assets/axion-favicon.svg?v=20260729" />
     <link rel="shortcut icon" href="./assets/axion-favicon.svg?v=20260729" />
     <link rel="canonical" href="https://ax-i-on.com/" />
@@ -23,6 +23,7 @@
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <link rel="stylesheet" href="./styles.css?v=20260803-payments-faq-v1" />
     <link rel="stylesheet" href="./axion-design-system.css?v=20260803-clean-motion-v1" />
+    <link rel="stylesheet" href="./axion-editorial.css?v=20260804-studio-v1" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -90,13 +91,14 @@
       }
     </script>
   </head>
-  <body class="locked" data-design-version="20260803-clean-motion-v1">
+  <body class="locked" data-design-version="20260804-studio-v1">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
       <div class="public-site">
         <header class="public-nav" aria-label="Axion front page navigation">
           <button id="publicLogo" class="public-brand" type="button">
             <span class="brand-mark technical-logo" aria-label="Axion mark"><span></span></span>
             <strong>Axion Process OS</strong>
+            <span class="public-brand-note">Bioprocess engineering, connected.</span>
           </button>
           <nav>
             <a href="./product" data-public-target="publicPlatform">Product</a>
@@ -111,534 +113,151 @@
         </header>
 
         <main class="public-scroll">
-          <section id="publicHome" class="public-hero public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
-            <div class="public-clarity-home">
-              <section class="clarity-hero" aria-label="Axion Process OS">
-                <img src="./assets/photography/weihenstephan-kombikeller-1600.jpg" alt="Large stainless-steel industrial process installation at Bayerische Staatsbrauerei Weihenstephan" width="1600" height="1066" fetchpriority="high" />
-                <div class="clarity-hero-copy">
-                  <p>Axion Process OS</p>
-                  <h1>Make the bioprocess investment decision in one model.</h1>
-                  <span>For precision fermentation, cultivated products, and modern biomanufacturing: connect process design, scale-up, facility capacity, TEA, LCA, and validation evidence.</span>
-                  <div class="clarity-hero-actions">
-                    <button class="public-primary" type="button" data-public-target="publicPilot">Request a technical pilot</button>
-                    <button id="openLoginHero" class="public-secondary" type="button">Open workspace</button>
-                    <a href="#product-preview">See the product</a>
-                  </div>
-                </div>
-                <div class="clarity-hero-scope">
-                  <span>Process design</span>
-                  <span>Simulation</span>
-                  <span>Scheduling</span>
-                  <span>TEA + LCA</span>
-                </div>
-                <small>Real industrial process installation · Weihenstephan</small>
-              </section>
-
-              <section class="clarity-audience" aria-label="Who should use Axion Process OS">
-                <header>
-                  <p>Who it is for</p>
-                  <h2>Built for teams turning biology into an operable factory.</h2>
-                  <span>Axion is most valuable when process design, scale-up, facility operations, and economics must agree on the same assumptions.</span>
-                </header>
-                <div class="clarity-role-grid">
-                  <article>
-                    <span>Process development</span>
-                    <h3>Design and scale the process.</h3>
-                    <p>Build batch, fed-batch, perfusion, or continuous routes; test yields, kinetics, media strategy, oxygen transfer, recovery, and physical limits.</p>
-                    <strong>Primary result</strong>
-                    <small>An editable process architecture with balances, boundaries, sensitivity ranges, and scale-up gaps.</small>
-                    <button type="button" data-public-detail="target-rd">See process-development workflow</button>
-                  </article>
-                  <article>
-                    <span>MSAT + manufacturing</span>
-                    <h3>Make the process operable.</h3>
-                    <p>Plan tech transfer, campaigns, equipment reuse, CIP/SIP, hold times, shared utilities, staffing, bottlenecks, and plant-data integration.</p>
-                    <strong>Primary result</strong>
-                    <small>A facility schedule, capacity envelope, resource conflicts, and a traceable readiness plan.</small>
-                    <button type="button" data-public-detail="target-msat">See manufacturing workflow</button>
-                  </article>
-                  <article>
-                    <span>Plant + project engineering</span>
-                    <h3>Define the facility concept.</h3>
-                    <p>Compare equipment trains, sizes, parallelization, utilities, cleaning systems, heat recovery, waste treatment, CAPEX, and facility fit.</p>
-                    <strong>Primary result</strong>
-                    <small>A reviewable whole-plant concept with PFD, equipment register, duties, utilities, and investment assumptions.</small>
-                    <button type="button" data-public-detail="target-engineering">See plant-engineering workflow</button>
-                  </article>
-                  <article>
-                    <span>TEA + LCA + strategy</span>
-                    <h3>Choose the defensible option.</h3>
-                    <p>Quantify COGS, CAPEX, water, energy, waste, emissions, uncertainty, and the effect of titer, recovery, media, utilization, and scale.</p>
-                    <strong>Primary result</strong>
-                    <small>Long-form decision datasets, sensitivity analysis, scenario comparisons, and an explicit evidence trail.</small>
-                    <button type="button" data-public-detail="target-tea">See decision workflow</button>
-                  </article>
-                </div>
-                <div class="clarity-fit-note">
-                  <div><b>Best fit now</b><span>Precision fermentation, cultivated products, industrial biotechnology, enzymes, and the engineering teams designing these facilities.</span></div>
-                  <div><b>Also supported</b><span>Biopharma, CDMOs, food processing, and multi-product sites that need concept design, scale-up, facility fit, COGS, and sustainability decisions.</span></div>
-                </div>
-              </section>
-
-              <section class="clarity-decisions" aria-label="Decisions supported by Axion">
-                <header>
-                  <p>What it solves</p>
-                  <h2>Start with the decision, not the module.</h2>
-                </header>
-                <div class="clarity-decision-table" role="table" aria-label="Engineering question to Axion output">
-                  <div class="clarity-decision-head" role="row"><span role="columnheader">Engineering question</span><span role="columnheader">Axion connects</span><span role="columnheader">Decision output</span></div>
-                  <article role="row"><strong role="cell">Can this process scale without losing productivity or quality?</strong><span role="cell">ODE/PDE kinetics, mass transfer, feeds, working volume, heat, CFD screening, biochemical limits</span><b role="cell">Scale-up or scale-out recommendation with operating envelope and missing validation work</b></article>
-                  <article role="row"><strong role="cell">Can this facility meet the required annual demand?</strong><span role="cell">Batch scheduling, equipment states, CIP/SIP, hold times, labor, utilities, storage, maintenance</span><b role="cell">Throughput, utilization, bottlenecks, campaign plan, and required equipment changes</b></article>
-                  <article role="row"><strong role="cell">Which process route should we fund or transfer?</strong><span role="cell">Yield, titer, recovery, materials, consumables, CAPEX, OPEX, uncertainty, NPV and sensitivity</span><b role="cell">Comparable scenarios with cost ranges, dominant drivers, and traceable assumptions</b></article>
-                  <article role="row"><strong role="cell">What evidence is still missing before design review?</strong><span role="cell">Plant data, literature, supplier quotes, standards, SOPs, model validity, source ownership</span><b role="cell">Output-specific readiness score and a prioritized engineering worklist</b></article>
-                </div>
-              </section>
-
-              <section class="clarity-decision-package" aria-label="Axion engineering decision package">
-                <header>
-                  <p>What the team receives</p>
-                  <h2>One reviewable engineering decision package.</h2>
-                  <span>Axion does not sell a collection of disconnected modules. It keeps the six results required for a defensible plant decision together, with assumptions, ranges, sources, and open validation work.</span>
-                </header>
-                <div class="clarity-package-grid">
-                  <article><b>01</b><div><h3>Process architecture</h3><p>Editable PFD, equipment duties, material and utility streams, recycle, cleaning, and whole-plant boundaries.</p></div></article>
-                  <article><b>02</b><div><h3>Scale-up envelope</h3><p>Batch, fed-batch, perfusion, ODE/PDE dynamics, oxygen, heat, metabolites, and physical operating limits.</p></div></article>
-                  <article><b>03</b><div><h3>Capacity plan</h3><p>Equipment reuse, campaign schedule, CIP/SIP, rooms, labor, utilities, holds, bottlenecks, and annual output.</p></div></article>
-                  <article><b>04</b><div><h3>Investment model</h3><p>CAPEX, OPEX, COGS, material burden, uncertainty ranges, sensitivities, NPV, and scenario comparison.</p></div></article>
-                  <article><b>05</b><div><h3>Environmental model</h3><p>Energy, water, materials, waste, emissions, functional unit, system boundary, and LCA data quality.</p></div></article>
-                  <article><b>06</b><div><h3>Evidence record</h3><p>Company data, literature, supplier quotes, model versions, confidence, validation status, and the exact work still missing.</p></div></article>
-                </div>
-                <div class="clarity-evidence-scale" aria-label="Model evidence levels">
-                  <span><i></i><b>Screening</b> Generated assumptions for option comparison</span>
-                  <span><i></i><b>Calibrated</b> Company data fitted with uncertainty</span>
-                  <span><i></i><b>Decision-ready</b> Evidence gates passed and review baseline frozen</span>
-                </div>
-              </section>
-
-              <section id="how-it-works" class="clarity-workflow" aria-label="How Axion works">
-                <header>
-                  <p>One model from concept to decision</p>
-                  <h2>Describe. Build. Refine.</h2>
-                </header>
+          <section id="publicHome" class="public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
+            <div class="editorial-home">
+              <section class="editorial-intro" aria-label="Axion introduction">
                 <div>
-                  <article><span>01</span><h3>Describe the product</h3><p>Define product, organism, scale, quality target, and available plant data.</p></article>
-                  <article><span>02</span><h3>Build the process</h3><p>Connect equipment, streams, utilities, cleaning, recycle, and production schedules.</p></article>
-                  <article><span>03</span><h3>Refine the decision</h3><p>Resolve balances, physical boundaries, capacity, economics, and environmental impact.</p></article>
+                  <p>Axion is where process development, MSAT, and plant engineering turn biology into an operable factory.</p>
+                  <span>One connected engineering model. From process brief to investment decision.</span>
+                </div>
+                <div class="editorial-intro-actions">
+                  <button class="public-primary" type="button" data-public-target="publicPilot">Request a pilot</button>
+                  <button id="openLoginHero" class="public-secondary" type="button">Open workspace</button>
                 </div>
               </section>
 
-              <section id="product-preview" class="clarity-product" aria-label="Axion software screenshots">
-                <header>
-                  <p>Inside Axion</p>
-                  <h2>The engineering model stays visible.</h2>
-                  <span>These are current views from the working application, not concept renders.</span>
-                </header>
-                <figure class="clarity-product-primary">
-                  <img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion Flowsheet Studio with equipment library, process units, biochemical stream labels and connected plant sections" width="1280" height="720" loading="lazy" />
+              <section class="editorial-showcase" aria-label="Axion process and product">
+                <figure class="editorial-case editorial-case-plant">
+                  <div class="editorial-case-media">
+                    <img src="./assets/photography/weihenstephan-kombikeller-1600.jpg" alt="Large stainless-steel industrial process installation at Bayerische Staatsbrauerei Weihenstephan" width="1600" height="1066" fetchpriority="high" />
+                    <div class="editorial-plant-signal" aria-hidden="true">
+                      <span>Media</span><i></i><span>Seed</span><i></i><span>BR</span><i></i><span>DSP</span>
+                    </div>
+                  </div>
                   <figcaption>
-                    <div><span>Flowsheet Studio</span><strong>Build and connect the complete process.</strong></div>
-                    <p>Keep upstream, bioreactors, downstream, filling, CIP/SIP, utilities, recycle, heat recovery, instrumentation, and material streams on one editable PFD-style canvas.</p>
+                    <div><strong>Industrial biomanufacturing</strong><span>Whole-plant architecture</span></div>
+                    <p>Process · utilities · cleaning · automation</p>
                   </figcaption>
                 </figure>
-                <div class="clarity-product-grid">
-                  <figure>
-                    <img src="./assets/product/axion-plant-overview.png" alt="Axion Plant Overview with equipment, stream, physical boundary and scientific source status" width="1280" height="720" loading="lazy" />
-                    <figcaption><span>Plant Overview</span><strong>See design completeness and open issues.</strong></figcaption>
-                  </figure>
-                  <figure>
-                    <img src="./assets/product/axion-tea-lca.png" alt="Axion TEA and LCA workspace showing media, material, facility, labour and utility cost drivers" width="1280" height="720" loading="lazy" />
-                    <figcaption><span>TEA + LCA</span><strong>Understand cost and environmental drivers.</strong></figcaption>
-                  </figure>
-                </div>
+                <figure class="editorial-case editorial-case-product">
+                  <div class="editorial-case-media">
+                    <img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion Flowsheet Studio with equipment library and connected bioprocess plant sections" width="1280" height="720" fetchpriority="high" />
+                  </div>
+                  <figcaption>
+                    <div><strong>Axion Process OS</strong><span>Flowsheet Studio</span></div>
+                    <button type="button" data-public-target="publicPlatform">Explore the product</button>
+                  </figcaption>
+                </figure>
               </section>
 
-              <section class="clarity-industry" aria-label="Industrial application context">
+              <section class="editorial-statement" aria-label="Axion value proposition">
+                <p>We make the complete engineering decision visible.</p>
+                <h1>Design the process. Prove the scale. Operate the plant.</h1>
+                <a href="#product-preview">See how the model stays connected</a>
+              </section>
+
+              <section class="editorial-audience" aria-label="Who should use Axion Process OS">
                 <header>
-                  <p>Built for industrial facilities</p>
-                  <h2>Model the process behind the stainless steel.</h2>
+                  <p>Built for the people who have to make it real</p>
+                  <h2>One model, four engineering perspectives.</h2>
                 </header>
-                <div>
-                  <figure>
-                    <img src="./assets/photography/industrial-bioprocess-hall.jpg" alt="Real industrial bioprocess hall with multiple stainless-steel vessels and process skids" width="2200" height="1467" loading="lazy" />
-                    <figcaption>Facility architecture</figcaption>
+                <div class="editorial-role-list">
+                  <article>
+                    <span>01</span><div><h3>Process development</h3><p>Build batch, fed-batch, perfusion, and continuous routes. Test kinetics, feeds, oxygen transfer, recovery, and scale-up limits.</p></div><button type="button" data-public-detail="target-rd">View workflow</button>
+                  </article>
+                  <article>
+                    <span>02</span><div><h3>MSAT + manufacturing</h3><p>Plan campaigns, equipment reuse, CIP/SIP, hold times, utilities, operators, bottlenecks, and tech transfer.</p></div><button type="button" data-public-detail="target-msat">View workflow</button>
+                  </article>
+                  <article>
+                    <span>03</span><div><h3>Plant engineering</h3><p>Compare equipment trains, parallelization, utilities, cleaning, heat recovery, wastewater, CAPEX, and facility fit.</p></div><button type="button" data-public-detail="target-engineering">View workflow</button>
+                  </article>
+                  <article>
+                    <span>04</span><div><h3>TEA + LCA</h3><p>Quantify materials, media, COGS, CAPEX, water, energy, emissions, uncertainty, NPV, and sensitivity.</p></div><button type="button" data-public-detail="target-tea">View workflow</button>
+                  </article>
+                </div>
+                <div class="editorial-fit">
+                  <div><b>Best fit now</b><span>Precision fermentation, cultivated products, industrial biotechnology, enzymes, and the engineering teams designing these facilities.</span></div>
+                  <div><b>Also supported</b><span>Biopharma, CDMOs, food processing, and multi-product production sites.</span></div>
+                </div>
+              </section>
+
+              <section id="product-preview" class="editorial-product" aria-label="Current Axion software views">
+                <header>
+                  <p>Current product, not concept art</p>
+                  <h2>The plant, the physics, and the decision stay in view.</h2>
+                </header>
+                <div class="editorial-product-grid">
+                  <figure class="editorial-product-wide">
+                    <img src="./assets/product/axion-flowsheet-workspace.png" alt="Current Axion process flowsheet and equipment workspace" width="1280" height="720" loading="lazy" />
+                    <figcaption><strong>Build the complete process</strong><span>Equipment, streams, utilities, cleaning, recycle, instrumentation, and biochemical context.</span></figcaption>
                   </figure>
                   <figure>
-                    <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real automated bioprocess plant with stainless-steel reactors, hygienic piping and control panels" width="1600" height="1200" loading="lazy" />
-                    <figcaption>Production equipment and automation</figcaption>
+                    <img src="./assets/product/axion-plant-overview.png" alt="Current Axion Plant Overview with equipment, streams, boundaries, and source status" width="1280" height="720" loading="lazy" />
+                    <figcaption><strong>Review readiness</strong><span>See what is modelled, evidenced, and still missing.</span></figcaption>
+                  </figure>
+                  <figure>
+                    <img src="./assets/product/axion-tea-lca.png" alt="Current Axion TEA and LCA view with cost drivers and materials" width="1280" height="720" loading="lazy" />
+                    <figcaption><strong>Defend the investment</strong><span>Cost, environmental impact, ranges, and sensitivity.</span></figcaption>
                   </figure>
                 </div>
-                <p>Axion links process logic to equipment duty, schedules, utilities, cleaning, physical limits, live plant data, and decision-ready exports.</p>
               </section>
 
-              <section class="clarity-capabilities" aria-label="Core Axion capabilities">
-                <div><span>Design</span><strong>Flowsheets, equipment, streams, equations</strong></div>
-                <div><span>Simulate</span><strong>Balances, dynamics, CFD, scheduling</strong></div>
-                <div><span>Decide</span><strong>Capacity, TEA, LCA, uncertainty</strong></div>
-                <div><span>Handoff</span><strong>Reports, data, versions, audit trail</strong></div>
+              <section id="how-it-works" class="editorial-workflow" aria-label="How Axion works">
+                <header><p>One system from concept to decision</p><h2>Describe. Build. Refine.</h2></header>
+                <ol>
+                  <li><span>01</span><div><h3>Describe the product</h3><p>Define biology, scale, quality target, facility context, and available company data.</p></div></li>
+                  <li><span>02</span><div><h3>Build the production system</h3><p>Connect equipment, streams, utilities, cleaning, recycle, schedules, and controls.</p></div></li>
+                  <li><span>03</span><div><h3>Refine the decision</h3><p>Resolve balances, ODE/PDE dynamics, physical boundaries, capacity, economics, and environmental impact.</p></div></li>
+                </ol>
               </section>
 
-              <section class="clarity-home-faq" aria-label="Frequently asked questions about Axion Process OS">
-                <header><p>Quick answers</p><h2>Know what Axion does before you open it.</h2></header>
+              <section class="editorial-decisions" aria-label="Engineering decision package">
+                <header><p>What the team receives</p><h2>One reviewable engineering decision package.</h2></header>
+                <div>
+                  <article><b>01</b><h3>Process architecture</h3><p>Editable PFD, equipment duties, material and utility streams, cleaning, recycle, and plant boundaries.</p></article>
+                  <article><b>02</b><h3>Scale-up envelope</h3><p>Batch modes, ODE/PDE dynamics, oxygen, heat, metabolites, and physical operating limits.</p></article>
+                  <article><b>03</b><h3>Capacity plan</h3><p>Campaigns, CIP/SIP, resources, holds, bottlenecks, utilization, and annual output.</p></article>
+                  <article><b>04</b><h3>Investment model</h3><p>CAPEX, OPEX, COGS, uncertainty, sensitivity, NPV, and scenario comparison.</p></article>
+                  <article><b>05</b><h3>Environmental model</h3><p>Energy, water, materials, waste, emissions, functional unit, and data quality.</p></article>
+                  <article><b>06</b><h3>Evidence record</h3><p>Company data, literature, sources, confidence, versions, and explicit validation gaps.</p></article>
+                </div>
+                <footer><span><i></i>Screening</span><span><i></i>Calibrated</span><span><i></i>Decision-ready</span></footer>
+              </section>
+
+              <section class="editorial-mission" aria-label="Axion mission">
+                <p>Our mission</p>
+                <h2>Make biomanufacturing design understandable before it becomes expensive.</h2>
+                <span>Axion turns scattered process knowledge into a living engineering model: visual enough for strategy, rigorous enough for scientists, and structured enough for engineering review.</span>
+              </section>
+
+              <section class="editorial-faq" aria-label="Frequently asked questions about Axion Process OS">
+                <header><p>Before you open the workspace</p><h2>Know what Axion does before you open it.</h2></header>
                 <div class="public-faq-list">
-                  <details><summary>Who should use Axion Process OS?</summary><p>Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA and LCA teams that need one traceable model for process design, facility capacity, cost, environmental impact, and technical review.</p></details>
-                  <details><summary>What do I receive from a model?</summary><p>An editable process flowsheet, stream and equipment data, balances, dynamic profiles, schedule and capacity results, TEA/LCA datasets, sensitivities, source records, validation gaps, and a combined engineering export.</p></details>
-                  <details><summary>Can we use our own plant and experimental data?</summary><p>Yes. Company-owned CSV and JSON datasets, historian exports, assays, supplier quotes, schedules, and model parameters can be mapped to the project with source, unit, confidence, and version context.</p></details>
-                  <details><summary>Is every result automatically validated?</summary><p>No. Axion separates screening, calibrated, and decision-ready evidence. Safety-critical, regulated, scale-up, and investment decisions still require agreed acceptance criteria and qualified engineering review.</p></details>
-                  <details><summary>How should a team start?</summary><p>Use one representative process and one real decision question. A technical pilot reconciles the process basis, required data, outputs, and acceptance criteria before a wider rollout.</p></details>
+                  <details><summary>Who should use Axion Process OS?</summary><p>Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA, and LCA teams that need one traceable model for process design, capacity, cost, environmental impact, and technical review.</p></details>
+                  <details><summary>What comes out of a model?</summary><p>An editable flowsheet, equipment and stream data, balances, dynamic profiles, schedules, capacity results, TEA/LCA datasets, sensitivities, source records, validation gaps, and engineering exports.</p></details>
+                  <details><summary>Can we use company data?</summary><p>Yes. Experimental data, historian exports, assays, supplier quotes, schedules, and parameters can be mapped with source, unit, confidence, and version context.</p></details>
+                  <details><summary>Is every result automatically validated?</summary><p>No. Axion distinguishes screening, calibrated, and decision-ready evidence. Regulated, safety-critical, and investment decisions still require qualified review and agreed acceptance criteria.</p></details>
                 </div>
-                <a class="public-text-link" href="./faq" data-public-target="publicFaq">Read all frequently asked questions</a>
+                <a href="./faq" data-public-target="publicFaq">Read the full FAQ</a>
               </section>
 
-              <section class="clarity-cta">
-                <div>
-                  <p>Axion Process OS</p>
-                  <h2>Turn a process idea into an editable plant model.</h2>
-                </div>
-                <button class="public-primary" type="button" data-public-target="publicPilot">Evaluate your process</button>
+              <section class="editorial-cta">
+                <div><p>Build the model behind the plant.</p><h2>Bring one real process decision.</h2></div>
+                <button class="public-primary" type="button" data-public-target="publicPilot">Request a technical pilot</button>
               </section>
 
-              <footer class="clarity-footer">
-                <span>Axion Process OS</span>
-                <div>
-                  <a href="./security" data-public-target="publicReadiness">Security</a>
-                  <a href="./superpro-designer-alternative" data-public-target="publicComparison">SuperPro alternative</a>
+              <footer class="editorial-footer">
+                <div><strong>Axion Process OS</strong><span>Bioprocess engineering, connected.</span></div>
+                <nav>
+                  <a href="./product" data-public-target="publicPlatform">Product</a>
                   <a href="./resources" data-public-target="publicResources">Resources</a>
+                  <a href="./security" data-public-target="publicReadiness">Security</a>
                   <a href="./legal#privacy" data-public-target="publicLegal">Privacy</a>
                   <a href="./legal#terms" data-public-target="publicLegal">Terms</a>
                   <a href="./legal#impressum" data-public-target="publicLegal">Impressum</a>
-                </div>
+                </nav>
                 <small>Industrial photography credits and licences are documented in the repository attribution file.</small>
               </footer>
-            </div>
-
-            <div class="public-minimal-hero" hidden>
-              <img src="./assets/axion-biomanufacturing-suite.png" alt="Autonomous biomanufacturing factory with industrial stainless-steel bioreactors, process skids, sterile piping, utilities and digital process overlays" loading="lazy" />
-              <div class="public-system-rail" aria-label="Active engineering model">
-                <span><i></i>Model engine online</span>
-                <span>Scenario AX-01</span>
-                <span>Facility resolution</span>
-              </div>
-              <div class="public-minimal-hero-copy">
-                <p>Axion Process OS · Industrial process engineering</p>
-                <h1>Engineer production plants at industrial scale.</h1>
-                <span>Design autonomous biomanufacturing factories, stainless-steel process trains, and operating scenarios in one connected model.</span>
-                <div>
-                  <button id="openLoginHeroLegacy" class="public-primary" type="button">Enter workspace</button>
-                  <a href="#how-it-works">Explore the workflow</a>
-                </div>
-              </div>
-              <div class="public-hero-fact" aria-label="Model scope">
-                <div><span>Scope</span><strong>Plant-wide</strong></div>
-                <div><span>Layers</span><strong>Process · utilities · automation</strong></div>
-                <div><span>State</span><strong><i></i>Scenario-ready</strong></div>
-              </div>
-              <span class="public-hero-credit">Axion autonomous biomanufacturing factory concept</span>
-            </div>
-
-            <section id="legacy-how-it-works" class="public-minimal-workflow" aria-label="How Axion works" hidden>
-              <header>
-                <p>One connected model</p>
-                <h2>From product brief to operating plant.</h2>
-              </header>
-              <div class="public-minimal-steps">
-                <article><span>01</span><h3>Describe</h3><p>Set the product, scale, biology, quality target, and facility constraints.</p></article>
-                <article><span>02</span><h3>Build</h3><p>Connect production equipment, support systems, utilities, cleaning, and schedules.</p></article>
-                <article><span>03</span><h3>Refine</h3><p>Resolve balances, capacity, CFD risk, economics, LCA, and design decisions.</p></article>
-              </div>
-            </section>
-
-            <section class="public-motion-lab" aria-label="Interactive Axion engineering models" hidden>
-              <header>
-                <p>Interactive engineering views</p>
-                <h2>Move from plant topology to reactor physics and operating time.</h2>
-                <span>Hover a model to inspect how Axion keeps process architecture, transport phenomena, and production schedules connected.</span>
-              </header>
-              <div class="public-motion-grid">
-                <figure class="motion-model motion-process">
-                  <div class="motion-process-line" aria-hidden="true">
-                    <span class="motion-unit motion-feed">M</span><i></i>
-                    <span class="motion-unit motion-seed">S</span><i></i>
-                    <span class="motion-unit motion-reactor">BR</span><i></i>
-                    <span class="motion-unit motion-dsp">DSP</span>
-                    <b class="motion-packet packet-one"></b>
-                    <b class="motion-packet packet-two"></b>
-                  </div>
-                  <figcaption><b>Process topology</b><span>Streams expose direction, sequence, and the role of each unit.</span></figcaption>
-                </figure>
-                <figure class="motion-model motion-reactor-field">
-                  <div class="motion-vessel" aria-hidden="true">
-                    <span class="motion-shaft"></span>
-                    <span class="motion-impeller upper"></span>
-                    <span class="motion-impeller lower"></span>
-                    <span class="motion-sparger"></span>
-                    <i class="motion-plume plume-one"></i>
-                    <i class="motion-plume plume-two"></i>
-                    <i class="motion-plume plume-three"></i>
-                  </div>
-                  <figcaption><b>Bioreactor field</b><span>Impellers, gas inlet, scalar transport, and working volume remain explicit.</span></figcaption>
-                </figure>
-                <figure class="motion-model motion-schedule">
-                  <div class="motion-timeboard" aria-hidden="true">
-                    <span><b>BR-101</b><i class="run-long"></i><em>CIP</em></span>
-                    <span><b>CF-201</b><i class="run-medium"></i><em>Flush</em></span>
-                    <span><b>UF-301</b><i class="run-short"></i><em>Release</em></span>
-                    <u></u>
-                  </div>
-                  <figcaption><b>Facility schedule</b><span>Batches, cleaning, release, and equipment reuse move on one clock.</span></figcaption>
-                </figure>
-              </div>
-            </section>
-
-            <section class="public-minimal-views" aria-label="Axion product views" hidden>
-              <article>
-                <figure data-layer="L01 · PROCESS ARCHITECTURE">
-                  <img class="photo-focus-site" src="./assets/photography/industrial-fermenters-15000l.jpg" alt="Industrial stainless-steel fermentation plant with 15,000-litre vessels, access platforms, downstream skids and plant controls" loading="lazy" />
-                  <figcaption>Industrial fermentation · 15,000 L vessels, recovery skids and utilities</figcaption>
-                </figure>
-                <div>
-                  <p>Model the complete facility</p>
-                  <h2>The full plant stays connected.</h2>
-                  <span>Move from the production route to equipment duty, utilities, CIP/SIP, recycle, heat integration, and physical limits without breaking the model.</span>
-                  <ul>
-                    <li>Upstream and downstream trains</li>
-                    <li>Utilities, cleaning, waste, and heat reuse</li>
-                    <li>Mass, energy, and component balances</li>
-                  </ul>
-                </div>
-              </article>
-              <article>
-                <figure data-layer="L02 · FACILITY OPERATIONS">
-                  <img src="./assets/photography/vaccine-bioreactor-plant.jpg" alt="Real stainless-steel vaccine and bioprocess plant with stirred vessels, instrumentation, control cabinets, hygienic piping and pumps" loading="lazy" />
-                  <figcaption>Automated process train · bioreactors, instrumentation and control</figcaption>
-                </figure>
-                <div>
-                  <p>Operate at production scale</p>
-                  <h2>Plan capacity across the facility.</h2>
-                  <span>Model parallel trains, shared equipment, transfers, cleaning cycles, hold times, operators, utilities, and inventory across complete campaigns.</span>
-                  <ul>
-                    <li>Batch and continuous operations</li>
-                    <li>Equipment occupancy and cleaning windows</li>
-                    <li>Debottlenecking and utilization scenarios</li>
-                  </ul>
-                </div>
-              </article>
-              <article>
-                <figure data-layer="L03 · ENGINEERING EVIDENCE">
-                  <img src="./assets/axion-biomanufacturing-suite.png" alt="Autonomous biomanufacturing factory with industrial stainless-steel reactor trains, utilities and connected engineering overlays" loading="lazy" />
-                  <figcaption>Autonomous factory · plant-wide process, automation and decision layers</figcaption>
-                </figure>
-                <div>
-                  <p>Evaluate the engineering</p>
-                  <h2>Physics and economics stay aligned.</h2>
-                  <span>Inspect scale-up, oxygen and nutrient transport, mass and energy balances, CAPEX, OPEX, LCA, uncertainty, and downloadable technical records.</span>
-                  <ul>
-                    <li>Bioreactor and CFD screening</li>
-                    <li>TEA, LCA, and cost-driver analysis</li>
-                    <li>Traceable assumptions and exports</li>
-                  </ul>
-                </div>
-              </article>
-            </section>
-
-            <section class="public-minimal-modules" aria-label="Axion core modules" hidden>
-              <div><span>Process</span><strong>Flowsheets and equipment</strong></div>
-              <div><span>Simulate</span><strong>Balances, schedules, CFD</strong></div>
-              <div><span>Decide</span><strong>TEA, LCA, reports</strong></div>
-              <button class="public-primary" type="button" data-public-target="loginPanel">Start modelling</button>
-            </section>
-
-            <footer class="public-minimal-footer" hidden>
-              <span>Axion Process OS</span>
-              <div>
-                <a href="./legal#privacy" data-public-target="publicLegal">Privacy</a>
-                <a href="./legal#terms" data-public-target="publicLegal">Terms</a>
-                <a href="./legal#impressum" data-public-target="publicLegal">Impressum</a>
-              </div>
-              <small>Photography: Bayerische Staatsbrauerei Weihenstephan, TECNIC Bioprocess Solutions, Marcelo Guarnieri and Crystal Kwok / Unsplash; CC1984USA / Wikimedia Commons. Licence details in the photography attribution file.</small>
-            </footer>
-          </section>
-
-          <section class="public-canvas-story public-page active-public-page" data-public-page="home" aria-label="Axion product canvas preview" hidden>
-            <div class="section-heading">
-              <p>Product Canvas</p>
-              <h2>See the complete plant as a structured model, not as a static image.</h2>
-            </div>
-            <div class="canvas-story-layout">
-              <figure class="product-canvas-preview" aria-label="Axion plant canvas with process and support layers">
-                <div class="canvas-preview-topbar">
-                  <b>Complete production canvas</b>
-                  <span>Main process · support systems · model outputs</span>
-                </div>
-                <div class="canvas-preview-map">
-                  <div class="canvas-main-row">
-                    <span class="canvas-node media">Media prep</span>
-                    <i></i>
-                    <span class="canvas-node seed">Seed train</span>
-                    <i></i>
-                    <span class="canvas-node reactor">Production bioreactor hall</span>
-                    <i></i>
-                    <span class="canvas-node harvest">Harvest</span>
-                    <i></i>
-                    <span class="canvas-node dsp">Purification / DSP</span>
-                  </div>
-                  <div class="canvas-support-row">
-                    <span>WFI + clean steam</span>
-                    <span>CIP/SIP</span>
-                    <span>Heat reuse</span>
-                    <span>Wastewater</span>
-                    <span>LCA/TEA exports</span>
-                  </div>
-                  <div class="canvas-signal-row">
-                    <span>AI design check</span>
-                    <span>CFD oxygen field</span>
-                    <span>Boundary warnings</span>
-                    <span>Schedule load</span>
-                  </div>
-                </div>
-                <figcaption>
-                  <b>Plant architecture first</b>
-                  <span>The user sees the whole production logic before opening equations, equipment data, costs, CFD, or reports.</span>
-                </figcaption>
-              </figure>
-              <aside class="canvas-model-stack" aria-label="Axion workspace model layers">
-                <article>
-                  <span>01</span>
-                  <h3>Briefing</h3>
-                  <p>Product, organism, scale, constraints and uploaded data become the model basis.</p>
-                </article>
-                <article>
-                  <span>02</span>
-                  <h3>Process Builder</h3>
-                  <p>Equipment and animated streams stay editable on one clean canvas.</p>
-                </article>
-                <article>
-                  <span>03</span>
-                  <h3>Simulation Layers</h3>
-                  <p>Balances, CFD, scheduling, economics, LCA, standards and recommendations stay attached.</p>
-                </article>
-              </aside>
-            </div>
-          </section>
-
-          <section class="public-screenshot-story public-page active-public-page" data-public-page="home" aria-label="Axion software screenshots" hidden>
-            <div class="section-heading">
-              <p>Inside the Software</p>
-              <h2>One calm workspace for building, simulating, reviewing, and exporting.</h2>
-            </div>
-            <div class="screenshot-grid software-insights-grid">
-              <figure class="software-screenshot builder-shot" aria-label="Axion process builder screenshot">
-                <div class="screen-shell">
-                  <div class="screen-topbar"><b>Process Builder</b><span>Full plant canvas</span></div>
-                  <div class="screen-canvas">
-                    <span class="screen-unit main">Media prep</span><i></i>
-                    <span class="screen-unit main core">Production STR</span><i></i>
-                    <span class="screen-unit main">Harvest</span><i></i>
-                    <span class="screen-unit main">DSP</span>
-                    <span class="screen-unit support wfi">WFI</span>
-                    <span class="screen-unit support cip">CIP/SIP</span>
-                    <span class="screen-unit support heat">Heat reuse</span>
-                    <span class="screen-unit support waste">Wastewater</span>
-                  </div>
-                </div>
-                <figcaption><b>Editable plant canvas</b><span>Main equipment, support systems, utilities, cleaning and exports stay visible as one readable production architecture.</span></figcaption>
-              </figure>
-              <figure class="software-screenshot cfd-shot" aria-label="Axion CFD workbench screenshot">
-                <div class="screen-shell">
-                  <div class="screen-topbar"><b>Bioreactor CFD</b><span>Start · inspect · export</span></div>
-                  <div class="screen-cfd">
-                    <div class="screen-vessel"><i></i><i></i><b></b><span></span></div>
-                    <div class="screen-chart"><b></b><b></b><b></b></div>
-                  </div>
-                </div>
-                <figcaption><b>CFD + kinetics layer</b><span>Oxygen, nutrient, shear, time profiles, turbulence checks and validation gaps are shown after the solver starts.</span></figcaption>
-              </figure>
-              <article class="software-screenshot reports-shot">
-                <span>Reports</span>
-                <h3>Everything exportable for TEA, LCA, simulation and review.</h3>
-                <p>Streams, mass balances, energy balances, costs, LCA inventories, schedules, CFD fields, kinetics, turbulence assumptions, connector payloads, source notes and readiness gaps are kept together.</p>
-                <div class="report-chip-row">
-                  <b>CSV</b><b>SVG</b><b>JSON</b><b>TEA</b><b>LCA</b><b>CFD</b>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="public-product-story public-page active-public-page" data-public-page="home" aria-label="Axion product details" hidden>
-            <div class="section-heading product-story-heading">
-              <p>Product Logic</p>
-              <h2>From brief to model, without visual noise.</h2>
-            </div>
-            <div class="product-story-stack">
-              <article class="product-story-card story-with-visual">
-                <div>
-                  <span>01 · Prompt to plant</span>
-                  <h3>Start with words. Continue with an editable engineering model.</h3>
-                  <p>Describe the product, scale, organism, quality target, and constraints. Axion turns the brief into a process family, an equipment train, streams, assumptions, and review outputs.</p>
-                </div>
-                <figure class="story-mini-flow" aria-label="Axion facility model preview">
-                  <span>Media</span>
-                  <i></i>
-                  <span>Seed</span>
-                  <i></i>
-                  <span class="story-core">Production</span>
-                  <i></i>
-                  <span>DSP</span>
-                  <i></i>
-                  <span>QC</span>
-                </figure>
-              </article>
-              <article class="product-story-card">
-                <span>02 · Visual builder</span>
-                <h3>Drag, connect, inspect.</h3>
-                <p>Build readable PFD-like flows with main process equipment, utilities, cleaning, heat reuse, recycle, QC, emissions, valves, pumps, sensors, and support infrastructure.</p>
-              </article>
-              <article class="product-story-card">
-                <span>03 · Physics layer</span>
-                <h3>Screen process limits before they become expensive.</h3>
-                <p>Check oxygen transfer, nutrients, heat load, shear, feed zones, hotspots, ammonium, lactate, pH, and working-volume boundaries before commissioning rigorous specialist simulations.</p>
-              </article>
-              <article class="product-story-card">
-                <span>04 · Engineering memory</span>
-                <h3>Sources, standards, equations, and downloads stay attached.</h3>
-                <p>Keep assumptions, SOP notes, literature, stream tables, mass balances, LCA inventory, TEA drivers, cost-stack graphics, and readiness recommendations connected to the model.</p>
-              </article>
-            </div>
-          </section>
-
-          <section class="public-build-loop public-page active-public-page" data-public-page="home" aria-label="Prompt to workspace loop" hidden>
-            <div class="section-heading">
-              <p>Build Loop</p>
-              <h2>Less configuration. More direct creation.</h2>
-            </div>
-            <div class="build-loop-grid">
-              <article>
-                <span>01</span>
-                <h3>Prompt the process</h3>
-                <p>Describe product, organism, scale, constraints, and production intent in one sentence or a detailed brief.</p>
-              </article>
-              <article>
-                <span>02</span>
-                <h3>Get a workspace</h3>
-                <p>Axion turns the brief into an editable model with equipment, process logic, streams, balances, and assumptions.</p>
-              </article>
-              <article>
-                <span>03</span>
-                <h3>Refine by editing</h3>
-                <p>Adjust the flowsheet, add support systems, inspect equations, export tables, and ask the help panel what to improve.</p>
-              </article>
-            </div>
-          </section>
-
-          <section class="public-mission public-page active-public-page" data-public-page="home" aria-label="Axion mission and vision" hidden>
-            <div class="mission-copy">
-              <p>Mission</p>
-              <h2>Make biomanufacturing design understandable before it becomes expensive.</h2>
-              <span>Axion is built for the moment where a product idea becomes a plant decision. The mission is to turn scattered process knowledge into a living engineering workspace: visual enough for strategy, rigorous enough for scientists, and structured enough for TEA, LCA, suppliers, QA, and future simulation.</span>
-            </div>
-            <div class="vision-card">
-              <p>Vision</p>
-              <h3>The operating layer for biological factories.</h3>
-              <span>Describe the product, see the process, challenge the assumptions, improve the design, export the evidence, and keep the model alive as the factory becomes real.</span>
             </div>
           </section>
 
