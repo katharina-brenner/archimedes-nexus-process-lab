@@ -90,6 +90,7 @@ const config = {
   supabasePlanEntitlementsTable: process.env.SUPABASE_PLAN_ENTITLEMENTS_TABLE || "axion_plan_entitlements",
   supabaseEntitlementOverridesTable: process.env.SUPABASE_ENTITLEMENT_OVERRIDES_TABLE || "axion_entitlement_overrides",
   supabaseSubscriptionEventsTable: process.env.SUPABASE_SUBSCRIPTION_EVENTS_TABLE || "axion_subscription_events",
+  supabaseAccessGrantsTable: process.env.SUPABASE_ACCESS_GRANTS_TABLE || "axion_access_grants",
   inviteEmailFrom: process.env.INVITE_EMAIL_FROM || "",
   salesNotificationTo: process.env.SALES_NOTIFICATION_TO || "",
   smtpHost: process.env.SMTP_HOST || "",
@@ -111,6 +112,8 @@ const config = {
   requireProductionConfig: process.env.AXION_REQUIRE_PRODUCTION_CONFIG === "true",
   pythonExecutable: process.env.AXION_PYTHON || "python3",
   pythonRunTimeoutMs: Number(process.env.AXION_PYTHON_TIMEOUT_MS || 15000),
+  scientificDataTimeoutMs: Number(process.env.AXION_SCIENTIFIC_DATA_TIMEOUT_MS || 9000),
+  scientificDataCacheTtlMs: Number(process.env.AXION_SCIENTIFIC_DATA_CACHE_TTL_MS || 15 * 60 * 1000),
 };
 
 const billingPlans = Object.freeze([
@@ -509,6 +512,7 @@ function renderPublicHtml(pathname, indexPath) {
 
 const defaultDb = {
   users: [],
+  foundingAccounts: [],
   orders: [],
   licenses: [],
   projects: [],
@@ -534,6 +538,7 @@ const defaultDb = {
 };
 
 const publicSubmissionWindows = new Map();
+const scientificDataCache = new Map();
 
 function backendFeatures() {
   return [
@@ -2048,6 +2053,15 @@ function activatePaidOrder(db, order, {
   order.currentPeriodEnd = currentPeriodEnd || order.currentPeriodEnd || "";
   if (paymentId) order.paymentId = paymentId;
   ensureCommerceIdentifiers(order, license);
+  const founding = db.foundingAccounts?.find((item) => normalizePrincipal(item.email) === normalizePrincipal(order.customerEmail) && item.status !== "converted");
+  if (founding && paymentProvider === "stripe") {
+    founding.status = "converted";
+    founding.convertedAt = paidAt;
+    founding.paidOrderId = order.id;
+    founding.paidLicenseKey = order.licenseKey;
+    const complimentaryLicense = db.licenses.find((item) => item.key === founding.licenseKey);
+    if (complimentaryLicense && complimentaryLicense.key !== order.licenseKey) complimentaryLicense.status = "replaced";
+  }
   db.audit.unshift({ at: paidAt, type: "order.paid", orderId: order.id, reference: order.reference, licenseKey: order.licenseKey, paymentProvider, paymentId });
   return order.licenseKey;
 }
@@ -2250,6 +2264,7 @@ async function createCheckout(req, res) {
 
 function ensureDbShape(db) {
   db.users ||= [];
+  db.foundingAccounts ||= [];
   db.orders ||= [];
   db.licenses ||= [];
   db.projects ||= [];
@@ -2286,6 +2301,105 @@ function ensureDbShape(db) {
   });
   seedUsers(db);
   return db;
+}
+
+const scientificDataSources = Object.freeze([
+  { id: "pubchem", name: "PubChem", domain: "Chemical compounds and physicochemical properties", provider: "NIH / NCBI", documentation: "https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest", modelUse: "Component identity, formula, molecular weight, structure and basic properties" },
+  { id: "chebi", name: "ChEBI", domain: "Biologically relevant chemical entities and ontology", provider: "EMBL-EBI", documentation: "https://www.ebi.ac.uk/chebi/tools", modelUse: "Canonical biochemical entities, synonyms, ontology classes and identifiers" },
+  { id: "uniprot", name: "UniProtKB", domain: "Protein sequence and functional annotation", provider: "UniProt Consortium", documentation: "https://www.uniprot.org/help/api", modelUse: "Enzymes, proteins, organisms, accessions and sequence metadata" },
+  { id: "rhea", name: "Rhea", domain: "Curated biochemical reactions", provider: "SIB Swiss Institute of Bioinformatics", documentation: "https://www.rhea-db.org/help/rest-api", modelUse: "Balanced reaction equations, enzyme links and biochemical reaction identifiers" },
+  { id: "europepmc", name: "Europe PMC", domain: "Life-science literature and open-access links", provider: "EMBL-EBI", documentation: "https://europepmc.org/RestfulWebService", modelUse: "Papers, citations, abstracts, data links and model evidence" },
+]);
+
+function scientificSource(sourceId) {
+  return scientificDataSources.find((source) => source.id === String(sourceId || "").toLowerCase());
+}
+
+function normalizedScientificQuery(value) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+async function fetchScientificJson(url) {
+  const response = await fetch(url, {
+    headers: { accept: "application/json", "user-agent": "Axion-Process-OS/1.0 scientific-data-connector" },
+    signal: AbortSignal.timeout(config.scientificDataTimeoutMs),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Source returned ${response.status}: ${text.slice(0, 180)}`);
+  return text ? JSON.parse(text) : {};
+}
+
+async function fetchScientificText(url) {
+  const response = await fetch(url, {
+    headers: { accept: "text/tab-separated-values", "user-agent": "Axion-Process-OS/1.0 scientific-data-connector" },
+    signal: AbortSignal.timeout(config.scientificDataTimeoutMs),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Source returned ${response.status}: ${text.slice(0, 180)}`);
+  return text;
+}
+
+function parseTsv(text) {
+  const [headerLine = "", ...lines] = String(text || "").trim().split(/\r?\n/);
+  const headers = headerLine.split("\t");
+  return lines.filter(Boolean).map((line) => Object.fromEntries(line.split("\t").map((value, index) => [headers[index] || `field_${index + 1}`, value])));
+}
+
+async function queryScientificData(sourceId, query, limit = 8) {
+  const source = scientificSource(sourceId);
+  if (!source) throw new Error("Choose a supported scientific data source.");
+  const cleanedQuery = normalizedScientificQuery(query);
+  if (cleanedQuery.length < 2) throw new Error("Enter at least two characters to search a scientific source.");
+  const resultLimit = Math.max(1, Math.min(20, Number(limit) || 8));
+  const cacheKey = `${source.id}:${cleanedQuery.toLowerCase()}:${resultLimit}`;
+  const cached = scientificDataCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < config.scientificDataCacheTtlMs) return { ...cached.payload, cached: true };
+  let rows = [];
+  if (source.id === "pubchem") {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanedQuery)}/property/Title,MolecularFormula,MolecularWeight,CanonicalSMILES,InChIKey,XLogP,TPSA/JSON`;
+    const payload = await fetchScientificJson(url);
+    rows = (payload.PropertyTable?.Properties || []).slice(0, resultLimit).map((item) => ({ id: `CID:${item.CID}`, title: item.Title || cleanedQuery, formula: item.MolecularFormula || "", molecularWeight: item.MolecularWeight ?? "", canonicalSmiles: item.ConnectivitySMILES || item.CanonicalSMILES || "", inchiKey: item.InChIKey || "", xlogp: item.XLogP ?? "", tpsa: item.TPSA ?? "", url: `https://pubchem.ncbi.nlm.nih.gov/compound/${item.CID}` }));
+  } else if (source.id === "chebi") {
+    const url = `https://www.ebi.ac.uk/ols4/api/search?q=${encodeURIComponent(cleanedQuery)}&ontology=chebi&rows=${resultLimit}`;
+    const payload = await fetchScientificJson(url);
+    rows = (payload.response?.docs || []).slice(0, resultLimit).map((item) => ({ id: item.short_form || item.obo_id || item.iri, title: item.label || cleanedQuery, description: Array.isArray(item.description) ? item.description.join(" ") : item.description || "", synonyms: Array.isArray(item.synonym) ? item.synonym.slice(0, 6).join(" | ") : "", url: item.iri || "" }));
+  } else if (source.id === "uniprot") {
+    const fields = "accession,id,protein_name,organism_name,length,ec";
+    const url = `https://rest.uniprot.org/uniprotkb/search?query=${encodeURIComponent(cleanedQuery)}&format=json&size=${resultLimit}&fields=${encodeURIComponent(fields)}`;
+    const payload = await fetchScientificJson(url);
+    rows = (payload.results || []).map((item) => ({ id: item.primaryAccession, title: item.proteinDescription?.recommendedName?.fullName?.value || item.uniProtkbId || item.primaryAccession, organism: item.organism?.scientificName || "", gene: item.genes?.[0]?.geneName?.value || "", length: item.sequence?.length || "", url: `https://www.uniprot.org/uniprotkb/${item.primaryAccession}/entry` }));
+  } else if (source.id === "rhea") {
+    const url = `https://www.rhea-db.org/rhea?query=${encodeURIComponent(cleanedQuery)}&columns=rhea-id,equation,ec&format=tsv`;
+    rows = parseTsv(await fetchScientificText(url)).slice(0, resultLimit).map((item) => {
+      const id = item["RHEA-ID"] || item["rhea-id"] || Object.values(item)[0] || "";
+      return { id, title: item["Equation"] || item.equation || Object.values(item)[1] || "Biochemical reaction", ec: item["EC number"] || item.ec || "", url: id ? `https://www.rhea-db.org/rhea/${String(id).replace(/^RHEA:/, "")}` : "" };
+    });
+  } else if (source.id === "europepmc") {
+    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(cleanedQuery)}&format=json&pageSize=${resultLimit}&resultType=core`;
+    const payload = await fetchScientificJson(url);
+    rows = (payload.resultList?.result || []).map((item) => ({ id: `${item.source || "MED"}:${item.id || item.pmid || item.pmcid || ""}`, title: item.title || "Untitled publication", authors: item.authorString || "", journal: item.journalTitle || "", year: item.pubYear || "", citedBy: item.citedByCount ?? "", openAccess: item.isOpenAccess === "Y" ? "yes" : "no", url: item.pmcid ? `https://europepmc.org/article/PMC/${item.pmcid.replace(/^PMC/, "")}` : `https://europepmc.org/article/${item.source || "MED"}/${item.id || item.pmid || ""}` }));
+  }
+  const payload = { source, query: cleanedQuery, results: rows, resultCount: rows.length, retrievedAt: new Date().toISOString(), cached: false };
+  scientificDataCache.set(cacheKey, { createdAt: Date.now(), payload });
+  return payload;
+}
+
+async function listScientificDataSources(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  json(res, 200, { sources: scientificDataSources, cacheTtlMs: config.scientificDataCacheTtlMs, note: "Results are retrieved from the named public provider at request time and must be reviewed before model use." });
+}
+
+async function searchScientificData(req, res) {
+  const session = verifySession(getBearer(req));
+  if (!session) return json(res, 401, { error: "Not authenticated" });
+  const body = await parseBody(req);
+  try {
+    const payload = await queryScientificData(body.sourceId, body.query, body.limit);
+    json(res, 200, payload);
+  } catch (error) {
+    json(res, 502, { error: `Scientific source search failed: ${error.message}` });
+  }
 }
 
 function academicSourceLibrary() {
@@ -5801,6 +5915,16 @@ async function login(req, res) {
     return;
   }
 
+  const foundingAccess = db.foundingAccounts.find((item) => item.username === user || normalizePrincipal(item.email) === user);
+  if (foundingAccess?.status === "blocked") {
+    json(res, 403, { error: "This workspace account is suspended. Contact the Axion workspace owner.", code: "ACCOUNT_SUSPENDED" });
+    return;
+  }
+  if (foundingAccess?.status === "payment_required") {
+    json(res, 402, { error: "The founding access period has ended. Choose a subscription to continue.", code: "PAYMENT_REQUIRED", planId: foundingAccess.planId });
+    return;
+  }
+
   const localUser = db.users.find((item) => item.status === "active" && (item.username === user || item.email === user));
   if (localUser?.passwordHash && safeCompare(localUser.passwordHash, userPasswordHash(password))) {
     const localLicense = activeLicenseForEmail(db, localUser.email);
@@ -5907,6 +6031,15 @@ async function account(req, res) {
     return;
   }
   const db = ensureDbShape(await loadDb());
+  const foundingAccess = db.foundingAccounts.find((item) => normalizePrincipal(item.email) === normalizePrincipal(verifiedSession.email));
+  if (foundingAccess?.status === "blocked") {
+    json(res, 403, { error: "This workspace account is suspended. Contact the Axion workspace owner.", code: "ACCOUNT_SUSPENDED" });
+    return;
+  }
+  if (foundingAccess?.status === "payment_required") {
+    json(res, 402, { error: "The founding access period has ended. Choose a subscription to continue.", code: "PAYMENT_REQUIRED", planId: foundingAccess.planId });
+    return;
+  }
   const license = db.licenses.find((item) =>
     (verifiedSession.licenseKey && item.key === verifiedSession.licenseKey)
     || (verifiedSession.email && normalizePrincipal(item.customerEmail) === normalizePrincipal(verifiedSession.email)));
@@ -5982,6 +6115,160 @@ async function listOrders(req, res) {
   }
   const db = ensureDbShape(await loadDb());
   json(res, 200, { orders: db.orders.map(sanitizeOrder), licenses: db.licenses.map(sanitizeLicense) });
+}
+
+function sanitizeFoundingAccount(account) {
+  return {
+    id: account.id,
+    slot: account.slot,
+    name: account.name,
+    username: account.username,
+    email: account.email,
+    company: account.company || "",
+    planId: account.planId,
+    planName: account.planName,
+    status: account.status,
+    customerNumber: account.customerNumber,
+    contractNumber: account.contractNumber,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+    blockedAt: account.blockedAt || "",
+    paymentRequiredAt: account.paymentRequiredAt || "",
+    convertedAt: account.convertedAt || "",
+  };
+}
+
+async function syncFoundingGrantToSupabase(account) {
+  if (!supabaseConfigured() || !account) return null;
+  try {
+    const rows = await supabaseRequest(`${config.supabaseAccessGrantsTable}?on_conflict=email`, {
+      method: "POST",
+      headers: { prefer: "resolution=merge-duplicates,return=representation" },
+      body: {
+        external_id: account.id,
+        grant_type: "founding_customer",
+        slot_number: account.slot,
+        email: account.email,
+        username: account.username,
+        display_name: account.name,
+        company: account.company || "",
+        plan_id: account.planId,
+        status: account.status,
+        customer_number: account.customerNumber,
+        contract_number: account.contractNumber,
+        converted_at: account.convertedAt || null,
+        metadata: { source: "axion-backend", createdAt: account.createdAt },
+      },
+    });
+    return rows?.[0] || null;
+  } catch (error) {
+    console.warn(`Supabase founding-account sync failed: ${error.message}`);
+    return null;
+  }
+}
+
+async function listFoundingAccounts(req, res) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") return json(res, 403, { error: "Admin access required" });
+  const db = ensureDbShape(await loadDb());
+  const accounts = db.foundingAccounts.slice().sort((a, b) => a.slot - b.slot).map(sanitizeFoundingAccount);
+  json(res, 200, {
+    accounts,
+    capacity: 5,
+    occupiedSlots: accounts.filter((item) => item.status !== "converted").length,
+    availableSlots: Math.max(0, 5 - accounts.filter((item) => item.status !== "converted").length),
+    statuses: ["active", "blocked", "payment_required", "converted"],
+  });
+}
+
+async function createFoundingAccount(req, res) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") return json(res, 403, { error: "Admin access required" });
+  const body = await parseBody(req);
+  const name = cleanPublicField(body.name, 120);
+  const username = normalizePrincipal(body.username).replace(/[^a-z0-9._-]/g, "").slice(0, 48);
+  const email = normalizePrincipal(body.email);
+  const company = cleanPublicField(body.company, 160);
+  const selectedPlan = billingPlan(body.planId || "professional");
+  const suppliedPassword = String(body.password || "");
+  const temporaryPassword = suppliedPassword || `Axion-${randomBytes(6).toString("base64url")}`;
+  if (name.length < 2 || username.length < 3 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "Enter a name, unique username, and valid email." });
+  if (!selectedPlan) return json(res, 400, { error: "Choose a valid Axion plan." });
+  if (temporaryPassword.length < 8) return json(res, 400, { error: "Initial password must contain at least eight characters." });
+  const db = ensureDbShape(await loadDb());
+  const occupied = db.foundingAccounts.filter((item) => item.status !== "converted");
+  if (occupied.length >= 5) return json(res, 409, { error: "All five founding-customer slots are occupied. Convert or remove a completed grant before creating another." });
+  if (db.users.some((item) => normalizePrincipal(item.email) === email || normalizePrincipal(item.username) === username)) return json(res, 409, { error: "This email or username is already registered." });
+  const slot = [1, 2, 3, 4, 5].find((candidate) => !occupied.some((item) => item.slot === candidate));
+  const createdAt = new Date().toISOString();
+  const user = { id: randomUUID(), username, email, name, company, role: "customer", passwordHash: userPasswordHash(temporaryPassword), createdAt, status: "active", foundingCustomer: true };
+  const order = {
+    id: randomUUID(), createdAt, status: "founding_access", reference: makeReference(), productName: config.productName,
+    planId: selectedPlan.id, planName: selectedPlan.name, seats: 1, amount: 0, currency: config.currency,
+    customerName: name, customerEmail: email, company, billingMode: "founding", subscriptionStatus: "trialing",
+  };
+  const license = {
+    key: makeLicenseKey(), customerEmail: email, customerName: name, company, orderId: order.id,
+    planId: selectedPlan.id, planName: selectedPlan.name, seats: 1, createdAt, status: "active", billingStatus: "trialing", foundingCustomer: true,
+  };
+  order.licenseKey = license.key;
+  ensureCommerceIdentifiers(order, license);
+  const account = {
+    id: randomUUID(), slot, userId: user.id, orderId: order.id, licenseKey: license.key,
+    name, username, email, company, planId: selectedPlan.id, planName: selectedPlan.name,
+    customerNumber: order.customerNumber, contractNumber: order.contractNumber,
+    status: "active", createdAt, updatedAt: createdAt,
+  };
+  db.users.unshift(user);
+  db.orders.unshift(order);
+  db.licenses.unshift(license);
+  db.foundingAccounts.push(account);
+  db.audit.unshift({ at: createdAt, type: "founding_account.created", foundingAccountId: account.id, slot, email, planId: selectedPlan.id, by: sessionPrincipal(session) });
+  await saveDb(db);
+  await Promise.all([syncCommerceRecordToSupabase(order, license, user), syncFoundingGrantToSupabase(account)]);
+  json(res, 201, { account: sanitizeFoundingAccount(account), temporaryPassword, note: "The initial password is returned only in this response. Share it through a secure channel." });
+}
+
+async function updateFoundingAccount(req, res, accountId) {
+  const session = verifySession(getBearer(req));
+  if (session?.role !== "admin") return json(res, 403, { error: "Admin access required" });
+  const body = await parseBody(req);
+  const action = String(body.action || "");
+  if (!["block", "unblock", "require_payment"].includes(action)) return json(res, 400, { error: "Use block, unblock, or require_payment." });
+  const db = ensureDbShape(await loadDb());
+  const account = db.foundingAccounts.find((item) => item.id === accountId);
+  if (!account) return json(res, 404, { error: "Founding account not found" });
+  if (account.status === "converted") return json(res, 409, { error: "This grant has already converted to a paid subscription." });
+  const user = db.users.find((item) => item.id === account.userId || normalizePrincipal(item.email) === normalizePrincipal(account.email));
+  const license = db.licenses.find((item) => item.key === account.licenseKey);
+  const order = db.orders.find((item) => item.id === account.orderId);
+  const now = new Date().toISOString();
+  if (action === "block") {
+    account.status = "blocked";
+    account.blockedAt = now;
+    if (user) user.status = "suspended";
+    if (license) { license.status = "suspended"; license.billingStatus = "suspended"; }
+    if (order) { order.status = "subscription_suspended"; order.subscriptionStatus = "suspended"; }
+  } else if (action === "unblock") {
+    account.status = "active";
+    account.blockedAt = "";
+    account.paymentRequiredAt = "";
+    if (user) user.status = "active";
+    if (license) { license.status = "active"; license.billingStatus = "trialing"; }
+    if (order) { order.status = "founding_access"; order.subscriptionStatus = "trialing"; }
+  } else {
+    account.status = "payment_required";
+    account.paymentRequiredAt = now;
+    if (user) user.status = "active";
+    if (license) { license.status = "suspended"; license.billingStatus = "payment_required"; }
+    if (order) { order.status = "payment_required"; order.subscriptionStatus = "payment_required"; }
+  }
+  account.updatedAt = now;
+  db.audit.unshift({ at: now, type: `founding_account.${action}`, foundingAccountId: account.id, email: account.email, by: sessionPrincipal(session) });
+  await saveDb(db);
+  if (order) await syncCommerceRecordToSupabase(order, license, user);
+  await syncFoundingGrantToSupabase(account);
+  json(res, 200, { account: sanitizeFoundingAccount(account), checkout: action === "require_payment" ? { page: `${config.appBaseUrl}/pricing`, planId: account.planId, email: account.email } : null });
 }
 
 async function listCustomerAccounts(req, res) {
@@ -6512,6 +6799,14 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
     await listAcademicSources(req, res);
     return;
   }
+  if (req.method === "GET" && pathname === "/api/scientific-data/sources") {
+    await listScientificDataSources(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/scientific-data/search") {
+    await searchScientificData(req, res);
+    return;
+  }
   if (req.method === "GET" && pathname === "/api/model-runs") {
     await listModelRuns(req, res, query);
     return;
@@ -6568,6 +6863,19 @@ async function routeApi(req, res, pathname, query = new URLSearchParams()) {
   }
   if (req.method === "GET" && pathname === "/api/admin/customers") {
     await listCustomerAccounts(req, res);
+    return;
+  }
+  if (req.method === "GET" && pathname === "/api/admin/founding-accounts") {
+    await listFoundingAccounts(req, res);
+    return;
+  }
+  if (req.method === "POST" && pathname === "/api/admin/founding-accounts") {
+    await createFoundingAccount(req, res);
+    return;
+  }
+  const foundingAccountMatch = pathname.match(/^\/api\/admin\/founding-accounts\/([^/]+)$/);
+  if (req.method === "PATCH" && foundingAccountMatch) {
+    await updateFoundingAccount(req, res, decodeURIComponent(foundingAccountMatch[1]));
     return;
   }
   const adminCustomerContractMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)\/contract$/);

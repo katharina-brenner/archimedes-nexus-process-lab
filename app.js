@@ -20,6 +20,13 @@ import {
   optimizeDesign,
   runScalarStateEstimator,
 } from "./advanced-process-modeling.js";
+import {
+  aspenCapabilityMatrix,
+  fenskeMinimumStages,
+  phaseEnvelopeRows,
+  pinchUtilityTargets,
+  solveIsothermalFlash,
+} from "./thermodynamics.js";
 
 const palette = [
   { type: "raw-material", label: "Raw Material Weighing", isoName: "Weighing and dispensing booth", cls: "Preparation", icon: "WB", color: "#51606f", residence: 1.5, power: 0.4, standards: ["EU GMP Part I Ch. 5", "ICH Q7", "ISO 14644"] },
@@ -2118,6 +2125,15 @@ const routeOptions = [
   { key: "lean", label: "Lean route", detail: "Reduced train for screening, early development, or simplified recovery assumptions." },
 ];
 
+function storedJson(key, fallback) {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) || "null");
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const state = {
   template: "culturedMeat",
   scale: "pilot",
@@ -2163,6 +2179,13 @@ const state = {
   plantDataBindings: [],
   dataApplicationHistory: [],
   integrations: [],
+  foundingAccounts: [],
+  lastFoundingCredential: null,
+  scientificDataSources: [],
+  scientificDataResults: [],
+  scientificDataQuery: "",
+  scientificDataSource: "pubchem",
+  attachedScientificRecords: storedJson("axion-attached-scientific-records", []),
   githubConnections: [],
   selectedIntegration: "",
   connectorResults: {},
@@ -2183,6 +2206,7 @@ const state = {
   advancedActivity: "structure",
   advancedRun: null,
   advancedMonteCarloSamples: 320,
+  thermodynamicInputs: { temperatureC: 37, pressureBar: 1.2, waterFraction: 0.88, ethanolFraction: 0.1 },
   commandHistory: [],
   commandHighlights: [],
   lockedRoutes: {},
@@ -2928,6 +2952,8 @@ function exportCurrentModelState() {
     dataApplicationHistory: clone(state.dataApplicationHistory || []),
     commandHistory: clone(state.commandHistory || []),
     lockedRoutes: clone(state.lockedRoutes || {}),
+    thermodynamicInputs: clone(state.thermodynamicInputs),
+    attachedScientificRecords: clone(state.attachedScientificRecords || []),
     automationState: state.automationState ? clone({
       connections: state.automationState.connections || [],
       loops: state.automationState.loops || [],
@@ -2971,6 +2997,13 @@ function importModelState(modelState = {}) {
   state.lockedRoutes = modelState.lockedRoutes && typeof modelState.lockedRoutes === "object"
     ? clone(modelState.lockedRoutes)
     : {};
+  state.thermodynamicInputs = modelState.thermodynamicInputs && typeof modelState.thermodynamicInputs === "object"
+    ? clone(modelState.thermodynamicInputs)
+    : { temperatureC: 37, pressureBar: 1.2, waterFraction: 0.88, ethanolFraction: 0.1 };
+  state.attachedScientificRecords = Array.isArray(modelState.attachedScientificRecords)
+    ? clone(modelState.attachedScientificRecords).slice(0, 100)
+    : state.attachedScientificRecords;
+  window.localStorage.setItem("axion-attached-scientific-records", JSON.stringify(state.attachedScientificRecords));
   state.connectFrom = null;
   state.connectTo = null;
   state.automationState = modelState.automationState && typeof modelState.automationState === "object" ? clone(modelState.automationState) : null;
@@ -2992,7 +3025,11 @@ function applyScale(key) {
   showToast(`${preset.label} scale applied`);
 }
 
+let metricsCache = { key: "", value: null };
+
 function metrics() {
+  const cacheKey = massBalanceCacheKey();
+  if (metricsCache.key === cacheKey && metricsCache.value) return metricsCache.value;
   const p = state.params;
   const mode = operationProfile();
   const processYield = (state.recovery / 100) * (p.viability / 100) * (p.harvestRecovery / 100) * (p.clarificationYield / 100) * (p.chromYield / 100) * (p.ufdfYield / 100);
@@ -3024,7 +3061,7 @@ function metrics() {
   const scale = scaleEconomics(preliminary);
   const directCost = scale.directCost;
 
-  return {
+  const result = {
     annualKg,
     annualHarvestVolumeL: mode.annualHarvestVolumeL,
     batchDuration,
@@ -3039,6 +3076,8 @@ function metrics() {
     scale,
     operationMode: mode,
   };
+  metricsCache = { key: cacheKey, value: result };
+  return result;
 }
 
 function unitSize(item) {
@@ -8922,6 +8961,62 @@ function runAdvancedModelActivity(activity = state.advancedActivity) {
   return baseRun;
 }
 
+function thermodynamicWorkbenchData() {
+  const input = state.thermodynamicInputs || {};
+  const water = Math.max(0.001, Math.min(0.998, Number(input.waterFraction) || 0.88));
+  const ethanol = Math.max(0.001, Math.min(0.998 - water, Number(input.ethanolFraction) || 0.1));
+  const carbonDioxide = Math.max(0.001, 1 - water - ethanol);
+  const flashInput = {
+    componentIds: ["water", "ethanol", "carbonDioxide"],
+    composition: [water, ethanol, carbonDioxide],
+    temperatureC: Number(input.temperatureC) || 37,
+    pressureBar: Math.max(0.05, Number(input.pressureBar) || 1.2),
+  };
+  const flash = solveIsothermalFlash(flashInput);
+  const envelope = phaseEnvelopeRows(flashInput, { minimumC: -10, maximumC: 180, points: 39 });
+  const minimumStages = fenskeMinimumStages({ lightKeyTop: 0.95, lightKeyBottom: 0.05, relativeVolatility: 2.3 });
+  const pinch = pinchUtilityTargets([
+    { id: "bioreactor-cooling", kind: "hot", supplyC: 37, targetC: 20, cpFlowKwK: Math.max(4, state.batchSize / 220) },
+    { id: "sip-condensate", kind: "hot", supplyC: 121, targetC: 35, cpFlowKwK: Math.max(3, state.batchSize / 520) },
+    { id: "media-heating", kind: "cold", supplyC: 10, targetC: 37, cpFlowKwK: Math.max(3, state.batchSize / 260) },
+    { id: "cip-heating", kind: "cold", supplyC: 20, targetC: 80, cpFlowKwK: Math.max(2, state.batchSize / 620) },
+  ], { deltaTminC: 10 });
+  return { flash, envelope, minimumStages, pinch, capabilityMatrix: aspenCapabilityMatrix() };
+}
+
+function renderThermodynamicWorkbench() {
+  const thermo = thermodynamicWorkbenchData();
+  const input = state.thermodynamicInputs;
+  const twoPhasePoints = thermo.envelope.filter((item) => item.phase === "two-phase");
+  return `
+    <section class="thermodynamic-workbench">
+      <header>
+        <div><span>Thermodynamics and separation</span><h3>Executable flash, phase and heat-integration screen</h3><p>Use this before detailed equipment design to test phase split, shortcut separation difficulty and minimum utility demand. Results expose their method and remain screening values until project property data are validated.</p></div>
+        <button data-download-report="thermodynamics-csv" type="button">Download thermodynamics</button>
+      </header>
+      <div class="thermodynamic-controls">
+        <label>Temperature <input id="thermoTemperature" type="number" min="-20" max="250" step="1" value="${escapeAttr(input.temperatureC)}" /><span>°C</span></label>
+        <label>Pressure <input id="thermoPressure" type="number" min="0.05" max="250" step="0.05" value="${escapeAttr(input.pressureBar)}" /><span>bar</span></label>
+        <label>Water fraction <input id="thermoWater" type="number" min="0.001" max="0.998" step="0.01" value="${escapeAttr(input.waterFraction)}" /></label>
+        <label>Ethanol fraction <input id="thermoEthanol" type="number" min="0.001" max="0.998" step="0.01" value="${escapeAttr(input.ethanolFraction)}" /></label>
+        <button class="primary" data-run-thermodynamics type="button">Run flash + energy target</button>
+      </div>
+      <div class="thermodynamic-kpis">
+        <article><span>Phase state</span><strong>${escapeHtml(thermo.flash.phase)}</strong><small>Rachford-Rice residual ${formatNumber(thermo.flash.residual, 6)}</small></article>
+        <article><span>Vapor fraction</span><strong>${formatNumber(thermo.flash.vaporFraction * 100, 2)}%</strong><small>${thermo.flash.iterations} nonlinear iterations</small></article>
+        <article><span>Two-phase interval</span><strong>${twoPhasePoints.length ? `${formatNumber(twoPhasePoints[0].temperatureC, 0)}–${formatNumber(twoPhasePoints.at(-1).temperatureC, 0)} °C` : "not detected"}</strong><small>39-point temperature sweep</small></article>
+        <article><span>Fenske minimum</span><strong>${formatNumber(thermo.minimumStages, 1)} stages</strong><small>95/5 light-key split, α = 2.3</small></article>
+        <article><span>Minimum hot utility</span><strong>${formatNumber(thermo.pinch.minimumHotUtilityKw, 1)} kW</strong><small>ΔTmin 10 °C heat cascade</small></article>
+        <article><span>Minimum cold utility</span><strong>${formatNumber(thermo.pinch.minimumColdUtilityKw, 1)} kW</strong><small>pinch target before HEN design</small></article>
+      </div>
+      <div class="thermodynamic-detail-grid">
+        <article><span>Flash composition</span>${thermo.flash.components.map((item) => `<p><b>${escapeHtml(item.component)} · ${escapeHtml(item.formula)}</b><small>z ${formatNumber(item.z, 4)} · K ${formatNumber(item.kValue, 4)} · x ${formatNumber(item.xLiquid, 4)} · y ${formatNumber(item.yVapor, 4)}</small></p>`).join("")}</article>
+        <article><span>Aspen-class capability map</span>${thermo.capabilityMatrix.map((item) => `<p><b>${escapeHtml(item.capability)} · ${escapeHtml(item.status)}</b><small>${escapeHtml(item.scope)}</small></p>`).join("")}</article>
+      </div>
+    </section>
+  `;
+}
+
 function renderAdvancedModellingBoard() {
   if (!els.modellingBoard) return;
   const run = state.advancedRun?.activity === state.advancedActivity ? state.advancedRun : runAdvancedModelActivity(state.advancedActivity);
@@ -8941,6 +9036,7 @@ function renderAdvancedModellingBoard() {
         <button class="action-button primary" data-advanced-run="${escapeAttr(state.advancedActivity)}" type="button">Run ${escapeHtml(run.title)}</button>
       </div>
     </header>
+    ${renderThermodynamicWorkbench()}
     <section class="advanced-model-workbench">
       <nav class="advanced-model-nav" aria-label="Advanced modelling activities">
         ${advancedModelActivities.map((item) => `
@@ -10155,6 +10251,88 @@ function renderStandards() {
   `;
 }
 
+const scientificSourceFallback = [
+  { id: "pubchem", name: "PubChem", domain: "Chemical compounds and physicochemical properties", provider: "NIH / NCBI" },
+  { id: "chebi", name: "ChEBI", domain: "Biochemical entities and ontology", provider: "EMBL-EBI" },
+  { id: "uniprot", name: "UniProtKB", domain: "Protein sequence and function", provider: "UniProt Consortium" },
+  { id: "rhea", name: "Rhea", domain: "Curated biochemical reactions", provider: "SIB" },
+  { id: "europepmc", name: "Europe PMC", domain: "Life-science literature", provider: "EMBL-EBI" },
+];
+
+function renderScientificDataNetwork() {
+  const sources = state.scientificDataSources.length ? state.scientificDataSources : scientificSourceFallback;
+  const results = state.scientificDataResults || [];
+  return `
+    <section class="scientific-data-network">
+      <header>
+        <div><span>Public scientific data network</span><h3>Search chemistry, proteins, reactions and evidence in the model workspace</h3><p>Axion queries the provider API through the backend, normalizes the result and records the original source link. No unreviewed public value is silently substituted into the process model.</p></div>
+        <strong>${sources.length} live source contracts</strong>
+      </header>
+      <div class="scientific-search-row">
+        <select id="scientificDataSource">${sources.map((source) => `<option value="${escapeAttr(source.id)}" ${source.id === state.scientificDataSource ? "selected" : ""}>${escapeHtml(source.name)} · ${escapeHtml(source.domain)}</option>`).join("")}</select>
+        <input id="scientificDataQuery" value="${escapeAttr(state.scientificDataQuery)}" placeholder="Search glucose, oxygen transfer, CHO, lactate dehydrogenase…" />
+        <button class="primary" data-search-scientific-data type="button">Search source</button>
+      </div>
+      <div class="scientific-source-strip">${sources.map((source) => `<button data-select-scientific-source="${escapeAttr(source.id)}" class="${source.id === state.scientificDataSource ? "active" : ""}" type="button"><strong>${escapeHtml(source.name)}</strong><small>${escapeHtml(source.provider)}</small></button>`).join("")}</div>
+      <div class="scientific-results" aria-live="polite">
+        ${state.scientificDataLoading ? `<article class="scientific-result empty"><strong>Searching the provider…</strong></article>` : results.length ? results.map((item, index) => `
+          <article class="scientific-result">
+            <div><span>${escapeHtml(item.id || `Record ${index + 1}`)}</span><strong>${escapeHtml(item.title || item.component || "Scientific record")}</strong><p>${escapeHtml(item.description || item.authors || item.organism || item.formula || item.equation || "Provider record")}</p></div>
+            <dl>${Object.entries(item).filter(([key, value]) => !["url", "title", "description"].includes(key) && value !== "" && value !== null && value !== undefined).slice(0, 6).map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("")}</dl>
+            <footer>${item.url ? `<a href="${escapeAttr(item.url)}" target="_blank" rel="noopener">Open source record</a>` : ""}<button data-attach-scientific-result="${index}" type="button">Attach as model evidence</button></footer>
+          </article>
+        `).join("") : `<article class="scientific-result empty"><strong>Search a provider to retrieve reviewed source candidates.</strong><p>Useful starting points: glucose in PubChem, CHO in UniProt, lactate in Rhea, or oxygen transfer in Europe PMC.</p></article>`}
+      </div>
+      <footer><span>${state.attachedScientificRecords.length} record${state.attachedScientificRecords.length === 1 ? "" : "s"} attached as project evidence</span><small>Public-database results remain source-attributed and require engineering review before calculation use.</small></footer>
+    </section>
+  `;
+}
+
+async function refreshScientificDataSources() {
+  try {
+    const payload = await apiRequest("/api/scientific-data/sources");
+    state.scientificDataSources = payload.sources || scientificSourceFallback;
+  } catch {
+    state.scientificDataSources = scientificSourceFallback;
+  }
+  if (document.body.dataset.activeView === "sources") renderSources();
+}
+
+async function searchScientificData() {
+  const query = document.querySelector("#scientificDataQuery")?.value.trim() || "";
+  const sourceId = document.querySelector("#scientificDataSource")?.value || state.scientificDataSource;
+  if (query.length < 2) {
+    showToast("Enter at least two characters to search");
+    return;
+  }
+  state.scientificDataQuery = query;
+  state.scientificDataSource = sourceId;
+  state.scientificDataLoading = true;
+  renderSources();
+  try {
+    const payload = await apiRequest("/api/scientific-data/search", { method: "POST", body: JSON.stringify({ sourceId, query, limit: 10 }) });
+    state.scientificDataResults = payload.results || [];
+    showToast(`${payload.resultCount || 0} ${payload.source?.name || "source"} records found${payload.cached ? " from cache" : ""}`);
+  } catch (error) {
+    state.scientificDataResults = [];
+    showToast(error.message || "Scientific source search failed");
+  } finally {
+    state.scientificDataLoading = false;
+    renderSources();
+  }
+}
+
+function attachScientificResult(index) {
+  const record = state.scientificDataResults?.[Number(index)];
+  if (!record) return;
+  const source = (state.scientificDataSources.length ? state.scientificDataSources : scientificSourceFallback).find((item) => item.id === state.scientificDataSource);
+  const attached = { id: `evidence-${Date.now()}`, sourceId: state.scientificDataSource, sourceName: source?.name || state.scientificDataSource, query: state.scientificDataQuery, record, attachedAt: new Date().toISOString(), projectId: state.currentProjectId || "local" };
+  state.attachedScientificRecords = [attached, ...state.attachedScientificRecords.filter((item) => item.record?.id !== record.id)].slice(0, 100);
+  window.localStorage.setItem("axion-attached-scientific-records", JSON.stringify(state.attachedScientificRecords));
+  renderSources();
+  showToast(`${record.id || "Scientific record"} attached as model evidence`);
+}
+
 function renderSources() {
   const groups = [...new Set(scientificSources.map((item) => item.group))];
   const propertyCategories = [...new Set(propertyRows().map((item) => item.category))];
@@ -10162,6 +10340,7 @@ function renderSources() {
   const attachedRows = attachedSourceModelPackRows();
   els.sourcesBoard.innerHTML = `
     ${renderCompanyDataStudio()}
+    ${renderScientificDataNetwork()}
     <section class="source-hero">
       <div>
         <p>Data & source layer</p>
@@ -10930,6 +11109,79 @@ function renderVersionComparison(comparison) {
   `;
 }
 
+function renderFoundingCustomerPanel() {
+  if (state.account?.role !== "admin") return "";
+  const accounts = state.foundingAccounts || [];
+  const occupied = accounts.filter((item) => item.status !== "converted").length;
+  const credential = state.lastFoundingCredential;
+  return `
+    <section class="founding-access-panel">
+      <header>
+        <div><span>Founding-customer access</span><h3>Five controlled customer accounts</h3><p>Create complimentary accounts now, suspend them instantly, or move them to normal monthly billing when the pilot ends.</p></div>
+        <strong>${occupied}/5 slots occupied</strong>
+      </header>
+      <div class="founding-access-layout">
+        <form class="founding-account-form" data-founding-account-form>
+          <label>Name<input id="foundingName" name="name" required placeholder="Customer name" /></label>
+          <label>Username<input id="foundingUsername" name="username" required placeholder="customer.user" /></label>
+          <label>Email<input id="foundingEmail" name="email" type="email" required placeholder="name@company.com" /></label>
+          <label>Company<input id="foundingCompany" name="company" placeholder="Company" /></label>
+          <label>Access level<select id="foundingPlan" name="planId"><option value="professional">Professional</option><option value="team">Engineering Team</option><option value="academic">Research</option></select></label>
+          <label>Initial password<input id="foundingPassword" name="password" type="password" minlength="8" placeholder="Generate automatically" /></label>
+          <button class="primary" data-create-founding-account type="button" ${occupied >= 5 ? "disabled" : ""}>Create customer account</button>
+          <small>The password is hashed on the backend. An automatically generated password is shown once after creation.</small>
+        </form>
+        <div class="founding-account-list">
+          ${credential ? `<div class="founding-credential"><span>Share once through a secure channel</span><strong>${escapeHtml(credential.username)}</strong><code>${escapeHtml(credential.password)}</code><button data-clear-founding-credential type="button">Hide credential</button></div>` : ""}
+          ${accounts.length ? accounts.map((item) => `
+            <article class="founding-account-card status-${escapeAttr(item.status)}">
+              <div><span>Slot ${item.slot} · ${escapeHtml(item.status.replaceAll("_", " "))}</span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.username)} · ${escapeHtml(item.email)}</small></div>
+              <dl><dt>Plan</dt><dd>${escapeHtml(item.planName)}</dd><dt>Customer</dt><dd>${escapeHtml(item.customerNumber)}</dd><dt>Contract</dt><dd>${escapeHtml(item.contractNumber)}</dd></dl>
+              <footer>
+                ${item.status === "active" ? `<button data-founding-action="block" data-founding-id="${escapeAttr(item.id)}" type="button">Block</button><button data-founding-action="require_payment" data-founding-id="${escapeAttr(item.id)}" type="button">Move to paid plan</button>` : ""}
+                ${["blocked", "payment_required"].includes(item.status) ? `<button data-founding-action="unblock" data-founding-id="${escapeAttr(item.id)}" type="button">Restore complimentary access</button>` : ""}
+                ${item.status === "payment_required" ? `<a href="/?page=pricing&plan=${escapeAttr(item.planId)}" target="_blank" rel="noopener">Open checkout page</a>` : ""}
+                ${item.status === "converted" ? `<b>Paid subscription active</b>` : ""}
+              </footer>
+            </article>
+          `).join("") : `<article class="founding-account-card empty"><p>No founding-customer accounts created yet.</p></article>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+async function createFoundingCustomerAccount() {
+  const payload = {
+    name: document.querySelector("#foundingName")?.value || "",
+    username: document.querySelector("#foundingUsername")?.value || "",
+    email: document.querySelector("#foundingEmail")?.value || "",
+    company: document.querySelector("#foundingCompany")?.value || "",
+    planId: document.querySelector("#foundingPlan")?.value || "professional",
+    password: document.querySelector("#foundingPassword")?.value || "",
+  };
+  try {
+    const result = await apiRequest("/api/admin/founding-accounts", { method: "POST", body: JSON.stringify(payload) });
+    state.lastFoundingCredential = { username: result.account.username, password: result.temporaryPassword };
+    await refreshProjects();
+    showToast(`Founding account created in slot ${result.account.slot}`);
+  } catch (error) {
+    showToast(error.message || "Founding account could not be created");
+  }
+}
+
+async function updateFoundingCustomerAccount(accountId, action) {
+  const labels = { block: "block this account", unblock: "restore complimentary access", require_payment: "end complimentary access and require a subscription" };
+  if (!window.confirm(`Confirm: ${labels[action] || action}?`)) return;
+  try {
+    const result = await apiRequest(`/api/admin/founding-accounts/${encodeURIComponent(accountId)}`, { method: "PATCH", body: JSON.stringify({ action }) });
+    await refreshProjects();
+    showToast(action === "require_payment" ? "Account now requires paid checkout" : `Account ${result.account.status}`);
+  } catch (error) {
+    showToast(error.message || "Account status could not be changed");
+  }
+}
+
 function renderProjectsBoard() {
   if (!els.projectsBoard) return;
   const activeProject = state.projects.find((item) => item.id === state.currentProjectId);
@@ -10993,6 +11245,7 @@ function renderProjectsBoard() {
       </article>
     </section>
     ${renderProductionReadinessPanel()}
+    ${renderFoundingCustomerPanel()}
     <section class="project-grid">
       <div class="project-column">
         <h3>Open projects</h3>
@@ -13598,6 +13851,10 @@ function engineeringExportPackageData(existingReport = null) {
   addTable("Dynamics", "PDE transport", "Distributed axial oxygen and nutrient fields with residuals and transport groups.", report.axialTransportPde);
   addTable("Dynamics", "Equation solver workflow", "Equation-oriented dynamic solution workflow including ICs, BCs, discretization and validation.", report.gpromsAlgorithm);
   addTable("Dynamics", "PVSD parameters", "Convective-dispersive and particle-volume-distribution model parameter basis.", report.pvsdParameters);
+  addTable("Thermodynamics", "Flash equilibrium", "Wilson K-value and Rachford-Rice isothermal flash component results.", report.thermodynamicFlash);
+  addTable("Thermodynamics", "Phase envelope", "Temperature sweep of vapor fraction and detected phase state at fixed pressure.", report.thermodynamicPhaseEnvelope);
+  addTable("Energy", "Pinch heat cascade", "Problem-table heat cascade and minimum utility target at the configured approach temperature.", report.thermodynamicPinch);
+  addTable("Governance", "Simulator capability map", "Transparent Aspen-class capability status: executable, screening, integration-ready, or specialist-solver required.", report.thermodynamicCapabilityMatrix);
 
   addTable("TEA", "TEA detail", "Annual, per-product and uncertainty cost values with allocation and source basis.", report.tea);
   addTable("TEA", "Cost register", "CAPEX, facility, media, materials, labor, QA/QC, utilities, waste and direct-cost lines.", report.costs);
@@ -13664,6 +13921,7 @@ function engineeringExportPackageData(existingReport = null) {
   addTable("Data", "Databank workbook", "Equipment, component, property, parameter, cost and CIP/SIP project libraries.", report.databankWorkbook);
   addTable("Data", "Exchange workbook", "Structured handoff map for spreadsheets, APIs, historians, CFD, LCA, TEA and QMS.", report.exchangeWorkbook);
   addTable("Evidence", "Scientific sources", "Scientific source and standards register used by the current model.", report.sources);
+  addTable("Evidence", "Attached public records", "Public database records explicitly attached by a user as model evidence, retaining provider and source URL.", report.attachedScientificRecords);
   addTable("Evidence", "Source readiness", "Source-ingestion coverage, extracted data and remaining implementation work.", report.sourceIngestionReadiness);
   addTable("Data", "Company datasets", "Uploaded company data, column roles, quality flags, calibration targets and model use.", report.companyDatasets);
   addTable("Evidence", "Standards register", "Applicable standards, scope, model implementation and compliance evidence need.", report.standards);
@@ -14078,13 +14336,28 @@ async function downloadCompleteEngineeringPackage() {
   showToast(`${files.length} detailed files downloaded together`);
 }
 
+let comprehensiveReportCache = { key: "", value: null };
+
 function comprehensiveReport() {
+  const reportKey = [
+    massBalanceCacheKey(),
+    state.currentProjectId || "",
+    (state.datasets || []).map((item) => `${item.id}:${item.updatedAt || item.createdAt || ""}:${item.appliedAt || ""}`).join("|"),
+    state.projectVersions?.length || 0,
+    state.projectBranches?.length || 0,
+    state.advancedRun?.generatedAt || "",
+    state.cfdBackendJob?.updatedAt || state.cfdBackendJob?.createdAt || "",
+    JSON.stringify(state.thermodynamicInputs || {}),
+    (state.attachedScientificRecords || []).map((item) => `${item.provider || ""}:${item.record?.id || ""}:${item.attachedAt || ""}`).join("|"),
+  ].join("||");
+  if (comprehensiveReportCache.key === reportKey && comprehensiveReportCache.value) return comprehensiveReportCache.value;
   const solved = solveMassBalance();
   const plantSim = plantSimulationModel();
   const schedule = campaignSchedule();
   const sensitivityAnalysis = engineeringSensitivityRows();
   const parameterIntervals = engineeringIntervalRows();
-  return {
+  const thermodynamics = thermodynamicWorkbenchData();
+  const report = {
     template: state.template,
     product: activeTemplate().product,
     generatedAt: new Date().toISOString(),
@@ -14171,13 +14444,20 @@ function comprehensiveReport() {
     modelReadiness: modelReadinessAssessment(),
     modelReadinessRows: modelReadinessRows(),
     industrialValidation: industrialValidationAssessment(),
+    thermodynamicFlash: thermodynamics.flash.components,
+    thermodynamicPhaseEnvelope: thermodynamics.envelope,
+    thermodynamicPinch: thermodynamics.pinch.intervals,
+    thermodynamicCapabilityMatrix: thermodynamics.capabilityMatrix,
     advancedPlanning: advancedPlanningSuite(schedule),
     boundaries: evaluatePhysicalBoundaries(),
     standards,
     sources: scientificSources,
+    attachedScientificRecords: state.attachedScientificRecords,
     recommendations: simulationReadinessItems(),
     twinWorkspace,
   };
+  comprehensiveReportCache = { key: reportKey, value: report };
+  return report;
 }
 
 function renderReportsBoard() {
@@ -15570,16 +15850,8 @@ function setView(view) {
   const target = document.querySelector(`#${view}View`);
   if (!target) return;
   document.body.dataset.activeView = view;
-  if (view === "simulation") renderSimulationBoard();
-  if (view === "modelling") renderAdvancedModellingBoard();
-  if (view === "cfd") renderCfdBoard();
-  if (view === "reports") renderReportsBoard();
-  if (view === "recommendations") renderRecommendations();
-  if (view === "validation") renderValidationCenter();
-  if (view === "twin") {
-    renderTwinWorkspace();
-    refreshAutomationState({ silent: true });
-  }
+  renderActiveView(view);
+  if (view === "twin") refreshAutomationState({ silent: true });
   document.querySelectorAll(".view").forEach((item) => item.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
   document.querySelectorAll(".suite-link").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
@@ -15739,6 +16011,13 @@ async function handleReportDownload(type) {
   } else if (type === "advanced-run-json") {
     if (!state.advancedRun) runAdvancedModelActivity(state.advancedActivity);
     downloadJson(`${exportFilenameBase()}-${state.advancedRun.activity}-advanced-model-run.json`, { run: state.advancedRun, model: { template: state.template, scale: state.scale, operationMode: state.operationMode, projectId: state.currentProjectId } }, `Advanced modelling - ${state.advancedRun.title}`);
+  } else if (type === "thermodynamics-csv") {
+    const thermo = thermodynamicWorkbenchData();
+    downloadCsv(`${exportFilenameBase()}-thermodynamics-flash-and-phase.csv`, [
+      ...thermo.flash.components.map((item) => ({ recordType: "flash component", temperatureC: thermo.flash.temperatureC, pressureBar: thermo.flash.pressureBar, vaporFraction: thermo.flash.vaporFraction, phase: thermo.flash.phase, ...item })),
+      ...thermo.envelope.map((item) => ({ recordType: "phase envelope", ...item })),
+      ...thermo.pinch.intervals.map((item) => ({ recordType: "pinch interval", ...item, minimumHotUtilityKw: thermo.pinch.minimumHotUtilityKw, minimumColdUtilityKw: thermo.pinch.minimumColdUtilityKw })),
+    ], "Thermodynamics, flash and pinch screening");
   } else if (type === "full-canvas-svg") {
     downloadSvg(`${exportFilenameBase()}-full-process-canvas.svg`, fullProcessCanvasSvg());
   } else if (type === "sensitivity-csv") {
@@ -18333,10 +18612,11 @@ async function handleIntegrationAction(action, key) {
 
 async function refreshProjects() {
   try {
-    const [payload, datasetsPayload, readiness] = await Promise.all([
+    const [payload, datasetsPayload, readiness, foundingPayload] = await Promise.all([
       apiRequest("/api/projects"),
       apiRequest(`/api/datasets${state.currentProjectId ? `?projectId=${encodeURIComponent(state.currentProjectId)}` : ""}`).catch(() => ({ datasets: [] })),
       apiRequest("/api/production-readiness").catch(() => fallbackProductionReadiness()),
+      state.account?.role === "admin" ? apiRequest("/api/admin/founding-accounts").catch(() => ({ accounts: [] })) : Promise.resolve({ accounts: [] }),
     ]);
     state.projects = payload.projects || [];
     state.projectInvites = payload.invites || [];
@@ -18345,6 +18625,7 @@ async function refreshProjects() {
     state.projectFolders = payload.folders || {};
     state.datasets = datasetsPayload.datasets || [];
     state.productionReadiness = readiness;
+    state.foundingAccounts = foundingPayload.accounts || [];
   } catch {
     const store = normalizeLocalProjectOwnership(localProjectStore());
     state.projects = store.projects || [];
@@ -18372,9 +18653,7 @@ async function refreshProjects() {
       state.projectBranches = [{ id: `local-main-${state.currentProjectId}`, projectId: state.currentProjectId, name: "main", headVersionId: state.projectVersions[0]?.id || "" }];
     }
   }
-  renderProjectsBoard();
-  renderSources();
-  renderReportsBoard();
+  renderActiveView(document.body.dataset.activeView || "projects");
   renderProfileMenu();
 }
 
@@ -19162,37 +19441,49 @@ function bindPublicPointerMotion() {
 }
 
 function renderAll() {
-  renderStartBoard();
-  renderProjectsBoard();
   renderTemplateList();
   renderScaleList();
-  els.paletteSearch.value = state.paletteSearch;
-  renderPaletteGroups();
-  renderPalette();
-  renderSectionPresets();
-  renderCanvasFocus();
-  renderFlowDetail();
-  renderQuickAdd();
-  renderEquationSpotlight();
-  renderParameters();
   renderMetrics();
-  renderOverview();
-  renderCanvas();
-  renderTables();
-  renderEquations();
-  renderSimulationBoard();
-  renderAdvancedModellingBoard();
-  renderCfdBoard();
-  renderAiBoard();
-  renderStandards();
-  renderSources();
-  renderRecommendations();
-  renderValidationCenter();
-  renderTwinWorkspace();
-  renderEconomics();
-  renderReportsBoard();
   renderProfileMenu();
+  renderActiveView(document.body.dataset.activeView || "start");
   enhanceInteractiveSurfaces();
+}
+
+function renderActiveView(view = document.body.dataset.activeView || "start") {
+  const renderers = {
+    start: () => renderStartBoard(),
+    projects: () => renderProjectsBoard(),
+    overview: () => renderOverview(),
+    flowsheet: () => {
+      els.paletteSearch.value = state.paletteSearch;
+      renderPaletteGroups();
+      renderPalette();
+      renderSectionPresets();
+      renderCanvasFocus();
+      renderFlowDetail();
+      renderQuickAdd();
+      renderEquationSpotlight();
+      renderParameters();
+      renderCanvas();
+    },
+    equipment: () => renderTables(),
+    streams: () => renderTables(),
+    equations: () => renderEquations(),
+    simulation: () => renderSimulationBoard(),
+    modelling: () => renderAdvancedModellingBoard(),
+    cfd: () => renderCfdBoard(),
+    ai: () => renderAiBoard(),
+    standards: () => renderStandards(),
+    sources: () => renderSources(),
+    recommendations: () => renderRecommendations(),
+    validation: () => renderValidationCenter(),
+    twin: () => renderTwinWorkspace(),
+    economics: () => renderEconomics(),
+    reports: () => renderReportsBoard(),
+  };
+  const startedAt = performance.now();
+  (renderers[view] || renderers.overview)();
+  document.body.dataset.lastRenderMs = (performance.now() - startedAt).toFixed(1);
 }
 
 function bindEvents() {
@@ -19331,6 +19622,25 @@ function bindEvents() {
   });
 
   els.projectsBoard?.addEventListener("click", (event) => {
+    const createFoundingButton = event.target.closest("[data-create-founding-account]");
+    if (createFoundingButton) {
+      createFoundingCustomerAccount();
+      event.stopPropagation();
+      return;
+    }
+    const foundingActionButton = event.target.closest("[data-founding-action]");
+    if (foundingActionButton) {
+      updateFoundingCustomerAccount(foundingActionButton.dataset.foundingId, foundingActionButton.dataset.foundingAction);
+      event.stopPropagation();
+      return;
+    }
+    const clearFoundingCredential = event.target.closest("[data-clear-founding-credential]");
+    if (clearFoundingCredential) {
+      state.lastFoundingCredential = null;
+      renderProjectsBoard();
+      event.stopPropagation();
+      return;
+    }
     const createBranchButton = event.target.closest("[data-create-branch]");
     if (createBranchButton) {
       createProjectBranch();
@@ -19438,6 +19748,26 @@ function bindEvents() {
   });
 
   els.sourcesBoard?.addEventListener("click", (event) => {
+    const scientificSearchButton = event.target.closest("[data-search-scientific-data]");
+    if (scientificSearchButton) {
+      searchScientificData();
+      event.stopPropagation();
+      return;
+    }
+    const scientificSourceButton = event.target.closest("[data-select-scientific-source]");
+    if (scientificSourceButton) {
+      state.scientificDataSource = scientificSourceButton.dataset.selectScientificSource;
+      state.scientificDataResults = [];
+      renderSources();
+      event.stopPropagation();
+      return;
+    }
+    const attachScientificButton = event.target.closest("[data-attach-scientific-result]");
+    if (attachScientificButton) {
+      attachScientificResult(attachScientificButton.dataset.attachScientificResult);
+      event.stopPropagation();
+      return;
+    }
     const openFilesButton = event.target.closest("[data-open-plant-files]");
     if (openFilesButton) {
       event.preventDefault();
@@ -19501,6 +19831,12 @@ function bindEvents() {
     const fileInput = event.target.closest("#companyDataFile");
     if (!fileInput?.files?.length) return;
     await queuePlantDataFiles(fileInput.files);
+  });
+
+  els.sourcesBoard?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !event.target.closest("#scientificDataQuery")) return;
+    event.preventDefault();
+    searchScientificData();
   });
 
   els.sourcesBoard?.addEventListener("dragover", (event) => {
@@ -19863,6 +20199,18 @@ function bindEvents() {
   });
 
   els.modellingBoard?.addEventListener("click", (event) => {
+    const thermodynamicsButton = event.target.closest("[data-run-thermodynamics]");
+    if (thermodynamicsButton) {
+      state.thermodynamicInputs = {
+        temperatureC: Number(document.querySelector("#thermoTemperature")?.value || 37),
+        pressureBar: Number(document.querySelector("#thermoPressure")?.value || 1.2),
+        waterFraction: Number(document.querySelector("#thermoWater")?.value || 0.88),
+        ethanolFraction: Number(document.querySelector("#thermoEthanol")?.value || 0.1),
+      };
+      renderAdvancedModellingBoard();
+      showToast("Flash, phase sweep and pinch targets recalculated");
+      return;
+    }
     const downloadButton = event.target.closest("[data-download-report]");
     if (downloadButton) {
       requestReportDownload(downloadButton.dataset.downloadReport);
@@ -20029,6 +20377,7 @@ function initializeAuthenticatedWorkspace() {
   startAutomationPolling();
   setView("start");
   refreshProjects();
+  refreshScientificDataSources();
 }
 
 window.__AXION_ACCEPT_AUTH__ = (payload) => {
