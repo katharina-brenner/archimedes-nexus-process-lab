@@ -777,7 +777,7 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
     const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
     assert.match(schema, /create table if not exists public\.axion_state/);
     assert.match(schema, /create table if not exists public\.axion_documents/);
-    for (const table of ["axion_customers", "axion_contracts", "axion_customer_users", "axion_plan_entitlements", "axion_entitlement_overrides", "axion_subscription_events"]) {
+    for (const table of ["axion_customers", "axion_contracts", "axion_customer_users", "axion_plan_entitlements", "axion_entitlement_overrides", "axion_subscription_events", "axion_access_grants"]) {
       assert.match(schema, new RegExp(`create table if not exists public\\.${table}`));
     }
     assert.match(schema, /revoke all on table public\.axion_state[\s\S]*from anon, authenticated/);
@@ -788,6 +788,106 @@ test("login, projects, connector actions, CFD jobs and paywall setup", async () 
   } finally {
     await stopServer(server);
     await githubMock.close();
+  }
+});
+
+test("admin can manage exactly five complimentary founding-customer accounts", async () => {
+  const server = await startServer();
+  try {
+    const adminLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "owner", password: "owner-test-password" },
+    });
+    assert.equal(adminLogin.response.status, 200);
+    const adminToken = adminLogin.payload.token;
+
+    const scientificSources = await jsonFetch(server.baseUrl, "/api/scientific-data/sources", { token: adminToken });
+    assert.equal(scientificSources.response.status, 200);
+    assert.deepEqual(
+      scientificSources.payload.sources.map((source) => source.id),
+      ["pubchem", "chebi", "uniprot", "rhea", "europepmc"],
+    );
+
+    const created = [];
+    for (let index = 1; index <= 5; index += 1) {
+      const result = await jsonFetch(server.baseUrl, "/api/admin/founding-accounts", {
+        token: adminToken,
+        method: "POST",
+        body: {
+          name: `Founding Customer ${index}`,
+          username: `founding-${index}`,
+          email: `founding-${index}@example.com`,
+          company: `Pilot Company ${index}`,
+          planId: index === 5 ? "team" : "professional",
+        },
+      });
+      assert.equal(result.response.status, 201);
+      assert.equal(result.payload.account.slot, index);
+      assert.equal(result.payload.account.status, "active");
+      assert.match(result.payload.temporaryPassword, /^Axion-/);
+      assert.match(result.payload.account.customerNumber, /^AX-C-/);
+      assert.match(result.payload.account.contractNumber, /^AX-K-/);
+      created.push(result.payload);
+    }
+
+    const full = await jsonFetch(server.baseUrl, "/api/admin/founding-accounts", { token: adminToken });
+    assert.equal(full.response.status, 200);
+    assert.equal(full.payload.occupiedSlots, 5);
+    assert.equal(full.payload.availableSlots, 0);
+
+    const sixth = await jsonFetch(server.baseUrl, "/api/admin/founding-accounts", {
+      token: adminToken,
+      method: "POST",
+      body: { name: "Sixth Customer", username: "founding-6", email: "founding-6@example.com", planId: "professional" },
+    });
+    assert.equal(sixth.response.status, 409);
+
+    const pilotLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "founding-1", password: created[0].temporaryPassword },
+    });
+    assert.equal(pilotLogin.response.status, 200);
+    assert.equal(pilotLogin.payload.account.entitlements.planId, "professional");
+
+    const blocked = await jsonFetch(server.baseUrl, `/api/admin/founding-accounts/${created[0].account.id}`, {
+      token: adminToken,
+      method: "PATCH",
+      body: { action: "block" },
+    });
+    assert.equal(blocked.response.status, 200);
+    assert.equal(blocked.payload.account.status, "blocked");
+    const blockedAccount = await jsonFetch(server.baseUrl, "/api/account", { token: pilotLogin.payload.token });
+    assert.equal(blockedAccount.response.status, 403);
+    assert.equal(blockedAccount.payload.code, "ACCOUNT_SUSPENDED");
+
+    const restored = await jsonFetch(server.baseUrl, `/api/admin/founding-accounts/${created[0].account.id}`, {
+      token: adminToken,
+      method: "PATCH",
+      body: { action: "unblock" },
+    });
+    assert.equal(restored.response.status, 200);
+    assert.equal(restored.payload.account.status, "active");
+    const restoredLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "founding-1", password: created[0].temporaryPassword },
+    });
+    assert.equal(restoredLogin.response.status, 200);
+
+    const paymentRequired = await jsonFetch(server.baseUrl, `/api/admin/founding-accounts/${created[1].account.id}`, {
+      token: adminToken,
+      method: "PATCH",
+      body: { action: "require_payment" },
+    });
+    assert.equal(paymentRequired.response.status, 200);
+    assert.equal(paymentRequired.payload.account.status, "payment_required");
+    assert.equal(paymentRequired.payload.checkout.planId, "professional");
+    const expiredLogin = await jsonFetch(server.baseUrl, "/api/auth/login", {
+      method: "POST",
+      body: { user: "founding-2", password: created[1].temporaryPassword },
+    });
+    assert.equal(expiredLogin.response.status, 402);
+  } finally {
+    await stopServer(server);
   }
 });
 

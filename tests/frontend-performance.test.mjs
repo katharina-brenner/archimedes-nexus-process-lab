@@ -65,6 +65,25 @@ test("production assets use durable caching without caching HTML", async () => {
   assert.match(server, /htmlDocument[\s\S]+no-cache/);
 });
 
+test("workspace rendering is view-aware and caches expensive engineering calculations", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+  ]);
+  const renderAll = app.match(/function renderAll\(\) \{([\s\S]*?)\n\}/)?.[1] || "";
+
+  assert.match(app, /let metricsCache = \{ key: "", value: null \}/);
+  assert.match(app, /let comprehensiveReportCache = \{ key: "", value: null \}/);
+  assert.match(app, /function renderActiveView\(view = document\.body\.dataset\.activeView/);
+  assert.match(renderAll, /renderActiveView\(document\.body\.dataset\.activeView/);
+  assert.doesNotMatch(renderAll, /renderReportsBoard\(/);
+  assert.doesNotMatch(renderAll, /renderSimulationBoard\(/);
+  assert.doesNotMatch(renderAll, /renderCfdBoard\(/);
+  assert.doesNotMatch(renderAll, /renderTwinWorkspace\(/);
+  assert.match(app, /document\.body\.dataset\.lastRenderMs/);
+  assert.match(styles, /\.modelling-view\.active\s*\{[\s\S]*overflow-y:\s*auto/);
+});
+
 test("large process graphs are routed outside the UI thread", async () => {
   const [app, worker] = await Promise.all([
     readFile(new URL("../app.js", import.meta.url), "utf8"),
