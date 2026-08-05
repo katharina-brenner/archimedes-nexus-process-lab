@@ -15,7 +15,7 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(legacyIndex >= 0);
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
-  assert.match(html, /data-design-version="20260805-uniform-system-v4"/);
+  assert.match(html, /data-design-version="20260805-public-architecture-v1"/);
 });
 
 test("design system covers public, workspace, canvas, and reduced-motion states", () => {
@@ -29,8 +29,8 @@ test("design system covers public, workspace, canvas, and reduced-motion states"
 test("editorial layer covers the studio homepage, subpages, and accessible motion", () => {
   assert.match(editorialCss, /\.editorial-showcase\s*\{/);
   assert.match(editorialCss, /\.editorial-product-grid\s*\{/);
-  assert.match(editorialCss, /\.editorial-system-meta\s*\{/);
-  assert.match(editorialCss, /\.axion-system-orbit\s*\{/);
+  assert.match(editorialCss, /\.public-plant-hero\s*\{/);
+  assert.match(editorialCss, /\.security-principles\s*\{/);
   assert.match(editorialCss, /\.public-scroll-progress\s*\{/);
   assert.match(editorialCss, /body\.locked \.public-section\.public-page\s*\{/);
   assert.match(editorialCss, /@keyframes studio-flow/);

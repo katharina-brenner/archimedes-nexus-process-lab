@@ -86,7 +86,7 @@ test("public FAQ, subscription clarity, and internal discovery links are shipped
     readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
   ]);
   assert.match(html, /id="publicFaq"[\s\S]{0,180}data-public-page="faq"/);
-  assert.match(html, /Know what Axion does before you open it/);
+  assert.match(html, /Clear answers before you start/);
   assert.match(html, /Payment FAQ/);
   assert.match(html, /public-route-footer/);
   assert.match(html, /href="\.\/bioprocess-simulation-software"/);
@@ -107,11 +107,28 @@ test("public positioning sells an evidence-led engineering decision package", as
   ]);
   assert.match(html, /Best fit now/);
   assert.match(html, /Precision fermentation, cultivated products, industrial biotechnology/);
-  assert.match(html, /One reviewable engineering decision package/);
+  assert.match(html, /Outputs built for engineering review/);
   assert.match(html, /Validated models, dedicated infrastructure, and implementation/);
   assert.doesNotMatch(html, /SuperPro is probably|3 bis 6 Mio|Umsatzbandbreite/);
   assert.match(app, /function decisionPackageMarkup/);
   for (const label of ["Process basis", "Scale-up envelope", "Capacity plan", "Investment model", "Environmental model", "Transport + validation"]) {
     assert.ok(app.includes(label), `missing decision-package label: ${label}`);
   }
+});
+
+test("public architecture uses one route section and evidence instead of internal placeholders", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  for (const page of ["platform", "workflow", "ecosystem", "readiness"]) {
+    const matches = html.match(new RegExp(`data-public-page="${page}"`, "g")) || [];
+    assert.equal(matches.length, 1, `expected one public section for ${page}`);
+  }
+  assert.match(html, /class="public-plant-hero"/);
+  assert.match(html, /assets\/photography\/weihenstephan-kombikeller-1600\.jpg/);
+  assert.match(html, /assets\/product\/axion-flowsheet-workspace\.png/);
+  assert.match(html, /assets\/product\/axion-plant-overview\.png/);
+  assert.match(html, /assets\/product\/axion-tea-lca\.png/);
+  assert.doesNotMatch(html, /Professional Web App Readiness/);
+  assert.doesNotMatch(html, /External setup needed/);
+  assert.doesNotMatch(html, /Current product evidence, not a future-state concept/);
+  assert.doesNotMatch(html, /class="axion-system-orbit"/);
 });
