@@ -152,3 +152,37 @@ test("every public detail control resolves through the lightweight public story 
   assert.match(bootstrap, /\/product\?detail=/);
   assert.match(bootstrap, /submitTechnicalPilot/);
 });
+
+test("brand page ships the official pixel mark, CI palette, and downloadable SVG variants", async () => {
+  const [html, bootstrap, server, sitemap, mark, favicon] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
+    readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
+    readFile(new URL("../assets/axion-mark.svg", import.meta.url), "utf8"),
+    readFile(new URL("../assets/axion-favicon.svg", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /id="publicBrand"[\s\S]{0,180}data-public-page="brand"/);
+  assert.match(html, /One precise mark\. One industrial identity\./);
+  assert.match(html, /Complete SVG \+ CI pack/);
+  for (const file of [
+    "axion-mark-navy.svg",
+    "axion-mark-blue.svg",
+    "axion-mark-light.svg",
+    "axion-mark-amber.svg",
+    "axion-mark-mono-navy.svg",
+    "axion-mark-mono-white.svg",
+    "axion-wordmark-navy.svg",
+    "axion-wordmark-white.svg",
+    "axion-brand-assets.zip",
+  ]) {
+    await access(new URL(`../public/brand-assets/${file}`, import.meta.url));
+    assert.ok(html.includes(file), `brand page does not link ${file}`);
+  }
+  assert.match(bootstrap, /brand: "brand"/);
+  assert.match(server, /"\/brand"/);
+  assert.match(sitemap, /https:\/\/ax-i-on\.com\/brand/);
+  assert.match(mark, /pixel axolotl mark/);
+  assert.match(mark, /<rect x="8" y="12"/);
+  assert.match(favicon, /rx="13" fill="#081f33"/);
+});

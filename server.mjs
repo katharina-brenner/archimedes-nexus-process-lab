@@ -433,6 +433,10 @@ const seoRouteMeta = Object.freeze({
     title: "Impressum, Privacy and Terms | Axion Process OS",
     description: "Read provider information, privacy, subscription, and engineering-use terms for Axion Process OS.",
   },
+  "/brand": {
+    title: "Axion Process OS Brand Assets and Corporate Identity",
+    description: "Download official Axion Process OS SVG logos and review the industrial color, typography, spacing, and usage system.",
+  },
   "/login": {
     title: "Sign in or Start Axion Professional | Axion Process OS",
     description: "Sign in to Axion Process OS or start a professional bioprocess modelling workspace through secure Stripe Checkout.",

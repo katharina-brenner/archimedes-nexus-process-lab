@@ -24,6 +24,7 @@ const routePages = {
   pricing: "pricing",
   pilot: "pilot",
   legal: "legal",
+  brand: "brand",
   login: "login",
 };
 const pathPage = routePages[window.location.pathname.replace(/^\/+|\/+$/g, "")];
@@ -47,6 +48,7 @@ const publicTargetPaths = {
   publicPricing: "/pricing",
   publicPilot: "/pilot",
   publicLegal: "/legal",
+  publicBrand: "/brand",
   loginPanel: "/login",
 };
 
@@ -454,6 +456,7 @@ function markActivePublicNavigation() {
     compare: "publicResources",
     migration: "publicResources",
     readiness: "publicResources",
+    brand: "publicResources",
     faq: "publicFaq",
     pricing: "publicPricing",
     pilot: "publicPilot",
@@ -673,7 +676,7 @@ window.addEventListener("popstate", () => {
 
 const lightweightPublicPages = new Set([
   "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",
-  "biopharma", "fermentation", "compare", "migration", "readiness", "faq", "pricing", "pilot", "legal", "login",
+  "biopharma", "fermentation", "compare", "migration", "readiness", "faq", "pricing", "pilot", "legal", "brand", "login",
 ]);
 const requiresWorkspaceBundle = !lightweightPublicPages.has(requestedPage)
   || (Boolean(session) && requestedPage === "home");

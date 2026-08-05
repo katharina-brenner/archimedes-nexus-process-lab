@@ -18,7 +18,7 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
   assert.ok(unifiedIndex > editorialIndex);
-  assert.match(html, /data-design-version="20260805-enterprise-public-v1"/);
+  assert.match(html, /data-design-version="20260805-brand-ci-v1"/);
   assert.match(unifiedCss, /Axion unified interface layer/);
   assert.match(unifiedCss, /Final alignment system/);
   assert.match(unifiedCss, /--public-content:\s*1240px/);
@@ -27,6 +27,9 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.match(unifiedCss, /assets\/axion-mark\.svg/);
   assert.match(unifiedCss, /Enterprise public system/);
   assert.match(unifiedCss, /\.public-enterprise-detail/);
+  assert.match(unifiedCss, /Axion corporate identity/);
+  assert.match(unifiedCss, /--ax-accent:\s*#2f63f5/);
+  assert.match(unifiedCss, /--ax-amber:\s*#f4b942/);
   assert.match(html, /assets\/photography\/axion-autonomous-bioprocess-hall-v1\.jpg/);
   assert.match(html, /assets\/photography\/axion-integrated-production-train-v1\.jpg/);
   assert.doesNotMatch(editorialCss, /Final alignment system/);

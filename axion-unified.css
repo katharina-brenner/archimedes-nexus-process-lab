@@ -5,34 +5,36 @@
 /* Final alignment system. All public routes share one geometry and contrast model. */
 
 :root {
-  --ax-bg: #e9eeec;
-  --ax-bg-deep: #dce4e1;
-  --ax-surface: #f7f9f7;
+  --ax-bg: #edf2f4;
+  --ax-bg-deep: #dce6eb;
+  --ax-surface: #f7f9fa;
   --ax-surface-strong: #ffffff;
-  --ax-surface-soft: #e2e9e6;
-  --ax-shell: #0b1d27;
-  --ax-shell-raised: #132b34;
-  --ax-shell-soft: #24464b;
-  --ax-ink: #102631;
-  --ax-muted: #5d7076;
-  --ax-quiet: #809096;
-  --ax-line: #c7d2cf;
-  --ax-line-strong: #9eafab;
-  --ax-accent: #4e9180;
-  --ax-accent-soft: #d8e8e2;
-  --ax-accent-strong: #286b5d;
-  --ax-cyan: #718f96;
-  --ax-blue: #567587;
-  --studio-paper: #f2f5f3;
-  --studio-paper-strong: #fbfcfb;
-  --studio-paper-deep: #e2e8e5;
-  --studio-ink: #102631;
-  --studio-muted: #5d6a70;
-  --studio-line: rgba(16, 38, 49, 0.16);
-  --studio-mint: #d8e8e2;
-  --studio-mint-strong: #2f7768;
-  --studio-cobalt: #456c7c;
-  --studio-night: #102631;
+  --ax-surface-soft: #e5ebef;
+  --ax-shell: #081f33;
+  --ax-shell-raised: #102c43;
+  --ax-shell-soft: #1d475b;
+  --ax-ink: #142c3a;
+  --ax-muted: #536b78;
+  --ax-quiet: #7b8d97;
+  --ax-line: #c6d2d8;
+  --ax-line-strong: #9dafb8;
+  --ax-accent: #2f63f5;
+  --ax-accent-soft: #e5ebff;
+  --ax-accent-strong: #244fd0;
+  --ax-cyan: #2a8f83;
+  --ax-blue: #2f63f5;
+  --ax-amber: #f4b942;
+  --ax-coral: #e6685d;
+  --studio-paper: #f4f7f8;
+  --studio-paper-strong: #fbfcfd;
+  --studio-paper-deep: #e5ebef;
+  --studio-ink: #142c3a;
+  --studio-muted: #536b78;
+  --studio-line: rgba(8, 31, 51, 0.15);
+  --studio-mint: #e5ebff;
+  --studio-mint-strong: #244fd0;
+  --studio-cobalt: #2f63f5;
+  --studio-night: #081f33;
   --public-content: 1240px;
   --public-gutter: 32px;
   --public-label-track: 220px;
@@ -40,7 +42,332 @@
   --public-section-space: 88px;
 }
 
-/* One restrained aquatic mark replaces the historical pixel-creature geometry. */
+/* Axion corporate identity. Navy is the foundation, blue signals interaction,
+   teal carries process evidence, and amber is reserved for emphasis. */
+body.locked :where(.public-primary, .login-button, .public-nav-login) {
+  color: #ffffff !important;
+  background: #081f33 !important;
+  border-color: #081f33 !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login):hover {
+  background: #2f63f5 !important;
+  border-color: #2f63f5 !important;
+}
+
+body.locked :where(a, button, input, select, textarea):focus-visible,
+body:not(.locked) :where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(47, 99, 245, 0.34) !important;
+  outline-offset: 2px !important;
+}
+
+body.locked .case-study-actions button.active,
+body.locked .case-study-actions button:hover {
+  color: #173ea8 !important;
+  background: #e5ebff !important;
+  border-color: #e5ebff !important;
+}
+
+body.locked .public-enterprise-detail footer a {
+  color: #ffffff !important;
+  background: #2f63f5 !important;
+}
+
+body.locked .public-brand-page .brand-signature h3 {
+  color: #ffffff !important;
+}
+
+body.locked .public-brand-page .brand-signature > div > span {
+  color: #9db7ff !important;
+}
+
+body.locked .public-brand-page {
+  padding-bottom: 112px !important;
+}
+
+body.locked .brand-signature {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.65fr) minmax(0, 1.35fr);
+  gap: 56px;
+  align-items: center;
+  margin: 64px 0 96px;
+  padding: 54px;
+  color: #f8fbfa;
+  background: #081f33;
+  border-radius: 18px;
+}
+
+body.locked .brand-signature figure {
+  display: grid;
+  min-height: 300px;
+  margin: 0;
+  place-items: center;
+  background: #ffffff;
+  border-radius: 14px;
+}
+
+body.locked .brand-signature img {
+  width: min(220px, 72%);
+  height: auto;
+}
+
+body.locked .brand-signature span,
+body.locked :where(.brand-downloads, .brand-palette) > header p,
+body.locked .brand-guidance article > span {
+  color: #7fa2ff;
+  font-family: var(--studio-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.locked .brand-signature h3 {
+  max-width: 680px;
+  margin: 14px 0 18px;
+  color: #ffffff;
+  font-size: clamp(36px, 4vw, 56px);
+  line-height: 1.02;
+}
+
+body.locked .brand-signature p {
+  max-width: 680px;
+  margin: 0 0 28px;
+  color: #bed0da;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+body.locked .brand-signature a,
+body.locked .brand-downloads a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  color: #ffffff;
+  background: #2f63f5;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+body.locked :where(.brand-downloads, .brand-palette) {
+  margin: 0 0 96px;
+}
+
+body.locked :where(.brand-downloads, .brand-palette) > header {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 56px;
+  align-items: end;
+  margin-bottom: 34px;
+}
+
+body.locked :where(.brand-downloads, .brand-palette) > header p {
+  margin: 0;
+  color: #244fd0;
+}
+
+body.locked :where(.brand-downloads, .brand-palette) > header h3 {
+  max-width: 760px;
+  margin: 0;
+  color: #142c3a;
+  font-size: clamp(32px, 3.3vw, 46px);
+  line-height: 1.06;
+}
+
+body.locked .brand-downloads > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+body.locked .brand-downloads article {
+  display: grid;
+  grid-template-rows: 220px auto auto auto;
+  gap: 9px;
+  min-width: 0;
+}
+
+body.locked .brand-downloads article figure {
+  display: grid;
+  margin: 0 0 8px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid rgba(8, 31, 51, 0.13);
+  border-radius: 14px;
+}
+
+body.locked .brand-downloads article figure img {
+  width: 126px;
+  height: 126px;
+  transition: transform 260ms ease;
+}
+
+body.locked .brand-downloads article:hover figure img {
+  transform: scale(1.045);
+}
+
+body.locked .brand-logo-navy,
+body.locked .brand-logo-blue,
+body.locked .brand-logo-amber {
+  background: #dfe6ea;
+}
+
+body.locked .brand-logo-light {
+  background: #ffffff;
+}
+
+body.locked .brand-downloads article strong {
+  color: #142c3a;
+  font-size: 16px;
+}
+
+body.locked .brand-downloads article > span {
+  min-height: 42px;
+  color: #5a6e79;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+body.locked .brand-downloads article > a {
+  width: max-content;
+  min-height: 36px;
+  padding: 8px 14px;
+}
+
+body.locked .brand-downloads > footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(8, 31, 51, 0.14);
+}
+
+body.locked .brand-downloads > footer a {
+  color: #173ea8;
+  background: #e5ebff;
+}
+
+body.locked .brand-palette > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid rgba(8, 31, 51, 0.14);
+  border-bottom: 1px solid rgba(8, 31, 51, 0.14);
+}
+
+body.locked .brand-palette article {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 4px 14px;
+  align-items: center;
+  padding: 22px 20px;
+  border-right: 1px solid rgba(8, 31, 51, 0.12);
+  border-bottom: 1px solid rgba(8, 31, 51, 0.12);
+}
+
+body.locked .brand-palette article i {
+  display: block;
+  width: 52px;
+  height: 52px;
+  grid-row: 1 / 3;
+  background: var(--brand-color);
+  border: 1px solid rgba(8, 31, 51, 0.12);
+  border-radius: 12px;
+}
+
+body.locked .brand-palette article strong {
+  color: #142c3a;
+  font-size: 14px;
+}
+
+body.locked .brand-palette article code {
+  color: #536b78;
+  font-family: var(--studio-mono);
+  font-size: 11px;
+}
+
+body.locked .brand-palette article span {
+  grid-column: 2;
+  color: #7b8d97;
+  font-size: 12px;
+}
+
+body.locked .brand-guidance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid rgba(8, 31, 51, 0.14);
+  border-bottom: 1px solid rgba(8, 31, 51, 0.14);
+}
+
+body.locked .brand-guidance article {
+  min-width: 0;
+  padding: 32px 28px 36px;
+  border-right: 1px solid rgba(8, 31, 51, 0.12);
+}
+
+body.locked .brand-guidance article > span {
+  color: #244fd0;
+}
+
+body.locked .brand-guidance h3 {
+  margin: 16px 0 12px;
+  color: #142c3a;
+  font-size: 21px;
+}
+
+body.locked .brand-guidance p {
+  margin: 0;
+  color: #536b78;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+@media (max-width: 900px) {
+  body.locked .brand-signature {
+    grid-template-columns: 1fr;
+  }
+
+  body.locked .brand-downloads > div,
+  body.locked .brand-palette > div,
+  body.locked .brand-guidance {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  body.locked .brand-signature {
+    gap: 32px;
+    margin: 42px 0 70px;
+    padding: 26px;
+  }
+
+  body.locked .brand-signature figure {
+    min-height: 230px;
+  }
+
+  body.locked :where(.brand-downloads, .brand-palette) > header,
+  body.locked .brand-downloads > div,
+  body.locked .brand-palette > div,
+  body.locked .brand-guidance {
+    grid-template-columns: 1fr;
+  }
+
+  body.locked .brand-downloads article {
+    grid-template-rows: 200px auto auto auto;
+  }
+
+  body.locked .brand-guidance article,
+  body.locked .brand-palette article {
+    border-right: 0;
+  }
+}
+
+/* Axion pixel axolotl. The rounded-square container is part of the signature. */
 .technical-logo,
 .help-logo {
   overflow: visible !important;
@@ -70,13 +397,15 @@
 
 body.locked .public-brand .brand-mark {
   color: #ffffff !important;
-  background: var(--studio-ink) !important;
-  border-radius: 50% !important;
+  background: #081f33 !important;
+  border-radius: 11px !important;
 }
 
 body:not(.locked) .sidebar .brand-mark,
 body:not(.locked) .help-logo {
-  color: #eef6f3 !important;
+  color: #f8fbfa !important;
+  background: #081f33 !important;
+  border-radius: 11px !important;
 }
 
 body.locked .public-section.public-page,
@@ -1043,9 +1372,9 @@ body:not(.locked) .help-logo::before {
 
 body:not(.locked) .suite-link.active,
 body:not(.locked) .suite-link[aria-current="page"] {
-  color: #f4faf7 !important;
-  background: #244f4a !important;
-  border-color: #3f7168 !important;
+  color: #ffffff !important;
+  background: #244fd0 !important;
+  border-color: #2f63f5 !important;
 }
 
 @media (max-width: 900px) {
@@ -1239,8 +1568,8 @@ body.locked .public-nav-links a > span {
 
 body.locked .public-nav-links a:hover,
 body.locked .public-nav-links a[aria-current="page"] {
-  color: #12372f !important;
-  background: #dfeae6 !important;
+  color: #173ea8 !important;
+  background: #e5ebff !important;
 }
 
 body.locked .public-nav-login {
@@ -1750,4 +2079,36 @@ body.locked .public-route-footer {
   body.locked .public-route-footer {
     width: calc(100% - 28px) !important;
   }
+}
+
+/* Final CI color authority. */
+body.locked :where(.public-primary, .login-button, .public-nav-login) {
+  color: #ffffff !important;
+  background: #081f33 !important;
+  border-color: #081f33 !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login):hover {
+  background: #2f63f5 !important;
+  border-color: #2f63f5 !important;
+}
+
+body.locked .case-study-actions button.active,
+body.locked .case-study-actions button:hover {
+  color: #173ea8 !important;
+  background: #e5ebff !important;
+  border-color: #e5ebff !important;
+}
+
+body.locked .public-enterprise-detail footer a {
+  color: #ffffff !important;
+  background: #2f63f5 !important;
+}
+
+body.locked .public-brand-page .brand-signature h3 {
+  color: #ffffff !important;
+}
+
+body.locked .public-brand-page .brand-signature > div > span {
+  color: #9db7ff !important;
 }
