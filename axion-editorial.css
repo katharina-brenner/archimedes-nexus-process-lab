@@ -2325,3 +2325,243 @@ body.locked #publicPricing .pricing-grid article {
     grid-column: auto;
   }
 }
+
+/* Professional uniformity pass. Keep one visual grammar across every surface. */
+
+:root {
+  --studio-text: #263646;
+  --studio-text-muted: #556473;
+  --studio-surface: rgba(255, 255, 255, 0.58);
+  --studio-surface-strong: #fbfbf9;
+  --studio-border: rgba(6, 26, 51, 0.16);
+  --studio-radius-control: 10px;
+  --studio-radius-card: 14px;
+  --studio-radius-panel: 20px;
+  --studio-shadow-soft: 0 16px 44px rgba(6, 26, 51, 0.07);
+}
+
+body.locked .public-scroll {
+  color: var(--studio-text);
+}
+
+body.locked .public-section.public-page,
+body.locked #loginPanel.public-login,
+body.locked #publicPricing.public-pricing {
+  width: min(1240px, calc(100% - 64px)) !important;
+}
+
+body.locked .public-section .section-heading,
+body.locked .public-section > header:first-child,
+body.locked #loginPanel .access-heading {
+  grid-template-columns: minmax(150px, 0.38fr) minmax(0, 1.62fr) !important;
+  gap: clamp(32px, 6vw, 88px) !important;
+}
+
+body.locked .public-section .section-heading h2,
+body.locked .public-section > header:first-child h2,
+body.locked #loginPanel .access-heading h2 {
+  max-width: 920px;
+  font-size: clamp(42px, 4.6vw, 66px) !important;
+  line-height: 1.02 !important;
+}
+
+body.locked .public-section .section-heading > span,
+body.locked .public-section .section-heading > p:not(:first-child),
+body.locked .public-section > header:first-child > span,
+body.locked #loginPanel .access-heading > span,
+body.locked #publicPricing .section-heading > span {
+  color: var(--studio-text-muted) !important;
+  font-size: 15px !important;
+  line-height: 1.65 !important;
+}
+
+body.locked .public-section :where(.platform-grid, .ecosystem-grid, .usecase-grid, .public-example-grid) > article,
+body.locked .public-section :where(.public-faq-list details, .pricing-private, .comparison-note, .migration-offer, .resource-download-card),
+body.locked #loginPanel .access-card {
+  border: 1px solid var(--studio-border) !important;
+  border-radius: var(--studio-radius-card) !important;
+  box-shadow: none !important;
+}
+
+body.locked .public-section :where(figure, .editorial-case-media, .editorial-case-product img, .editorial-product-grid figure > img) {
+  overflow: hidden;
+  border-radius: var(--studio-radius-card) !important;
+}
+
+body.locked .public-section :where(.platform-grid, .ecosystem-grid, .usecase-grid, .public-example-grid) > article,
+body.locked .public-section .public-faq-list details {
+  background: var(--studio-surface) !important;
+}
+
+body.locked .public-section :where(article, details) :where(p, li, small),
+body.locked .public-section :where(.section-heading, header) > span {
+  color: var(--studio-text-muted);
+}
+
+body.locked :where(.public-primary, .public-secondary, .pricing-plan-button, .login-button, .checkout-link),
+body.locked .public-nav nav :where(a, button) {
+  min-height: 42px;
+  border-radius: var(--studio-radius-control) !important;
+  font-family: var(--studio-sans);
+  font-weight: 600;
+}
+
+body.locked :where(input, select, textarea) {
+  border-radius: var(--studio-radius-control) !important;
+}
+
+body.locked :where(.pricing-grid article, .pricing-billing-strip, .pricing-private) {
+  border-radius: var(--studio-radius-card) !important;
+}
+
+body.locked .pricing-billing-strip {
+  overflow: hidden;
+  color: #f7fbfa;
+  background: #173044 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+body.locked .pricing-billing-strip b {
+  color: #ffffff !important;
+}
+
+body.locked .pricing-billing-strip small {
+  color: #d5e0e2 !important;
+}
+
+body.locked #publicPricing .pricing-grid article {
+  color: #f7fbfa !important;
+  background: #0d2230 !important;
+  border: 1px solid rgba(168, 213, 207, 0.22) !important;
+  border-radius: var(--studio-radius-card) !important;
+}
+
+body.locked #publicPricing .pricing-grid article.pricing-featured {
+  border-color: rgba(111, 168, 255, 0.68) !important;
+  box-shadow: inset 0 3px 0 var(--studio-cobalt) !important;
+}
+
+body.locked #publicPricing .pricing-grid article :where(h3, strong) {
+  color: #ffffff !important;
+}
+
+body.locked #publicPricing .pricing-grid article :where(p, li, small) {
+  color: #c9d6da !important;
+}
+
+body.locked #publicPricing .pricing-grid article > span:first-child {
+  color: #a9bbc2 !important;
+}
+
+body.locked #loginPanel .access-card {
+  background: #0d2230 !important;
+}
+
+body.locked #loginPanel .access-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 20px !important;
+}
+
+body.locked #loginPanel .access-card {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.locked #loginPanel .access-card :where(p, small, span) {
+  color: #c7d5d8 !important;
+}
+
+body.locked .editorial-fit,
+body.locked .editorial-cta {
+  border-radius: var(--studio-radius-panel) !important;
+}
+
+body:not(.locked) {
+  --ax-radius-sm: 8px;
+  --ax-radius: 10px;
+  --ax-radius-lg: 14px;
+  --ax-panel-radius: 16px;
+}
+
+body:not(.locked) :where(
+  .kpi-card,
+  .canvas-frame,
+  .simulation-board,
+  .modelling-board,
+  .cfd-board,
+  .economics-view,
+  .reports-board,
+  .profile-card,
+  .data-source-panel,
+  .project-card,
+  .integration-card
+) {
+  border-radius: var(--ax-panel-radius) !important;
+}
+
+body:not(.locked) :where(
+  button,
+  input,
+  select,
+  textarea,
+  .suite-link,
+  .equipment-node,
+  .unit-card,
+  .equipment-library-item
+) {
+  border-radius: var(--ax-radius) !important;
+}
+
+body.locked .public-nav nav .public-menu-toggle {
+  display: none !important;
+}
+
+@media (max-width: 820px) {
+  body.locked .public-nav nav .public-menu-toggle {
+    display: inline-flex !important;
+  }
+
+  body.locked .public-section.public-page,
+  body.locked #loginPanel.public-login,
+  body.locked #publicPricing.public-pricing {
+    width: calc(100% - 36px) !important;
+  }
+
+  body.locked .public-section .section-heading,
+  body.locked .public-section > header:first-child,
+  body.locked #loginPanel .access-heading {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    margin-bottom: 38px !important;
+  }
+
+  body.locked .public-section .section-heading h2,
+  body.locked .public-section > header:first-child h2,
+  body.locked #loginPanel .access-heading h2 {
+    font-size: clamp(36px, 10.5vw, 52px) !important;
+  }
+
+  body.locked .public-section .section-heading > span,
+  body.locked .public-section .section-heading > p:not(:first-child),
+  body.locked #loginPanel .access-heading > span {
+    max-width: 620px;
+    font-size: 14px !important;
+  }
+
+  body.locked #loginPanel .access-panel {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 560px) {
+  :root {
+    --studio-radius-card: 12px;
+    --studio-radius-panel: 16px;
+  }
+
+  body.locked .public-section.public-page,
+  body.locked #loginPanel.public-login,
+  body.locked #publicPricing.public-pricing {
+    width: calc(100% - 28px) !important;
+  }
+}

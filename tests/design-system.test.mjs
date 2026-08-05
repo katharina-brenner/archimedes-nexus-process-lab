@@ -15,7 +15,7 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(legacyIndex >= 0);
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
-  assert.match(html, /data-design-version="20260804-process-system-v11"/);
+  assert.match(html, /data-design-version="20260805-uniform-system-v4"/);
 });
 
 test("design system covers public, workspace, canvas, and reduced-motion states", () => {
@@ -35,4 +35,13 @@ test("editorial layer covers the studio homepage, subpages, and accessible motio
   assert.match(editorialCss, /body\.locked \.public-section\.public-page\s*\{/);
   assert.match(editorialCss, /@keyframes studio-flow/);
   assert.match(editorialCss, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test("public and workspace surfaces share the uniform component grammar", () => {
+  assert.match(editorialCss, /--studio-radius-control:\s*10px/);
+  assert.match(editorialCss, /--studio-radius-card:\s*14px/);
+  assert.match(editorialCss, /--studio-text-muted:\s*#556473/);
+  assert.match(editorialCss, /body\.locked #publicPricing \.pricing-grid article/);
+  assert.match(editorialCss, /body\.locked \.public-nav nav \.public-menu-toggle/);
+  assert.match(editorialCss, /body:not\(\.locked\) :where\(/);
 });
