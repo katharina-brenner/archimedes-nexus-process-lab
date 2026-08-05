@@ -1169,3 +1169,585 @@ body:not(.locked) .suite-link[aria-current="page"] {
     margin-top: 28px;
   }
 }
+
+/* Enterprise public system.
+   One hierarchy for every route: proposition, evidence, capabilities, action. */
+body.locked #publicHome .public-plant-hero h1 {
+  font-size: clamp(56px, 5.1vw, 76px) !important;
+  font-weight: 560 !important;
+  line-height: 0.98 !important;
+}
+
+body.locked #publicHome :where(.editorial-audience, .editorial-product, .editorial-workflow) > header h2 {
+  max-width: 720px !important;
+  font-family: var(--studio-sans) !important;
+  font-size: clamp(42px, 3.8vw, 56px) !important;
+  font-weight: 600 !important;
+  line-height: 1.04 !important;
+}
+
+body.locked #publicHome .editorial-plant-context figcaption strong,
+body.locked #publicHome .editorial-cta h2 {
+  font-family: var(--studio-sans) !important;
+  font-weight: 600 !important;
+}
+
+body.locked #publicHome .editorial-plant-context figcaption strong {
+  font-size: 28px !important;
+}
+
+body.locked #publicHome .editorial-cta h2 {
+  font-size: clamp(38px, 3.4vw, 50px) !important;
+}
+
+body.locked #publicHome .editorial-workflow li > span {
+  font-family: var(--studio-sans) !important;
+  font-size: 15px !important;
+  font-weight: 750 !important;
+}
+
+body.locked .public-site,
+body.locked .public-scroll {
+  color: #18303a !important;
+  background: #f3f6f4 !important;
+}
+
+body.locked .public-nav {
+  min-height: 76px !important;
+  background: rgba(248, 250, 248, 0.96) !important;
+  border-bottom: 1px solid rgba(16, 38, 49, 0.12) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(18px);
+}
+
+body.locked .public-nav-links {
+  gap: 2px !important;
+}
+
+body.locked .public-nav-links a {
+  min-height: 40px !important;
+  padding: 10px 13px !important;
+  color: #334a53 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 999px !important;
+}
+
+body.locked .public-nav-links a > span {
+  display: none !important;
+}
+
+body.locked .public-nav-links a:hover,
+body.locked .public-nav-links a[aria-current="page"] {
+  color: #12372f !important;
+  background: #dfeae6 !important;
+}
+
+body.locked .public-nav-login {
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  color: #fff !important;
+  background: #102631 !important;
+  border-radius: 12px !important;
+}
+
+body.locked .public-section.public-page:not(#publicHome) {
+  padding-top: 76px !important;
+  padding-bottom: 112px !important;
+}
+
+body.locked .public-section > .section-heading:first-child,
+body.locked #loginPanel > .access-heading:first-child {
+  display: block !important;
+  max-width: 900px !important;
+  margin: 0 0 56px !important;
+}
+
+body.locked .public-section > .section-heading:first-child > p,
+body.locked #loginPanel > .access-heading:first-child > p {
+  margin: 0 0 14px !important;
+  color: #2f6d60 !important;
+  font-family: var(--studio-sans) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  text-transform: uppercase !important;
+}
+
+body.locked .public-section > .section-heading:first-child > h2,
+body.locked #loginPanel > .access-heading:first-child > h2 {
+  max-width: 860px !important;
+  margin: 0 !important;
+  color: #102631 !important;
+  font-family: var(--studio-sans) !important;
+  font-size: clamp(44px, 4.6vw, 64px) !important;
+  font-weight: 600 !important;
+  line-height: 1.02 !important;
+}
+
+body.locked .public-section > .section-heading:first-child > span,
+body.locked #loginPanel > .access-heading:first-child > span {
+  display: block !important;
+  max-width: 720px !important;
+  margin: 22px 0 0 !important;
+  color: #586a70 !important;
+  font-size: 16px !important;
+  line-height: 1.65 !important;
+}
+
+body.locked .public-subpage-gallery {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.55fr) !important;
+  gap: 18px !important;
+  margin: 0 0 76px !important;
+}
+
+body.locked .public-subpage-gallery > figure {
+  position: relative !important;
+  min-height: 440px !important;
+  overflow: hidden !important;
+  aspect-ratio: auto !important;
+  background: #102631 !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+body.locked .public-subpage-gallery > figure img {
+  transition: transform 650ms cubic-bezier(0.2, 0.75, 0.2, 1) !important;
+}
+
+body.locked .public-subpage-gallery > figure:hover img {
+  transform: scale(1.018);
+}
+
+body.locked .public-subpage-gallery figcaption {
+  right: 18px !important;
+  bottom: 18px !important;
+  left: 18px !important;
+  padding: 22px !important;
+  color: #fff !important;
+  background: rgba(10, 31, 39, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 13px !important;
+  backdrop-filter: blur(14px);
+}
+
+body.locked .public-subpage-gallery figcaption > span {
+  color: #a9cbc2 !important;
+  font-size: 11px !important;
+}
+
+body.locked .public-subpage-gallery figcaption strong {
+  color: #fff !important;
+  font-size: 22px !important;
+}
+
+body.locked .public-subpage-gallery figcaption p {
+  color: #cfddda !important;
+  font-size: 13px !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) {
+  display: grid !important;
+  gap: 0 !important;
+  margin: 0 0 76px !important;
+  border-top: 1px solid rgba(16, 38, 49, 0.14) !important;
+  border-bottom: 1px solid rgba(16, 38, 49, 0.14) !important;
+}
+
+body.locked .platform-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body.locked :where(.workflow-rail, .public-example-grid, .ecosystem-grid) {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) > article {
+  min-height: 230px !important;
+  padding: 30px 32px !important;
+  color: #18303a !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-right: 1px solid rgba(16, 38, 49, 0.12) !important;
+  border-bottom: 1px solid rgba(16, 38, 49, 0.12) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) > article:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+  transform: none !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) article > span:first-child {
+  color: #2f6d60 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) h3 {
+  margin: 14px 0 12px !important;
+  color: #102631 !important;
+  font-family: var(--studio-sans) !important;
+  font-size: 23px !important;
+  font-weight: 600 !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) p,
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) article > span:not(:first-child) {
+  color: #5a6c72 !important;
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) button {
+  width: fit-content !important;
+  margin-top: 22px !important;
+  padding: 0 !important;
+  color: #1f6356 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  font-weight: 700 !important;
+}
+
+body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) button::after {
+  content: "  →";
+}
+
+body.locked #publicPlatform > .migration-grid,
+body.locked #publicWorkflow .workflow-examples,
+body.locked #publicEcosystem .ecosystem-examples,
+body.locked #publicComparison :where(.comparison-use-grid, .comparison-faq, .comparison-source) {
+  display: none !important;
+}
+
+body.locked .public-workflow-product {
+  margin: 0 0 76px !important;
+  overflow: hidden;
+  border: 1px solid rgba(16, 38, 49, 0.13) !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body.locked .public-case-study {
+  display: grid !important;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) !important;
+  gap: 42px !important;
+  margin: 18px 0 0 !important;
+  padding: 48px !important;
+  color: #fff !important;
+  background: #102631 !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+body.locked .public-case-study .case-study-copy {
+  min-width: 0;
+}
+
+body.locked .public-case-study :where(.case-study-map, .case-source-note) {
+  display: none !important;
+}
+
+body.locked .public-case-study .case-study-copy > p,
+body.locked .public-case-study .public-enterprise-detail > div > span {
+  color: #92c3b8 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+}
+
+body.locked .public-case-study h3 {
+  color: #fff !important;
+  font-family: var(--studio-sans) !important;
+  font-size: clamp(28px, 3vw, 42px) !important;
+  line-height: 1.08 !important;
+}
+
+body.locked .public-case-study .case-study-copy > span,
+body.locked .public-case-study .public-enterprise-detail p,
+body.locked .public-case-study .public-enterprise-detail li {
+  color: #c2d2cf !important;
+  font-size: 14px !important;
+  line-height: 1.65 !important;
+}
+
+body.locked .case-study-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 28px !important;
+}
+
+body.locked .case-study-actions button {
+  min-height: 38px !important;
+  padding: 0 14px !important;
+  color: #dce9e6 !important;
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 999px !important;
+}
+
+body.locked .case-study-actions button.active,
+body.locked .case-study-actions button:hover {
+  color: #102631 !important;
+  background: #d8e8e2 !important;
+  border-color: #d8e8e2 !important;
+}
+
+body.locked #publicDetailPanel {
+  min-width: 0;
+  min-height: 320px;
+}
+
+body.locked .public-enterprise-detail {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  height: 100%;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+body.locked .public-enterprise-detail h3 {
+  margin: 10px 0 14px !important;
+  font-size: clamp(30px, 3vw, 44px) !important;
+}
+
+body.locked .public-enterprise-detail ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+body.locked .public-enterprise-detail li {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.locked .public-enterprise-detail footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+body.locked .public-enterprise-detail footer a {
+  min-height: 42px;
+  padding: 11px 16px;
+  color: #102631 !important;
+  background: #d8e8e2;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+body.locked .public-enterprise-detail footer a + a {
+  color: #e3ece9 !important;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+body.locked .public-section > header.intent-hero:first-child,
+body.locked .resource-hero,
+body.locked .pilot-intro {
+  display: grid !important;
+  grid-template-columns: minmax(0, 0.9fr) minmax(520px, 1.1fr) !important;
+  gap: 52px !important;
+  align-items: center !important;
+  margin: 0 0 72px !important;
+  padding: 42px !important;
+  background: #fff !important;
+  border: 1px solid rgba(16, 38, 49, 0.12) !important;
+  border-radius: 18px !important;
+}
+
+body.locked .intent-hero h1,
+body.locked .resource-hero h1,
+body.locked .pilot-intro h2 {
+  max-width: 680px !important;
+  color: #102631 !important;
+  font-family: var(--studio-sans) !important;
+  font-size: clamp(42px, 4.2vw, 60px) !important;
+  font-weight: 600 !important;
+  line-height: 1.02 !important;
+}
+
+body.locked .intent-hero > figure,
+body.locked .resource-hero > figure,
+body.locked .pilot-intro > figure {
+  min-height: 400px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+body.locked :where(.intent-mode-strip, .intent-process-chain) {
+  gap: 8px !important;
+  margin-bottom: 48px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+body.locked :where(.intent-mode-strip, .intent-process-chain) span {
+  padding: 10px 14px !important;
+  color: #214b43 !important;
+  background: #dfeae6 !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+body.locked .intent-decision-grid {
+  gap: 0 !important;
+  margin-bottom: 72px !important;
+  border-top: 1px solid rgba(16, 38, 49, 0.14) !important;
+  border-bottom: 1px solid rgba(16, 38, 49, 0.14) !important;
+}
+
+body.locked .intent-decision-grid article {
+  min-height: 220px !important;
+  padding: 30px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-right: 1px solid rgba(16, 38, 49, 0.12) !important;
+  border-radius: 0 !important;
+}
+
+body.locked .intent-decision-grid h2 {
+  color: #102631 !important;
+  font-family: var(--studio-sans) !important;
+  font-size: 23px !important;
+}
+
+body.locked .intent-proof-pair {
+  gap: 18px !important;
+  margin: 0 0 72px !important;
+}
+
+body.locked .intent-proof-pair figure {
+  overflow: hidden;
+  background: #fff !important;
+  border: 1px solid rgba(16, 38, 49, 0.12) !important;
+  border-radius: 18px !important;
+}
+
+body.locked .intent-proof-pair img {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+body.locked :where(.intent-review-table, .intent-output-list > div, .comparison-table) {
+  background: #fff !important;
+  border-color: rgba(16, 38, 49, 0.13) !important;
+  border-radius: 14px !important;
+}
+
+body.locked #publicPricing .pricing-grid article,
+body.locked #loginPanel .access-card,
+body.locked .pilot-form,
+body.locked #publicFaq .public-faq-list details {
+  background: #fff !important;
+  border: 1px solid rgba(16, 38, 49, 0.13) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+body.locked .public-route-footer {
+  width: min(1240px, calc(100% - 64px)) !important;
+  margin: 0 auto !important;
+  padding: 48px 0 64px !important;
+  color: #53676e !important;
+  background: transparent !important;
+  border-top: 1px solid rgba(16, 38, 49, 0.14) !important;
+}
+
+@media (max-width: 980px) {
+  body.locked .public-subpage-gallery,
+  body.locked .public-section > header.intent-hero:first-child,
+  body.locked .resource-hero,
+  body.locked .pilot-intro,
+  body.locked .public-case-study {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.locked :where(.workflow-rail, .public-example-grid, .ecosystem-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.locked .public-subpage-gallery > figure {
+    min-height: 380px !important;
+  }
+}
+
+@media (max-width: 680px) {
+  body.locked .public-section.public-page:not(#publicHome) {
+    width: calc(100% - 28px) !important;
+    padding-top: 48px !important;
+    padding-bottom: 76px !important;
+  }
+
+  body.locked .public-section > .section-heading:first-child > h2,
+  body.locked #loginPanel > .access-heading:first-child > h2,
+  body.locked .intent-hero h1,
+  body.locked .resource-hero h1,
+  body.locked .pilot-intro h2 {
+    font-size: clamp(38px, 11vw, 48px) !important;
+  }
+
+  body.locked .public-subpage-gallery,
+  body.locked .platform-grid,
+  body.locked :where(.workflow-rail, .public-example-grid, .ecosystem-grid) {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.locked .public-subpage-gallery > figure {
+    min-height: 360px !important;
+  }
+
+  body.locked :where(.platform-grid, .workflow-rail, .ecosystem-grid, .public-example-grid) > article {
+    min-height: 0 !important;
+    padding: 26px 4px !important;
+    border-right: 0 !important;
+  }
+
+  body.locked .public-case-study,
+  body.locked .public-section > header.intent-hero:first-child,
+  body.locked .resource-hero,
+  body.locked .pilot-intro {
+    gap: 30px !important;
+    padding: 26px !important;
+  }
+
+  body.locked .intent-hero > figure,
+  body.locked .resource-hero > figure,
+  body.locked .pilot-intro > figure {
+    min-height: 280px !important;
+  }
+
+  body.locked .intent-decision-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.locked .intent-decision-grid article {
+    min-height: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(16, 38, 49, 0.12) !important;
+  }
+
+  body.locked .public-route-footer {
+    width: calc(100% - 28px) !important;
+  }
+}

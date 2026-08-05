@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { publicDetailKeys } from "../public-detail-stories.js";
 
 const root = new URL("..", import.meta.url);
 
@@ -132,4 +133,22 @@ test("public architecture uses one route section and evidence instead of interna
   assert.doesNotMatch(html, /External setup needed/);
   assert.doesNotMatch(html, /Current product evidence, not a future-state concept/);
   assert.doesNotMatch(html, /class="axion-system-orbit"/);
+});
+
+test("every public detail control resolves through the lightweight public story router", async () => {
+  const [html, bootstrap] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
+  ]);
+  const referencedKeys = [...html.matchAll(/data-public-detail="([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(referencedKeys.length >= 20);
+  for (const key of new Set(referencedKeys)) {
+    assert.ok(publicDetailKeys.includes(key), `missing public story for detail key: ${key}`);
+  }
+  assert.match(bootstrap, /function renderPublicDetail/);
+  assert.match(bootstrap, /function publicDetailPath/);
+  assert.match(bootstrap, /window\.addEventListener\("popstate"/);
+  assert.match(bootstrap, /aria-current/);
+  assert.match(bootstrap, /\/product\?detail=/);
+  assert.match(bootstrap, /submitTechnicalPilot/);
 });

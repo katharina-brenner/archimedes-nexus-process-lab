@@ -1,3 +1,5 @@
+import { publicDetailStories } from "./public-detail-stories.js";
+
 const publicGate = document.querySelector("#loginGate");
 const session = window.localStorage.getItem("axion-session");
 const params = new URLSearchParams(window.location.search);
@@ -26,6 +28,7 @@ const routePages = {
 };
 const pathPage = routePages[window.location.pathname.replace(/^\/+|\/+$/g, "")];
 const requestedPage = params.get("page") || pathPage || "home";
+const requestedDetail = params.get("detail");
 const publicTargetPaths = {
   publicHome: "/",
   publicPlatform: "/product",
@@ -398,6 +401,70 @@ function openPublicHome() {
   else window.location.assign("/");
 }
 
+function publicDetailPath(key) {
+  return `/product?detail=${encodeURIComponent(key)}`;
+}
+
+function renderPublicDetail(key = "mab-overview", { scroll = true, updateUrl = true } = {}) {
+  const story = publicDetailStories[key] || publicDetailStories["mab-overview"];
+  const resolvedKey = publicDetailStories[key] ? key : "mab-overview";
+  const panel = document.querySelector("#publicDetailPanel");
+  if (!panel) return false;
+
+  const next = publicDetailStories[story.next] || publicDetailStories["mab-overview"];
+  const nextKey = publicDetailStories[story.next] ? story.next : "mab-overview";
+  panel.innerHTML = `
+    <article class="public-enterprise-detail">
+      <div>
+        <span>${story.label}</span>
+        <h3>${story.title}</h3>
+        <p>${story.summary}</p>
+      </div>
+      <ul>${story.outcomes.map((outcome) => `<li>${outcome}</li>`).join("")}</ul>
+      <footer>
+        <a href="${publicDetailPath(nextKey)}" data-public-detail-next="${nextKey}">Next: ${next.label}</a>
+        <a href="/pilot" data-public-target="publicPilot">Discuss this workflow</a>
+      </footer>
+    </article>`;
+
+  document.querySelectorAll("[data-public-detail]").forEach((item) => {
+    const active = item.dataset.publicDetail === resolvedKey;
+    item.classList.toggle("active", active);
+    if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(active));
+  });
+
+  if (updateUrl && window.location.pathname === "/product") {
+    window.history.pushState({ detail: resolvedKey }, "", publicDetailPath(resolvedKey));
+  }
+  if (scroll) panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  return true;
+}
+
+function markActivePublicNavigation() {
+  const activeTargetByPage = {
+    platform: "publicPlatform",
+    workflow: "publicWorkflow",
+    ecosystem: "publicEcosystem",
+    simulation: "publicEcosystem",
+    scheduling: "publicEcosystem",
+    tea: "publicEcosystem",
+    biopharma: "publicEcosystem",
+    fermentation: "publicEcosystem",
+    resources: "publicResources",
+    compare: "publicResources",
+    migration: "publicResources",
+    readiness: "publicResources",
+    faq: "publicFaq",
+    pricing: "publicPricing",
+    pilot: "publicPilot",
+  };
+  const activeTarget = activeTargetByPage[requestedPage];
+  document.querySelectorAll(".public-nav-links [data-public-target]").forEach((link) => {
+    if (link.dataset.publicTarget === activeTarget) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+}
+
 function handOffToWorkspace(target) {
   loadWorkspace()
     .then(() => {
@@ -425,6 +492,18 @@ function interceptPublicAction(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     window.location.assign(`/login?plan=${encodeURIComponent(target.dataset.checkoutPlan)}`);
+    return;
+  }
+
+  const detailKey = target.dataset.publicDetailNext || target.dataset.publicDetail;
+  if (detailKey) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (window.location.pathname === "/product" && document.querySelector("#publicDetailPanel")) {
+      renderPublicDetail(detailKey);
+    } else {
+      window.location.assign(publicDetailPath(detailKey));
+    }
     return;
   }
 
@@ -488,6 +567,53 @@ async function submitPublicEngineeringBrief(event) {
   }
 }
 
+async function submitTechnicalPilot(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const result = form.querySelector("#pilotResult");
+  const button = form.querySelector('button[type="submit"]');
+  const payload = {
+    name: form.querySelector("#pilotName")?.value.trim() || "",
+    email: form.querySelector("#pilotEmail")?.value.trim() || "",
+    company: form.querySelector("#pilotCompany")?.value.trim() || "",
+    role: form.querySelector("#pilotRole")?.value.trim() || "",
+    process: form.querySelector("#pilotProcess")?.value || "",
+    challenge: form.querySelector("#pilotChallenge")?.value.trim() || "",
+    website: form.querySelector("#pilotWebsite")?.value || "",
+    consent: Boolean(form.querySelector("#pilotConsent")?.checked),
+    source: params.get("utm_source") || document.referrer || "website",
+    campaign: params.get("utm_campaign") || "technical-pilot",
+    landingPage: window.location.href,
+  };
+  button.disabled = true;
+  button.textContent = "Sending request...";
+  result.className = "pilot-result is-pending";
+  result.textContent = "Saving your process evaluation request securely.";
+  try {
+    const response = await fetch("/api/leads/pilot", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "The request could not be sent.");
+    result.className = "pilot-result is-success";
+    result.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = "Request received";
+    const copy = document.createElement("span");
+    copy.textContent = `Reference ${body.reference || "created"}. Axion will use your engineering question to prepare the next step.`;
+    result.append(heading, copy);
+    form.reset();
+  } catch (error) {
+    result.className = "pilot-result is-error";
+    result.textContent = error.message || "The request could not be sent. Please try again.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Request technical pilot";
+  }
+}
+
 async function submitMigrationAssessment(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -537,13 +663,19 @@ if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 bindPublicScrollProgress();
 bindPublicHeroMotion();
 bindPublicMenu();
+markActivePublicNavigation();
+if (requestedPage === "platform") renderPublicDetail(requestedDetail || "mab-overview", { scroll: false, updateUrl: false });
+window.addEventListener("popstate", () => {
+  if (window.location.pathname === "/product") {
+    renderPublicDetail(new URLSearchParams(window.location.search).get("detail") || "mab-overview", { scroll: false, updateUrl: false });
+  }
+});
 
 const lightweightPublicPages = new Set([
   "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",
-  "biopharma", "fermentation", "compare", "migration", "readiness", "faq", "pricing", "legal", "login",
+  "biopharma", "fermentation", "compare", "migration", "readiness", "faq", "pricing", "pilot", "legal", "login",
 ]);
-const requiresWorkspaceBundle = ["pilot"].includes(requestedPage)
-  || !lightweightPublicPages.has(requestedPage)
+const requiresWorkspaceBundle = !lightweightPublicPages.has(requestedPage)
   || (Boolean(session) && requestedPage === "home");
 
 if (requiresWorkspaceBundle) {
@@ -551,6 +683,7 @@ if (requiresWorkspaceBundle) {
 } else {
   document.addEventListener("click", interceptPublicAction, true);
   document.querySelector("#publicBriefSignupForm")?.addEventListener("submit", submitPublicEngineeringBrief);
+  document.querySelector("#pilotForm")?.addEventListener("submit", submitTechnicalPilot);
   document.querySelector("#migrationAssessmentForm")?.addEventListener("submit", submitMigrationAssessment);
   if (requestedPage === "login") {
     bindLightweightLogin();
