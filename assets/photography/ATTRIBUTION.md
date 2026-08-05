@@ -1,4 +1,15 @@
-# Photography attribution
+# Photography and visualization attribution
+
+The following Axion-owned concept visualizations were created specifically for
+the public website. They are not photographs of a named customer facility:
+
+- `axion-autonomous-bioprocess-hall-v1.jpg`
+  - Creator: Axion Process OS, generated with OpenAI image generation
+  - Context: Large autonomous biomanufacturing hall used as the homepage hero.
+
+- `axion-integrated-production-train-v1.jpg`
+  - Creator: Axion Process OS, generated with OpenAI image generation
+  - Context: Integrated stainless-steel production train used to explain whole-plant scope.
 
 The following files are sourced from Wikimedia Commons and are used on the
 Axion Process OS public website:

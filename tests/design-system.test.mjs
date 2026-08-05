@@ -18,12 +18,15 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
   assert.ok(unifiedIndex > editorialIndex);
-  assert.match(html, /data-design-version="20260805-stylesheet-system-v1"/);
+  assert.match(html, /data-design-version="20260805-brand-reduction-v1"/);
   assert.match(unifiedCss, /Axion unified interface layer/);
   assert.match(unifiedCss, /Final alignment system/);
   assert.match(unifiedCss, /--public-content:\s*1240px/);
   assert.match(unifiedCss, /header\.intent-hero:first-child/);
   assert.match(unifiedCss, /Alignment enforcement/);
+  assert.match(unifiedCss, /assets\/axion-mark\.svg/);
+  assert.match(html, /assets\/photography\/axion-autonomous-bioprocess-hall-v1\.jpg/);
+  assert.match(html, /assets\/photography\/axion-integrated-production-train-v1\.jpg/);
   assert.doesNotMatch(editorialCss, /Final alignment system/);
 });
 

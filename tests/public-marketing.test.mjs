@@ -86,7 +86,7 @@ test("public FAQ, subscription clarity, and internal discovery links are shipped
     readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
   ]);
   assert.match(html, /id="publicFaq"[\s\S]{0,180}data-public-page="faq"/);
-  assert.match(html, /Clear answers before you start/);
+  assert.match(html, /Clear answers for process and engineering teams/);
   assert.match(html, /Payment FAQ/);
   assert.match(html, /public-route-footer/);
   assert.match(html, /href="\.\/bioprocess-simulation-software"/);
@@ -105,9 +105,9 @@ test("public positioning sells an evidence-led engineering decision package", as
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
-  assert.match(html, /Best fit now/);
-  assert.match(html, /Precision fermentation, cultivated products, industrial biotechnology/);
-  assert.match(html, /Outputs built for engineering review/);
+  assert.match(html, /Built for the teams that turn biology into production/);
+  assert.match(html, /Process development \+ MSAT/);
+  assert.match(html, /See the whole production system/);
   assert.match(html, /Validated models, dedicated infrastructure, and implementation/);
   assert.doesNotMatch(html, /SuperPro is probably|3 bis 6 Mio|Umsatzbandbreite/);
   assert.match(app, /function decisionPackageMarkup/);
@@ -123,7 +123,8 @@ test("public architecture uses one route section and evidence instead of interna
     assert.equal(matches.length, 1, `expected one public section for ${page}`);
   }
   assert.match(html, /class="public-plant-hero"/);
-  assert.match(html, /assets\/photography\/weihenstephan-kombikeller-1600\.jpg/);
+  assert.match(html, /assets\/photography\/axion-autonomous-bioprocess-hall-v1\.jpg/);
+  assert.match(html, /assets\/photography\/axion-integrated-production-train-v1\.jpg/);
   assert.match(html, /assets\/product\/axion-flowsheet-workspace\.png/);
   assert.match(html, /assets\/product\/axion-plant-overview\.png/);
   assert.match(html, /assets\/product\/axion-tea-lca\.png/);
