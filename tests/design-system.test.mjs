@@ -7,19 +7,24 @@ const root = path.resolve(import.meta.dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "axion-design-system.css"), "utf8");
 const editorialCss = fs.readFileSync(path.join(root, "axion-editorial.css"), "utf8");
+const unifiedCss = fs.readFileSync(path.join(root, "axion-unified.css"), "utf8");
 
 test("clean-motion design system is loaded after the legacy stylesheet", () => {
   const legacyIndex = html.indexOf("styles.css?v=");
   const designIndex = html.indexOf("axion-design-system.css?v=");
   const editorialIndex = html.indexOf("axion-editorial.css?v=");
+  const unifiedIndex = html.indexOf("axion-unified.css?v=");
   assert.ok(legacyIndex >= 0);
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
-  assert.match(html, /data-design-version="20260805-alignment-system-v1"/);
-  assert.match(editorialCss, /Final alignment system/);
-  assert.match(editorialCss, /--public-content:\s*1240px/);
-  assert.match(editorialCss, /header\.intent-hero:first-child/);
-  assert.match(editorialCss, /Alignment enforcement/);
+  assert.ok(unifiedIndex > editorialIndex);
+  assert.match(html, /data-design-version="20260805-stylesheet-system-v1"/);
+  assert.match(unifiedCss, /Axion unified interface layer/);
+  assert.match(unifiedCss, /Final alignment system/);
+  assert.match(unifiedCss, /--public-content:\s*1240px/);
+  assert.match(unifiedCss, /header\.intent-hero:first-child/);
+  assert.match(unifiedCss, /Alignment enforcement/);
+  assert.doesNotMatch(editorialCss, /Final alignment system/);
 });
 
 test("design system covers public, workspace, canvas, and reduced-motion states", () => {
