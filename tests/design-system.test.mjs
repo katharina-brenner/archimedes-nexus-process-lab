@@ -15,7 +15,11 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(legacyIndex >= 0);
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
-  assert.match(html, /data-design-version="20260805-public-architecture-v1"/);
+  assert.match(html, /data-design-version="20260805-alignment-system-v1"/);
+  assert.match(editorialCss, /Final alignment system/);
+  assert.match(editorialCss, /--public-content:\s*1240px/);
+  assert.match(editorialCss, /header\.intent-hero:first-child/);
+  assert.match(editorialCss, /Alignment enforcement/);
 });
 
 test("design system covers public, workspace, canvas, and reduced-motion states", () => {
