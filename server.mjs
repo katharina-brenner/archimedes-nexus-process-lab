@@ -412,7 +412,7 @@ const seoRouteMeta = Object.freeze({
       { question: "Which production modes can Axion model?", answer: "Axion supports batch, fed-batch, perfusion, continuous and hybrid process architectures with mode-specific material balances, dynamic profiles, harvest logic, schedules and economic assumptions." },
       { question: "Is the Axion CFD view a validated CFD solver?", answer: "The in-app CFD view is an interactive engineering screen. Validated three-dimensional CFD requires a verified mesh, numerical settings, material models, convergence evidence and an external CFD worker such as OpenFOAM." },
       { question: "Can companies upload their own production data?", answer: "Yes. Projects accept customer-owned historian series, batch records, assays, recipes, schedules, utilities, TEA and LCA inventories and supplier quotes through structured CSV and JSON ingestion workflows." },
-      { question: "How are Axion subscriptions paid?", answer: "Monthly subscriptions use Stripe-hosted Checkout. Stripe handles payment credentials, while Axion stores only the customer, contract, plan, entitlement and verified subscription status required to control access." },
+      { question: "How are Axion subscriptions paid?", answer: "Research and Professional subscriptions accept credit and debit cards through Stripe-hosted Checkout. Team, Site and private contracts can also use invoice billing after company details are confirmed. Axion stores no card credentials." },
       { question: "Does Axion replace engineering validation?", answer: "No. Axion distinguishes screening, calibrated and decision-ready evidence. Qualified engineers remain responsible for safety, GMP, regulatory, equipment, validation and investment decisions." },
     ],
   },
@@ -420,7 +420,7 @@ const seoRouteMeta = Object.freeze({
     title: "Axion Process OS Pricing | Professional Bioprocess Modelling",
     description: "Compare monthly Axion Process OS plans for research, professional bioprocess modelling, engineering teams and governed enterprise sites.",
     faq: [
-      { question: "How does Axion subscription payment work?", answer: "Choose a monthly plan and continue to Stripe-hosted Checkout. Axion activates workspace access after Stripe confirms the subscription." },
+      { question: "How does Axion subscription payment work?", answer: "Choose a monthly plan and pay by credit or debit card through Stripe-hosted Checkout. Team, Site and private contracts can request invoice billing. Axion activates workspace access after payment or an approved contract is confirmed." },
       { question: "Can an Axion subscription be cancelled?", answer: "Yes. Active customers can use the Stripe customer portal from their Axion profile to manage payment methods, invoices and cancellation." },
       { question: "Does Axion store card or bank details?", answer: "No. Payment credentials are entered and stored with Stripe. Axion receives the verified customer and subscription status required for access control." },
     ],
