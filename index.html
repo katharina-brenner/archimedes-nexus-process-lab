@@ -23,7 +23,7 @@
     <link rel="preload" as="image" href="./assets/photography/weihenstephan-kombikeller-1600.jpg" />
     <link rel="stylesheet" href="./styles.css?v=20260803-payments-faq-v1" />
     <link rel="stylesheet" href="./axion-design-system.css?v=20260803-clean-motion-v1" />
-    <link rel="stylesheet" href="./axion-editorial.css?v=20260804-studio-v1" />
+    <link rel="stylesheet" href="./axion-editorial.css?v=20260804-process-system-v11" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -91,7 +91,7 @@
       }
     </script>
   </head>
-  <body class="locked" data-design-version="20260804-studio-v1">
+  <body class="locked" data-design-version="20260804-process-system-v11">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
       <div class="public-site">
         <header class="public-nav" aria-label="Axion front page navigation">
@@ -101,64 +101,104 @@
             <span class="public-brand-note">Bioprocess engineering, connected.</span>
           </button>
           <nav>
-            <a href="./product" data-public-target="publicPlatform">Product</a>
-            <a href="./workflow" data-public-target="publicWorkflow">How it works</a>
-            <a href="./solutions" data-public-target="publicEcosystem">Solutions</a>
-            <a href="./resources" data-public-target="publicResources">Resources</a>
-            <a href="./faq" data-public-target="publicFaq">FAQ</a>
-            <a href="./pricing" data-public-target="publicPricing">Pricing</a>
-            <a href="./pilot" data-public-target="publicPilot">Request pilot</a>
+            <button class="public-menu-toggle" type="button" aria-expanded="false" aria-controls="publicNavLinks">Menu</button>
+            <div id="publicNavLinks" class="public-nav-links">
+            <a href="./product" data-public-target="publicPlatform"><span>01</span> Product</a>
+            <a href="./workflow" data-public-target="publicWorkflow"><span>02</span> How it works</a>
+            <a href="./solutions" data-public-target="publicEcosystem"><span>03</span> Solutions</a>
+            <a href="./resources" data-public-target="publicResources"><span>04</span> Resources</a>
+            <a href="./faq" data-public-target="publicFaq"><span>05</span> FAQ</a>
+            <a href="./pricing" data-public-target="publicPricing"><span>06</span> Pricing</a>
+            <a href="./pilot" data-public-target="publicPilot"><span>07</span> Pilot</a>
+            </div>
             <button class="public-nav-login" type="button" data-public-target="loginPanel">Sign in</button>
           </nav>
+          <div class="public-scroll-progress" aria-hidden="true"><span></span></div>
         </header>
 
         <main class="public-scroll">
           <section id="publicHome" class="public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
             <div class="editorial-home">
-              <section class="editorial-intro" aria-label="Axion introduction">
-                <div>
-                  <p>Axion is where process development, MSAT, and plant engineering turn biology into an operable factory.</p>
-                  <span>One connected engineering model. From process brief to investment decision.</span>
+              <div class="editorial-system-meta" aria-label="Axion system context">
+                <span>48.1351° N · 11.5820° E</span>
+                <span>System / AX-001</span>
+                <span>Industrial process modelling · bioengineering · AI</span>
+              </div>
+              <section class="editorial-statement" aria-label="Axion value proposition">
+                <div class="editorial-statement-copy">
+                  <p class="editorial-kicker"><i></i>Industrial process modelling · bioengineering · AI</p>
+                  <h1>Turn complex <em>bioprocesses</em> into systems that scale.</h1>
+                  <div class="editorial-hero-bottom">
+                    <div class="editorial-hero-intro">
+                      <p>Axion connects process development, MSAT, plant engineering, and TEA/LCA in one quantitative, plant-wide engineering model.</p>
+                      <div class="editorial-intro-actions">
+                        <button class="public-primary" type="button" data-public-target="publicPilot">Request a pilot <span>↗</span></button>
+                        <button id="openLoginHero" class="public-secondary" type="button">Open workspace <span>↗</span></button>
+                      </div>
+                    </div>
+                    <div class="editorial-principle"><small>What Axion connects</small><p>Science → model →<br />decision → scale.</p></div>
+                  </div>
                 </div>
-                <div class="editorial-intro-actions">
-                  <button class="public-primary" type="button" data-public-target="publicPilot">Request a pilot</button>
-                  <button id="openLoginHero" class="public-secondary" type="button">Open workspace</button>
+                <div class="axion-system-orbit" aria-label="Connected Axion engineering loop">
+                  <span class="orbit-label orbit-model">Model</span>
+                  <span class="orbit-label orbit-scale">Scale</span>
+                  <span class="orbit-label orbit-build">Build</span>
+                  <i class="orbit-ring orbit-ring-outer"></i>
+                  <i class="orbit-ring orbit-ring-inner"></i>
+                  <i class="orbit-node orbit-node-one"></i>
+                  <i class="orbit-node orbit-node-two"></i>
+                  <i class="orbit-node orbit-node-three"></i>
+                  <div class="orbit-core"><small>Process</small><b>Decision</b></div>
                 </div>
               </section>
+
+              <section class="editorial-proof" aria-label="Current reference model scope">
+                <div><strong>76</strong><span>equipment objects<br />in the reference model</span></div>
+                <div><strong>81</strong><span>material, utility,<br />and support streams</span></div>
+                <div><strong>01</strong><span>connected engineering<br />decision package</span></div>
+                <p>Current product evidence, not a future-state concept.</p>
+              </section>
+
+              <div class="editorial-capabilities" aria-label="Axion capabilities">
+                <div>
+                  <span>Process architecture</span><i></i><span>Dynamic simulation</span><i></i><span>Scheduling</span><i></i><span>CFD screening</span><i></i><span>TEA + LCA</span><i></i><span>Versioning</span><i></i><span>Industrial data</span><i></i>
+                  <span aria-hidden="true">Process architecture</span><i aria-hidden="true"></i><span aria-hidden="true">Dynamic simulation</span><i aria-hidden="true"></i><span aria-hidden="true">Scheduling</span><i aria-hidden="true"></i><span aria-hidden="true">CFD screening</span><i aria-hidden="true"></i><span aria-hidden="true">TEA + LCA</span><i aria-hidden="true"></i><span aria-hidden="true">Versioning</span><i aria-hidden="true"></i><span aria-hidden="true">Industrial data</span><i aria-hidden="true"></i>
+                </div>
+              </div>
 
               <section class="editorial-showcase" aria-label="Axion process and product">
-                <figure class="editorial-case editorial-case-plant">
-                  <div class="editorial-case-media">
-                    <img src="./assets/photography/weihenstephan-kombikeller-1600.jpg" alt="Large stainless-steel industrial process installation at Bayerische Staatsbrauerei Weihenstephan" width="1600" height="1066" fetchpriority="high" />
-                    <div class="editorial-plant-signal" aria-hidden="true">
-                      <span>Media</span><i></i><span>Seed</span><i></i><span>BR</span><i></i><span>DSP</span>
+                <header class="editorial-showcase-heading">
+                  <span>01 / Product in context</span>
+                  <h2>See the whole plant. Then open the model behind it.</h2>
+                </header>
+                <div class="editorial-showcase-grid">
+                  <figure class="editorial-case editorial-case-plant">
+                    <div class="editorial-case-media">
+                      <img src="./assets/photography/weihenstephan-kombikeller-1600.jpg" alt="Large stainless-steel industrial process installation at Bayerische Staatsbrauerei Weihenstephan" width="1600" height="1066" fetchpriority="high" />
+                      <div class="editorial-plant-signal" aria-hidden="true">
+                        <span>Media</span><i></i><span>Seed</span><i></i><span>BR</span><i></i><span>DSP</span>
+                      </div>
                     </div>
-                  </div>
-                  <figcaption>
-                    <div><strong>Industrial biomanufacturing</strong><span>Whole-plant architecture</span></div>
-                    <p>Process · utilities · cleaning · automation</p>
-                  </figcaption>
-                </figure>
-                <figure class="editorial-case editorial-case-product">
-                  <div class="editorial-case-media">
-                    <img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion Flowsheet Studio with equipment library and connected bioprocess plant sections" width="1280" height="720" fetchpriority="high" />
-                  </div>
-                  <figcaption>
-                    <div><strong>Axion Process OS</strong><span>Flowsheet Studio</span></div>
-                    <button type="button" data-public-target="publicPlatform">Explore the product</button>
-                  </figcaption>
-                </figure>
-              </section>
-
-              <section class="editorial-statement" aria-label="Axion value proposition">
-                <p>We make the complete engineering decision visible.</p>
-                <h1>Design the process. Prove the scale. Operate the plant.</h1>
-                <a href="#product-preview">See how the model stays connected</a>
+                    <figcaption>
+                      <div><strong>Industrial biomanufacturing</strong><span>Whole-plant architecture</span></div>
+                      <p>Process · utilities · cleaning · automation</p>
+                    </figcaption>
+                  </figure>
+                  <figure class="editorial-case editorial-case-product">
+                    <div class="editorial-case-media">
+                      <img src="./assets/product/axion-flowsheet-workspace.png" alt="Axion Flowsheet Studio with equipment library and connected bioprocess plant sections" width="1280" height="720" fetchpriority="high" />
+                    </div>
+                    <figcaption>
+                      <div><strong>Axion Process OS</strong><span>Flowsheet Studio</span></div>
+                      <button type="button" data-public-target="publicPlatform">Explore the product</button>
+                    </figcaption>
+                  </figure>
+                </div>
               </section>
 
               <section class="editorial-audience" aria-label="Who should use Axion Process OS">
                 <header>
-                  <p>Built for the people who have to make it real</p>
+                  <p>02 / Built for the people who have to make it real</p>
                   <h2>One model, four engineering perspectives.</h2>
                 </header>
                 <div class="editorial-role-list">
@@ -183,7 +223,7 @@
 
               <section id="product-preview" class="editorial-product" aria-label="Current Axion software views">
                 <header>
-                  <p>Current product, not concept art</p>
+                  <p>03 / Current product, not concept art</p>
                   <h2>The plant, the physics, and the decision stay in view.</h2>
                 </header>
                 <div class="editorial-product-grid">
@@ -203,7 +243,7 @@
               </section>
 
               <section id="how-it-works" class="editorial-workflow" aria-label="How Axion works">
-                <header><p>One system from concept to decision</p><h2>Describe. Build. Refine.</h2></header>
+                <header><p>04 / One system from concept to decision</p><h2>Describe. Build. Refine.</h2></header>
                 <ol>
                   <li><span>01</span><div><h3>Describe the product</h3><p>Define biology, scale, quality target, facility context, and available company data.</p></div></li>
                   <li><span>02</span><div><h3>Build the production system</h3><p>Connect equipment, streams, utilities, cleaning, recycle, schedules, and controls.</p></div></li>
@@ -212,7 +252,7 @@
               </section>
 
               <section class="editorial-decisions" aria-label="Engineering decision package">
-                <header><p>What the team receives</p><h2>One reviewable engineering decision package.</h2></header>
+                <header><p>05 / What the team receives</p><h2>One reviewable engineering decision package.</h2></header>
                 <div>
                   <article><b>01</b><h3>Process architecture</h3><p>Editable PFD, equipment duties, material and utility streams, cleaning, recycle, and plant boundaries.</p></article>
                   <article><b>02</b><h3>Scale-up envelope</h3><p>Batch modes, ODE/PDE dynamics, oxygen, heat, metabolites, and physical operating limits.</p></article>
@@ -225,13 +265,13 @@
               </section>
 
               <section class="editorial-mission" aria-label="Axion mission">
-                <p>Our mission</p>
+                <p>06 / Our mission</p>
                 <h2>Make biomanufacturing design understandable before it becomes expensive.</h2>
                 <span>Axion turns scattered process knowledge into a living engineering model: visual enough for strategy, rigorous enough for scientists, and structured enough for engineering review.</span>
               </section>
 
               <section class="editorial-faq" aria-label="Frequently asked questions about Axion Process OS">
-                <header><p>Before you open the workspace</p><h2>Know what Axion does before you open it.</h2></header>
+                <header><p>07 / Before you open the workspace</p><h2>Know what Axion does before you open it.</h2></header>
                 <div class="public-faq-list">
                   <details><summary>Who should use Axion Process OS?</summary><p>Process-development, MSAT, manufacturing, plant-engineering, CDMO, TEA, and LCA teams that need one traceable model for process design, capacity, cost, environmental impact, and technical review.</p></details>
                   <details><summary>What comes out of a model?</summary><p>An editable flowsheet, equipment and stream data, balances, dynamic profiles, schedules, capacity results, TEA/LCA datasets, sensitivities, source records, validation gaps, and engineering exports.</p></details>
@@ -2015,6 +2055,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260803-payments-faq-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260804-process-system-v11"></script>
   </body>
 </html>

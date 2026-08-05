@@ -323,6 +323,76 @@ function showRequestedPublicPageImmediately(page) {
   return true;
 }
 
+function bindPublicScrollProgress() {
+  const progress = document.querySelector(".public-scroll-progress > span");
+  const publicScroll = document.querySelector(".public-scroll");
+  if (!progress || !publicScroll) return;
+
+  let frame = 0;
+  const update = () => {
+    frame = 0;
+    const documentScroller = document.scrollingElement;
+    const publicScrollable = publicScroll.scrollHeight > publicScroll.clientHeight + 2;
+    const scroller = publicScrollable ? publicScroll : documentScroller;
+    const maximum = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+    const ratio = Math.min(1, Math.max(0, scroller.scrollTop / maximum));
+    progress.style.transform = `scaleX(${ratio})`;
+  };
+  const scheduleUpdate = () => {
+    if (!frame) frame = window.requestAnimationFrame(update);
+  };
+
+  publicScroll.addEventListener("scroll", scheduleUpdate, { passive: true });
+  window.addEventListener("scroll", scheduleUpdate, { passive: true });
+  window.addEventListener("resize", scheduleUpdate, { passive: true });
+  update();
+}
+
+function bindPublicHeroMotion() {
+  const hero = document.querySelector(".editorial-statement");
+  const orbit = hero?.querySelector(".axion-system-orbit");
+  const allowsMotion = window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)").matches;
+  if (!hero || !orbit || !allowsMotion) return;
+
+  let frame = 0;
+  let pointerX = 0;
+  let pointerY = 0;
+  const update = () => {
+    frame = 0;
+    const bounds = hero.getBoundingClientRect();
+    const x = ((pointerX - bounds.left) / Math.max(1, bounds.width) - 0.5) * 22;
+    const y = ((pointerY - bounds.top) / Math.max(1, bounds.height) - 0.5) * 18;
+    orbit.style.setProperty("--orbit-x", `${x.toFixed(1)}px`);
+    orbit.style.setProperty("--orbit-y", `${y.toFixed(1)}px`);
+  };
+  hero.addEventListener("pointermove", (event) => {
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+    if (!frame) frame = window.requestAnimationFrame(update);
+  }, { passive: true });
+  hero.addEventListener("pointerleave", () => {
+    orbit.style.setProperty("--orbit-x", "0px");
+    orbit.style.setProperty("--orbit-y", "0px");
+  });
+}
+
+function bindPublicMenu() {
+  const navigation = document.querySelector(".public-nav nav");
+  const toggle = navigation?.querySelector(".public-menu-toggle");
+  if (!navigation || !toggle) return;
+
+  const setOpen = (open) => {
+    navigation.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = open ? "Close" : "Menu";
+  };
+  toggle.addEventListener("click", () => setOpen(!navigation.classList.contains("is-open")));
+  navigation.querySelector(".public-nav-links")?.addEventListener("click", () => setOpen(false));
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setOpen(false);
+  });
+}
+
 function openPublicHome() {
   if (window.location.pathname === "/") publicGate?.scrollTo({ top: 0, behavior: "smooth" });
   else window.location.assign("/");
@@ -464,6 +534,9 @@ async function submitMigrationAssessment(event) {
 }
 
 if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
+bindPublicScrollProgress();
+bindPublicHeroMotion();
+bindPublicMenu();
 
 const lightweightPublicPages = new Set([
   "home", "platform", "workflow", "ecosystem", "resources", "simulation", "scheduling", "tea",

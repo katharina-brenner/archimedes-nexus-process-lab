@@ -15,7 +15,7 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(legacyIndex >= 0);
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
-  assert.match(html, /data-design-version="20260804-studio-v1"/);
+  assert.match(html, /data-design-version="20260804-process-system-v11"/);
 });
 
 test("design system covers public, workspace, canvas, and reduced-motion states", () => {
@@ -29,6 +29,9 @@ test("design system covers public, workspace, canvas, and reduced-motion states"
 test("editorial layer covers the studio homepage, subpages, and accessible motion", () => {
   assert.match(editorialCss, /\.editorial-showcase\s*\{/);
   assert.match(editorialCss, /\.editorial-product-grid\s*\{/);
+  assert.match(editorialCss, /\.editorial-system-meta\s*\{/);
+  assert.match(editorialCss, /\.axion-system-orbit\s*\{/);
+  assert.match(editorialCss, /\.public-scroll-progress\s*\{/);
   assert.match(editorialCss, /body\.locked \.public-section\.public-page\s*\{/);
   assert.match(editorialCss, /@keyframes studio-flow/);
   assert.match(editorialCss, /@media \(prefers-reduced-motion: reduce\)/);
