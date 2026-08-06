@@ -7,9 +7,9 @@
     <title>Bioprocess Engineering Software for Process Development &amp; MSAT | Axion</title>
     <meta name="description" content="Browser-based bioprocess engineering for process development, MSAT, plant engineering and TEA/LCA teams: flowsheets, dynamics, scheduling, CFD screening, economics, sustainability and engineering exports." />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
-    <meta name="theme-color" content="#102631" />
-    <link rel="icon" type="image/svg+xml" sizes="any" href="./assets/axion-favicon.svg?v=20260805-ci" />
-    <link rel="shortcut icon" href="./assets/axion-favicon.svg?v=20260805-ci" />
+    <meta name="theme-color" content="#071d33" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="./assets/axion-favicon.svg?v=20260806-aquatic" />
+    <link rel="shortcut icon" href="./assets/axion-favicon.svg?v=20260806-aquatic" />
     <link rel="canonical" href="https://ax-i-on.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Axion Process OS" />
@@ -20,11 +20,12 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ax-i-on.com/assets/photography/axion-autonomous-bioprocess-hall-v1.jpg" />
     <link rel="alternate" type="application/rss+xml" title="Axion Engineering Brief" href="https://ax-i-on.com/feed.xml" />
-    <link rel="preload" as="image" href="./assets/photography/axion-autonomous-bioprocess-hall-v1.jpg" />
+    <link rel="preload" as="image" href="./assets/photography/industrial-fermenters-15000l.jpg" />
     <link rel="stylesheet" href="./styles.css?v=20260803-payments-faq-v1" />
     <link rel="stylesheet" href="./axion-design-system.css?v=20260803-clean-motion-v1" />
-    <link rel="stylesheet" href="./axion-editorial.css?v=20260805-brand-ci-v1" />
-    <link rel="stylesheet" href="./axion-unified.css?v=20260805-brand-ci-v1" />
+    <link rel="stylesheet" href="./axion-editorial.css?v=20260806-coherent-blue-v2" />
+    <link rel="stylesheet" href="./axion-unified.css?v=20260806-coherent-blue-v2" />
+    <link rel="stylesheet" href="./axion-color-authority.css?v=20260806-coherent-blue-v2" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -92,7 +93,7 @@
       }
     </script>
   </head>
-  <body class="locked" data-design-version="20260805-brand-ci-v1">
+  <body class="locked" data-design-version="20260806-coherent-blue-v2">
     <section id="loginGate" class="login-gate" aria-label="Secure login">
       <div class="public-site">
         <header class="public-nav" aria-label="Axion front page navigation">
@@ -120,8 +121,12 @@
           <section id="publicHome" class="public-page active-public-page public-minimal-home" data-public-page="home" aria-label="Axion Process OS front page">
             <div class="editorial-home">
               <section class="public-plant-hero" aria-label="Axion Process OS for industrial bioprocess engineering">
-                <img src="./assets/photography/axion-autonomous-bioprocess-hall-v1.jpg" alt="Large autonomous biomanufacturing hall with stainless-steel reactors, process skids, utilities and pipe bridges" width="1672" height="939" fetchpriority="high" />
+                <video class="public-plant-film" autoplay muted loop playsinline preload="metadata" poster="./assets/photography/industrial-fermenters-15000l.jpg" aria-label="Large-scale stainless-steel biomanufacturing plants">
+                  <source src="./assets/video/axion-industrial-plant-loop.webm" type="video/webm" />
+                </video>
+                <img class="public-plant-film-fallback" src="./assets/photography/industrial-fermenters-15000l.jpg" alt="Large stainless-steel fermentation plant with reactors, platforms and connected process equipment" width="1600" height="1067" fetchpriority="high" />
                 <div class="public-plant-hero-copy">
+                  <span class="public-hero-kicker">Industrial bioprocess engineering</span>
                   <h1>Design the process.<br />Understand the plant.</h1>
                   <p>Axion connects flowsheets, simulation, scheduling, scale-up, TEA and LCA in one traceable engineering workspace.</p>
                   <div class="editorial-intro-actions">
@@ -129,6 +134,68 @@
                     <button id="openLoginHero" class="public-secondary" type="button">Open workspace <span>↗</span></button>
                   </div>
                 </div>
+                <div class="public-film-status" aria-hidden="true"><i></i><span>Plant model · live</span></div>
+              </section>
+
+              <section class="public-live-pilot" aria-label="Interactive Axion process pilot">
+                <header>
+                  <div><span>Live pilot</span><h2>Follow one process from media to final product.</h2></div>
+                  <p>Switch the operating mode and watch streams, equipment loading and plant outputs update together.</p>
+                </header>
+                <div class="pilot-mode-switch" role="group" aria-label="Production mode">
+                  <button type="button" data-pilot-mode="batch">Batch</button>
+                  <button type="button" data-pilot-mode="fedbatch" class="active" aria-pressed="true">Fed-batch</button>
+                  <button type="button" data-pilot-mode="perfusion">Perfusion</button>
+                </div>
+                <div class="pilot-process-board" data-pilot-board="fedbatch">
+                  <div class="pilot-board-head"><span id="pilotProcessName">Monoclonal antibody · fed-batch</span><span>Illustrative engineering model</span></div>
+                  <svg class="pilot-flowsheet" viewBox="0 0 1200 520" role="img" aria-labelledby="pilotFlowTitle pilotFlowDesc">
+                    <title id="pilotFlowTitle">Animated monoclonal antibody production pilot</title>
+                    <desc id="pilotFlowDesc">Media preparation, seed train, production bioreactor, harvest, purification and fill finish connected by directional process streams with cleaning and heat recovery support.</desc>
+                    <defs>
+                      <marker id="pilotArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#6f8fb0" /></marker>
+                    </defs>
+                    <g class="pilot-streams pilot-streams-main" fill="none" marker-end="url(#pilotArrow)">
+                      <path d="M170 205 H245"/><path d="M390 205 H475"/><path d="M660 205 H740"/><path d="M875 205 H945"/>
+                    </g>
+                    <g class="pilot-streams pilot-streams-feed" fill="none" marker-end="url(#pilotArrow)"><path d="M560 56 V112"/></g>
+                    <g class="pilot-streams pilot-streams-support" fill="none" marker-end="url(#pilotArrow)"><path d="M325 382 H525 V302"/><path d="M675 382 H825 V288"/></g>
+                    <g class="pilot-unit pilot-unit-media" tabindex="0" role="button" aria-label="T-101 media preparation">
+                      <rect x="30" y="145" width="140" height="120" rx="22"/><text x="52" y="174" class="pilot-tag">T-101</text><text x="52" y="210">Media</text><text x="52" y="232">preparation</text><text x="52" y="252" class="pilot-meta">1,200 L/h</text>
+                    </g>
+                    <g class="pilot-unit pilot-unit-seed" tabindex="0" role="button" aria-label="BR-201 seed train">
+                      <rect x="245" y="132" width="145" height="146" rx="28"/><text x="268" y="164" class="pilot-tag">BR-201</text><text x="268" y="208">Seed train</text><text x="268" y="236" class="pilot-meta">50 → 500 L</text>
+                    </g>
+                    <g class="pilot-unit pilot-unit-main" tabindex="0" role="button" aria-label="BR-301 production bioreactor">
+                      <rect x="475" y="112" width="185" height="190" rx="40"/><text x="502" y="148" class="pilot-tag">BR-301 · CORE</text><text x="502" y="202">Production</text><text x="502" y="226">bioreactor</text><text id="pilotReactorMeta" x="502" y="258" class="pilot-meta">2,000 L · 72%</text><circle class="pilot-reactor-pulse" cx="625" cy="267" r="8"/>
+                    </g>
+                    <g class="pilot-unit pilot-unit-harvest" tabindex="0" role="button" aria-label="CF-401 harvest centrifuge">
+                      <rect x="740" y="145" width="135" height="120" rx="22"/><text x="762" y="174" class="pilot-tag">CF-401</text><text x="762" y="210">Harvest</text><text id="pilotHarvestMeta" x="762" y="238" class="pilot-meta">97.5% yield</text>
+                    </g>
+                    <g class="pilot-unit pilot-unit-dsp" tabindex="0" role="button" aria-label="CH-501 purification train">
+                      <rect x="945" y="132" width="160" height="146" rx="28"/><text x="968" y="164" class="pilot-tag">CH-501</text><text x="968" y="204">Purification</text><text x="968" y="226">+ fill</text><text id="pilotDspMeta" x="968" y="252" class="pilot-meta">3 columns</text>
+                    </g>
+                    <g class="pilot-feed"><rect x="505" y="18" width="110" height="38" rx="19"/><text x="560" y="42" text-anchor="middle">Feed</text></g>
+                    <g class="pilot-support"><rect x="240" y="350" width="170" height="64" rx="18"/><text x="264" y="379" class="pilot-tag">CIP-701</text><text x="264" y="400">Cleaning loop</text></g>
+                    <g class="pilot-support"><rect x="635" y="350" width="190" height="64" rx="18"/><text x="660" y="379" class="pilot-tag">HX-801</text><text x="660" y="400">Heat recovery</text></g>
+                    <g class="pilot-output"><rect x="1010" y="350" width="160" height="72" rx="20"/><text x="1035" y="380" class="pilot-tag">OUTPUT</text><text id="pilotOutput" x="1035" y="405">412 kg/year</text></g>
+                  </svg>
+                  <div class="pilot-metrics" aria-live="polite">
+                    <article><span>Cycle</span><strong id="pilotCycle">14.2 d</strong><small>including turnaround</small></article>
+                    <article><span>Plant utilization</span><strong id="pilotUtilization">78%</strong><small>scheduled equipment load</small></article>
+                    <article><span>COGS range</span><strong id="pilotCost">€89–112/g</strong><small>P10–P90 screening</small></article>
+                    <article><span>Critical limit</span><strong id="pilotLimit">O₂ transfer</strong><small>modelled constraint</small></article>
+                  </div>
+                </div>
+                <footer><span>Illustrative public pilot. Values change with mode; validated customer models use project data and documented assumptions.</span><button type="button" class="public-secondary" data-public-target="publicPlatform">Open product detail <span>↗</span></button></footer>
+              </section>
+
+              <section class="academic-reference-rail" aria-label="Academic background and research network">
+                <header><span>Academic background + research network</span><p>Institutions and programs connected to the founder's academic path. No customer endorsement is implied.</p></header>
+                <div class="academic-marquee" aria-hidden="true"><div>
+                  <span>University of Cambridge</span><span>Technical University of Munich</span><span>LMU Munich</span><span>Stanford University</span><span>KAIST</span><span>CDTM</span><span>Bayerische EliteAkademie</span><span>TUM Venture Labs</span>
+                  <span>University of Cambridge</span><span>Technical University of Munich</span><span>LMU Munich</span><span>Stanford University</span><span>KAIST</span><span>CDTM</span><span>Bayerische EliteAkademie</span><span>TUM Venture Labs</span>
+                </div></div>
               </section>
 
               <section class="editorial-audience" aria-label="Who should use Axion Process OS">
@@ -1289,12 +1356,12 @@
 
             <div class="brand-signature" aria-label="Axion primary brand signature">
               <figure>
-                <img src="./brand-assets/axion-mark-navy.svg" alt="Axion pixel axolotl in white on navy" width="256" height="256" />
+                <img src="./brand-assets/axion-mark-navy.svg" alt="Axion aquatic axolotl mark in white on navy" width="256" height="256" />
               </figure>
               <div>
                 <span>Primary mark</span>
-                <h3>Pixel-built. Industrial by default.</h3>
-                <p>The front-facing pixel axolotl is the product mark. Navy and white is the default expression; Signal Blue and Reactor Amber are controlled accents.</p>
+                <h3>Aquatic form. Industrial precision.</h3>
+                <p>The streamlined side-profile axolotl is the product mark. Navy and white is the default expression; Cobalt and Reactor Amber are controlled accents.</p>
                 <a href="./brand-assets/axion-mark-navy.svg" download>Download primary SVG</a>
               </div>
             </div>
@@ -1303,7 +1370,7 @@
               <header><p>SVG library</p><h3>Choose the version for its background.</h3></header>
               <div>
                 <article><figure class="brand-logo-navy"><img src="./brand-assets/axion-mark-navy.svg" alt="Navy Axion logo" /></figure><strong>Primary navy</strong><span>Default for product and company use.</span><a href="./brand-assets/axion-mark-navy.svg" download>SVG</a></article>
-                <article><figure class="brand-logo-blue"><img src="./brand-assets/axion-mark-blue.svg" alt="Signal blue Axion logo" /></figure><strong>Signal blue</strong><span>Campaigns and interactive product moments.</span><a href="./brand-assets/axion-mark-blue.svg" download>SVG</a></article>
+                <article><figure class="brand-logo-blue"><img src="./brand-assets/axion-mark-blue.svg" alt="Cobalt Axion logo" /></figure><strong>Cobalt</strong><span>Interaction and focused product moments.</span><a href="./brand-assets/axion-mark-blue.svg" download>SVG</a></article>
                 <article><figure class="brand-logo-light"><img src="./brand-assets/axion-mark-light.svg" alt="Light Axion logo" /></figure><strong>Light surface</strong><span>Documents, print, and pale backgrounds.</span><a href="./brand-assets/axion-mark-light.svg" download>SVG</a></article>
                 <article><figure class="brand-logo-amber"><img src="./brand-assets/axion-mark-amber.svg" alt="Amber Axion logo" /></figure><strong>Reactor amber</strong><span>Limited edition and simulation emphasis.</span><a href="./brand-assets/axion-mark-amber.svg" download>SVG</a></article>
               </div>
@@ -1320,19 +1387,19 @@
             <section class="brand-palette" aria-label="Axion corporate colors">
               <header><p>Corporate colors</p><h3>Deep engineering tones with one bright signal.</h3></header>
               <div>
-                <article style="--brand-color:#081f33"><i></i><strong>Axion Navy</strong><code>#081F33</code><span>Foundation</span></article>
-                <article style="--brand-color:#2f63f5"><i></i><strong>Signal Blue</strong><code>#2F63F5</code><span>Interaction</span></article>
-                <article style="--brand-color:#2a8f83"><i></i><strong>Process Teal</strong><code>#2A8F83</code><span>Evidence</span></article>
-                <article style="--brand-color:#f4b942"><i></i><strong>Reactor Amber</strong><code>#F4B942</code><span>Emphasis</span></article>
-                <article style="--brand-color:#e6685d"><i></i><strong>Safety Coral</strong><code>#E6685D</code><span>Critical only</span></article>
-                <article style="--brand-color:#f4f7f8"><i></i><strong>Ice</strong><code>#F4F7F8</code><span>Canvas</span></article>
+                <article style="--brand-color:#071d33"><i></i><strong>Axion Navy</strong><code>#071D33</code><span>Foundation</span></article>
+                <article style="--brand-color:#316bff"><i></i><strong>Cobalt</strong><code>#316BFF</code><span>Interaction</span></article>
+                <article style="--brand-color:#6f8fb0"><i></i><strong>Process Steel</strong><code>#6F8FB0</code><span>Evidence</span></article>
+                <article style="--brand-color:#f2b441"><i></i><strong>Reactor Amber</strong><code>#F2B441</code><span>Emphasis</span></article>
+                <article style="--brand-color:#d95d58"><i></i><strong>Safety Coral</strong><code>#D95D58</code><span>Critical only</span></article>
+                <article style="--brand-color:#eef3f8"><i></i><strong>Ice</strong><code>#EEF3F8</code><span>Canvas</span></article>
               </div>
             </section>
 
             <section class="brand-guidance" aria-label="Axion identity guidance">
               <article><span>Typography</span><h3>Manrope + DM Mono</h3><p>Manrope carries product and company communication. DM Mono is reserved for equipment tags, equations, units, versions, and technical metadata.</p></article>
-              <article><span>Color discipline</span><h3>Navy first, accents second</h3><p>Signal Blue indicates interaction. Amber marks attention. Coral appears only for errors or safety-critical states. Pink is intentionally excluded from the core identity.</p></article>
-              <article><span>Clear space</span><h3>Let the mark breathe</h3><p>Keep one eye-to-eye distance around the mark. Never stretch, rotate, outline, shadow, or animate the pixel geometry.</p></article>
+              <article><span>Color discipline</span><h3>Navy first, accents second</h3><p>Cobalt indicates interaction. Process Steel carries neutral engineering evidence. Amber marks attention. Coral appears only for errors or safety-critical states.</p></article>
+              <article><span>Clear space</span><h3>Let the mark breathe</h3><p>Keep one body-height around the mark. Never stretch, rotate, outline, shadow, or animate individual parts of the aquatic silhouette.</p></article>
             </section>
           </section>
 
@@ -1809,6 +1876,6 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./public-bootstrap.js?v=20260805-brand-ci-v1"></script>
+    <script type="module" src="./public-bootstrap.js?v=20260806-coherent-blue-v2"></script>
   </body>
 </html>

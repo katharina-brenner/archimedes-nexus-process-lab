@@ -21,7 +21,7 @@
   --ax-accent: #2f63f5;
   --ax-accent-soft: #e5ebff;
   --ax-accent-strong: #244fd0;
-  --ax-cyan: #2a8f83;
+  --ax-cyan: #316bff;
   --ax-blue: #2f63f5;
   --ax-amber: #f4b942;
   --ax-coral: #e6685d;
@@ -42,8 +42,8 @@
   --public-section-space: 88px;
 }
 
-/* Axion corporate identity. Navy is the foundation, blue signals interaction,
-   teal carries process evidence, and amber is reserved for emphasis. */
+/* Axion corporate identity. Navy is the foundation, cobalt signals interaction,
+   steel carries infrastructure, and amber is reserved for emphasis. */
 body.locked :where(.public-primary, .login-button, .public-nav-login) {
   color: #ffffff !important;
   background: #081f33 !important;
@@ -79,6 +79,786 @@ body.locked .public-brand-page .brand-signature h3 {
 
 body.locked .public-brand-page .brand-signature > div > span {
   color: #9db7ff !important;
+}
+
+/* 2026-08-06 coherent blue identity.
+   This is the final color and contrast authority for both the public site and workspace. */
+:root {
+  --ax-bg: #eef3f8;
+  --ax-bg-deep: #dfe8f1;
+  --ax-surface: #f7f9fc;
+  --ax-surface-strong: #ffffff;
+  --ax-surface-soft: #e9eff6;
+  --ax-shell: #071d33;
+  --ax-shell-raised: #0d2944;
+  --ax-shell-soft: #173b5c;
+  --ax-ink: #10273d;
+  --ax-muted: #526a80;
+  --ax-quiet: #71869a;
+  --ax-line: #c5d2df;
+  --ax-line-strong: #9fb1c3;
+  --ax-accent: #316bff;
+  --ax-accent-soft: #e7edff;
+  --ax-accent-strong: #234fc8;
+  --ax-cyan: #6f8fb0;
+  --ax-blue: #316bff;
+  --ax-amber: #f2b441;
+  --ax-coral: #d95d58;
+  --studio-paper: #eef3f8;
+  --studio-paper-strong: #fbfcfe;
+  --studio-paper-deep: #dfe8f1;
+  --studio-surface: #f8fafc;
+  --studio-surface-2: #e9eff6;
+  --studio-ink: #10273d;
+  --studio-muted: #526a80;
+  --studio-line: rgba(7, 29, 51, 0.15);
+  --studio-mint: #e7edff;
+  --studio-mint-strong: #234fc8;
+  --studio-cobalt: #316bff;
+  --studio-night: #071d33;
+  --studio-shell: #06182a;
+  --studio-shell-2: #0a243e;
+  --studio-shell-3: #123451;
+  --studio-green: #315f8c;
+  --studio-teal: #6f8fb0;
+  --studio-steel: #7c94ad;
+  --studio-amber: #b98529;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  letter-spacing: 0 !important;
+}
+
+/* Organic aquatic mark restored across navigation, workspace and helper. */
+.technical-logo,
+.help-logo {
+  border-radius: 50% !important;
+}
+
+.technical-logo::before,
+.help-logo::before,
+body:not(.locked) .sidebar .brand-mark .technical-logo::before,
+body:not(.locked) .sidebar .technical-logo::before,
+body:not(.locked) .help-logo::before {
+  inset: 5px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: currentColor !important;
+  box-shadow: none !important;
+  content: "" !important;
+  -webkit-mask: url("./assets/axion-mark.svg") center / contain no-repeat !important;
+  mask: url("./assets/axion-mark.svg") center / contain no-repeat !important;
+}
+
+body.locked .public-brand .brand-mark,
+body:not(.locked) .sidebar .brand-mark,
+body:not(.locked) .help-logo {
+  color: #ffffff !important;
+  background: #071d33 !important;
+  border-radius: 50% !important;
+}
+
+/* Public system: predictable light surfaces and explicit dark-surface text. */
+body.locked,
+body.locked .public-site,
+body.locked .public-scroll {
+  color: #10273d !important;
+  background: #eef3f8 !important;
+}
+
+body.locked :where(.public-section, .editorial-home, .public-page) {
+  color: #10273d;
+}
+
+body.locked :where(.section-heading, .editorial-audience, .editorial-product, .editorial-workflow, .public-live-pilot, .academic-reference-rail) :where(h1, h2, h3, strong, b) {
+  color: #10273d;
+}
+
+body.locked :where(.section-heading, .editorial-audience, .editorial-product, .editorial-workflow, .public-live-pilot, .academic-reference-rail) :where(p, span, small) {
+  color: #526a80;
+}
+
+body.locked .public-nav {
+  color: #ffffff !important;
+  background: rgba(7, 29, 51, 0.96) !important;
+  border-color: rgba(167, 190, 214, 0.25) !important;
+  box-shadow: 0 14px 38px rgba(5, 20, 35, 0.18) !important;
+}
+
+body.locked .public-nav :where(strong, a, button) {
+  color: #f7faff !important;
+}
+
+body.locked .public-nav a:hover,
+body.locked .public-nav a[aria-current="page"] {
+  color: #ffffff !important;
+  background: #173b5c !important;
+}
+
+body.locked .public-scroll-progress > span {
+  background: #4f82ff !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login) {
+  color: #ffffff !important;
+  background: #316bff !important;
+  border-color: #316bff !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login):hover {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+  border-color: #234fc8 !important;
+}
+
+body.locked .public-secondary {
+  color: #10273d !important;
+  background: #ffffff !important;
+  border-color: #b8c7d6 !important;
+}
+
+body.locked .public-secondary:hover {
+  color: #173ea8 !important;
+  background: #e7edff !important;
+  border-color: #9db5ff !important;
+}
+
+/* Video-led opening frame. */
+body.locked #publicHome .public-plant-hero {
+  position: relative;
+  min-height: min(780px, calc(100vh - 118px)) !important;
+  overflow: hidden;
+  isolation: isolate;
+  background: #071d33 !important;
+  border: 1px solid rgba(7, 29, 51, 0.18) !important;
+  border-radius: 24px !important;
+}
+
+body.locked #publicHome .public-plant-film,
+body.locked #publicHome .public-plant-film-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+body.locked #publicHome .public-plant-film-fallback {
+  z-index: -2;
+}
+
+body.locked #publicHome .public-plant-film {
+  z-index: -1;
+}
+
+body.locked #publicHome .public-plant-hero::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(90deg, rgba(4, 19, 34, 0.94) 0%, rgba(4, 19, 34, 0.72) 47%, rgba(4, 19, 34, 0.2) 78%, rgba(4, 19, 34, 0.36) 100%);
+}
+
+body.locked #publicHome .public-plant-hero-copy {
+  max-width: 760px !important;
+  padding: clamp(52px, 8vw, 108px) !important;
+}
+
+body.locked #publicHome .public-hero-kicker {
+  display: inline-flex;
+  margin-bottom: 22px;
+  color: #b9cbff !important;
+  font-family: var(--studio-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+body.locked #publicHome .public-plant-hero h1,
+body.locked #publicHome .public-plant-hero p {
+  color: #ffffff !important;
+  text-shadow: 0 2px 22px rgba(2, 12, 22, 0.3);
+}
+
+body.locked #publicHome .public-plant-hero p {
+  max-width: 640px;
+  color: #d6e2ee !important;
+}
+
+body.locked #publicHome .public-film-status {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 14px;
+  color: #f5f8fb;
+  background: rgba(5, 22, 39, 0.78);
+  border: 1px solid rgba(210, 225, 240, 0.22);
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+}
+
+body.locked #publicHome .public-film-status i {
+  width: 7px;
+  height: 7px;
+  background: #6f9aff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(111, 154, 255, 0.14);
+  animation: axion-live-pulse 1.8s ease-in-out infinite;
+}
+
+body.locked #publicHome .public-film-status span {
+  color: #f5f8fb !important;
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Public interactive pilot. */
+body.locked #publicHome .public-live-pilot {
+  width: min(var(--public-content), calc(100% - 64px));
+  margin: 0 auto;
+  padding: 112px 0 104px;
+}
+
+body.locked #publicHome .public-live-pilot > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.65fr);
+  gap: 72px;
+  align-items: end;
+  margin-bottom: 34px;
+}
+
+body.locked #publicHome .public-live-pilot > header > div > span,
+body.locked #publicHome .pilot-board-head,
+body.locked #publicHome .pilot-tag,
+body.locked #publicHome .pilot-metrics span {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+body.locked #publicHome .public-live-pilot > header > div > span {
+  display: block;
+  margin-bottom: 14px;
+  color: #316bff !important;
+}
+
+body.locked #publicHome .public-live-pilot h2 {
+  max-width: 720px;
+  margin: 0;
+  font-size: clamp(40px, 4.7vw, 68px);
+  font-weight: 600;
+  line-height: 1.02;
+}
+
+body.locked #publicHome .public-live-pilot > header p {
+  margin: 0 0 6px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+body.locked #publicHome .pilot-mode-switch {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 5px;
+  background: #dfe7f0;
+  border-radius: 999px;
+}
+
+body.locked #publicHome .pilot-mode-switch button {
+  min-height: 38px;
+  padding: 8px 18px;
+  color: #425b72;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.locked #publicHome .pilot-mode-switch button.active {
+  color: #ffffff;
+  background: #071d33;
+  box-shadow: 0 6px 16px rgba(7, 29, 51, 0.16);
+}
+
+body.locked #publicHome .pilot-process-board {
+  overflow: hidden;
+  color: #eaf1f8;
+  background: #071d33;
+  border: 1px solid rgba(119, 148, 177, 0.34);
+  border-radius: 24px;
+  box-shadow: 0 28px 72px rgba(7, 29, 51, 0.17);
+}
+
+body.locked #publicHome .pilot-board-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 24px;
+  color: #dbe7f4;
+  background: #0d2944;
+  border-bottom: 1px solid rgba(146, 172, 198, 0.22);
+}
+
+body.locked #publicHome .pilot-board-head span {
+  color: inherit !important;
+}
+
+body.locked #publicHome .pilot-flowsheet {
+  display: block;
+  width: 100%;
+  min-width: 920px;
+  height: auto;
+  color: #eaf1f8;
+  background:
+    linear-gradient(rgba(126, 151, 178, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 151, 178, 0.09) 1px, transparent 1px),
+    #071d33;
+  background-size: 40px 40px;
+}
+
+body.locked #publicHome .pilot-unit,
+body.locked #publicHome .pilot-support,
+body.locked #publicHome .pilot-feed,
+body.locked #publicHome .pilot-output {
+  cursor: pointer;
+  transition: transform 180ms ease, filter 180ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+body.locked #publicHome .pilot-unit rect {
+  fill: #102f4d;
+  stroke: #6f8fb0;
+  stroke-width: 1.5;
+}
+
+body.locked #publicHome .pilot-unit-main rect {
+  fill: #173b5c;
+  stroke: #6f9aff;
+  stroke-width: 2;
+}
+
+body.locked #publicHome .pilot-support rect {
+  fill: #0d2944;
+  stroke: #557593;
+}
+
+body.locked #publicHome .pilot-feed rect,
+body.locked #publicHome .pilot-output rect {
+  fill: #173b5c;
+  stroke: #6f8fb0;
+}
+
+body.locked #publicHome .pilot-unit:hover,
+body.locked #publicHome .pilot-unit:focus,
+body.locked #publicHome .pilot-support:hover,
+body.locked #publicHome .pilot-output:hover {
+  filter: drop-shadow(0 10px 16px rgba(2, 12, 22, 0.35));
+  outline: none;
+  transform: translateY(-5px);
+}
+
+body.locked #publicHome :where(.pilot-unit, .pilot-support, .pilot-output).selected rect {
+  stroke: #f2b441;
+  stroke-width: 3;
+}
+
+body.locked #publicHome .pilot-flowsheet text {
+  fill: #f5f8fb;
+  font-family: var(--studio-sans);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+body.locked #publicHome .pilot-flowsheet .pilot-tag {
+  fill: #9cb6ff;
+  font-size: 11px;
+}
+
+body.locked #publicHome .pilot-flowsheet .pilot-meta {
+  fill: #b9cadb;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+body.locked #publicHome .pilot-streams path {
+  stroke: #78a9ff;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 10 13;
+  animation: public-pilot-stream 1.25s linear infinite;
+}
+
+body.locked #publicHome .pilot-streams-feed path {
+  stroke: #f2b441;
+  animation-duration: 0.95s;
+}
+
+body.locked #publicHome .pilot-streams-support path {
+  stroke: #8098b0;
+  stroke-width: 5;
+  animation-duration: 1.65s;
+}
+
+body.locked #publicHome [data-pilot-board="batch"] .pilot-streams-main path { animation-duration: 1.6s; }
+body.locked #publicHome [data-pilot-board="perfusion"] .pilot-streams-main path { animation-duration: 0.72s; }
+
+body.locked #publicHome .pilot-reactor-pulse {
+  fill: #f2b441;
+  animation: axion-live-pulse 1.5s ease-in-out infinite;
+}
+
+body.locked #publicHome .pilot-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid rgba(146, 172, 198, 0.22);
+}
+
+body.locked #publicHome .pilot-metrics article {
+  min-width: 0;
+  padding: 22px 24px 24px;
+  border-right: 1px solid rgba(146, 172, 198, 0.18);
+}
+
+body.locked #publicHome .pilot-metrics article:last-child {
+  border-right: 0;
+}
+
+body.locked #publicHome .pilot-metrics span,
+body.locked #publicHome .pilot-metrics strong,
+body.locked #publicHome .pilot-metrics small {
+  display: block;
+  color: #b9cadb !important;
+}
+
+body.locked #publicHome .pilot-metrics strong {
+  margin: 8px 0 5px;
+  color: #ffffff !important;
+  font-size: clamp(22px, 2.2vw, 32px);
+}
+
+body.locked #publicHome .pilot-metrics small {
+  font-size: 11px;
+}
+
+body.locked #publicHome .public-live-pilot > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  padding: 18px 4px 0;
+}
+
+body.locked #publicHome .public-live-pilot > footer > span {
+  max-width: 760px;
+  color: #61758a !important;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Academic track: text-only to avoid implying institutional endorsement. */
+body.locked #publicHome .academic-reference-rail {
+  width: min(var(--public-content), calc(100% - 64px));
+  margin: 0 auto 110px;
+  overflow: hidden;
+  border-top: 1px solid #c5d2df;
+  border-bottom: 1px solid #c5d2df;
+}
+
+body.locked #publicHome .academic-reference-rail > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 22px 0;
+}
+
+body.locked #publicHome .academic-reference-rail > header span {
+  color: #10273d !important;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+body.locked #publicHome .academic-reference-rail > header p {
+  max-width: 600px;
+  margin: 0;
+  font-size: 11px;
+  text-align: right;
+}
+
+body.locked #publicHome .academic-marquee {
+  overflow: hidden;
+  padding: 26px 0 30px;
+  border-top: 1px solid #d6e0e9;
+}
+
+body.locked #publicHome .academic-marquee > div {
+  display: flex;
+  width: max-content;
+  animation: academic-rail 34s linear infinite;
+}
+
+body.locked #publicHome .academic-marquee span {
+  display: inline-flex;
+  align-items: center;
+  color: #29455f !important;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+body.locked #publicHome .academic-marquee span::after {
+  width: 6px;
+  height: 6px;
+  margin: 0 30px;
+  content: "";
+  background: #316bff;
+  border-radius: 50%;
+}
+
+/* Workspace identity: one navy shell, one blue interaction language, no teal wash. */
+body:not(.locked) {
+  color: #10273d !important;
+  background: #e8eef5 !important;
+}
+
+body:not(.locked) .app-shell {
+  background: #e8eef5 !important;
+}
+
+body:not(.locked) .sidebar {
+  color: #eaf1f8 !important;
+  background: #071d33 !important;
+  border-color: #28445f !important;
+}
+
+body:not(.locked) .sidebar::after {
+  background: #316bff !important;
+}
+
+body:not(.locked) .brand p,
+body:not(.locked) .suite-nav-label,
+body:not(.locked) .sidebar :where(.product-meta, .muted, small) {
+  color: #a7bbcf !important;
+}
+
+body:not(.locked) .suite-link {
+  color: #d5e0eb !important;
+}
+
+body:not(.locked) .suite-link:hover {
+  color: #ffffff !important;
+  background: #102f4d !important;
+}
+
+body:not(.locked) .suite-link.active,
+body:not(.locked) .suite-link[aria-current="page"] {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+  border-color: #4f82ff !important;
+}
+
+body:not(.locked) :where(.topbar, .canvas-frame, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) {
+  color: #10273d !important;
+  background: #f8fafc !important;
+  border-color: #c5d2df !important;
+}
+
+body:not(.locked) :where(.topbar, .canvas-frame, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) :where(h1, h2, h3, h4, strong, b) {
+  color: #10273d !important;
+}
+
+body:not(.locked) :where(.topbar, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) :where(p, span, small, label) {
+  color: #526a80;
+}
+
+body:not(.locked) :where(button, .tab, .mode-button, .chip, .pill) {
+  border-color: #b8c7d6;
+}
+
+body:not(.locked) :where(button.active, .tab.active, .mode-button.active, .chip.active, .pill.active) {
+  color: #ffffff !important;
+  background: #316bff !important;
+  border-color: #316bff !important;
+}
+
+body:not(.locked) :where(input, select, textarea) {
+  color: #10273d !important;
+  background: #ffffff !important;
+  border-color: #aebfd0 !important;
+}
+
+body:not(.locked) :where(input, select, textarea)::placeholder {
+  color: #71869a !important;
+}
+
+body:not(.locked) .flowsheet-canvas {
+  background:
+    linear-gradient(rgba(132, 158, 184, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 158, 184, 0.11) 1px, transparent 1px),
+    linear-gradient(rgba(132, 158, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 158, 184, 0.05) 1px, transparent 1px),
+    #071d33 !important;
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px, auto !important;
+}
+
+body:not(.locked) #flowsheetView .unit,
+body:not(.locked) .unit {
+  border-color: rgba(126, 156, 188, 0.48) !important;
+  background: #0d2944 !important;
+}
+
+body:not(.locked) #flowsheetView .unit-bioreactor,
+body:not(.locked) .unit-bioreactor {
+  border-color: #6f9aff !important;
+  background: #173b5c !important;
+}
+
+body:not(.locked) #flowsheetView .unit:hover,
+body:not(.locked) #flowsheetView .unit.selected {
+  border-color: #8fb0ff !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28), 0 0 0 3px rgba(79, 130, 255, 0.16) !important;
+}
+
+body:not(.locked) .unit-icon,
+body:not(.locked) #flowsheetView .unit-icon {
+  color: var(--symbol-color, #86a7c7) !important;
+}
+
+body:not(.locked) .unit-role,
+body:not(.locked) #flowsheetView .unit-role {
+  color: #c8d8e8 !important;
+  background: rgba(111, 143, 176, 0.16) !important;
+}
+
+body:not(.locked) .unit-port,
+body:not(.locked) #flowsheetView .unit-port {
+  background: #8fb0ff !important;
+  box-shadow: 0 0 0 1px rgba(143, 176, 255, 0.7) !important;
+}
+
+body:not(.locked) .stream-line {
+  color: #78a9ff !important;
+}
+
+body:not(.locked) .stream-utility {
+  color: #91a9c2 !important;
+}
+
+body:not(.locked) .stream-waste {
+  color: #d5a74d !important;
+}
+
+body:not(.locked) .stream-qc {
+  color: #a99bd0 !important;
+}
+
+body:not(.locked) #flowsheetView .stream-path-base,
+body:not(.locked) .stream-path-base {
+  stroke: rgba(143, 169, 194, 0.3) !important;
+}
+
+body:not(.locked) #flowsheetView .stream-path-flow {
+  filter: drop-shadow(0 0 3px rgba(120, 169, 255, 0.3)) !important;
+}
+
+body:not(.locked) .stream-label,
+body:not(.locked) #flowsheetView .stream-label {
+  color: #eff5fb !important;
+  background: rgba(5, 22, 39, 0.96) !important;
+  border-color: rgba(126, 156, 188, 0.45) !important;
+}
+
+body:not(.locked) .stream-label :where(span, small, b, strong) {
+  color: inherit !important;
+}
+
+@keyframes public-pilot-stream {
+  to { stroke-dashoffset: -46; }
+}
+
+@keyframes axion-live-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1.22); }
+}
+
+@keyframes academic-rail {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.locked #publicHome .public-plant-film { display: none; }
+  body.locked #publicHome .pilot-streams path,
+  body.locked #publicHome .pilot-reactor-pulse,
+  body.locked #publicHome .public-film-status i,
+  body.locked #publicHome .academic-marquee > div { animation: none !important; }
+}
+
+@media (max-width: 900px) {
+  body.locked #publicHome .public-live-pilot > header {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  body.locked #publicHome .pilot-process-board {
+    overflow-x: auto;
+  }
+
+  body.locked #publicHome .pilot-metrics {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 620px) {
+  body.locked #publicHome .public-plant-hero {
+    min-height: 620px !important;
+    border-radius: 18px !important;
+  }
+
+  body.locked #publicHome .public-plant-hero-copy {
+    padding: 38px 24px 46px !important;
+  }
+
+  body.locked #publicHome .public-live-pilot,
+  body.locked #publicHome .academic-reference-rail {
+    width: calc(100% - 28px);
+  }
+
+  body.locked #publicHome .public-live-pilot {
+    padding: 82px 0 76px;
+  }
+
+  body.locked #publicHome .pilot-mode-switch {
+    width: 100%;
+  }
+
+  body.locked #publicHome .pilot-mode-switch button {
+    flex: 1;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  body.locked #publicHome .public-live-pilot > footer,
+  body.locked #publicHome .academic-reference-rail > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body.locked #publicHome .academic-reference-rail > header p {
+    text-align: left;
+  }
 }
 
 body.locked .public-brand-page {
@@ -367,7 +1147,7 @@ body.locked .brand-guidance p {
   }
 }
 
-/* Axion pixel axolotl. The rounded-square container is part of the signature. */
+/* Axion aquatic mark. The organic side profile is the primary signature. */
 .technical-logo,
 .help-logo {
   overflow: visible !important;

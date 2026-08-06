@@ -285,6 +285,7 @@ const staticTypes = new Map([
   [".png", "image/png"],
   [".jpg", "image/jpeg"],
   [".jpeg", "image/jpeg"],
+  [".webm", "video/webm"],
   [".ico", "image/x-icon"],
   [".pdf", "application/pdf"],
   [".zip", "application/zip"],

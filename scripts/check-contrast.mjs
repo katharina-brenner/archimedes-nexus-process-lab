@@ -1,15 +1,15 @@
 const pairs = [
-  ["dark surface heading", "#f8fcfc", "#102334", 4.5],
-  ["dark surface body", "#c2d6d4", "#102334", 4.5],
-  ["dark surface accent", "#a9e4d6", "#102334", 4.5],
-  ["light surface heading", "#102033", "#ffffff", 4.5],
-  ["light surface body", "#52647e", "#ffffff", 4.5],
-  ["teal text on white", "#0f5a52", "#ffffff", 4.5],
-  ["active control text", "#0b1b24", "#a5e2d0", 4.5],
-  ["white on deep teal", "#ffffff", "#245c52", 4.5],
-  ["sidebar label", "#a9bdc2", "#0b1828", 4.5],
-  ["sidebar navigation", "#d7e5e7", "#0b1828", 4.5],
-  ["public secondary copy", "#c5d3cf", "#102334", 4.5],
+  ["navy surface heading", "#ffffff", "#071d33", 4.5],
+  ["navy surface body", "#c8d7e5", "#071d33", 4.5],
+  ["light surface heading", "#10273d", "#ffffff", 4.5],
+  ["light surface body", "#526a80", "#ffffff", 4.5],
+  ["ice surface body", "#526a80", "#eef3f8", 4.5],
+  ["white on cobalt", "#ffffff", "#234fc8", 4.5],
+  ["ink on amber", "#10273d", "#f2b441", 4.5],
+  ["sidebar label", "#a7bbcf", "#071d33", 4.5],
+  ["sidebar navigation", "#d5e0eb", "#071d33", 4.5],
+  ["canvas stream label", "#eff5fb", "#051627", 4.5],
+  ["open status", "#10273d", "#d9e4ef", 4.5],
 ];
 
 function channel(value) {

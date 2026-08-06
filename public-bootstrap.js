@@ -381,6 +381,84 @@ function bindPublicHeroMotion() {
   });
 }
 
+function bindPublicPilot() {
+  const board = document.querySelector(".pilot-process-board");
+  const buttons = [...document.querySelectorAll("[data-pilot-mode]")];
+  if (!board || !buttons.length) return;
+
+  const modes = {
+    batch: {
+      name: "Recombinant enzyme · batch",
+      reactor: "10,000 L · 75%",
+      harvest: "94.0% yield",
+      downstream: "2 recovery steps",
+      output: "620 t/year",
+      cycle: "5.8 d",
+      utilization: "68%",
+      cost: "€8.4–12.7/kg",
+      limit: "Heat removal",
+    },
+    fedbatch: {
+      name: "Monoclonal antibody · fed-batch",
+      reactor: "2,000 L · 72%",
+      harvest: "97.5% yield",
+      downstream: "3 columns",
+      output: "412 kg/year",
+      cycle: "14.2 d",
+      utilization: "78%",
+      cost: "€89–112/g",
+      limit: "O₂ transfer",
+    },
+    perfusion: {
+      name: "Monoclonal antibody · perfusion",
+      reactor: "2,000 L · 70%",
+      harvest: "ATF · 99.0%",
+      downstream: "4 columns",
+      output: "865 kg/year",
+      cycle: "32.0 d",
+      utilization: "84%",
+      cost: "€52–76/g",
+      limit: "Media demand",
+    },
+  };
+
+  const fields = {
+    name: document.querySelector("#pilotProcessName"),
+    reactor: document.querySelector("#pilotReactorMeta"),
+    harvest: document.querySelector("#pilotHarvestMeta"),
+    downstream: document.querySelector("#pilotDspMeta"),
+    output: document.querySelector("#pilotOutput"),
+    cycle: document.querySelector("#pilotCycle"),
+    utilization: document.querySelector("#pilotUtilization"),
+    cost: document.querySelector("#pilotCost"),
+    limit: document.querySelector("#pilotLimit"),
+  };
+
+  const applyMode = (key) => {
+    const mode = modes[key] || modes.fedbatch;
+    board.dataset.pilotBoard = key;
+    Object.entries(fields).forEach(([field, element]) => {
+      if (element) element.textContent = mode[field];
+    });
+    buttons.forEach((button) => {
+      const active = button.dataset.pilotMode === key;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  };
+
+  buttons.forEach((button) => button.addEventListener("click", () => applyMode(button.dataset.pilotMode)));
+  board.querySelectorAll(".pilot-unit, .pilot-support, .pilot-output").forEach((unit) => {
+    unit.addEventListener("click", () => {
+      board.querySelectorAll(".pilot-unit, .pilot-support, .pilot-output").forEach((candidate) => candidate.classList.remove("selected"));
+      unit.classList.add("selected");
+      const status = board.querySelector(".pilot-board-head span:last-child");
+      if (status) status.textContent = unit.getAttribute("aria-label") || "Selected equipment";
+    });
+  });
+  applyMode("fedbatch");
+}
+
 function bindPublicMenu() {
   const navigation = document.querySelector(".public-nav nav");
   const toggle = navigation?.querySelector(".public-menu-toggle");
@@ -665,6 +743,7 @@ async function submitMigrationAssessment(event) {
 if (requestedPage !== "home") showRequestedPublicPageImmediately(requestedPage);
 bindPublicScrollProgress();
 bindPublicHeroMotion();
+bindPublicPilot();
 bindPublicMenu();
 markActivePublicNavigation();
 if (requestedPage === "platform") renderPublicDetail(requestedDetail || "mab-overview", { scroll: false, updateUrl: false });

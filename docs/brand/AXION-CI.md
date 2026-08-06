@@ -2,11 +2,11 @@
 
 ## Brand idea
 
-Axion turns complex bioprocess engineering into one legible production system. The identity therefore combines an exact pixel grid with restrained industrial colors and highly readable typography.
+Axion turns complex bioprocess engineering into one legible production system. The identity combines an organic aquatic mark with restrained industrial colors, precise layouts, and highly readable typography.
 
 ## Primary logo
 
-Use the navy rounded-square pixel axolotl as the default mark. The symbol must remain upright, optically centered, and unmodified. Use the horizontal wordmark when the product name is not already visible next to the mark.
+Use the navy side-profile aquatic axolotl as the default mark. Its compact body, external gills, and forward movement suggest biological systems in controlled flow. The symbol must remain upright, optically centered, and unmodified. Use the horizontal wordmark when the product name is not already visible next to the mark.
 
 Minimum digital size: 24 px for the mark and 120 px for the horizontal wordmark. Keep clear space equal to one eye-to-eye distance around the mark.
 
@@ -14,16 +14,17 @@ Minimum digital size: 24 px for the mark and 120 px for the horizontal wordmark.
 
 | Role | Name | Hex | Use |
 | --- | --- | --- | --- |
-| Foundation | Axion Navy | `#081F33` | Navigation, dark surfaces, primary logo |
-| Interaction | Signal Blue | `#2F63F5` | Links, focus, selected controls, primary actions |
-| Evidence | Process Teal | `#2A8F83` | Validated data, material and process states |
-| Emphasis | Reactor Amber | `#F4B942` | Sparse highlights, warnings, active simulation |
-| Critical | Safety Coral | `#E6685D` | Errors and safety-critical states only |
-| Canvas | Ice | `#F4F7F8` | Public and workspace background |
+| Foundation | Axion Navy | `#071D33` | Navigation, dark surfaces, primary logo |
+| Interaction | Signal Cobalt | `#316BFF` | Links, focus, selected controls, main process streams |
+| Infrastructure | Process Steel | `#6F8FB0` | Utilities, secondary information, technical structure |
+| Emphasis | Reactor Amber | `#F2B441` | Sparse highlights, review states, active simulation |
+| Critical | Safety Coral | `#D95D58` | Errors and safety-critical states only |
+| Canvas | Ice | `#EEF3F8` | Public and workspace background |
 | Surface | White | `#FFFFFF` | Primary content surfaces |
-| Text | Engineering Ink | `#142C3A` | Main text on light surfaces |
+| Text | Engineering Ink | `#10273D` | Main text on light surfaces |
+| Secondary text | System Slate | `#526A80` | Supporting copy on light surfaces |
 
-Signal Blue and Reactor Amber are accents. Neither should replace Axion Navy as the primary brand color. Safety Coral is semantic, never decorative.
+Signal Cobalt and Reactor Amber are accents. Neither should replace Axion Navy as the primary brand color. Process Steel supports infrastructure and utilities. Safety Coral is semantic, never decorative. Turquoise is not part of the Axion corporate palette.
 
 ## Typography
 
@@ -33,10 +34,11 @@ Use Manrope for all interface, marketing, data, and document headings. Use DM Mo
 
 - Use one primary action per section.
 - Prefer white or Ice surfaces with Navy text.
-- Reserve Signal Blue for interaction and selected state.
-- Preserve process colors for streams and engineering status semantics.
+- Reserve Signal Cobalt for interaction, selected state, and the main process route.
+- Use Process Steel for utilities and secondary engineering structure.
+- Use Reactor Amber for review or active-simulation states, and Safety Coral only for critical conditions.
 - Use 12 to 18 px radii for product surfaces and 10 to 13 px for the logo container.
-- Do not stretch, rotate, outline, shadow, animate, or recolor the pixel geometry independently.
+- Do not stretch, rotate, outline, shadow, animate, or modify the mark geometry.
 
 ## Brand voice
 
@@ -52,7 +54,7 @@ Motion explains direction, sequence, and state. Continuous flow animation should
 
 ## Accessibility
 
-Do not encode meaning by color alone. Pair every process or status color with a label, icon, pattern, or numerical state. Verify contrast on light and dark surfaces before release. Use Navy text on Ice, Soft Teal, and Amber surfaces; use white on Navy and Signal Blue.
+Do not encode meaning by color alone. Pair every process or status color with a label, icon, pattern, or numerical state. Verify contrast on light and dark surfaces before release. Use Engineering Ink on Ice, White, Process Steel tints, and Amber; use white on Navy and Cobalt. Never place light text on a light surface or dark text on a dark surface.
 
 ## Co-branding and templates
 

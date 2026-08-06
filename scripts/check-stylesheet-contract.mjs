@@ -8,6 +8,7 @@ const styleFiles = [
   "axion-design-system.css",
   "axion-editorial.css",
   "axion-unified.css",
+  "axion-color-authority.css",
 ];
 
 const indexes = styleFiles.map((file) => html.indexOf(file));

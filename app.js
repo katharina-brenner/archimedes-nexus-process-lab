@@ -6423,7 +6423,7 @@ function plantSimulationSvg() {
   const orderedIds = [...layout.keys()];
   const indexById = Object.fromEntries(orderedIds.map((id, index) => [id, index]));
   const colorForLayer = (layer) => ({
-    main: "#0f5a52",
+    main: "#316bff",
     support: "#5d707b",
     utility: "#275f6b",
     cleaning: "#95c7bd",
@@ -6504,7 +6504,7 @@ function plantSimulationSvg() {
       if (!box) return "";
       const incoming = !item.from;
       const layer = streamKind(item, from, to);
-      const color = layer === "waste" ? "#596a64" : layer === "utility" ? "#6f8794" : layer === "qc" ? "#8a6f3d" : "#0f5a52";
+      const color = layer === "waste" ? "#b18439" : layer === "utility" ? "#6f8fb0" : layer === "qc" ? "#8d78b3" : "#316bff";
       const y = box.y + box.h / 2;
       const startX = incoming ? Math.max(60, box.x - 72) : box.x + box.w;
       const finishX = incoming ? box.x : Math.min(width - 60, box.x + box.w + 72);
@@ -6533,7 +6533,7 @@ function plantSimulationSvg() {
       <path d="M0,0 L8,4 L0,8 z" fill="#95c7bd"/>
     </marker>
     <marker id="arrowMain" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
-      <path d="M0,0 L9,4.5 L0,9 z" fill="#0f5a52"/>
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#316bff"/>
     </marker>
   </defs>
   <rect width="${width}" height="${height}" fill="#f4f7f6"/>
@@ -6552,7 +6552,7 @@ function plantSimulationSvg() {
   <g>${streams}</g>
   <g>${units}</g>
   <g font-family="Arial, sans-serif" font-size="12" fill="#344652">
-    <rect x="74" y="${height - 92}" width="22" height="10" rx="5" fill="#0f5a52"/><text x="106" y="${height - 83}">Main process stream</text>
+    <rect x="74" y="${height - 92}" width="22" height="10" rx="5" fill="#316bff"/><text x="106" y="${height - 83}">Main process stream</text>
     <rect x="256" y="${height - 92}" width="22" height="10" rx="5" fill="#5d707b"/><text x="288" y="${height - 83}">Support/logistics</text>
     <rect x="424" y="${height - 92}" width="22" height="10" rx="5" fill="#275f6b"/><text x="456" y="${height - 83}">Utilities</text>
     <rect x="544" y="${height - 92}" width="22" height="10" rx="5" fill="#95c7bd"/><text x="576" y="${height - 83}">CIP/SIP</text>
@@ -15764,7 +15764,7 @@ function renderEconomics() {
   const costItems = [
     { label: "Annualized CAPEX", value: data.scale.annualizedCapital, color: "#123a56" },
     { label: "Fixed facility burden", value: data.scale.fixedBurden, color: "#275f6b" },
-    { label: "Materials + media", value: data.scale.materialIntensity, color: "#0f8f83" },
+    { label: "Materials + media", value: data.scale.materialIntensity, color: "#316bff" },
     { label: "Labor", value: data.scale.laborCost, color: "#7b8a84" },
     { label: "QA/QC validation", value: data.scale.qaCost, color: "#62738a" },
     { label: "Utilities + waste", value: data.scale.utilityCost + data.scale.wasteCost, color: "#257c88" },
@@ -15790,7 +15790,7 @@ function renderEconomics() {
       .map((item) => `
         <div class="cost-bar material-cost-bar">
           <span>${item.item}</span>
-          <span class="cost-track"><span class="cost-fill" style="width:${Math.max(2, item.value / materialTotal * 100)}%; background:#0f8f83"></span></span>
+          <span class="cost-track"><span class="cost-fill" style="width:${Math.max(2, item.value / materialTotal * 100)}%; background:#316bff"></span></span>
           <strong>${formatNumber(item.value / materialTotal * 100, 0)}%</strong>
         </div>
       `).join("")}

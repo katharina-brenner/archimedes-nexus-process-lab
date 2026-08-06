@@ -153,7 +153,7 @@ test("every public detail control resolves through the lightweight public story 
   assert.match(bootstrap, /submitTechnicalPilot/);
 });
 
-test("brand page ships the official pixel mark, CI palette, SVG variants, and PowerPoint guide", async () => {
+test("brand page ships the official aquatic mark, CI palette, SVG variants, and PowerPoint guide", async () => {
   const [html, bootstrap, server, sitemap, mark, favicon] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
@@ -185,7 +185,7 @@ test("brand page ships the official pixel mark, CI palette, SVG variants, and Po
   assert.match(server, /"\/brand"/);
   assert.match(server, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
   assert.match(sitemap, /https:\/\/ax-i-on\.com\/brand/);
-  assert.match(mark, /pixel axolotl mark/);
-  assert.match(mark, /<rect x="8" y="12"/);
-  assert.match(favicon, /rx="13" fill="#081f33"/);
+  assert.match(mark, /aquatic axolotl mark/);
+  assert.match(mark, /<path d="M11 27/);
+  assert.match(favicon, /<circle cx="32" cy="32" r="31" fill="#071d33"/);
 });

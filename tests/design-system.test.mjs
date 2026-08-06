@@ -18,7 +18,7 @@ test("clean-motion design system is loaded after the legacy stylesheet", () => {
   assert.ok(designIndex > legacyIndex);
   assert.ok(editorialIndex > designIndex);
   assert.ok(unifiedIndex > editorialIndex);
-  assert.match(html, /data-design-version="20260805-brand-ci-v1"/);
+  assert.match(html, /data-design-version="20260806-coherent-blue-v2"/);
   assert.match(unifiedCss, /Axion unified interface layer/);
   assert.match(unifiedCss, /Final alignment system/);
   assert.match(unifiedCss, /--public-content:\s*1240px/);

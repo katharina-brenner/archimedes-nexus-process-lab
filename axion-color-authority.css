@@ -1,0 +1,386 @@
+/* Axion final visual authority.
+   Loaded last so historic experiments cannot reintroduce teal or low-contrast surfaces. */
+
+:root {
+  --ax-bg: #eef3f8;
+  --ax-bg-deep: #dfe8f1;
+  --ax-surface: #f7f9fc;
+  --ax-surface-strong: #ffffff;
+  --ax-surface-soft: #e9eff6;
+  --ax-shell: #071d33;
+  --ax-shell-raised: #0d2944;
+  --ax-shell-soft: #173b5c;
+  --ax-ink: #10273d;
+  --ax-muted: #526a80;
+  --ax-line: #c5d2df;
+  --ax-line-strong: #9fb1c3;
+  --ax-accent: #316bff;
+  --ax-accent-soft: #e7edff;
+  --ax-accent-strong: #234fc8;
+  --ax-cyan: #6f8fb0;
+  --ax-blue: #316bff;
+  --ax-amber: #f2b441;
+  --ax-coral: #d95d58;
+  --studio-paper: #eef3f8;
+  --studio-surface: #f8fafc;
+  --studio-surface-2: #e9eff6;
+  --studio-ink: #10273d;
+  --studio-muted: #526a80;
+  --studio-line: #c5d2df;
+  --studio-shell: #06182a;
+  --studio-shell-2: #0a243e;
+  --studio-shell-3: #123451;
+  --studio-green: #315f8c;
+  --studio-teal: #6f8fb0;
+  --studio-mint: #e7edff;
+  --studio-steel: #7c94ad;
+  --studio-amber: #b98529;
+}
+
+body.locked .public-nav {
+  color: #ffffff !important;
+  background: rgba(7, 29, 51, 0.97) !important;
+  border-color: rgba(167, 190, 214, 0.25) !important;
+  box-shadow: 0 14px 38px rgba(5, 20, 35, 0.18) !important;
+}
+
+body.locked .public-nav :where(strong, a, button, span) {
+  color: #f7faff !important;
+}
+
+body.locked .public-nav .public-brand strong,
+body.locked .public-nav nav a,
+body.locked .public-nav nav button {
+  color: #f7faff !important;
+}
+
+body.locked .public-nav a:hover,
+body.locked .public-nav a[aria-current="page"] {
+  color: #ffffff !important;
+  background: #173b5c !important;
+}
+
+body.locked .public-scroll-progress > span {
+  background: #4f82ff !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login) {
+  color: #ffffff !important;
+  background: #316bff !important;
+  border-color: #316bff !important;
+}
+
+body.locked :where(.public-primary, .login-button, .public-nav-login):hover {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+  border-color: #234fc8 !important;
+}
+
+body.locked .public-secondary {
+  color: #10273d !important;
+  background: #ffffff !important;
+  border-color: #b8c7d6 !important;
+}
+
+body.locked .public-secondary:hover {
+  color: #173ea8 !important;
+  background: #e7edff !important;
+  border-color: #9db5ff !important;
+}
+
+body.locked :where(.public-section, .public-page, .editorial-home) {
+  color: #10273d;
+}
+
+body.locked :where(.public-section, .public-page) :where(h1, h2, h3, h4, strong, b) {
+  color: #10273d;
+}
+
+body.locked :where(.public-section, .public-page) :where(p, small) {
+  color: #526a80;
+}
+
+body.locked #publicHome .public-live-pilot > header h2 {
+  color: #10273d !important;
+}
+
+body.locked #publicHome .public-live-pilot > header p {
+  color: #526a80 !important;
+}
+
+body.locked :where(.intent-mode-strip, .intent-process-chain) span {
+  color: #29455f !important;
+  background: #e7edf4 !important;
+}
+
+body.locked .editorial-cta,
+body.locked .public-enterprise-detail {
+  color: #ffffff !important;
+  background: #071d33 !important;
+}
+
+body.locked .editorial-cta :where(h2, strong),
+body.locked .public-enterprise-detail :where(h3, strong) {
+  color: #ffffff !important;
+}
+
+body.locked .editorial-cta :where(p, span),
+body.locked .public-enterprise-detail :where(p, span, li) {
+  color: #c8d7e5 !important;
+}
+
+.technical-logo,
+.help-logo {
+  border-radius: 50% !important;
+}
+
+.technical-logo::before,
+.help-logo::before,
+body:not(.locked) .sidebar .brand-mark .technical-logo::before,
+body:not(.locked) .sidebar .technical-logo::before,
+body:not(.locked) .help-logo::before {
+  inset: 5px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: currentColor !important;
+  box-shadow: none !important;
+  content: "" !important;
+  -webkit-mask: url("./assets/axion-mark.svg") center / contain no-repeat !important;
+  mask: url("./assets/axion-mark.svg") center / contain no-repeat !important;
+}
+
+body.locked .public-brand .brand-mark,
+body:not(.locked) .sidebar .brand-mark,
+body:not(.locked) .help-logo {
+  color: #ffffff !important;
+  background: #071d33 !important;
+  border-radius: 50% !important;
+}
+
+body:not(.locked),
+body:not(.locked) .app-shell {
+  color: #10273d !important;
+  background: #e8eef5 !important;
+}
+
+body:not(.locked) .sidebar {
+  color: #eaf1f8 !important;
+  background: #071d33 !important;
+  border-color: #28445f !important;
+}
+
+body:not(.locked) .sidebar::after {
+  background: #316bff !important;
+}
+
+body:not(.locked) .sidebar :where(.brand p, .suite-nav-label, .product-meta, .muted, small) {
+  color: #a7bbcf !important;
+}
+
+body:not(.locked) .suite-link {
+  color: #d5e0eb !important;
+}
+
+body:not(.locked) .suite-link:hover {
+  color: #ffffff !important;
+  background: #102f4d !important;
+}
+
+body:not(.locked) .suite-link.active,
+body:not(.locked) .suite-link[aria-current="page"] {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+  border-color: #4f82ff !important;
+}
+
+body:not(.locked) :where(.topbar, .canvas-frame, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) {
+  color: #10273d !important;
+  background: #f8fafc !important;
+  border-color: #c5d2df !important;
+}
+
+body:not(.locked) :where(.topbar, .canvas-frame, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) :where(h1, h2, h3, h4, strong, b) {
+  color: #10273d !important;
+}
+
+body:not(.locked) :where(.topbar, .data-view, .equations-view, .simulation-view, .standards-view, .economics-view, .schedule-panel, .recipe-editor-panel, .route-topology-panel, .route-optimizer-grid, .workspace-card, .control-group, .metric-card) :where(p, span, small, label) {
+  color: #526a80;
+}
+
+body:not(.locked) :where(input, select, textarea) {
+  color: #10273d !important;
+  background: #ffffff !important;
+  border-color: #aebfd0 !important;
+}
+
+body:not(.locked) :where(input, select, textarea)::placeholder {
+  color: #71869a !important;
+}
+
+body:not(.locked) :where(button.active, .tab.active, .mode-button.active, .chip.active, .pill.active) {
+  color: #ffffff !important;
+  background: #316bff !important;
+  border-color: #316bff !important;
+}
+
+body:not(.locked) .flowsheet-canvas {
+  background:
+    linear-gradient(rgba(132, 158, 184, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 158, 184, 0.11) 1px, transparent 1px),
+    linear-gradient(rgba(132, 158, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 158, 184, 0.05) 1px, transparent 1px),
+    #071d33 !important;
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px, auto !important;
+}
+
+body:not(.locked) #flowsheetView .unit,
+body:not(.locked) .unit {
+  border-color: rgba(126, 156, 188, 0.48) !important;
+  background: #0d2944 !important;
+}
+
+body:not(.locked) #flowsheetView .unit-bioreactor,
+body:not(.locked) .unit-bioreactor {
+  border-color: #6f9aff !important;
+  background: #173b5c !important;
+}
+
+body:not(.locked) #flowsheetView .unit:hover,
+body:not(.locked) #flowsheetView .unit.selected {
+  border-color: #8fb0ff !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28), 0 0 0 3px rgba(79, 130, 255, 0.16) !important;
+}
+
+body:not(.locked) .unit-icon,
+body:not(.locked) #flowsheetView .unit-icon {
+  color: var(--symbol-color, #86a7c7) !important;
+}
+
+body:not(.locked) .unit-role,
+body:not(.locked) #flowsheetView .unit-role {
+  color: #c8d8e8 !important;
+  background: rgba(111, 143, 176, 0.16) !important;
+}
+
+body:not(.locked) .unit-port,
+body:not(.locked) #flowsheetView .unit-port {
+  background: #8fb0ff !important;
+  box-shadow: 0 0 0 1px rgba(143, 176, 255, 0.7) !important;
+}
+
+body:not(.locked) .stream-line { color: #78a9ff !important; }
+body:not(.locked) .stream-utility { color: #91a9c2 !important; }
+body:not(.locked) .stream-waste { color: #d5a74d !important; }
+body:not(.locked) .stream-qc { color: #a99bd0 !important; }
+
+body:not(.locked) #flowsheetView .stream-path-base,
+body:not(.locked) .stream-path-base {
+  stroke: rgba(143, 169, 194, 0.3) !important;
+}
+
+body:not(.locked) #flowsheetView .stream-path-flow {
+  filter: drop-shadow(0 0 3px rgba(120, 169, 255, 0.3)) !important;
+}
+
+body:not(.locked) .stream-label,
+body:not(.locked) #flowsheetView .stream-label {
+  color: #eff5fb !important;
+  background: rgba(5, 22, 39, 0.96) !important;
+  border-color: rgba(126, 156, 188, 0.45) !important;
+}
+
+body:not(.locked) .stream-label :where(span, small, b, strong) {
+  color: inherit !important;
+}
+
+/* Final semantic contrast contract. These selectors intentionally outrank the
+   historical component layers so status meaning never depends on inheritance. */
+body:not(.locked) :where(.connection-status, .table-connection-status).status-complete {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+}
+
+body:not(.locked) :where(.connection-status, .table-connection-status).status-open {
+  color: #10273d !important;
+  background: #d9e4ef !important;
+}
+
+body:not(.locked) :where(.connection-status, .table-connection-status).status-isolated {
+  color: #ffffff !important;
+  background: #526a80 !important;
+}
+
+body:not(.locked) .economic-status,
+body:not(.locked) .economic-status.status-ready {
+  color: #ffffff !important;
+  background: #234fc8 !important;
+}
+
+body:not(.locked) .economic-status.status-screening {
+  color: #10273d !important;
+  background: #f2b441 !important;
+}
+
+body:not(.locked) .material-cost-bar {
+  border-left-color: rgba(49, 107, 255, 0.34) !important;
+}
+
+body:not(.locked) .cost-track {
+  background: #dce5ee !important;
+}
+
+body:not(.locked) .workbench-selection,
+body:not(.locked) .workbench-empty,
+body:not(.locked) .workbench-audit {
+  color: #10273d !important;
+  background: #f8fafc !important;
+  border-color: #c5d2df !important;
+}
+
+body:not(.locked) .connection-prompt {
+  color: #ffffff !important;
+  background: #071d33 !important;
+  border-color: #28445f !important;
+}
+
+body:not(.locked) .connection-prompt :where(span, strong) {
+  color: #ffffff !important;
+}
+
+body:not(.locked) #flowsheetView .boundary-node,
+body:not(.locked) #flowsheetView .boundary-node.boundary-outlet {
+  color: #ffffff !important;
+  background: #102f4d !important;
+  border-color: #6f8fb0 !important;
+}
+
+body:not(.locked) #flowsheetView .boundary-node :where(span, b, small) {
+  color: #eaf1f8 !important;
+}
+
+body:not(.locked) #flowsheetView .unit-connection-count {
+  color: #10273d !important;
+  background: #e6edf4 !important;
+}
+
+@media (max-width: 620px) {
+  body.locked #publicHome .public-plant-hero h1 {
+    max-width: 100% !important;
+    font-size: clamp(38px, 11vw, 44px) !important;
+    line-height: 1.02 !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  body.locked #publicHome .public-plant-hero-copy {
+    min-width: 0 !important;
+    padding-right: 24px !important;
+    padding-left: 24px !important;
+  }
+
+  body.locked #publicHome .public-live-pilot > header h2 {
+    font-size: 38px !important;
+    line-height: 1.05 !important;
+  }
+}
