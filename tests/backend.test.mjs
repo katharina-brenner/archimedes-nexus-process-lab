@@ -1057,3 +1057,14 @@ test("production static routes fall back to the app when a public directory shar
     await rm(staticHome, { recursive: true, force: true });
   }
 });
+
+test("public routes normalize trailing slashes without losing the query string", async () => {
+  const server = await startServer();
+  try {
+    const response = await fetch(`${server.baseUrl}/product/?detail=builder`, { redirect: "manual" });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("location"), "/product?detail=builder");
+  } finally {
+    await stopServer(server);
+  }
+});

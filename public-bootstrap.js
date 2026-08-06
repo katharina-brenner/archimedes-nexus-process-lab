@@ -485,6 +485,15 @@ function publicDetailPath(key) {
   return `/product?detail=${encodeURIComponent(key)}`;
 }
 
+function canonicalPublicTarget(target) {
+  const publicPath = publicTargetPaths[target?.dataset?.publicTarget];
+  if (!publicPath) return "";
+  if (!(target instanceof HTMLAnchorElement)) return publicPath;
+  const declared = target.getAttribute("href") || "";
+  const hashIndex = declared.indexOf("#");
+  return hashIndex >= 0 ? `${publicPath}${declared.slice(hashIndex)}` : publicPath;
+}
+
 function renderPublicDetail(key = "mab-overview", { scroll = true, updateUrl = true } = {}) {
   const story = publicDetailStories[key] || publicDetailStories["mab-overview"];
   const resolvedKey = publicDetailStories[key] ? key : "mab-overview";
@@ -588,9 +597,7 @@ function interceptPublicAction(event) {
     return;
   }
 
-  if (target instanceof HTMLAnchorElement && target.hasAttribute("data-public-target")) return;
-
-  const publicPath = publicTargetPaths[target.dataset.publicTarget];
+  const publicPath = canonicalPublicTarget(target);
   if (publicPath) {
     event.preventDefault();
     event.stopImmediatePropagation();

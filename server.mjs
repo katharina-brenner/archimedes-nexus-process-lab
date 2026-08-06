@@ -7006,6 +7006,11 @@ const server = createServer(async (req, res) => {
       await routeApi(req, res, url.pathname, url.searchParams);
       return;
     }
+    if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+      res.writeHead(308, { location: `${url.pathname.slice(0, -1)}${url.search}` });
+      res.end();
+      return;
+    }
     serveStatic(req, res, url.pathname);
   } catch (error) {
     json(res, 500, { error: error.message || "Internal server error" });

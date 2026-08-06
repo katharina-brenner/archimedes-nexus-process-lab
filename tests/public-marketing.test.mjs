@@ -153,6 +153,52 @@ test("every public detail control resolves through the lightweight public story 
   assert.match(bootstrap, /submitTechnicalPilot/);
 });
 
+test("public navigation uses canonical root routes on every subpage", async () => {
+  const [html, bootstrap] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public-bootstrap.js", import.meta.url), "utf8"),
+  ]);
+  const targets = {
+    publicHome: ["/", "home"],
+    publicPlatform: ["/product", "platform"],
+    publicWorkflow: ["/workflow", "workflow"],
+    publicEcosystem: ["/solutions", "ecosystem"],
+    publicResources: ["/resources", "resources"],
+    publicSimulationIntent: ["/bioprocess-simulation-software", "simulation"],
+    publicSchedulingIntent: ["/biomanufacturing-scheduling-software", "scheduling"],
+    publicTeaIntent: ["/bioprocess-tea-lca-software", "tea"],
+    publicBiopharmaIntent: ["/biopharma-process-simulation", "biopharma"],
+    publicFermentationIntent: ["/fermentation-process-modeling", "fermentation"],
+    publicReadiness: ["/security", "readiness"],
+    publicFaq: ["/faq", "faq"],
+    publicComparison: ["/superpro-designer-alternative", "compare"],
+    publicMigration: ["/superpro-designer-migration", "migration"],
+    publicPricing: ["/pricing", "pricing"],
+    publicPilot: ["/pilot", "pilot"],
+    publicLegal: ["/legal", "legal"],
+    publicBrand: ["/brand", "brand"],
+    loginPanel: ["/login", "login"],
+  };
+
+  assert.match(html, /<base href="\/"\s*\/>/);
+  const referencedTargets = [...html.matchAll(/data-public-target="([^"]+)"/g)].map((match) => match[1]);
+  for (const target of new Set(referencedTargets)) {
+    assert.ok(targets[target], `unknown public navigation target: ${target}`);
+  }
+  for (const [target, [path, page]] of Object.entries(targets)) {
+    assert.ok(bootstrap.includes(`${target}: "${path}"`), `wrong canonical path for ${target}`);
+    assert.match(html, new RegExp(`data-public-page="${page}"`), `missing page section for ${path}`);
+  }
+
+  for (const match of html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*data-public-target="([^"]+)"[^>]*>/g)) {
+    const [, href, target] = match;
+    const resolved = new URL(href, "https://ax-i-on.com/");
+    assert.equal(resolved.pathname, targets[target][0], `${href} does not match ${target}`);
+  }
+  assert.match(bootstrap, /function canonicalPublicTarget/);
+  assert.doesNotMatch(bootstrap, /HTMLAnchorElement[^\n]+hasAttribute\("data-public-target"\)\) return/);
+});
+
 test("brand page ships the official aquatic mark, CI palette, SVG variants, and PowerPoint guide", async () => {
   const [html, bootstrap, server, sitemap, mark, favicon] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
