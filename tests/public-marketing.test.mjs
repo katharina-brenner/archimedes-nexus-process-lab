@@ -183,6 +183,7 @@ test("brand page ships the official pixel mark, CI palette, SVG variants, and Po
   }
   assert.match(bootstrap, /brand: "brand"/);
   assert.match(server, /"\/brand"/);
+  assert.match(server, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
   assert.match(sitemap, /https:\/\/ax-i-on\.com\/brand/);
   assert.match(mark, /pixel axolotl mark/);
   assert.match(mark, /<rect x="8" y="12"/);

@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, normalize, resolve } from "node:path";
+import { basename, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
@@ -286,6 +286,10 @@ const staticTypes = new Map([
   [".jpg", "image/jpeg"],
   [".jpeg", "image/jpeg"],
   [".ico", "image/x-icon"],
+  [".pdf", "application/pdf"],
+  [".zip", "application/zip"],
+  [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  [".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
 ]);
 
 const seoRouteMeta = Object.freeze({
@@ -6936,8 +6940,11 @@ function serveStatic(req, res, pathname) {
   const immutableAsset = /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(requested);
   const htmlDocument = extname(filePath) === ".html";
   const unbundledDevelopmentSource = staticRootDir === rootDir;
+  const extension = extname(filePath);
+  const downloadableDocument = new Set([".zip", ".xlsx", ".pptx"]).has(extension);
   res.writeHead(200, {
     "content-type": staticTypes.get(extname(filePath)) || "application/octet-stream",
+    ...(downloadableDocument ? { "content-disposition": `attachment; filename="${basename(filePath)}"` } : {}),
     "cache-control": immutableAsset
       ? "public, max-age=31536000, immutable"
       : htmlDocument || unbundledDevelopmentSource
